@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Organizations: allow read for members, create for authenticated users,
+    // update/delete only by existing members (ideally owners). This rule
+    // assumes organizations doc may have either:
+    // - `members` array of uids (existing code), and/or
+    // - `members/{uid}` subcollection documents (optional future model).
+    match /organizations/{orgId} {
+      allow read: if isOrgMember(orgId);
+      allow create: if request.auth != null && request.resource.data.members is list && request.resource.data.members.hasAny([request.auth.uid]);
+      allow update, delete: if isOrgMember(orgId);
+
+      // Allow reading membership subdocs if member
+      match /members/{memberId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isOrgMember(orgId);
+        allow update, delete: if isOrgMember(orgId);
+      }
+    }
+
+    // Venues: require org membership to read; writes only by org members.
+    match /venues/{venueId} {
+      allow read: if isVenueVisibleToUser(venueId);
+      allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
+      allow update, delete: if isVenueOwnerOrOrgMember(venueId);
+    }
+
+    // Events: require org membership to read; writes only by org members.
+    match /events/{eventId} {
+      allow read: if isEventVisibleToUser(eventId);
+      allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
+      allow update, delete: if isEventOwnerOrOrgMember(eventId);
+    }
+
+    // Users: allow users to read/write their own profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Fallback deny
+    function isOrgMember(orgId) {
+      // Check members array
+      return request.auth != null && (
+        exists(/databases/$(database)/documents/organizations/$(orgId)) &&
+        (
+          get(/databases/$(database)/documents/organizations/$(orgId)).data.members is list &&
+          get(/databases/$(database)/documents/organizations/$(orgId)).data.members.hasAny([request.auth.uid])
+        )
+        ||
+        // or members subcollection
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+      );
+    }
+
+    function isVenueVisibleToUser(venueId) {
+      return exists(/databases/$(database)/documents/venues/$(venueId)) &&
+        (let v = get(/databases/$(database)/documents/venues/$(venueId)).data;
+          // if venue has orgId, require membership; otherwise public
+          !(v.orgId is string) || isOrgMember(v.orgId)
+        );
+    }
+
+    function isEventVisibleToUser(eventId) {
+      return exists(/databases/$(database)/documents/events/$(eventId)) &&
+        (let e = get(/databases/$(database)/documents/events/$(eventId)).data;
+          !(e.orgId is string) || isOrgMember(e.orgId)
+        );
+    }
+
+    function isVenueOwnerOrOrgMember(venueId) {
+      return request.auth != null && exists(/databases/$(database)/documents/venues/$(venueId)) &&
+        (let v = get(/databases/$(database)/documents/venues/$(venueId)).data;
+          // owner check
+          (v.userId == request.auth.uid) || (v.orgId is string && isOrgMember(v.orgId))
+        );
+    }
+
+    function isEventOwnerOrOrgMember(eventId) {
+      return request.auth != null && exists(/databases/$(database)/documents/events/$(eventId)) &&
+        (let e = get(/databases/$(database)/documents/events/$(eventId)).data;
+          (e.userId == request.auth.uid) || (e.orgId is string && isOrgMember(e.orgId))
+        );
+    }
+  }
+}

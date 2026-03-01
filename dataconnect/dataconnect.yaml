@@ -1,0 +1,12 @@
+specVersion: "v1"
+serviceId: "CrowdCAD"
+location: "us-west2"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "mainapp"
+      cloudSql:
+        instanceId: "crowdcad-db"
+      # schemaValidation: "COMPATIBLE"
+connectorDirs: ["./connector"]

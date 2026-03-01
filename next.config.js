@@ -1,0 +1,40 @@
+/** @type {import('next').NextConfig} */
+const path = require('path');
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  // Ensure Next.js traces output from the project root (Dispatch)
+  outputFileTracingRoot: path.resolve(__dirname),
+  images: {
+    remotePatterns: [
+      // Classic Firebase Storage REST endpoint
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        pathname: '/v0/b/**', // allow any bucket path
+      },
+      // Alternate Google Storage endpoint (some URLs resolve here)
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+        pathname: '/**',
+      },
+      // App Check / modern storage domains for your bucket
+      // Replace dispatch-60ca7 with YOUR actual bucket name if different
+      {
+        protocol: 'https',
+        hostname: 'dispatch-60ca7.firebasestorage.app',
+        pathname: '/**',
+      },
+      // If your bucket is regionalized and uses a regional subdomain, add a wildcard:
+      {
+        protocol: 'https',
+        hostname: '*.firebasestorage.app',
+        pathname: '/**',
+      },
+    ],
+  },
+};
+
+module.exports = nextConfig;

@@ -1,0 +1,70 @@
+# Repository issue labels for CrowdCAD
+# Use this as a reference or import via GitHub Settings
+
+- name: bug
+  color: d73a4a
+  description: Something isn't working
+
+- name: feature
+  color: a2eeef
+  description: New feature or enhancement request
+
+- name: documentation
+  color: 0075ca
+  description: Improvements or additions to documentation
+
+- name: good first issue
+  color: 7057ff
+  description: Good for newcomers
+
+- name: help wanted
+  color: 008672
+  description: Extra attention is needed
+
+- name: question
+  color: d876e3
+  description: Further information is requested
+
+- name: security
+  color: ee0701
+  description: Security-related issue (use private advisories for vulnerabilities)
+
+- name: wontfix
+  color: ffffff
+  description: This will not be worked on
+
+- name: duplicate
+  color: cfd3d7
+  description: This issue or pull request already exists
+
+- name: priority/low
+  color: fbca04
+  description: Low priority
+
+- name: priority/medium
+  color: fbca04
+  description: Medium priority
+
+- name: priority/high
+  color: d93f0b
+  description: High priority
+
+- name: priority/critical
+  color: b60205
+  description: Critical priority
+
+- name: blocked
+  color: d93f0b
+  description: Blocked by external dependency or issue
+
+- name: enhancement
+  color: a2eeef
+  description: Enhancement to existing feature
+
+- name: dependencies
+  color: 0366d6
+  description: Pull requests that update a dependency file
+
+- name: ci/cd
+  color: 0e8a16
+  description: Related to continuous integration or deployment

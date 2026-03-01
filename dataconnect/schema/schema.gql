@@ -1,0 +1,52 @@
+type User @table {
+  displayName: String!
+  createdAt: Timestamp!
+  email: String
+  role: String
+}
+
+type Event @table {
+  name: String!
+  location: String!
+  startTime: Timestamp!
+  endTime: Timestamp!
+  createdAt: Timestamp!
+  status: String
+  description: String
+  createdBy: User!
+}
+
+type Unit @table {
+  callSign: String!
+  unitType: String!
+  createdAt: Timestamp!
+  status: String
+  personnel: String
+  updatedAt: Timestamp
+  currentEvent: Event
+}
+
+type Incident @table {
+  incidentType: String!
+  locationDescription: String!
+  openedAt: Timestamp!
+  createdAt: Timestamp!
+  severity: String
+  status: String
+  description: String
+  closedAt: Timestamp
+  updatedAt: Timestamp
+  event: Event!
+  openedBy: User!
+}
+
+type DispatchLog @table {
+  timestamp: Timestamp!
+  logType: String!
+  message: String!
+  createdAt: Timestamp!
+  unitStatusAtTime: String
+  incident: Incident!
+  unit: Unit!
+  dispatcher: User!
+}

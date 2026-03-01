@@ -1,0 +1,248 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Page Loading Progress Bar ────────────────────────────── */
+#nprogress {
+  pointer-events: none;
+}
+
+#nprogress .bar {
+  background: #3eb1fd;
+  position: fixed;
+  z-index: 9999;
+  top: 64px; /* Below navbar (navbar is h-16 = 64px) */
+  left: 0;
+  width: 100%;
+  height: 4px;
+  box-shadow: 0 0 10px #3eb1fd, 0 0 5px #3eb1fd;
+}
+
+#nprogress .peg {
+  display: block;
+  position: absolute;
+  right: 0px;
+  width: 100px;
+  height: 100%;
+  box-shadow: 0 0 10px #3eb1fd, 0 0 5px #3eb1fd;
+  opacity: 1.0;
+  transform: rotate(3deg) translate(0px, -4px);
+}
+
+#nprogress .spinner {
+  display: block;
+  position: fixed;
+  z-index: 9999;
+  bottom: 24px;
+  right: 24px;
+}
+
+#nprogress .spinner-icon {
+  width: 48px;
+  height: 48px;
+  box-sizing: border-box;
+  border: solid 4px transparent;
+  border-top-color: #3eb1fd;
+  border-left-color: #3eb1fd;
+  border-radius: 50%;
+  animation: nprogress-spinner 400ms linear infinite;
+  box-shadow: 0 0 20px rgba(62, 177, 253, 0.3);
+}
+
+@keyframes nprogress-spinner {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ── Toast notification theming ────────────────────────────── */
+:root {
+  --toastify-color-dark:      #262624;
+  --toastify-text-color-dark: #faf9f5;
+  --toastify-color-info:      #5eaae8;
+  --toastify-color-success:   #98c379;
+  --toastify-color-warning:   #ce9864;
+  --toastify-color-error:     #e56a6a;
+}
+
+@layer base {
+  .Toastify__toast-theme--dark {
+    @apply rounded-xl border border-surface-liner shadow-xl;
+  }
+  .Toastify__toast--info    { @apply border-status-blue/40; }
+  .Toastify__toast--success { @apply border-status-green/40; }
+  .Toastify__toast--warning { @apply border-yellow-400/40; }
+  .Toastify__toast--error   { @apply border-status-red/40; }
+  .Toastify__progress-bar   { @apply bg-status-blue; }
+
+  /* ── CSS variables for shadcn/radix primitives ───────────── */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+    --radius: 0.5rem;
+
+    /* Aceternity Ripple Effect */
+    --color-neutral-100: #f5f5f4;
+    --color-neutral-300: #d4d4d8;
+    --color-neutral-500: #71717a;
+    --color-neutral-700: #3f3f46;
+    --color-neutral-800: #27272a;
+    --color-neutral-900: #18181b;
+    --ripple-accent-rgb: 62, 177, 253;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+.animate-cell-ripple {
+  animation: cell-ripple var(--duration, 400ms) ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@keyframes cell-ripple {
+  0% {
+    opacity: calc(0.3 * (1 - var(--distance-ratio, 0)));
+    box-shadow: none;
+    background-color: rgba(62, 177, 253, 0); /* change ripple color */
+  }
+  50% {
+    opacity: calc(0.9 * (1 - var(--distance-ratio, 0)));
+    box-shadow: 0px 0px 30px 5px rgba(62, 177, 253, calc(0.6 * (1 - var(--distance-ratio, 0)))) inset;
+    background-color: rgba(62, 177, 253, calc(0.2 * (1 - var(--distance-ratio, 0))));
+  }
+}
+
+
+
+
+.map-overlay-container {
+  position: fixed;
+  top: 10vh; /* 10% from top */
+  left: 5vw; /* 5% from left */
+  width: 90vw; /* 90% of viewport width */
+  height: 80vh; /* 80% of viewport height */
+  max-width: 1200px; /* Optional max width */
+  max-height: 900px; /* Optional max height */
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  overflow: hidden;
+  z-index: 1000;
+}
+
+
+
+/* ── Global base styles ────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-surface-deepest text-foreground;
+  }
+}
+
+/* ── Custom scrollbar — thin, transparent track, HeroUI-grey thumb ── */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(113, 113, 122, 0.5) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(113, 113, 122, 0.5);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(161, 161, 170, 0.7);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+@keyframes scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll var(--animation-duration, 40s) 
+    var(--animation-direction, forwards) linear infinite;
+}
+
+/* ── NProgress loading bar styles ──────────────────────────── */
+#nprogress {
+  pointer-events: none;
+}
+
+#nprogress .bar {
+  background: #3eb1fd;
+  position: fixed;
+  z-index: 99999;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
+
+#nprogress .peg {
+  display: block;
+  position: absolute;
+  right: 0px;
+  width: 100px;
+  height: 100%;
+  box-shadow: 0 0 10px #3eb1fd, 0 0 5px #3eb1fd;
+  opacity: 1.0;
+  transform: rotate(3deg) translate(0px, -4px);
+}
