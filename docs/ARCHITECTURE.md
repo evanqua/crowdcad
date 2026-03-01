@@ -45,7 +45,7 @@ Authentication & security
 
 Development & testing
 
-- Local development: run `npm install` then `npm run dev` from `dispatch-app` or the repository root if configured.
+- Local development: run `npm install` then `npm run dev` from the repository root.
 - Emulator Suite: use the Firebase Emulator Suite for testing Firestore, Auth, and Storage rules locally.
 
 Build & Deploy

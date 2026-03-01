@@ -1,6 +1,6 @@
 # Firebase Setup for CrowdCAD
 
-This guide explains how to configure Firebase for local development and production deployments. It complements `dispatch-app/src/app/firebase.ts` which contains the runtime initialization code.
+This guide explains how to configure Firebase for local development and production deployments. It complements `src/app/firebase.ts` which contains the runtime initialization code.
 
 Important: do not commit secrets (API keys or service account JSON) to the repository. Use environment files for local development and CI secrets for production.
 
@@ -23,7 +23,7 @@ Record the Project ID — you will use it in `NEXT_PUBLIC_FIREBASE_PROJECT_ID` a
 
 ## Local environment variables
 
-Create a `.env.local` file inside `dispatch-app/` with these variables (example):
+Create a `.env.local` file in the project root with these variables (copy from `.env.example`):
 
 ```env
 NEXT_PUBLIC_FIREBASE_API_KEY=AIza...your_api_key...
@@ -37,14 +37,13 @@ DISABLE_TELEMETRY=true
 ```
 
 - `DISABLE_TELEMETRY=true` is recommended for production hosting when handling PHI to avoid accidental analytics capture.
-- Only the API key is exposed to the client; treat other values as configuration, but keep service-account-level credentials out of client code.
+- Firebase client config values (including the API key) are intentionally exposed to the browser — this is expected and normal for Firebase web apps. Access control is enforced by Firestore and Storage security rules, not by keeping the config secret. Service-account credentials and private keys must never appear in client code or be committed to the repository.
 
 ## Emulator Suite (recommended for testing rules)
 
 Install and run the Firebase Emulator Suite for safe local testing of Firestore, Auth and Storage:
 
 ```bash
-cd dispatch-app
 npm install -g firebase-tools
 firebase emulators:start --only firestore,auth,storage
 ```
@@ -67,7 +66,7 @@ Use the emulators when developing Firestore rules and client workflows.
 ## CI & production deploys
 
 - Store `FIREBASE_PROJECT` and `FIREBASE_TOKEN` (or use Workload Identity Federation) in your CI secrets.
-- Use the GitHub Actions snippet in `docs/DEPLOYMENT.md` or your preferred CI provider to run `npm run build` and `firebase deploy` from `dispatch-app`.
+- Use the GitHub Actions snippet in `docs/DEPLOYMENT.md` or your preferred CI provider to run `npm run build` and `firebase deploy` from the project root.
 
 ## Firewalls, BAAs, and compliance
 

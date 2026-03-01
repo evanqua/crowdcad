@@ -4,8 +4,8 @@ CrowdCAD takes the security and privacy of our users and contributors seriously.
 
 **Current project status**
 
-- Project version: **0.1.0** (early development).
-- Support policy: during this early phase we provide fixes for the latest tagged release and the default branch.
+- Project version: **1.0.0**.
+- Support policy: we provide fixes for the latest tagged release and the default branch.
 
 ## How to report a vulnerability
 

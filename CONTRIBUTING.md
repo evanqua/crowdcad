@@ -1,6 +1,6 @@
 # Contributing to CrowdCAD
 
-Thank you for helping improve CrowdCAD — contributions of all kinds are welcome.
+Thank you for helping improve CrowdCAD. We welcome contributions of all kinds.
 
 Please read this document together with `CODE_OF_CONDUCT.md`, `LICENSE.md`, and `SECURITY.md` before contributing.
 
@@ -28,19 +28,18 @@ Please read this document together with `CODE_OF_CONDUCT.md`, `LICENSE.md`, and 
 1. Fork the repository on GitHub and clone your fork locally:
 
 ```bash
-git clone https://github.com/<your-username>/crowdcad.git
+git clone https://github.com/<your-github-username>/crowdcad.git
 cd crowdcad
 ```
 
-2. Install dependencies and run the development server from the app folder:
+2. Install dependencies and run the development server:
 
 ```bash
-cd dispatch-app
 npm install
 npm run dev
 ```
 
-The app runs using Next.js (App Router). See `dispatch-app/README.md` or the top-level `README.md` for more details about Firebase configuration.
+The app runs using Next.js (App Router). See the top-level `README.md` for more details about Firebase configuration.
 
 ## Branching & commit guidelines
 
@@ -85,7 +84,6 @@ Small PRs are easier to review. If work is exploratory, prefer opening a draft P
 - Run linters and tests before opening a PR (if applicable):
 
 ```bash
-cd dispatch-app
 npm run lint
 # run tests if the project has a test script
 npm test
@@ -95,7 +93,7 @@ npm test
 
 ## Documentation contributions
 
-- Improve or expand the top-level `README.md` or `dispatch-app` documentation.
+- Improve or expand the top-level `README.md` or documentation in `docs/`.
 - Prefer linking to public feature pages (for screenshots and demos): https://crowdcad.org/features
 - Keep documentation clear, concise, and accessible.
 

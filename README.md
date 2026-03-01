@@ -3,7 +3,8 @@
 [![CI](https://github.com/evanqua/crowdcad/workflows/CI/badge.svg)](https://github.com/evanqua/crowdcad/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE.md)
 [![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
-CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system for volunteer EMS and event medical teams. Full developer and operational documentation lives in the `docs/` folder and in policy files. The demo with further information can be found [crowdcad.org](https://crowdcad.org)
+
+CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system for volunteer EMS and event medical teams. Full developer and operational documentation lives in the `docs/` folder and in policy files. The demo with further information can be found at [crowdcad.org](https://crowdcad.org)
 
 #### Quick links
 
@@ -20,22 +21,33 @@ CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system f
 
 #### Quickstart
 
-1. Clone the repo and open the `dispatch-app` workspace:
+1. Fork then clone (recommended — preserves attribution and lets you receive upstream updates):
 
 ```bash
-git clone git@github.com/evanqua/crowdcad.git
-cd dispatch-app
+# Fork via GitHub first: https://github.com/evanqua/crowdcad
+# Then clone your fork:
+git clone https://github.com/<your-github-username>/crowdcad.git
+cd crowdcad
 npm install
 npm run dev
 ```
 
-2. The dev server typically runs at `http://localhost:3000`.
+Or clone directly without forking:
 
-3. For Firebase configuration, follow the instructions in [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md). The runtime initializer is at `dispatch-app/src/app/firebase.ts`.
+```bash
+git clone https://github.com/evanqua/crowdcad.git
+cd crowdcad
+npm install
+npm run dev
+```
+
+2. The dev server runs at `http://localhost:3000`.
+
+3. For Firebase configuration, follow the instructions in [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md). The runtime initializer is at `src/app/firebase.ts`.
 
 Environment example
 
-Copy ` .env.example` to `.env.local` and fill your Firebase values before running locally. Do not commit your `.env.local`:
+Copy `.env.example` to `.env.local` and fill your Firebase values before running locally. Do not commit your `.env.local`:
 
 ```bash
 cp .env.example .env.local
