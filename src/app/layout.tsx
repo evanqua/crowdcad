@@ -9,8 +9,8 @@ import ProgressBarProvider from "@/components/ProgressBarProvider";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark text-foreground bg-background">
-      <body>
+    <html lang="en" className="dark text-foreground bg-background" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         {/* Inline early-unregister to avoid stale service worker serving old _next chunks in dev */}
         {process.env.NODE_ENV === 'development' && (
           <script
