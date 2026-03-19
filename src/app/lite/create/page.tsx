@@ -1,7 +1,4 @@
-'use client';
-
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { Suspense } from 'react';
 import {
   Button,
   Card,
@@ -102,7 +99,12 @@ const buildPostingTimes = (from: Time, to: Time, byMinutesRaw: string): string[]
   return times;
 };
 
-export default function LiteCreatePage() {
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+function LiteCreateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedEventId = searchParams.get('eventId');
@@ -1466,5 +1468,13 @@ export default function LiteCreatePage() {
         LICENSES={LICENSES}
       />
     </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <LiteCreateContent />
+    </Suspense>
   );
 }
