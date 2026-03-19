@@ -58,7 +58,7 @@ export default function LiteLandingPage() {
   };
 
   return (
-    <main className="h-[100dvh] w-full max-w-full overflow-hidden relative flex flex-col text-surface-light bg-surface-deepest">
+    <main className="h-full w-full max-w-full overflow-hidden relative flex flex-col text-surface-light bg-surface-deepest">
       {/* Aurora background */}
       <AuroraBackground className="absolute inset-0 h-full w-full" showRadialGradient={true} />
 
