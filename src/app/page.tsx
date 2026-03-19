@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import LoginModal from '@/components/modals/auth/loginmodal';
 import { useAuth } from '@/hooks/useauth';
@@ -139,6 +140,10 @@ export default function LandingPage() {
           <ExternalLink className="w-3 h-3" />
           AGPLv3 License
         </a>
+        <span className="hidden sm:inline text-surface-light/20">|</span>
+        <Link href="/lite" className="text-surface-light/50 hover:text-accent transition-colors">
+          Try Lite Mode offline
+        </Link>
         <span className="hidden sm:inline text-surface-light/20">|</span>
         <span className="text-surface-light/30">
           © {new Date().getFullYear()} CrowdCAD contributors
