@@ -3,9 +3,9 @@ import type { Metadata } from 'next';
 import 'react-toastify/dist/ReactToastify.css';
 import "./globals.css";
 import { HeroUIProvider } from "@heroui/react";
-import AppNavbar from "@/components/layout/appnavbar";
 import DevServiceWorkerCleanup from "@/components/devServiceWorkerCleanup";
 import ProgressBarProvider from "@/components/ProgressBarProvider";
+import AppShell from "../components/layout/appshell";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -78,8 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <DevServiceWorkerCleanup />
         <ProgressBarProvider />
         <HeroUIProvider>
-          <AppNavbar />
-          <div>{children}</div>
+          <AppShell>{children}</AppShell>
         </HeroUIProvider>
       </body>
     </html>
