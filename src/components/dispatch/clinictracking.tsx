@@ -8,7 +8,6 @@ import {
   DropdownTrigger, 
   DropdownMenu, 
   DropdownItem,
-  ScrollShadow,
   Textarea
 } from '@heroui/react';
 import { Plus, MoreVertical } from 'lucide-react';

@@ -135,7 +135,7 @@ export default function CallTrackingCard({
   }, [call.log]);
 
   const timer = useMMSS(callTimestamp);
-  const bg = callBg(call, event);
+  const bg = getCallRowClass(call) || callBg(call, event);
 
   // Get available teams for dropdown (including On Break and In Clinic)
   const availableStaff = useMemo(() => {

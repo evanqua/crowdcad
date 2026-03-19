@@ -37,7 +37,7 @@ function useMMSS(since?: number) {
   return `${mm}:${ss}`;
 }
 
-function callBg(call: Call) {
+function callBg() {
   // Clinic calls always use default background
   return 'bg-surface-deep';
 }
@@ -108,7 +108,7 @@ export default function ClinicTrackingCard({
   }, [call.log]);
 
   const timer = useMMSS(callTimestamp);
-  const bg = callBg(call);
+  const bg = getCallRowClass(call) || callBg();
 
   // Get primary team (first assigned team or first detached team)
   const primaryTeam = useMemo(() => {

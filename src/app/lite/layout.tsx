@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LiteProvider } from '@/lib/LiteContext';
+import LiteNavbar from '@/components/layout/litenavbar';
 
 /**
  * Lite Layout
@@ -28,7 +29,8 @@ export const metadata: Metadata = {
 export default function LiteLayout({ children }: { children: React.ReactNode }) {
   return (
     <LiteProvider isLiteMode={true}>
-      <div>{children}</div>
+      <LiteNavbar />
+      <div className="h-[calc(100dvh-4rem)]">{children}</div>
     </LiteProvider>
   );
 }

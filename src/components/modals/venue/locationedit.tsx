@@ -80,7 +80,7 @@ export default function LocationEditModal({
       }}
     >
       <ModalContent>
-        {(close) => (
+        {() => (
           <>
             <ModalHeader className="text-2xl font-bold text-surface">
               Edit Location

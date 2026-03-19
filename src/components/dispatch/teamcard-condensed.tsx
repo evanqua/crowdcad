@@ -35,23 +35,6 @@ function useMMSS(since?: number) {
   return `${mm}:${ss}`;
 }
 
-function getLeadNameCert(staff: Staff) {
-  const isSupervisor =
-    Array.isArray(staff.members) &&
-    staff.members.length === 1 &&
-    typeof staff.members[0] === 'string' &&
-    !staff.members[0].includes('(Lead)');
-
-  if (isSupervisor) {
-    const m = staff.members?.[0] ?? '';
-    const rx = m.match(/^(.+?)\s\[(.+?)\]/);
-    return { name: rx?.[1] ?? m, cert: rx?.[2] ?? '' };
-  }
-  const lead = (staff.members || []).find(m => typeof m === 'string' && m.includes('(Lead)')) || '';
-  const rx = lead.match(/^(.+?)\s\[(.+?)\]/);
-  return { name: rx?.[1] ?? 'No Lead', cert: rx?.[2] ?? '' };
-}
-
 function teamBg(status: string, event: Event, team: string) {
   // Check if team is assisting with equipment (orange)
   const onEqRun =
@@ -110,8 +93,7 @@ export default function TeamCardCondensed({
   useEffect(() => {
     setLocationInput(staff.location || '');
   }, [staff.location]);
-  
-  const {name, cert} = useMemo(() => getLeadNameCert(staff), [staff]);
+
   const timer = useMMSS(sinceMs);
 
   // Status options

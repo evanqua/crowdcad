@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '@/app/firebase';
 import { collection, getDocs, query, where, deleteDoc, doc, addDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
 import type { Venue, Event } from '@/app/types';
 import { useAuth } from '@/hooks/useauth';
 import LoadingScreen from '@/components/ui/loading-screen';

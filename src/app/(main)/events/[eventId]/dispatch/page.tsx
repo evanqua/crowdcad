@@ -15,6 +15,8 @@ import { toast, Slide } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
 import { useAuth } from '@/hooks/useauth';
+import { useLiteMode } from '@/lib/LiteContext';
+import { deleteLiteEvent, getLiteEvent, saveLiteEvent, type LiteEventDraft } from '@/lib/liteEventStore';
 import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4} from "lucide-react";
 import TeamCard from '@/components/dispatch/teamcard';
 import TeamCardCondensed from '@/components/dispatch/teamcard-condensed';
@@ -29,8 +31,87 @@ import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, Dropd
 import EquipmentCard from '@/components/dispatch/equipmentcard';
 import LoadingScreen from '@/components/ui/loading-screen';
 
-interface DispatchPageProps {
-  params: Promise<{ eventId: string }>
+interface DispatchRoutePageProps {
+  params: Promise<{ eventId: string }>;
+}
+
+const LITE_LOCAL_USER_ID = 'lite-local';
+
+function removeUndefinedDeep<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => removeUndefinedDeep(item)) as unknown as T;
+  }
+
+  const cleaned = {} as Record<string, unknown>;
+  const record = obj as Record<string, unknown>;
+
+  Object.keys(record).forEach((key) => {
+    const val = removeUndefinedDeep(record[key]);
+    if (val !== undefined) cleaned[key] = val;
+  });
+
+  return cleaned as unknown as T;
+}
+
+function normalizeLiteDraftToEvent(draft: LiteEventDraft): Event {
+  const eventPosts = draft.eventPosts?.length ? draft.eventPosts : draft.venue.posts;
+
+  return {
+    id: draft.id,
+    name: draft.name,
+    date: draft.date,
+    venue: {
+      id: `lite-venue-${draft.id}`,
+      name: draft.venue.name || 'Lite Venue',
+      equipment: draft.venue.equipment || [],
+      posts: draft.venue.posts || [],
+      layers: [],
+      userId: LITE_LOCAL_USER_ID,
+      mapUrl: undefined,
+    },
+    userId: LITE_LOCAL_USER_ID,
+    postingTimes: draft.postingTimes || [],
+    staff: draft.staff || [],
+    supervisor: draft.supervisor || [],
+    calls: draft.calls || [],
+    status: draft.status,
+    createdAt: draft.createdAt,
+    eventPosts: eventPosts || [],
+    eventEquipment: draft.eventEquipment || [],
+    postAssignments: draft.postAssignments || {},
+    pendingAssignments: draft.pendingAssignments || {},
+  };
+}
+
+function toLiteDraftFromEvent(nextEvent: Event, previousDraft: LiteEventDraft): LiteEventDraft {
+  return {
+    ...previousDraft,
+    id: nextEvent.id || previousDraft.id,
+    mode: 'lite',
+    name: nextEvent.name ?? previousDraft.name,
+    date: nextEvent.date ?? previousDraft.date,
+    venue: {
+      name: nextEvent.venue?.name ?? previousDraft.venue.name,
+      posts: nextEvent.eventPosts ?? nextEvent.venue?.posts ?? previousDraft.venue.posts,
+      equipment: nextEvent.venue?.equipment ?? previousDraft.venue.equipment,
+    },
+    postingTimes: nextEvent.postingTimes || [],
+    staff: nextEvent.staff || [],
+    supervisor: nextEvent.supervisor || [],
+    eventPosts: nextEvent.eventPosts || [],
+    eventEquipment: nextEvent.eventEquipment || [],
+    calls: nextEvent.calls || [],
+    status: nextEvent.status ?? previousDraft.status ?? 'active',
+    postAssignments: nextEvent.postAssignments || {},
+    pendingAssignments: nextEvent.pendingAssignments || {},
+    createdAt:
+      typeof nextEvent.createdAt === 'string'
+        ? nextEvent.createdAt
+        : previousDraft.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 import ReactDOM from 'react-dom';
@@ -158,14 +239,18 @@ const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
 
 const AUTO_POST_SYNC = false;
 
-export default function DispatchPage({ params }: DispatchPageProps) {
+export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [event, setEvent] = useState<Event | undefined>(undefined);
   const [postAssignments, setPostAssignments] = useState<PostAssignment>({});
   // const handleBulkPostAssignment = (newAssignments: PostAssignment) => {
   //   setPostAssignments(newAssignments);
   // };
   const { eventId } = use(params);
-  const { user, ready } = useAuth();
+  const { isLiteMode: layoutLiteMode } = useLiteMode();
+  const isLiteMode = layoutLiteMode;
+  const { user: authUser, ready: authReady } = useAuth();
+  const user = isLiteMode ? null : authUser;
+  const ready = isLiteMode ? true : authReady;
   const router = useRouter();
   const [openCallId, setOpenCallId] = useState<string | null>(null);
   const [openClinicCallId, setOpenClinicCallId] = useState<string | null>(null);
@@ -234,6 +319,35 @@ export default function DispatchPage({ params }: DispatchPageProps) {
     updateInput: Partial<Event> | ((current: Event) => Partial<Event>)
   ) => {
     if (!eventId) return;
+
+    if (isLiteMode) {
+      try {
+        const currentDraft = await getLiteEvent(eventId);
+        if (!currentDraft) {
+          throw new Error('Lite event not found');
+        }
+
+        const currentEvent = normalizeLiteDraftToEvent(currentDraft);
+        const updates =
+          typeof updateInput === 'function' ? updateInput(currentEvent) : updateInput;
+
+        const nextEvent = {
+          ...currentEvent,
+          ...removeUndefinedDeep(updates),
+        } as Event;
+
+        const nextDraft = toLiteDraftFromEvent(nextEvent, currentDraft);
+        await saveLiteEvent(nextDraft);
+
+        setEvent(nextEvent);
+        setPostAssignments(nextEvent.postAssignments || {});
+      } catch (error) {
+        console.error('Local update failed:', error);
+        toast.error('Failed to save local changes. Please try again.');
+      }
+      return;
+    }
+
     try {
       await runTransaction(db, async (transaction) => {
         const eventRef = doc(db, "events", eventId);
@@ -249,31 +363,13 @@ export default function DispatchPage({ params }: DispatchPageProps) {
           updates = updateInput;
         }
 
-        const removeUndefined = <T,>(obj: T): T => {
-          if (obj === null || typeof obj !== 'object') return obj;
-
-          if (Array.isArray(obj)) {
-            return obj.map((item) => removeUndefined(item)) as unknown as T;
-          }
-
-          const cleaned = {} as Record<string, unknown>;
-          const record = obj as Record<string, unknown>;
-
-          Object.keys(record).forEach((key) => {
-            const val = removeUndefined(record[key]);
-            if (val !== undefined) cleaned[key] = val;
-          });
-
-          return cleaned as unknown as T;
-        };
-
-        transaction.update(eventRef, removeUndefined(updates));
+        transaction.update(eventRef, removeUndefinedDeep(updates));
       });
     } catch (error) {
       console.error("Update failed:", error);
       toast.error("Failed to save changes. Please try again.");
     }
-  }, [eventId]);
+  }, [eventId, isLiteMode]);
 
   const handlePostAssignment = useCallback(async (time: string, post: string, team: string) => {
     await updateEvent((currentEvent) => {
@@ -836,98 +932,6 @@ export default function DispatchPage({ params }: DispatchPageProps) {
 
     return 'bg-surface-deep';
   };
-
-
-  const ACTIVE_CALL_SET = new Set(['Assigned','En Route','On Scene','Transporting','Pending']);
-
-  const commitEquipmentLocation = async (resourceName: string, newLocationRaw: string) => {
-    if (!event) return;
-    const newLocation = newLocationRaw; // allow empty
-
-    let touched = false;
-    const updatedEquipment = (event.eventEquipment || []).map(eq => {
-      if (eq.name === resourceName) {
-        touched = true;
-        const inUse = !!eq.assignedTeam;
-        return {
-          ...eq,
-          location: newLocation,
-          status: inUse ? eq.status : ('Available' as EquipmentStatus),
-        };
-      }
-      return eq;
-    });
-
-    if (!touched) {
-      updatedEquipment.push({
-        id: `eq_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-        name: resourceName,
-        status: ('Available' as EquipmentStatus),
-        location: newLocation,
-        assignedTeam: null,
-      });
-    }
-
-    await updateEvent({ eventEquipment: updatedEquipment });
-  };
-
-
-
-  const [equipmentDraft, setEquipmentDraft] = useState<Record<string, string>>({});
-
-  type EquipRow = {
-    name: string;
-    inUse: boolean;
-    rightText: string;   // shown in the UI
-    location: string;    // raw location value (can be '')
-  };
-
-
-  function getEquipmentRows(): EquipRow[] {
-    const venueEquipment = (event?.venue as { equipment?: (string | { name: string })[] })?.equipment ?? [];
-    const tracked = event?.eventEquipment ?? [];
-
-    const byName: Record<string, { name: string; assignedTeam?: string | null; location?: string | null; }> = {};
-
-    for (const v of venueEquipment) {
-      const name = typeof v === 'string' ? v : v?.name;
-      if (name) byName[name] = { name, assignedTeam: null, location: null };
-    }
-    for (const t of tracked) {
-      byName[t.name] = { name: t.name, assignedTeam: t.assignedTeam ?? null, location: t.location ?? null };
-    }
-
-    const rows = Object.values(byName).map(r => {
-      const inUse = !!(r.assignedTeam && r.assignedTeam.trim());
-      const location = r.location ?? ''; // raw value for editing (may be empty)
-      let rightText: string;
-
-      if (inUse) {
-        // compute "CallNum - Team(s)" (leave as you already had)
-        const call = (event?.calls ?? []).find(c =>
-          c.assignedTeam?.includes(r.assignedTeam!) && ACTIVE_CALL_SET.has(c.status)
-        );
-        if (call) {
-          const callNo = callDisplayNumberMap.get(call.id);
-          const teams = (call.assignedTeam ?? []).join(', ');
-          rightText = `${callNo} - ${teams}`;
-        } else {
-          rightText = `— - ${r.assignedTeam ?? ''}`;
-        }
-      } else {
-        rightText = location || 'Clinic';
-      }
-
-      return { name: r.name, inUse, location, rightText };
-    });
-
-    rows.sort((a, b) => {
-      if (a.inUse !== b.inUse) return a.inUse ? 1 : -1;
-      return a.name.localeCompare(b.name, undefined, { numeric: true });
-    });
-
-    return rows;
-  }
 
 
   async function handleAgeSexBlur(callId: string) {
@@ -1593,19 +1597,60 @@ export default function DispatchPage({ params }: DispatchPageProps) {
 
    useEffect(() => {
     if (!eventId) {
-      console.error('eventId is undefined or null, skipping Firestore subscription');
+      console.error('eventId is undefined or null, skipping event subscription');
       return;
     }
-    
+
+    if (isLiteMode) {
+      let cancelled = false;
+
+      const loadLiteEvent = async () => {
+        try {
+          const draft = await getLiteEvent(eventId);
+          if (cancelled) return;
+
+          if (!draft) {
+            setEvent(undefined);
+            router.push('/lite/create');
+            return;
+          }
+
+          const activeDraft =
+            draft.status === 'draft' ? { ...draft, status: 'active' as const } : draft;
+
+          if (activeDraft !== draft) {
+            await saveLiteEvent(activeDraft);
+          }
+
+          const normalizedEvent = normalizeLiteDraftToEvent(activeDraft);
+          setEvent((prev) => {
+            if (!isEqual(prev, normalizedEvent)) {
+              return normalizedEvent;
+            }
+            return prev;
+          });
+          setPostAssignments(normalizedEvent.postAssignments || {});
+        } catch (error) {
+          console.error('Error loading local event:', error);
+          setEvent(undefined);
+          router.push('/lite/create');
+        }
+      };
+
+      void loadLiteEvent();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (!user) {
       return;
     }
-    
+
     const unsubscribe = onSnapshot(doc(db, 'events', eventId), (doc) => {
       if (doc.exists()) {
         const eventData = doc.data() as Event;
         // Debug: log event document contents to diagnose missing postingTimes
-        // eslint-disable-next-line no-console
         console.log('Firestore snapshot - eventData:', {
           id: doc.id,
           postingTimes: eventData.postingTimes,
@@ -1647,9 +1692,9 @@ export default function DispatchPage({ params }: DispatchPageProps) {
         router.push('/?login=true&error=unauthorized');
       }
     });
-    
+
     return () => unsubscribe();
-  }, [eventId, user, router, isAdmin]);
+  }, [eventId, user, router, isAdmin, isLiteMode]);
   
   const handleRemoveTeamFromCall = async (callId: string, teamToRemove: string) => {
     if (!event) return;
@@ -2667,7 +2712,73 @@ export default function DispatchPage({ params }: DispatchPageProps) {
       draggable: true,
       transition: Slide,
     });
-  }  
+  }
+
+  const formatSummaryTimestamp = useCallback((timestamp: number): string => {
+    return Number.isFinite(timestamp) ? timestamp.toFixed(2) : '';
+  }, []);
+
+  const generateSummaryCSVData = useCallback((): string => {
+    if (!event) return '';
+
+    const csvRows: string[] = [];
+    csvRows.push('Log Type,Team/Call ID,Timestamp,Message');
+
+    event.staff.forEach((team) => {
+      (team.log || []).forEach((entry: TeamLogEntry) => {
+        const message = (entry.message || '').replace(/"/g, '""');
+        csvRows.push(`Staff,${team.team},${formatSummaryTimestamp(entry.timestamp)},"${message}"`);
+      });
+    });
+
+    event.calls.forEach((call) => {
+      (call.log || []).forEach((entry: CallLogEntry) => {
+        const message = (entry.message || '').replace(/"/g, '""');
+        csvRows.push(`Call,${call.id},${formatSummaryTimestamp(entry.timestamp)},"${message}"`);
+      });
+    });
+
+    return csvRows.join('\n');
+  }, [event, formatSummaryTimestamp]);
+
+  const handleExportSummaryCsv = useCallback(() => {
+    const csvContent = generateSummaryCSVData();
+    if (!csvContent) {
+      toast.info('No summary logs to export yet.');
+      return;
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.setAttribute('download', `${event?.name || eventId || 'LiteEvent'}_Summary.csv`);
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }, [event?.name, eventId, generateSummaryCSVData]);
+
+  const handleClearLiteEvent = useCallback(async () => {
+    if (!isLiteMode || !eventId) return;
+
+    const confirmed = window.confirm(
+      'This will permanently clear this local event and all logs. This action is irreversible. Are you sure you want to continue?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteLiteEvent(eventId);
+      toast.success('Local event cleared.');
+      router.push('/lite');
+    } catch (error) {
+      console.error('Failed to clear local event:', error);
+      toast.error('Failed to clear local event. Please try again.');
+    }
+  }, [isLiteMode, eventId, router]);
+
   const [showVenueMap, setShowVenueMap] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
   const [showEndEvent, setShowEndEvent] = useState(false);
@@ -2676,17 +2787,33 @@ export default function DispatchPage({ params }: DispatchPageProps) {
     const openVenue = () => setShowVenueMap(true);
     const openPosting = () => setShowPostingSchedule(true);
     const openEnd = () => setShowEndEvent(true);
+    const openLiteClear = () => {
+      void handleClearLiteEvent();
+    };
+    const openLiteExport = () => {
+      handleExportSummaryCsv();
+    };
 
-    window.addEventListener('open-venue-map', openVenue);
     window.addEventListener('open-posting-schedule', openPosting);
-    window.addEventListener('open-end-event', openEnd);
+    window.addEventListener('open-lite-clear-event', openLiteClear);
+    window.addEventListener('open-lite-export-summary', openLiteExport);
+
+    if (!isLiteMode) {
+      window.addEventListener('open-venue-map', openVenue);
+      window.addEventListener('open-end-event', openEnd);
+    }
 
     return () => {
-      window.removeEventListener('open-venue-map', openVenue);
       window.removeEventListener('open-posting-schedule', openPosting);
-      window.removeEventListener('open-end-event', openEnd);
+      window.removeEventListener('open-lite-clear-event', openLiteClear);
+      window.removeEventListener('open-lite-export-summary', openLiteExport);
+
+      if (!isLiteMode) {
+        window.removeEventListener('open-venue-map', openVenue);
+        window.removeEventListener('open-end-event', openEnd);
+      }
     };
-  }, []);
+  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv]);
 
   // Tab cycling for left sidebar tabs
   useEffect(() => {
@@ -2711,19 +2838,21 @@ export default function DispatchPage({ params }: DispatchPageProps) {
   }, [selectedLeftTab]);
 
   useEffect(() => {
+    if (isLiteMode) return;
+
     if (ready && !user) {
       // Store the current path for redirect after login
       sessionStorage.setItem('redirectPath', `/events/${eventId}/dispatch`);
       router.push('/?login=true&error=auth');
     }
-  }, [user, ready, router, eventId]);
+  }, [user, ready, router, eventId, isLiteMode]);
 
   // Return early if auth is not ready or user is not authenticated
-  if (!ready) {
+  if (!isLiteMode && !ready) {
     return <LoadingScreen label="Loading…" />;
   }
 
-  if (!user) {
+  if (!isLiteMode && !user) {
     return (
       <div className="w-full bg-surface-deepest min-h-[calc(100vh-72px)] flex items-center justify-center">
         <div className="text-surface-light">Redirecting...</div>
@@ -2932,6 +3061,8 @@ export default function DispatchPage({ params }: DispatchPageProps) {
       {/* Main Layout */}
       <div className="w-full bg-surface-deepest h-[calc(100vh-72px)]">
         <div className="max-w-[1750px] mx-auto px-3 sm:px-4 h-full">
+
+
           {isAdmin && (
             <button 
               onClick={() => setShowDebugModal(true)}
@@ -3905,32 +4036,6 @@ export default function DispatchPage({ params }: DispatchPageProps) {
         </div>
       </div>
 
-      {/* All your existing modals - unchanged */}
-      {event?.venue && (
-        <VenueMapModal
-          isOpen={showVenueMap}
-          onClose={() => setShowVenueMap(false)}
-          layers={
-            event.venue.layers && event.venue.layers.length
-              ? event.venue.layers
-              : [
-                  {
-                    id:
-                      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                        ? (crypto as unknown as { randomUUID?: () => string }).randomUUID?.() ?? `layer-${Date.now()}`
-                        : `layer-${Date.now()}`,
-                    name: event.venue.name || 'Main Floor',
-                    posts: event.eventPosts || [],
-                    mapUrl: event.venue.mapUrl,
-                  },
-                ]
-          }
-          staff={event.staff || []}
-          equipment={event.eventEquipment || []}
-          teamTimers={teamTimers}
-        />
-      )}
-
       <PostingScheduleModal
         isOpen={showPostingSchedule}
         onClose={() => setShowPostingSchedule(false)}
@@ -3945,12 +4050,42 @@ export default function DispatchPage({ params }: DispatchPageProps) {
         notifyPostAssignmentChange={notifyPostAssignmentChange}
       />
 
-      <EndEventModal
-        open={showEndEvent}
-        onClose={() => setShowEndEvent(false)}
-        onEndNoSummary={async () => {}}
-        onQuickSummary={async () => router.push(`/events/${event.id}/summary`)}
-      />
+      {!isLiteMode && (
+        <>
+          {/* Cloud-only modals */}
+          {event?.venue && (
+            <VenueMapModal
+              isOpen={showVenueMap}
+              onClose={() => setShowVenueMap(false)}
+              layers={
+                event.venue.layers && event.venue.layers.length
+                  ? event.venue.layers
+                  : [
+                      {
+                        id:
+                          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                            ? (crypto as unknown as { randomUUID?: () => string }).randomUUID?.() ?? `layer-${Date.now()}`
+                            : `layer-${Date.now()}`,
+                        name: event.venue.name || 'Main Floor',
+                        posts: event.eventPosts || [],
+                        mapUrl: event.venue.mapUrl,
+                      },
+                    ]
+              }
+              staff={event.staff || []}
+              equipment={event.eventEquipment || []}
+              teamTimers={teamTimers}
+            />
+          )}
+
+          <EndEventModal
+            open={showEndEvent}
+            onClose={() => setShowEndEvent(false)}
+            onEndNoSummary={async () => {}}
+            onQuickSummary={async () => router.push(`/events/${event.id}/summary`)}
+          />
+        </>
+      )}
 
       {showDuplicateModal && selectedDuplicateCallId && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-center justify-center" onClick={() => setShowDuplicateModal(false)}>

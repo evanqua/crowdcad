@@ -16,6 +16,14 @@ This document is a short, user-focused guide to the primary workflows in CrowdCA
 4. Create or join a Team/Unit assigned to the Event.
 5. Use the Dispatch interface to log calls, assign teams, and close incidents.
 
+## Lite mode (local-only)
+
+- Open `/lite` to use CrowdCAD Lite without cloud sync.
+- Lite mode stores data in your browser (IndexedDB/local storage) on the current device.
+- In Lite Event Setup, you can add/edit locations, equipment, and teams before starting dispatch.
+- Teams can be edited from the Teams panel using the pencil icon.
+- Use this mode for quick local workflows when internet or account access is unavailable.
+
 ## Basic concepts
 
 - Event: an organized occurrence (concert, festival, sports match) with its own roster, venues and logs.

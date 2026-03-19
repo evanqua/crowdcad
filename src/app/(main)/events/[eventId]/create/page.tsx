@@ -2,9 +2,9 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import { db } from '@/app/firebase';
-import { doc, getDoc, updateDoc, deleteDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, addDoc } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
-import { Event, Venue, Staff, Supervisor, Post, Equipment, EventEquipment } from '@/app/types';
+import { Event, Venue, Staff, Supervisor, Post, EventEquipment } from '@/app/types';
 import { getAuth } from 'firebase/auth';
 import Image from 'next/image';
 import { Tabs, Tab, Input, DatePicker, Select, SelectItem, Checkbox, Button, Card, ScrollShadow, Chip, TimeInput } from '@heroui/react';
@@ -18,11 +18,6 @@ import LoadingScreen from '@/components/ui/loading-screen';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 const LICENSES = ['CPR', 'EMT-B', 'EMT-A', 'EMT-P', 'RN', 'MD/DO'];
-
-// Helper to check if Post is an object with name property
-const isPostObject = (post: Post): post is { name: string; x: number | null; y: number | null } => {
-  return typeof post === 'object' && post !== null && 'name' in post;
-};
 
 // Helper to get post name regardless of type
 const getPostName = (post: Post): string => {
@@ -56,8 +51,8 @@ export default function EventCreation() {
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imgContainerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  const [, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const submittedRef = useRef(false);
 
@@ -149,10 +144,8 @@ export default function EventCreation() {
       try {
         const docRef = doc(db, 'events', eventId);
         await updateDoc(docRef, stripUndefined({ postingTimes: times }));
-        // eslint-disable-next-line no-console
         console.log('Autosaved postingTimes to draft:', { eventId, postingTimes: times });
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('Failed to autosave postingTimes:', err);
       }
     }, 600);
@@ -402,7 +395,6 @@ export default function EventCreation() {
       };
 
       const computedTimes = computePostingTimes();
-      // eslint-disable-next-line no-console
       console.log('handleSubmit computed postingTimes:', computedTimes, 'eventData.postingTimes:', eventData.postingTimes);
 
       let eventDocId = eventId;
@@ -419,7 +411,6 @@ export default function EventCreation() {
               updatedAt: new Date().toISOString(),
               status: 'active',
             }));
-            // eslint-disable-next-line no-console
             console.log('Event updated:', { eventId: eventDocId, postingTimes: eventData.postingTimes || [] });
           } else {
             const newDocRef = await addDoc(collection(db, 'events'), stripUndefined({
@@ -431,7 +422,6 @@ export default function EventCreation() {
               status: 'active',
             }));
             eventDocId = newDocRef.id;
-            // eslint-disable-next-line no-console
             console.log('Event created (branch new):', { eventId: eventDocId, postingTimes: eventData.postingTimes || [] });
           }
         } catch (error) {
@@ -444,7 +434,6 @@ export default function EventCreation() {
             status: 'active',
           }));
           eventDocId = newDocRef.id;
-          // eslint-disable-next-line no-console
           console.log('Event created (catch):', { eventId: eventDocId, postingTimes: eventData.postingTimes || [] });
         }
       } else {
@@ -456,7 +445,6 @@ export default function EventCreation() {
           status: 'active',
         }));
         eventDocId = docRef.id;
-        // eslint-disable-next-line no-console
         console.log('Event created (no eventId):', { eventId: eventDocId, postingTimes: eventData.postingTimes || [] });
       }
       router.push(`/events/${eventDocId}/dispatch`);

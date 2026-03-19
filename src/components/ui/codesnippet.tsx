@@ -12,7 +12,7 @@ export default function CodeSnippet({ code, label }: { code: string; label?: str
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
+    } catch {
       // no-op
     }
   }
