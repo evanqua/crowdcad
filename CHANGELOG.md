@@ -14,7 +14,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Lite mode local-only workflow for event setup and dispatch, including browser-local persistence without Firebase sync.
+- Lite dispatch navbar controls for Posting Schedule, Clear Event, and Export Summary actions.
+
+### Changed
+
+- Unified Lite and Cloud dispatch onto a shared dispatch UI flow to reduce duplication and keep feature parity.
+- Lite dispatch navbar behavior now mirrors main app navbar behavior (clock placement, auth controls, desktop/mobile parity).
+- Lite dispatch route now uses a lightweight wrapper that delegates to the shared dispatch page.
+
 ### Fixed
+
+- Resolved Next.js route export/type issues on dispatch pages that could fail production builds.
+- Cleared lint/type build blockers across dispatch, venue management, profile, and modal components.
+- Updated venue map icon rendering to satisfy Next.js image lint requirements.
 
 - Suppressed non-actionable React hydration mismatch warnings in development when browser extensions inject attributes on root HTML/body before client hydration.
 
