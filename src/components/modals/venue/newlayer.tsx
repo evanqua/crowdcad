@@ -61,7 +61,7 @@ export default function NewLayerModal({ isOpen, onClose, onSubmit }: Props) {
       }}
     >
       <ModalContent>
-        {(close) => (
+        {() => (
           <>
             <ModalHeader className="text-2xl font-bold text-surface">
               Add New Layer

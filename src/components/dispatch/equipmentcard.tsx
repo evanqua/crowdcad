@@ -2,9 +2,9 @@
 
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
-  Card, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
+  Card, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
 } from '@heroui/react';
 import { MoreVertical } from 'lucide-react';
@@ -60,10 +60,6 @@ export default function EquipmentCard({
   }, [equipment.currentLocation, equipment.stagingLocation, equipment.deliveryTeam]);
 
   const isOnCall = equipment.status.startsWith('Call ');
-  
-  const associatedCall = equipment.callId 
-    ? event.calls?.find(c => c.id === equipment.callId)
-    : null;
 
   const statusOptions = ['Available', 'In Use', 'In Clinic'];
 
@@ -74,22 +70,7 @@ export default function EquipmentCard({
     return 'Available';
   })();
 
-  // Location options
-  const locationOptions: string[] = React.useMemo(() => {
-    const base: string[] = ['Clinic'];
-    const posts = (event.venue?.posts || []).map(p => (typeof p === 'string' ? p : p.name));
-    return Array.from(new Set([...base, ...posts, equipment.stagingLocation].filter(Boolean)));
-  }, [event.venue?.posts, equipment.stagingLocation]);
-
   const bg = equipmentBg(equipment.status);
-
-  const displayLocation = (() => {
-    if (equipment.deliveryTeam) return equipment.deliveryTeam;
-    if (isOnCall && associatedCall?.assignedTeam && associatedCall.assignedTeam.length) return associatedCall.assignedTeam[0];
-    if (equipment.currentLocation && event?.staff?.some(s => s.team === equipment.currentLocation)) return equipment.currentLocation;
-    if (equipment.needsRefresh) return 'In Clinic';
-    return equipment.currentLocation || equipment.stagingLocation || 'Not Set';
-  })();
 
   return (
     <Card

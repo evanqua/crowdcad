@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { FirebaseError } from 'firebase/app';
 import { useAuth } from '@/hooks/useauth';
-import { Avatar, Button, Card, CardBody, Input, Select, SelectItem, Tabs, Tab } from '@heroui/react';
+import { Avatar, Button, Card, CardBody, Input, Tabs, Tab } from '@heroui/react';
 import { auth, db } from '@/app/firebase';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut, deleteUser } from 'firebase/auth';
 import { doc, setDoc, collection, query, where, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
 import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
 import LoadingScreen from '@/components/ui/loading-screen';
-import { User, Shield, Database, Settings, HelpCircle, LogOut, Trash2, Download, Eye, EyeOff } from 'lucide-react';
+import { User, Shield, Database, Settings, LogOut, Trash2, Download, Eye, EyeOff } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, ready } = useAuth();

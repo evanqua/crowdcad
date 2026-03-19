@@ -9,8 +9,7 @@ import {
   DropdownTrigger, 
   DropdownMenu, 
   DropdownItem,
-  Textarea,
-  ScrollShadow
+  Textarea
 } from '@heroui/react';
 import { Plus, MoreVertical } from "lucide-react";
 import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment } from '@/app/types';
@@ -254,7 +253,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 }));
                                 try {
                                   await handleCellBlur(call.id, 'chiefComplaint');
-                                } catch (err) {
+                                } catch {
                                   // ignore - pending will be cleared by effect if updated
                                 }
                               }}
@@ -301,7 +300,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 }));
                                 try {
                                   await handleAgeSexBlur(call.id);
-                                } catch (err) {}
+                                } catch {}
                               }}
                               onFocus={(e) => {
                                 // Clear [Edit] placeholder on focus

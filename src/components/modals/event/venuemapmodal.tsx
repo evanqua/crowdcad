@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { Modal, ModalContent, ModalBody, Button, Card, Tooltip } from '@heroui/react';
-import { ZoomIn, ZoomOut, RotateCcw, MapPin, Cross, ShieldPlus, Briefcase, HousePlus } from 'lucide-react';
+import { Modal, ModalContent, ModalBody, Button, Card } from '@heroui/react';
+import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus } from 'lucide-react';
 import { Post, Staff, Equipment, Layer } from '@/app/types';
 
 function StatusTimer({ since }: { since: number }) {
@@ -112,28 +112,6 @@ function PostMarker({ post, rect }: PostMarkerProps) {
   );
 }
 
-function getEquipmentMarkerColors(equipment: Equipment) {
-  let color = '#8B5CF6'; // Purple for default
-  const outline = '2px solid white';
-
-  switch (equipment.status) {
-    case 'Available':
-      color = '#10B981'; // Green
-      break;
-    case 'En Route to Call':
-      color = '#F59E0B'; // Amber
-      break;
-    case 'Transporting Patient':
-      color = '#EF4444'; // Red
-      break;
-    case 'Out of Service':
-      color = '#6B7280'; // Gray
-      break;
-  }
-
-  return { color, outline };
-}
-
 function getEquipmentIcon(equipment: Equipment) {
   const name = equipment.name.toLowerCase();
   
@@ -155,22 +133,24 @@ function getEquipmentIcon(equipment: Equipment) {
 function EquipmentIcon({ type, className }: { type: string; className?: string }) {
   if (type === 'wheelchair') {
     return (
-      <img 
-        src="/map/wheelchair.svg" 
-        alt="Wheelchair" 
+      <Image
+        src="/map/wheelchair.svg"
+        alt="Wheelchair"
+        width={24}
+        height={24}
         className={className}
-        style={{ width: '100%', height: '100%' }}
         draggable={false}
       />
     );
   }
   if (type === 'stretcher') {
     return (
-      <img 
-        src="/map/gurney.svg" 
-        alt="Gurney" 
+      <Image
+        src="/map/gurney.svg"
+        alt="Gurney"
+        width={24}
+        height={24}
         className={className}
-        style={{ width: '100%', height: '100%' }}
         draggable={false}
       />
     );

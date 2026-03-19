@@ -27,14 +27,12 @@ import ClinicTrackingCard from '@/components/dispatch/clinictrackingcard';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import DebugModal from '@/components/modals/debugmodal';
 import { ShieldAlert } from 'lucide-react';
-import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip, Chip } from "@heroui/react"
+import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip } from "@heroui/react"
 import EquipmentCard from '@/components/dispatch/equipmentcard';
 import LoadingScreen from '@/components/ui/loading-screen';
 
-interface DispatchPageProps {
+interface DispatchRoutePageProps {
   params: Promise<{ eventId: string }>;
-  liteEventId?: string;
-  forceLiteMode?: boolean;
 }
 
 const LITE_LOCAL_USER_ID = 'lite-local';
@@ -241,16 +239,15 @@ const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
 
 const AUTO_POST_SYNC = false;
 
-export default function DispatchPage({ params, liteEventId, forceLiteMode = false }: DispatchPageProps) {
+export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [event, setEvent] = useState<Event | undefined>(undefined);
   const [postAssignments, setPostAssignments] = useState<PostAssignment>({});
   // const handleBulkPostAssignment = (newAssignments: PostAssignment) => {
   //   setPostAssignments(newAssignments);
   // };
-  const { eventId: routeEventId } = use(params);
+  const { eventId } = use(params);
   const { isLiteMode: layoutLiteMode } = useLiteMode();
-  const isLiteMode = forceLiteMode || layoutLiteMode;
-  const eventId = liteEventId ?? routeEventId;
+  const isLiteMode = layoutLiteMode;
   const { user: authUser, ready: authReady } = useAuth();
   const user = isLiteMode ? null : authUser;
   const ready = isLiteMode ? true : authReady;
@@ -935,98 +932,6 @@ export default function DispatchPage({ params, liteEventId, forceLiteMode = fals
 
     return 'bg-surface-deep';
   };
-
-
-  const ACTIVE_CALL_SET = new Set(['Assigned','En Route','On Scene','Transporting','Pending']);
-
-  const commitEquipmentLocation = async (resourceName: string, newLocationRaw: string) => {
-    if (!event) return;
-    const newLocation = newLocationRaw; // allow empty
-
-    let touched = false;
-    const updatedEquipment = (event.eventEquipment || []).map(eq => {
-      if (eq.name === resourceName) {
-        touched = true;
-        const inUse = !!eq.assignedTeam;
-        return {
-          ...eq,
-          location: newLocation,
-          status: inUse ? eq.status : ('Available' as EquipmentStatus),
-        };
-      }
-      return eq;
-    });
-
-    if (!touched) {
-      updatedEquipment.push({
-        id: `eq_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-        name: resourceName,
-        status: ('Available' as EquipmentStatus),
-        location: newLocation,
-        assignedTeam: null,
-      });
-    }
-
-    await updateEvent({ eventEquipment: updatedEquipment });
-  };
-
-
-
-  const [equipmentDraft, setEquipmentDraft] = useState<Record<string, string>>({});
-
-  type EquipRow = {
-    name: string;
-    inUse: boolean;
-    rightText: string;   // shown in the UI
-    location: string;    // raw location value (can be '')
-  };
-
-
-  function getEquipmentRows(): EquipRow[] {
-    const venueEquipment = (event?.venue as { equipment?: (string | { name: string })[] })?.equipment ?? [];
-    const tracked = event?.eventEquipment ?? [];
-
-    const byName: Record<string, { name: string; assignedTeam?: string | null; location?: string | null; }> = {};
-
-    for (const v of venueEquipment) {
-      const name = typeof v === 'string' ? v : v?.name;
-      if (name) byName[name] = { name, assignedTeam: null, location: null };
-    }
-    for (const t of tracked) {
-      byName[t.name] = { name: t.name, assignedTeam: t.assignedTeam ?? null, location: t.location ?? null };
-    }
-
-    const rows = Object.values(byName).map(r => {
-      const inUse = !!(r.assignedTeam && r.assignedTeam.trim());
-      const location = r.location ?? ''; // raw value for editing (may be empty)
-      let rightText: string;
-
-      if (inUse) {
-        // compute "CallNum - Team(s)" (leave as you already had)
-        const call = (event?.calls ?? []).find(c =>
-          c.assignedTeam?.includes(r.assignedTeam!) && ACTIVE_CALL_SET.has(c.status)
-        );
-        if (call) {
-          const callNo = callDisplayNumberMap.get(call.id);
-          const teams = (call.assignedTeam ?? []).join(', ');
-          rightText = `${callNo} - ${teams}`;
-        } else {
-          rightText = `— - ${r.assignedTeam ?? ''}`;
-        }
-      } else {
-        rightText = location || 'Clinic';
-      }
-
-      return { name: r.name, inUse, location, rightText };
-    });
-
-    rows.sort((a, b) => {
-      if (a.inUse !== b.inUse) return a.inUse ? 1 : -1;
-      return a.name.localeCompare(b.name, undefined, { numeric: true });
-    });
-
-    return rows;
-  }
 
 
   async function handleAgeSexBlur(callId: string) {
@@ -1746,7 +1651,6 @@ export default function DispatchPage({ params, liteEventId, forceLiteMode = fals
       if (doc.exists()) {
         const eventData = doc.data() as Event;
         // Debug: log event document contents to diagnose missing postingTimes
-        // eslint-disable-next-line no-console
         console.log('Firestore snapshot - eventData:', {
           id: doc.id,
           postingTimes: eventData.postingTimes,

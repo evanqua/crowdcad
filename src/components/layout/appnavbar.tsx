@@ -25,7 +25,7 @@ import {
   Avatar,
 } from "@heroui/react";
 
-import { Menu, UserRound, Cog, LogOut } from "lucide-react";
+import { Menu, UserRound, LogOut } from "lucide-react";
 
 const LoginModalLazy = dynamic(() => import("@/components/modals/auth/loginmodal"), { ssr: false });
 

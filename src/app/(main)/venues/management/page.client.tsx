@@ -22,8 +22,6 @@ import LocationEditModal from '@/components/modals/venue/locationedit';
 import {
   Button,
   Input,
-  Select,
-  SelectItem,
   ButtonGroup,
   Card,
   Tabs,
@@ -120,7 +118,7 @@ export default function VenueManagementPageClient() {
   const [hoverId, setHoverId] = useState<number | null>(null);
 
   // Image aspect ratio
-  const [aspectRatio, setAspectRatio] = useState(1);
+  const [, setAspectRatio] = useState(1);
 
   // New layer modal
   const [isNewLayerModalOpen, setIsNewLayerModalOpen] = useState(false);
@@ -249,14 +247,6 @@ export default function VenueManagementPageClient() {
       ...prev,
       equipment: prev.equipment.filter((_, i) => i !== index),
     }));
-  };
-
-  const updateEquipmentLocation = (index: number, locationId: string) => {
-    setVenueData((prev) => {
-      const updated = [...prev.equipment];
-      updated[index] = { ...updated[index], locationId: locationId || undefined };
-      return { ...prev, equipment: updated };
-    });
   };
 
   const startEditEquipment = (index: number) => {

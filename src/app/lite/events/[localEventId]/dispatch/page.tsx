@@ -13,11 +13,5 @@ export default function LiteDispatchPage() {
     [localEventId]
   );
 
-  return (
-    <SharedDispatchPage
-      params={sharedParams}
-      liteEventId={localEventId}
-      forceLiteMode={true}
-    />
-  );
+  return <SharedDispatchPage params={sharedParams} />;
 }
