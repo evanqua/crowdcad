@@ -1,4 +1,7 @@
-import React, { Suspense } from 'react';
+'use client';
+
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Button,
   Card,
@@ -98,11 +101,6 @@ const buildPostingTimes = (from: Time, to: Time, byMinutesRaw: string): string[]
 
   return times;
 };
-
-'use client';
-
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 
 function LiteCreateContent() {
   const router = useRouter();
