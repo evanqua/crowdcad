@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/app/firebase';
 import { useAuth } from '@/hooks/useauth';
@@ -22,6 +22,7 @@ import {
   NavbarMenu,
   NavbarMenuItem,
   NavbarMenuToggle,
+  Chip,
 } from '@heroui/react';
 import { LogOut, Menu, UserRound } from 'lucide-react';
 
@@ -40,6 +41,19 @@ function initialsFromUser(u?: { displayName?: string | null; email?: string | nu
   return (u?.email?.[0] ?? 'U').toUpperCase();
 }
 
+function LiveClock() {
+  const [now, setNow] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span suppressHydrationWarning={true} className="tabular-nums text-surface-light text-lg font-semibold font-arial">
+      {now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+    </span>
+  );
+}
+
 const liteNavItems = [
   { label: 'Lite Home', href: '/lite' },
   { label: 'Create', href: '/lite/create' },
@@ -53,9 +67,22 @@ export default function LiteNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginMode, setLoginMode] = useState<'login' | 'signup'>('login');
+  const isDispatch = !!(pathname && /^\/lite\/events\/[^/]+\/dispatch(?:$|\/|\?)/.test(pathname));
 
   const isActive = (href: string) => pathname === href;
   const initials = initialsFromUser(user ?? undefined);
+
+  const openPostingSchedule = () => {
+    window.dispatchEvent(new CustomEvent('open-posting-schedule'));
+  };
+
+  const triggerClearEvent = () => {
+    window.dispatchEvent(new CustomEvent('open-lite-clear-event'));
+  };
+
+  const triggerExportSummary = () => {
+    window.dispatchEvent(new CustomEvent('open-lite-export-summary'));
+  };
 
   const onLogout = async () => {
     await signOut(auth);
@@ -85,10 +112,11 @@ export default function LiteNavbar() {
           menuItem: 'justify-center text-surface-light',
         }}
       >
-        <div className="relative flex items-center justify-between w-full max-w-[1200px] mx-auto">
+        <div className={`flex items-center justify-between w-full ${!isDispatch ? 'max-w-[1200px] mx-auto' : ''}`}>
+          {/* LEFT: brand */}
           <NavbarContent justify="start" className="min-w-0">
             <NavbarBrand>
-              <button onClick={() => router.push('/lite')} className="flex items-center">
+              <button onClick={() => router.push("/")} className="flex items-center">
                 <Image
                   src="/logo.svg"
                   alt="Logo"
@@ -99,25 +127,73 @@ export default function LiteNavbar() {
                   className="cursor-pointer w-24 h-auto"
                 />
               </button>
+
+              {isDispatch && (
+                <div className="ml-4 sm:ml-6 md:ml-8">
+                  <LiveClock />
+                  <Chip size="lg" color="success" variant="flat" className="ml-4">
+                    Lite Mode
+                  </Chip>
+                </div>
+                
+              )}
             </NavbarBrand>
           </NavbarContent>
 
           <NavbarContent
-            className="hidden lg:flex gap-8 absolute left-1/2 -translate-x-1/2"
+            className={`hidden lg:flex gap-8 ${!isDispatch ? 'max-w-[500px]' : ''}`}
             justify="center"
           >
-            {liteNavItems.map(({ label, href }) => (
-              <NavbarItem key={href} isActive={isActive(href)}>
-                <Link
-                  href={href}
-                  className={`text-lg font-medium transition ${
-                    isActive(href) ? 'text-surface-light' : 'text-surface-faint hover:text-accent'
-                  }`}
-                >
-                  {label}
-                </Link>
-              </NavbarItem>
-            ))}
+            {isDispatch ? (
+              <>
+                <NavbarItem>
+                  <button
+                    onClick={openPostingSchedule}
+                    className="text-lg font-medium transition text-surface-light hover:text-accent"
+                  >
+                    Posting Schedule
+                  </button>
+                </NavbarItem>
+
+                <NavbarItem>
+                  <Dropdown placement="bottom-start">
+                    <DropdownTrigger>
+                      <button
+                        type="button"
+                        className="text-lg font-medium transition text-surface-light hover:text-accent"
+                      >
+                        End Event
+                      </button>
+                    </DropdownTrigger>
+                    <DropdownMenu aria-label="Lite end event actions">
+                      <DropdownItem
+                        key="clear-event"
+                        className="text-status-red"
+                        onPress={triggerClearEvent}
+                      >
+                        Clear Event
+                      </DropdownItem>
+                      <DropdownItem key="export-summary" onPress={triggerExportSummary}>
+                        Export Summary
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                </NavbarItem>
+              </>
+            ) : (
+              liteNavItems.map(({ label, href }) => (
+                <NavbarItem key={href} isActive={isActive(href)}>
+                  <Link
+                    href={href}
+                    className={`text-lg font-medium transition ${
+                      isActive(href) ? 'text-surface-light' : 'text-surface-faint hover:text-accent'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                </NavbarItem>
+              ))
+            )}
           </NavbarContent>
 
           <NavbarContent justify="end" className="gap-2 sm:gap-3 md:gap-4">
@@ -195,19 +271,57 @@ export default function LiteNavbar() {
         </div>
 
         <NavbarMenu className="bg-surface-deep border-t border-surface-liner pt-6">
-          {liteNavItems.map(({ label, href }) => (
-            <NavbarMenuItem key={href}>
-              <Link
-                href={href}
-                onClick={() => setIsMenuOpen(false)}
-                className={`w-full text-lg font-medium transition ${
-                  isActive(href) ? 'text-surface-light' : 'text-surface-faint hover:text-accent'
-                }`}
-              >
-                {label}
-              </Link>
-            </NavbarMenuItem>
-          ))}
+          {isDispatch ? (
+            <>
+              <NavbarMenuItem>
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    openPostingSchedule();
+                  }}
+                  className="block w-full text-left text-[18px] px-2 py-2"
+                >
+                  Posting Schedule
+                </button>
+              </NavbarMenuItem>
+              <NavbarMenuItem>
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    triggerClearEvent();
+                  }}
+                  className="block w-full text-left text-[18px] px-2 py-2 text-status-red"
+                >
+                  Clear Event
+                </button>
+              </NavbarMenuItem>
+              <NavbarMenuItem>
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    triggerExportSummary();
+                  }}
+                  className="block w-full text-left text-[18px] px-2 py-2"
+                >
+                  Export Summary
+                </button>
+              </NavbarMenuItem>
+            </>
+          ) : (
+            liteNavItems.map(({ label, href }) => (
+              <NavbarMenuItem key={href}>
+                <Link
+                  href={href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`w-full text-lg font-medium transition ${
+                    isActive(href) ? 'text-surface-light' : 'text-surface-faint hover:text-accent'
+                  }`}
+                >
+                  {label}
+                </Link>
+              </NavbarMenuItem>
+            ))
+          )}
 
           <div className="my-2 border-t border-surface-liner" />
 

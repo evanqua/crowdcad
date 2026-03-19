@@ -4,6 +4,7 @@ import type {
   Call,
   Equipment,
   EventEquipment,
+  PostAssignment,
   Post,
   Staff,
   Supervisor,
@@ -41,6 +42,10 @@ export interface LiteEventDraft {
   staff: Staff[];
   supervisor: Supervisor[];
   eventPosts: Post[];
+  postAssignments?: PostAssignment;
+  pendingAssignments?: {
+    [team: string]: { post: string; time: string };
+  };
   eventEquipment: EventEquipment[];
   calls: Call[];
   status: 'draft' | 'active';
@@ -155,6 +160,8 @@ export function createDefaultLiteEventDraft(eventId: string, eventName = ''): Li
     staff: [],
     supervisor: [],
     eventPosts: [],
+    postAssignments: {},
+    pendingAssignments: {},
     eventEquipment: [],
     calls: [],
     status: 'draft',
@@ -228,4 +235,125 @@ export async function deleteLiteEvent(eventId: string): Promise<void> {
   }
 
   fallbackDeleteFromLocalStorage(eventId);
+}
+
+/**
+ * Dispatch update helpers — all mutations persist immediately to local storage
+ */
+
+export async function updateLiteEventStatus(eventId: string, status: 'draft' | 'active'): Promise<LiteEventDraft | null> {
+  const event = await getLiteEvent(eventId);
+  if (!event) return null;
+
+  const updated = { ...event, status };
+  await saveLiteEvent(updated);
+  return updated;
+}
+
+export async function addLiteCall(eventId: string, call: Call): Promise<LiteEventDraft | null> {
+  const event = await getLiteEvent(eventId);
+  if (!event) return null;
+
+  const updated = {
+    ...event,
+    calls: [...event.calls, call],
+  };
+  await saveLiteEvent(updated);
+  return updated;
+}
+
+export async function updateLiteCall(eventId: string, callId: string, updates: Partial<Call>): Promise<LiteEventDraft | null> {
+  const event = await getLiteEvent(eventId);
+  if (!event) return null;
+
+  const updated = {
+    ...event,
+    calls: event.calls.map((c) => (c.id === callId ? { ...c, ...updates } : c)),
+  };
+  await saveLiteEvent(updated);
+  return updated;
+}
+
+export async function deleteLiteCall(eventId: string, callId: string): Promise<LiteEventDraft | null> {
+  const event = await getLiteEvent(eventId);
+  if (!event) return null;
+
+  const updated = {
+    ...event,
+    calls: event.calls.filter((c) => c.id !== callId),
+  };
+  await saveLiteEvent(updated);
+  return updated;
+}
+
+export async function updateLiteTeamStatus(
+  eventId: string,
+  teamName: string,
+  status: string,
+  location?: string
+): Promise<LiteEventDraft | null> {
+  const event = await getLiteEvent(eventId);
+  if (!event) return null;
+
+  const updated = {
+    ...event,
+    staff: event.staff.map((team) => {
+      if (team.team === teamName) {
+        return { ...team, status, location: location ?? team.location };
+      }
+      return team;
+    }),
+  };
+  await saveLiteEvent(updated);
+  return updated;
+}
+
+export async function updateLiteSupervisorStatus(
+  eventId: string,
+  supervisorTeam: string,
+  status: string,
+  location?: string
+): Promise<LiteEventDraft | null> {
+  const event = await getLiteEvent(eventId);
+  if (!event) return null;
+
+  const updated = {
+    ...event,
+    supervisor: event.supervisor.map((sup) => {
+      if (sup.team === supervisorTeam) {
+        return { ...sup, status, location: location ?? sup.location };
+      }
+      return sup;
+    }),
+  };
+  await saveLiteEvent(updated);
+  return updated;
+}
+
+export async function updateLiteEquipmentStatus(
+  eventId: string,
+  equipmentId: string,
+  status: string,
+  assignedTeam?: string | null,
+  location?: string
+): Promise<LiteEventDraft | null> {
+  const event = await getLiteEvent(eventId);
+  if (!event) return null;
+
+  const updated = {
+    ...event,
+    eventEquipment: event.eventEquipment.map((eq) => {
+      if (eq.id === equipmentId) {
+        return {
+          ...eq,
+          status,
+          assignedTeam: assignedTeam ?? eq.assignedTeam,
+          location: location ?? eq.location,
+        };
+      }
+      return eq;
+    }),
+  };
+  await saveLiteEvent(updated);
+  return updated;
 }
