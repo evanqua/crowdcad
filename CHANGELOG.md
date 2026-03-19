@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] - 2026-03-19
+
 ### Added
 
 - Lite mode local-only workflow for event setup and dispatch, including browser-local persistence without Firebase sync.
@@ -30,7 +34,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Resolved Next.js route export/type issues on dispatch pages that could fail production builds.
 - Cleared lint/type build blockers across dispatch, venue management, profile, and modal components.
 - Updated venue map icon rendering to satisfy Next.js image lint requirements.
-
 - Suppressed non-actionable React hydration mismatch warnings in development when browser extensions inject attributes on root HTML/body before client hydration.
 
 ---
@@ -100,4 +103,8 @@ Initial public release of **CrowdCAD** — an open-source, browser-based Compute
 ---
 
 *For upgrade notes and migration steps, see the relevant release on GitHub. For security vulnerabilities, follow the process in [SECURITY.md](SECURITY.md).*
+
+[Unreleased]: https://github.com/evanqua/crowdcad/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/evanqua/crowdcad/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/evanqua/crowdcad/releases/tag/v1.0.0
 
