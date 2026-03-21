@@ -155,7 +155,15 @@ function LiteCreateContent() {
   const inputClassNames = {
     label: 'text-white font-medium',
     inputWrapper:
-      'rounded-2xl px-4 hover:bg-surface-deep shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+      'rounded-2xl px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+    input:
+      'text-white outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
+  } as const;
+
+  const attachedInputClassNames = {
+    label: inputClassNames.label,
+    inputWrapper:
+      'rounded-l-2xl rounded-r-none px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
     input:
       'text-white outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   } as const;
@@ -217,6 +225,7 @@ function LiteCreateContent() {
     const from = parseTimeValue(eventDraft.scheduleConfig.from, new Time(16, 0));
     const to = parseTimeValue(eventDraft.scheduleConfig.to, new Time(23, 59));
 
+    setPostsEnabled(eventDraft.postingScheduleEnabled ?? eventDraft.postingTimes.length > 0);
     setScheduleFrom(from);
     setScheduleTo(to);
     setScheduleBy(eventDraft.scheduleConfig.by || '75');
@@ -635,6 +644,7 @@ function LiteCreateContent() {
 
     updateDraft((current) => ({
       ...current,
+      postingScheduleEnabled: postsEnabled,
       postingTimes,
       scheduleConfig: {
         from: formatTimeValue(scheduleFrom),
@@ -789,8 +799,9 @@ function LiteCreateContent() {
                       <Tab key="equipment" title="Equipment" />
                     </Tabs>
 
-                    <div className="flex-1 flex gap-2">
+                    <div className="flex-1 flex gap-0">
                       <Input
+                        className="flex-1"
                         placeholder={selectedLeftTab === 'locations' ? 'e.g., Main Entrance' : 'e.g., Gurney 1'}
                         value={selectedLeftTab === 'locations' ? locationInput : equipmentInput}
                         onValueChange={(value) => {
@@ -811,14 +822,13 @@ function LiteCreateContent() {
                           }
                         }}
                         variant="flat"
-                        classNames={inputClassNames}
+                        classNames={attachedInputClassNames}
                       />
                       <Button
-                        isIconOnly
                         onPress={selectedLeftTab === 'locations' ? addLocation : addEquipment}
-                        className="flex-shrink-0 bg-accent hover:bg-accent/90 text-white"
+                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-2xl text-white"
                       >
-                        <Plus className="h-5 w-5" />
+                        Add
                       </Button>
                     </div>
                   </div>
@@ -1010,7 +1020,6 @@ function LiteCreateContent() {
                           <>
                             <h3 className="text-white font-semibold text-lg">Teams</h3>
                             <Button
-                              isIconOnly
                               size="sm"
                               onPress={() => {
                                 setTeamModalMode('create');
@@ -1019,10 +1028,10 @@ function LiteCreateContent() {
                                 setCurrentMembers([]);
                                 setIsTeamModalOpen(true);
                               }}
-                              className="min-w-8 w-8 h-8"
+                              className="h-8 px-3 text-sm text-white"
                               style={{ backgroundColor: '#27272a' }}
                             >
-                              <Plus className="h-4 w-4 text-white" />
+                              Add Team
                             </Button>
                           </>
                         )}
@@ -1031,13 +1040,12 @@ function LiteCreateContent() {
                           <>
                             <h3 className="text-white font-semibold text-lg">Supervisors</h3>
                             <Button
-                              isIconOnly
                               size="sm"
                               onPress={() => setIsSupervisorModalOpen(true)}
-                              className="min-w-8 w-8 h-8"
+                              className="h-8 px-3 text-sm text-white"
                               style={{ backgroundColor: '#27272a' }}
                             >
-                              <Plus className="h-4 w-4 text-white" />
+                              Add Supervisor
                             </Button>
                           </>
                         )}

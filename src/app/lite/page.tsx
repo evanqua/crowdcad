@@ -80,7 +80,7 @@ export default function LiteLandingPage() {
             </h1>
           </div>
           <p className="text-lg sm:text-xl text-gray-300 text-center">
-            Fast, lightweight dispatch for events — no internet, no cloud, no account required
+            Fast, lightweight dispatch for events — no internet required
           </p>
         </div>
 
@@ -105,12 +105,12 @@ export default function LiteLandingPage() {
           <Button
             onClick={handleStartLiteMode}
             isLoading={isCreating}
+            variant="shadow"
             color="primary"
             size="lg"
             className="w-full flex items-center justify-center gap-2"
           >
             Start Lite Mode
-            <ArrowRight className="w-4 h-4" />
           </Button>
 
           <p className="text-xs text-gray-400 text-center">

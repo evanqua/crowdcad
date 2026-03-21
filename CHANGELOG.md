@@ -14,6 +14,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Lite event drafts now persist a `postingScheduleEnabled` flag to keep posting schedule behavior consistent between setup and dispatch.
+
+### Changed
+
+- Lite setup Locations/Equipment add row now uses an attached input + action button style with aligned corner radii and consistent spacing.
+- Teams and Supervisors panel actions in Lite setup now use explicit `Add Team` and `Add Supervisor` buttons.
+- Lite dispatch navbar now hides `Posting Schedule` when posting schedule is disabled in event setup.
+- Lite navbar primary links were simplified to focus on Lite routes (`Lite Home`, `Create`).
+- Landing page copy and CTA text were refined (`CrowdCAD Lite` footer label and Lite subtitle wording), and Lite CTA iconography was simplified.
+- Updated `public/logo.svg` artwork/viewBox for refined logo rendering.
+
+### Fixed
+
+- Removed initial navbar mount flicker/layout shift on page reload by rendering the main app navbar in the initial render path instead of client-only lazy loading.
+
 ---
 
 ## [1.1.0] - 2026-03-19

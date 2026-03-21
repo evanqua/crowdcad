@@ -1,9 +1,7 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-
-const AppNavbar = dynamic(() => import('@/components/layout/appnavbar'), { ssr: false });
+import AppNavbar from '@/components/layout/appnavbar';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

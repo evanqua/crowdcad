@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/app/firebase';
 import { useAuth } from '@/hooks/useauth';
+import { getLiteEvent } from '@/lib/liteEventStore';
 import {
   Avatar,
   Button,
@@ -57,7 +58,6 @@ function LiveClock() {
 const liteNavItems = [
   { label: 'Lite Home', href: '/lite' },
   { label: 'Create', href: '/lite/create' },
-  { label: 'Cloud Home', href: '/' },
 ];
 
 export default function LiteNavbar() {
@@ -67,10 +67,37 @@ export default function LiteNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginMode, setLoginMode] = useState<'login' | 'signup'>('login');
+  const [postingScheduleEnabled, setPostingScheduleEnabled] = useState(true);
   const isDispatch = !!(pathname && /^\/lite\/events\/[^/]+\/dispatch(?:$|\/|\?)/.test(pathname));
+  const liteDispatchEventId = pathname?.match(/^\/lite\/events\/([^/?#]+)\/dispatch(?:$|[/?#])/)?.[1] ?? null;
 
   const isActive = (href: string) => pathname === href;
   const initials = initialsFromUser(user ?? undefined);
+  const showPostingSchedule = isDispatch && postingScheduleEnabled;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPostingScheduleConfig = async () => {
+      if (!isDispatch || !liteDispatchEventId) {
+        setPostingScheduleEnabled(true);
+        return;
+      }
+
+      const event = await getLiteEvent(decodeURIComponent(liteDispatchEventId));
+      if (cancelled) return;
+
+      setPostingScheduleEnabled(
+        event?.postingScheduleEnabled ?? (event?.postingTimes?.length ?? 0) > 0
+      );
+    };
+
+    void loadPostingScheduleConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDispatch, liteDispatchEventId]);
 
   const openPostingSchedule = () => {
     window.dispatchEvent(new CustomEvent('open-posting-schedule'));
@@ -146,14 +173,16 @@ export default function LiteNavbar() {
           >
             {isDispatch ? (
               <>
-                <NavbarItem>
-                  <button
-                    onClick={openPostingSchedule}
-                    className="text-lg font-medium transition text-surface-light hover:text-accent"
-                  >
-                    Posting Schedule
-                  </button>
-                </NavbarItem>
+                {showPostingSchedule && (
+                  <NavbarItem>
+                    <button
+                      onClick={openPostingSchedule}
+                      className="text-lg font-medium transition text-surface-light hover:text-accent"
+                    >
+                      Posting Schedule
+                    </button>
+                  </NavbarItem>
+                )}
 
                 <NavbarItem>
                   <Dropdown placement="bottom-start">
@@ -273,17 +302,19 @@ export default function LiteNavbar() {
         <NavbarMenu className="bg-surface-deep border-t border-surface-liner pt-6">
           {isDispatch ? (
             <>
-              <NavbarMenuItem>
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    openPostingSchedule();
-                  }}
-                  className="block w-full text-left text-[18px] px-2 py-2"
-                >
-                  Posting Schedule
-                </button>
-              </NavbarMenuItem>
+              {showPostingSchedule && (
+                <NavbarMenuItem>
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      openPostingSchedule();
+                    }}
+                    className="block w-full text-left text-[18px] px-2 py-2"
+                  >
+                    Posting Schedule
+                  </button>
+                </NavbarMenuItem>
+              )}
               <NavbarMenuItem>
                 <button
                   onClick={() => {

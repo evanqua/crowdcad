@@ -32,6 +32,7 @@ export interface LiteEventDraft {
   mode: 'lite';
   name: string;
   date: string;
+  postingScheduleEnabled?: boolean;
   scheduleConfig: {
     from: string;
     to: string;
@@ -146,6 +147,7 @@ export function createDefaultLiteEventDraft(eventId: string, eventName = ''): Li
     mode: 'lite',
     name: eventName,
     date: now.split('T')[0],
+    postingScheduleEnabled: true,
     scheduleConfig: {
       from: '16:00',
       to: '23:59',
