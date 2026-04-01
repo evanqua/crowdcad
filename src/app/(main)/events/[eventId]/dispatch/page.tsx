@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState, useRef, useCallback, ReactNode, RefObject, use} from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, use } from 'react';
 import PostingScheduleModal from '@/components/modals/event/postingschedulemodal';
 import VenueMapModal from '@/components/modals/event/venuemapmodal';
 import EndEventModal from '@/components/modals/event/endeventmodal';
@@ -16,10 +16,9 @@ import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
 import { useAuth } from '@/hooks/useauth';
 import { useLiteMode } from '@/lib/LiteContext';
-import { deleteLiteEvent, getLiteEvent, saveLiteEvent, type LiteEventDraft } from '@/lib/liteEventStore';
+import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
 import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4} from "lucide-react";
-import TeamCard from '@/components/dispatch/teamcard';
-import TeamCardCondensed from '@/components/dispatch/teamcard-condensed';
+import TeamWidget from '@/components/dispatch/teamwidget';
 import { CallTrackingTable } from '@/components/dispatch/calltracking';
 import ClinicTrackingTable from '@/components/dispatch/clinictracking';
 import CallTrackingCard from '@/components/dispatch/calltrackingcard';
@@ -30,145 +29,11 @@ import { ShieldAlert } from 'lucide-react';
 import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip } from "@heroui/react"
 import EquipmentCard from '@/components/dispatch/equipmentcard';
 import LoadingScreen from '@/components/ui/loading-screen';
+import PortalDropdown from '@/components/ui/portal-dropdown';
+import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 
 interface DispatchRoutePageProps {
   params: Promise<{ eventId: string }>;
-}
-
-const LITE_LOCAL_USER_ID = 'lite-local';
-
-function removeUndefinedDeep<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') return obj;
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => removeUndefinedDeep(item)) as unknown as T;
-  }
-
-  const cleaned = {} as Record<string, unknown>;
-  const record = obj as Record<string, unknown>;
-
-  Object.keys(record).forEach((key) => {
-    const val = removeUndefinedDeep(record[key]);
-    if (val !== undefined) cleaned[key] = val;
-  });
-
-  return cleaned as unknown as T;
-}
-
-function normalizeLiteDraftToEvent(draft: LiteEventDraft): Event {
-  const eventPosts = draft.eventPosts?.length ? draft.eventPosts : draft.venue.posts;
-
-  return {
-    id: draft.id,
-    name: draft.name,
-    date: draft.date,
-    venue: {
-      id: `lite-venue-${draft.id}`,
-      name: draft.venue.name || 'Lite Venue',
-      equipment: draft.venue.equipment || [],
-      posts: draft.venue.posts || [],
-      layers: [],
-      userId: LITE_LOCAL_USER_ID,
-      mapUrl: undefined,
-    },
-    userId: LITE_LOCAL_USER_ID,
-    postingTimes: draft.postingTimes || [],
-    staff: draft.staff || [],
-    supervisor: draft.supervisor || [],
-    calls: draft.calls || [],
-    status: draft.status,
-    createdAt: draft.createdAt,
-    eventPosts: eventPosts || [],
-    eventEquipment: draft.eventEquipment || [],
-    postAssignments: draft.postAssignments || {},
-    pendingAssignments: draft.pendingAssignments || {},
-  };
-}
-
-function toLiteDraftFromEvent(nextEvent: Event, previousDraft: LiteEventDraft): LiteEventDraft {
-  return {
-    ...previousDraft,
-    id: nextEvent.id || previousDraft.id,
-    mode: 'lite',
-    name: nextEvent.name ?? previousDraft.name,
-    date: nextEvent.date ?? previousDraft.date,
-    venue: {
-      name: nextEvent.venue?.name ?? previousDraft.venue.name,
-      posts: nextEvent.eventPosts ?? nextEvent.venue?.posts ?? previousDraft.venue.posts,
-      equipment: nextEvent.venue?.equipment ?? previousDraft.venue.equipment,
-    },
-    postingTimes: nextEvent.postingTimes || [],
-    staff: nextEvent.staff || [],
-    supervisor: nextEvent.supervisor || [],
-    eventPosts: nextEvent.eventPosts || [],
-    eventEquipment: nextEvent.eventEquipment || [],
-    calls: nextEvent.calls || [],
-    status: nextEvent.status ?? previousDraft.status ?? 'active',
-    postAssignments: nextEvent.postAssignments || {},
-    pendingAssignments: nextEvent.pendingAssignments || {},
-    createdAt:
-      typeof nextEvent.createdAt === 'string'
-        ? nextEvent.createdAt
-        : previousDraft.createdAt,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-import ReactDOM from 'react-dom';
-
-interface PortalDropdownProps {
-  anchorRef: RefObject<HTMLElement>;
-  isOpen: boolean;
-  children: ReactNode;
-  widthClass?: string;
-  onClose?: () => void;
-}
-
-function PortalDropdown({
-  anchorRef,
-  isOpen,
-  children,
-  widthClass = 'w-auto',
-  onClose,
-}: PortalDropdownProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleDown(e: MouseEvent) {
-      const t = e.target as Node;
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(t) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(t)
-      ) {
-        onClose?.();
-      }
-    }
-    document.addEventListener('mousedown', handleDown);
-    return () => document.removeEventListener('mousedown', handleDown);
-  }, [onClose, anchorRef]);
-
-  if (!isOpen || !anchorRef.current) return null;
-
-  const rect = anchorRef.current.getBoundingClientRect();
-  const dropdownStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: rect.bottom + 4,
-    left: rect.left,
-    zIndex: 9999,
-  };
-
-  return ReactDOM.createPortal(
-    <div
-      ref={menuRef}
-      style={dropdownStyle}
-      className={`inline-block bg-surface-deepest border border-surface-liner rounded shadow-lg ${widthClass} max-h-[60vh] overflow-auto whitespace-nowrap`}
-    >
-      {children}
-    </div>,
-    document.body
-  );
 }
 
 // function StatusTimer({ since }: { since: number })  {
@@ -190,52 +55,6 @@ function PortalDropdown({
 //     </span>
 //   );
 // }
-
-interface TeamWidgetProps {
-  staff: Staff;
-  event: Event;
-  callDisplayNumberMap: Map<string, number>;
-  teamTimers: { [team: string]: number };
-  onStatusChange: (staff: Staff, newStatus: string) => void;
-  onLocationChange: (staff: Staff, newLocation: string) => void;
-  onEditTeam?: (staff: Staff) => void;
-  onDeleteTeam?: (team: string) => void;
-  onRefreshTeamPost?: (team: string) => void;
-  updateEvent: (updates: Partial<Event>) => Promise<void>;
-  cardViewMode?: 'normal' | 'condensed';
-}
-
-
-const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
-  const {
-    staff,
-    event,
-    teamTimers,
-    onStatusChange,
-    onLocationChange,
-    onEditTeam,
-    onDeleteTeam,
-    onRefreshTeamPost,
-    updateEvent,
-    cardViewMode = 'normal',
-  } = props;
-
-  const CardComponent = cardViewMode === 'condensed' ? TeamCardCondensed : TeamCard;
-
-  return (
-    <CardComponent
-      staff={staff}
-      event={event}
-      sinceMs={teamTimers?.[staff.team]}
-      onStatusChange={onStatusChange}
-      onLocationChange={onLocationChange}
-      onEdit={onEditTeam}
-      onDelete={onDeleteTeam}
-      onRefreshPost={onRefreshTeamPost}
-      updateEvent={updateEvent}
-    />
-  );
-});
 
 const AUTO_POST_SYNC = false;
 
