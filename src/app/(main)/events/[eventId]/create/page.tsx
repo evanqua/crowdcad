@@ -11,6 +11,8 @@ import { Tabs, Tab, Input, DatePicker, Select, SelectItem, Checkbox, Button, Car
 import { parseDate, getLocalTimeZone, today, Time } from '@internationalized/date';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Plus, Trash2 } from 'lucide-react';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
+import { buildPostingTimes } from '@/lib/scheduleUtils';
+import { clampPanPosition, clampScale } from '@/lib/zoomPanUtils';
 import { stripUndefined } from '@/lib/utils';
 import AddTeamModal from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
@@ -97,39 +99,18 @@ export default function EventCreation() {
 
   // Generate schedule chips based on time range and interval
   useEffect(() => {
-    const intervalMinutes = parseInt(scheduleBy) || 0;
-    if (intervalMinutes <= 0) {
+    const times = buildPostingTimes(scheduleFrom, scheduleTo, scheduleBy);
+    if (times.length === 0) {
       setScheduleChips([]);
       setEventData(prev => ({ ...prev, postingTimes: [] }));
       return;
     }
 
-    const fromMinutes = scheduleFrom.hour * 60 + scheduleFrom.minute;
-    const toMinutes = scheduleTo.hour * 60 + scheduleTo.minute;
-
-    // Allow ranges that span midnight. If `to` is <= `from`, treat `to` as next day.
-    const MINUTES_IN_DAY = 24 * 60;
-    let endMinutes = toMinutes;
-    if (toMinutes <= fromMinutes) {
-      endMinutes = toMinutes + MINUTES_IN_DAY;
-    }
-
-    const chips: { id: string; time: string; editable: boolean }[] = [];
-    const times: string[] = [];
-
-    // Safety cap to avoid accidental infinite loops when intervalMinutes is tiny.
-    const maxIterations = Math.ceil((endMinutes - fromMinutes) / Math.max(1, intervalMinutes)) + 2;
-    let iterations = 0;
-
-    for (let minutes = fromMinutes; minutes <= endMinutes; minutes += intervalMinutes) {
-      if (++iterations > maxIterations) break;
-      const mod = minutes % MINUTES_IN_DAY;
-      const hours = Math.floor(mod / 60);
-      const mins = mod % 60;
-      const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-      chips.push({ id: crypto.randomUUID(), time: timeStr, editable: false });
-      times.push(timeStr);
-    }
+    const chips = times.map((timeStr) => ({
+      id: crypto.randomUUID(),
+      time: timeStr,
+      editable: false,
+    }));
 
     setScheduleChips(chips);
     setEventData(prev => ({ ...prev, postingTimes: times }));
@@ -230,29 +211,7 @@ export default function EventCreation() {
           return;
         }
           // Ensure postingTimes are computed and included in the draft at creation time
-          const intervalMinutes = parseInt(scheduleBy) || 0;
-          const times: string[] = [];
-          if (intervalMinutes > 0) {
-            const fromMinutes = scheduleFrom.hour * 60 + scheduleFrom.minute;
-            const toMinutes = scheduleTo.hour * 60 + scheduleTo.minute;
-            const MINUTES_IN_DAY = 24 * 60;
-            let endMinutes = toMinutes;
-            if (toMinutes <= fromMinutes) {
-              endMinutes = toMinutes + MINUTES_IN_DAY;
-            }
-
-            // Safety cap
-            const maxIterations = Math.ceil((endMinutes - fromMinutes) / Math.max(1, intervalMinutes)) + 2;
-            let iterations = 0;
-            for (let minutes = fromMinutes; minutes <= endMinutes; minutes += intervalMinutes) {
-              if (++iterations > maxIterations) break;
-              const mod = minutes % MINUTES_IN_DAY;
-              const hours = Math.floor(mod / 60);
-              const mins = mod % 60;
-              const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-              times.push(timeStr);
-            }
-          }
+          const times = buildPostingTimes(scheduleFrom, scheduleTo, scheduleBy);
 
           const draft = {
             ...eventData,
@@ -368,33 +327,7 @@ export default function EventCreation() {
       }
 
       // Compute postingTimes right before save in case state hasn't flushed.
-      const computePostingTimes = (): string[] => {
-        const intervalMinutes = parseInt(scheduleBy) || 0;
-        const times: string[] = [];
-        if (intervalMinutes <= 0) return times;
-
-        const fromMinutes = scheduleFrom.hour * 60 + scheduleFrom.minute;
-        const toMinutes = scheduleTo.hour * 60 + scheduleTo.minute;
-        const MINUTES_IN_DAY = 24 * 60;
-        let endMinutes = toMinutes;
-        if (toMinutes <= fromMinutes) {
-          endMinutes = toMinutes + MINUTES_IN_DAY;
-        }
-
-        const maxIterations = Math.ceil((endMinutes - fromMinutes) / Math.max(1, intervalMinutes)) + 2;
-        let iterations = 0;
-        for (let minutes = fromMinutes; minutes <= endMinutes; minutes += intervalMinutes) {
-          if (++iterations > maxIterations) break;
-          const mod = minutes % MINUTES_IN_DAY;
-          const hours = Math.floor(mod / 60);
-          const mins = mod % 60;
-          const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-          times.push(timeStr);
-        }
-        return times;
-      };
-
-      const computedTimes = computePostingTimes();
+      const computedTimes = buildPostingTimes(scheduleFrom, scheduleTo, scheduleBy);
       console.log('handleSubmit computed postingTimes:', computedTimes, 'eventData.postingTimes:', eventData.postingTimes);
 
       let eventDocId = eventId;
@@ -559,11 +492,11 @@ export default function EventCreation() {
 
   // Zoom handlers
   const handleZoomIn = () => {
-    setScale(prev => Math.min(prev + 0.25, 3));
+    setScale(prev => clampScale(prev + 0.25, 0.5, 3));
   };
 
   const handleZoomOut = () => {
-    setScale(prev => Math.max(prev - 0.25, 0.5));
+    setScale(prev => clampScale(prev - 0.25, 0.5, 3));
   };
 
   const handleResetZoom = () => {
@@ -603,13 +536,17 @@ export default function EventCreation() {
     const newX = e.clientX - panStart.x;
     const newY = e.clientY - panStart.y;
 
-    const maxX = Math.max(0, (imgWidth - containerRect.width) / scale);
-    const maxY = Math.max(0, (imgHeight - containerRect.height) / scale);
-
-    setPosition({
-      x: Math.min(0, Math.max(-maxX, newX)),
-      y: Math.min(0, Math.max(-maxY, newY)),
-    });
+    setPosition(
+      clampPanPosition({
+        newX,
+        newY,
+        imgWidth,
+        imgHeight,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+        scale,
+      })
+    );
   };
 
   // Handle pan end

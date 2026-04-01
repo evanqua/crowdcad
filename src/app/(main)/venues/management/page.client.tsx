@@ -17,6 +17,8 @@ import {
 } from 'firebase/storage';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
+import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
+import { clampPanPosition, clampScale } from '@/lib/zoomPanUtils';
 import NewLayerModal from '@/components/modals/venue/newlayer';
 import LocationEditModal from '@/components/modals/venue/locationedit';
 import {
@@ -330,14 +332,17 @@ export default function VenueManagementPageClient() {
     const newX = e.clientX - panStart.x;
     const newY = e.clientY - panStart.y;
 
-    // Clamp position to keep image within view
-    const maxX = Math.max(0, (imgWidth - containerRect.width) / scale);
-    const maxY = Math.max(0, (imgHeight - containerRect.height) / scale);
-
-    setPosition({
-      x: Math.min(0, Math.max(-maxX, newX)),
-      y: Math.min(0, Math.max(-maxY, newY)),
-    });
+    setPosition(
+      clampPanPosition({
+        newX,
+        newY,
+        imgWidth,
+        imgHeight,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+        scale,
+      })
+    );
   };
 
 
@@ -355,21 +360,11 @@ export default function VenueManagementPageClient() {
 
     const rect = img.getBoundingClientRect();
 
-    // Check if click is within image bounds
-    if (
-      evt.clientX < rect.left ||
-      evt.clientX > rect.right ||
-      evt.clientY < rect.top ||
-      evt.clientY > rect.bottom
-    ) {
+    if (!isPointWithinRect(evt.clientX, evt.clientY, rect)) {
       return;
     }
 
-    const xPercent = ((evt.clientX - rect.left) / rect.width) * 100;
-    const yPercent = ((evt.clientY - rect.top) / rect.height) * 100;
-
-    const x = Math.max(0, Math.min(100, xPercent));
-    const y = Math.max(0, Math.min(100, yPercent));
+    const { x, y } = pixelToPercent(evt.clientX, evt.clientY, rect);
 
     // Create temporary marker
     const newPost: Post = {
@@ -487,10 +482,7 @@ export default function VenueManagementPageClient() {
       const rect = img.getBoundingClientRect();
 
       const onMove = (e: MouseEvent) => {
-        const nx = ((e.clientX - rect.left) / rect.width) * 100;
-        const ny = ((e.clientY - rect.top) / rect.height) * 100;
-        const x = Math.max(0, Math.min(100, nx));
-        const y = Math.max(0, Math.min(100, ny));
+        const { x, y } = pixelToPercent(e.clientX, e.clientY, rect);
 
         setVenueData((prev) => {
           const newLayers = [...prev.layers];
@@ -1173,7 +1165,7 @@ export default function VenueManagementPageClient() {
                             isIconOnly
                             size="sm"
                             variant="flat"
-                            onPress={() => setScale(prev => Math.min(prev + 0.5, 5))}
+                            onPress={() => setScale(prev => clampScale(prev + 0.5, 1, 5))}
                             className="bg-surface-deepest/95"
                           >
                             <ZoomIn className="h-4 w-4" />
@@ -1182,7 +1174,7 @@ export default function VenueManagementPageClient() {
                             isIconOnly
                             size="sm"
                             variant="flat"
-                            onPress={() => setScale(prev => Math.max(prev - 0.5, 1))}
+                            onPress={() => setScale(prev => clampScale(prev - 0.5, 1, 5))}
                             className="bg-surface-deepest/95"
                           >
                             <ZoomOut className="h-4 w-4" />
