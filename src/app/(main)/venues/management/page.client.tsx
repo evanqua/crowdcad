@@ -18,7 +18,7 @@ import {
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
-import { clampPanPosition, clampScale } from '@/lib/zoomPanUtils';
+import { useZoomPan } from '@/hooks/useZoomPan';
 import NewLayerModal from '@/components/modals/venue/newlayer';
 import LocationEditModal from '@/components/modals/venue/locationedit';
 import {
@@ -106,11 +106,24 @@ export default function VenueManagementPageClient() {
   // Hidden file input for map upload/replace
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Zoom and pan state
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const {
+    scale,
+    position,
+    isPanning,
+    setScale,
+    setPosition,
+    handleWheel,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+  } = useZoomPan(imgRef, imgContainerRef, {
+    minScale: 1,
+    maxScale: 5,
+    disablePan: () => isAddMarkerMode || draggingIdx !== null,
+  });
 
   // Drag/hover
   const [pendingLayer, setPendingLayer] = useState<number | null>(null);
@@ -148,7 +161,7 @@ export default function VenueManagementPageClient() {
     } else {
       setPreviewUrl(venueData.layers[currentLayer]?.mapUrl || null);
     }
-  }, [mapFile, pendingLayer, currentLayer, venueData.layers]);
+  }, [mapFile, pendingLayer, currentLayer, venueData.layers, setPosition, setScale]);
 
   // Auto-focus marker name input when pending marker is set
   useEffect(() => {
@@ -292,63 +305,6 @@ export default function VenueManagementPageClient() {
       return { ...prev, layers: newLayers };
     });
     setLocationInput('');
-  };
-
-  // Handle zoom
-    // Handle zoom (disabled for wheel/trackpad - use buttons only)
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    // Prevent default scroll behavior but don't zoom
-    e.preventDefault();
-  };
-
-
-  // Handle pan start
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isAddMarkerMode || draggingIdx !== null) return;
-
-    setIsPanning(true);
-    setPanStart({ x: e.clientX - position.x, y: e.clientY - position.y });
-  };
-
-  // Handle pan move
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isPanning) return;
-
-    const img = imgRef.current;
-    const container = imgContainerRef.current;
-    if (!img || !container) {
-      setPosition({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const imgWidth = img.offsetWidth * scale;
-    const imgHeight = img.offsetHeight * scale;
-
-    // Calculate new position
-    const newX = e.clientX - panStart.x;
-    const newY = e.clientY - panStart.y;
-
-    setPosition(
-      clampPanPosition({
-        newX,
-        newY,
-        imgWidth,
-        imgHeight,
-        containerWidth: containerRect.width,
-        containerHeight: containerRect.height,
-        scale,
-      })
-    );
-  };
-
-
-  // Handle pan end
-  const handleMouseUp = () => {
-    setIsPanning(false);
   };
 
   // Handle map click for marker placement
@@ -1165,7 +1121,7 @@ export default function VenueManagementPageClient() {
                             isIconOnly
                             size="sm"
                             variant="flat"
-                            onPress={() => setScale(prev => clampScale(prev + 0.5, 1, 5))}
+                            onPress={() => zoomIn(0.5)}
                             className="bg-surface-deepest/95"
                           >
                             <ZoomIn className="h-4 w-4" />
@@ -1174,7 +1130,7 @@ export default function VenueManagementPageClient() {
                             isIconOnly
                             size="sm"
                             variant="flat"
-                            onPress={() => setScale(prev => clampScale(prev - 0.5, 1, 5))}
+                            onPress={() => zoomOut(0.5)}
                             className="bg-surface-deepest/95"
                           >
                             <ZoomOut className="h-4 w-4" />
@@ -1183,10 +1139,7 @@ export default function VenueManagementPageClient() {
                         <Button
                           size="sm"
                           variant="flat"
-                          onPress={() => {
-                            setScale(1);
-                            setPosition({ x: 0, y: 0 });
-                          }}
+                          onPress={resetZoom}
                           className="bg-surface-deepest/95 text-xs px-2"
                         >
                           Reset

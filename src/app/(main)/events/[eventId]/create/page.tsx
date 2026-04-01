@@ -8,11 +8,12 @@ import { Event, Venue, Staff, Supervisor, Post, EventEquipment } from '@/app/typ
 import { getAuth } from 'firebase/auth';
 import Image from 'next/image';
 import { Tabs, Tab, Input, DatePicker, Select, SelectItem, Checkbox, Button, Card, ScrollShadow, Chip, TimeInput } from '@heroui/react';
-import { parseDate, getLocalTimeZone, today, Time } from '@internationalized/date';
+import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Plus, Trash2 } from 'lucide-react';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
-import { buildPostingTimes } from '@/lib/scheduleUtils';
-import { clampPanPosition, clampScale } from '@/lib/zoomPanUtils';
+import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
+import { useTeamForm } from '@/hooks/useTeamForm';
+import { useZoomPan } from '@/hooks/useZoomPan';
 import { stripUndefined } from '@/lib/utils';
 import AddTeamModal from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
@@ -58,19 +59,46 @@ export default function EventCreation() {
   const imgRef = useRef<HTMLImageElement>(null);
   const submittedRef = useRef(false);
 
-  // Zoom and pan state
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const {
+    scale,
+    position,
+    isPanning,
+    handleWheel,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+  } = useZoomPan(imgRef, imgContainerRef, { minScale: 0.5, maxScale: 3 });
+
+  const {
+    teamName,
+    setTeamName,
+    memberName,
+    setMemberName,
+    memberCert,
+    setMemberCert,
+    isTeamLead,
+    setIsTeamLead,
+    currentMembers,
+    addMember,
+    removeMember,
+    reset: resetTeamForm,
+  } = useTeamForm();
+
+  const {
+    scheduleFrom,
+    setScheduleFrom,
+    scheduleTo,
+    setScheduleTo,
+    scheduleBy,
+    setScheduleBy,
+    postingTimes,
+  } = useScheduleGeneration();
+
   const [hoverId, setHoverId] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<{ left: number; top: number; text: string } | null>(null);
-
-  const [teamName, setTeamName] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [memberCert, setMemberCert] = useState('');
-  const [isTeamLead, setIsTeamLead] = useState(false);
-  const [currentMembers, setCurrentMembers] = useState<{ name: string; cert: string; lead: boolean }[]>([]);
   const [samName, setSamName] = useState('');
   const [samMemberName, setSamMemberName] = useState('');
   const [samCert, setSamCert] = useState('');
@@ -78,9 +106,6 @@ export default function EventCreation() {
   const [openSupervisors, setOpenSupervisors] = useState<Record<number, boolean>>({});
   const [postsEnabled, setPostsEnabled] = useState(true);
   const [lastSelectedPostIndex, setLastSelectedPostIndex] = useState<number | null>(null);
-  const [scheduleFrom, setScheduleFrom] = useState<Time>(new Time(16, 0));
-  const [scheduleTo, setScheduleTo] = useState<Time>(new Time(23, 59));
-  const [scheduleBy, setScheduleBy] = useState('75');
   const [scheduleChips, setScheduleChips] = useState<{ id: string; time: string; editable: boolean }[]>([]);
   const [editingChipId, setEditingChipId] = useState<string | null>(null);
   const [editingChipValue, setEditingChipValue] = useState('');
@@ -99,7 +124,7 @@ export default function EventCreation() {
 
   // Generate schedule chips based on time range and interval
   useEffect(() => {
-    const times = buildPostingTimes(scheduleFrom, scheduleTo, scheduleBy);
+    const times = postingTimes;
     if (times.length === 0) {
       setScheduleChips([]);
       setEventData(prev => ({ ...prev, postingTimes: [] }));
@@ -114,7 +139,7 @@ export default function EventCreation() {
 
     setScheduleChips(chips);
     setEventData(prev => ({ ...prev, postingTimes: times }));
-  }, [scheduleFrom, scheduleTo, scheduleBy]);
+  }, [postingTimes]);
 
   // Autosave postingTimes to the draft event document when they change.
   // Debounced to avoid excessive writes while the user is adjusting inputs.
@@ -211,7 +236,7 @@ export default function EventCreation() {
           return;
         }
           // Ensure postingTimes are computed and included in the draft at creation time
-          const times = buildPostingTimes(scheduleFrom, scheduleTo, scheduleBy);
+          const times = postingTimes;
 
           const draft = {
             ...eventData,
@@ -275,8 +300,7 @@ export default function EventCreation() {
       members,
     };
     setEventData(prev => ({ ...prev, staff: [...(prev.staff || []), newStaff] }));
-    setTeamName("");
-    setCurrentMembers([]);
+    resetTeamForm();
     setIsTeamModalOpen(false);
   };
 
@@ -298,19 +322,6 @@ export default function EventCreation() {
     setIsSupervisorModalOpen(false);
   };
 
-  const addMember = () => {
-    if (memberName.trim() && memberCert) {
-      setCurrentMembers(prev => [...prev, { name: memberName.trim(), cert: memberCert, lead: isTeamLead }]);
-      setMemberName('');
-      setMemberCert('');
-      setIsTeamLead(false);
-    }
-  };
-
-  const removeMember = (index: number) => {
-    setCurrentMembers(prev => prev.filter((_, i) => i !== index));
-  };
-
   const handleSubmit = async () => {
     submittedRef.current = true;
     try {
@@ -327,7 +338,7 @@ export default function EventCreation() {
       }
 
       // Compute postingTimes right before save in case state hasn't flushed.
-      const computedTimes = buildPostingTimes(scheduleFrom, scheduleTo, scheduleBy);
+      const computedTimes = postingTimes;
       console.log('handleSubmit computed postingTimes:', computedTimes, 'eventData.postingTimes:', eventData.postingTimes);
 
       let eventDocId = eventId;
@@ -490,68 +501,16 @@ export default function EventCreation() {
     }));
   };
 
-  // Zoom handlers
   const handleZoomIn = () => {
-    setScale(prev => clampScale(prev + 0.25, 0.5, 3));
+    zoomIn(0.25);
   };
 
   const handleZoomOut = () => {
-    setScale(prev => clampScale(prev - 0.25, 0.5, 3));
+    zoomOut(0.25);
   };
 
   const handleResetZoom = () => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
-  };
-
-  // Handle wheel (prevent default scrolling)
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  };
-
-  // Handle pan start
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    setIsPanning(true);
-    setPanStart({ x: e.clientX - position.x, y: e.clientY - position.y });
-  };
-
-  // Handle pan move
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isPanning) return;
-
-    const img = imgRef.current;
-    const container = imgContainerRef.current;
-    if (!img || !container) {
-      setPosition({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const imgWidth = img.offsetWidth * scale;
-    const imgHeight = img.offsetHeight * scale;
-
-    const newX = e.clientX - panStart.x;
-    const newY = e.clientY - panStart.y;
-
-    setPosition(
-      clampPanPosition({
-        newX,
-        newY,
-        imgWidth,
-        imgHeight,
-        containerWidth: containerRect.width,
-        containerHeight: containerRect.height,
-        scale,
-      })
-    );
-  };
-
-  // Handle pan end
-  const handleMouseUp = () => {
-    setIsPanning(false);
+    resetZoom();
   };
 
   // Convert date string to CalendarDate
