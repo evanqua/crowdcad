@@ -13,6 +13,7 @@ import {
 } from '@heroui/react';
 import { Plus, MoreVertical } from "lucide-react";
 import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment } from '@/app/types';
+import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 
 import {
   Dropdownmenu,
@@ -98,78 +99,16 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   TableColGroup,
 }) => {
   // const ButtonRefs = useRef<Record<string, HTMLElement | null>>({});
-  // Persistent local state for notes/log text per call — never goes null to prevent flicker
-  const [notesTexts, setNotesTexts] = React.useState<Record<string, string>>({});
-  const notesFocusedRef = React.useRef<string | null>(null);
-  const [logTexts, setLogTexts] = React.useState<Record<string, string>>({});
-  const logFocusedRef = React.useRef<string | null>(null);
-
-  // Sync notes from props when not focused
-  React.useEffect(() => {
-    if (!event?.calls) return;
-    setNotesTexts(prev => {
-      const next = { ...prev };
-      for (const call of event.calls) {
-        if (notesFocusedRef.current !== call.id) {
-          next[call.id] = call.notes || '';
-        }
-      }
-      return next;
-    });
-  }, [event?.calls]);
-
-  // Sync log from props when not focused
-  React.useEffect(() => {
-    if (!event?.calls) return;
-    setLogTexts(prev => {
-      const next = { ...prev };
-      for (const call of event.calls) {
-        if (logFocusedRef.current !== call.id) {
-          const text = call.log && call.log.length > 0
-            ? call.log.map((entry: LogEntry) => entry.message).join('\n')
-            : '';
-          next[call.id] = text;
-        }
-      }
-      return next;
-    });
-  }, [event?.calls]);
-  // Track pending values for fields while an update is in-flight to avoid
-  // briefly showing the placeholder '[Edit]' after a blur/save.
-  const [pendingValues, setPendingValues] = React.useState<Record<string, Partial<Record<EditableCallField, string>>>>({});
-
-  React.useEffect(() => {
-    if (!event?.calls || Object.keys(pendingValues).length === 0) return;
-    const newPending = { ...pendingValues } as typeof pendingValues;
-    let changed = false;
-    for (const callId of Object.keys(pendingValues)) {
-      const callNow = event.calls.find((c: Call) => c.id === callId);
-      if (!callNow) {
-        delete newPending[callId];
-        changed = true;
-        continue;
-      }
-      const pv = pendingValues[callId];
-      // If chiefComplaint pending and it matches current call value, remove pending
-      if (pv.chiefComplaint !== undefined) {
-        if ((callNow.chiefComplaint || '') === (pv.chiefComplaint || '')) {
-          delete newPending[callId];
-          changed = true;
-          continue;
-        }
-      }
-      // If ageSex pending and it matches formatted current call value, remove pending
-      if (pv.ageSex !== undefined) {
-        const formatted = formatAgeSex(callNow.age, callNow.gender) || '';
-        if (formatted === (pv.ageSex || '')) {
-          delete newPending[callId];
-          changed = true;
-          continue;
-        }
-      }
-    }
-    if (changed) setPendingValues(newPending);
-  }, [event?.calls, pendingValues, formatAgeSex]);
+  const {
+    notesTexts,
+    setNotesTexts,
+    notesFocusedRef,
+    logTexts,
+    setLogTexts,
+    logFocusedRef,
+    pendingValues,
+    markPendingValue,
+  } = useCallTrackingState(event, formatAgeSex);
 
 
   return (
@@ -247,10 +186,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 }
                               }}
                               onBlur={async () => {
-                                setPendingValues(prev => ({
-                                  ...prev,
-                                  [call.id]: { ...(prev[call.id] || {}), chiefComplaint: editValue }
-                                }));
+                                markPendingValue(call.id, 'chiefComplaint', editValue);
                                 try {
                                   await handleCellBlur(call.id, 'chiefComplaint');
                                 } catch {
@@ -294,10 +230,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                               autoFocus
                               onChange={(e) => setEditValue(e.target.value)}
                               onBlur={async () => {
-                                setPendingValues(prev => ({
-                                  ...prev,
-                                  [call.id]: { ...(prev[call.id] || {}), ageSex: editValue }
-                                }));
+                                markPendingValue(call.id, 'ageSex', editValue);
                                 try {
                                   await handleAgeSexBlur(call.id);
                                 } catch {}
