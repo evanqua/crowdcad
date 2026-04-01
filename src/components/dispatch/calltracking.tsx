@@ -9,11 +9,11 @@ import {
   DropdownTrigger, 
   DropdownMenu, 
   DropdownItem,
-  Textarea
 } from '@heroui/react';
 import { Plus, MoreVertical } from "lucide-react";
 import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment } from '@/app/types';
 import { useCallTrackingState } from '@/hooks/useCallTrackingState';
+import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
 
 import {
   Dropdownmenu,
@@ -1229,115 +1229,68 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                   
                   {/* Expanded row for notes and log - NO ANIMATION */}
                   {openCallId === call.id && (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className={`p-2 border-b border-surface-liner ${getCallRowClass(call)}`}
-                        onClick={() => setOpenCallId(null)}
-                      >
-                        <div className="cursor-pointer">
-                          {call.priority && (
-                            <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
-                              ⚠️ PRIORITY CALL: Life threat to patient/provider
-                            </div>
-                          )}
-                          
-                          {/* Notes - Using HeroUI Textarea - NO LOG ENTRY */}
-                          <div
-                            className="mt-1 mb-3 text-sm text-surface-light"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="font-semibold mb-1">Notes</div>
-                            <Textarea
-                              value={notesTexts[call.id] ?? (call.notes || '')}
-                              onChange={(e) => {
-                                setNotesTexts(prev => ({ ...prev, [call.id]: e.target.value }));
-                              }}
-                              onBlur={async () => {
-                                notesFocusedRef.current = null;
-                                const text = notesTexts[call.id] ?? '';
-                                const callNow = event?.calls.find((c: Call) => c.id === call.id);
-                                if (!callNow) return;
-                                
-                                if ((callNow.notes || '') !== text) {
-                                  const updatedCall = { ...callNow, notes: text };
-                                  const updated = event!.calls.map((c: Call) => 
-                                    c.id === call.id ? updatedCall : c
-                                  );
-                                  await updateEvent({ calls: updated });
-                                }
-                              }}
-                              onFocus={() => {
-                                notesFocusedRef.current = call.id;
-                              }}
-                              minRows={2}
-                              variant="flat"
-                              placeholder="Add notes"
-                              className="min-w-0"
-                              classNames={{
-                                input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0",
-                                inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                              }}
-                            />
-                          </div>
+                    <CallTrackingDetails
+                      key={`${call.id}-details`}
+                      callDisplayNumber={callDisplayNumberMap.get(call.id)}
+                      notesText={notesTexts[call.id] ?? (call.notes || '')}
+                      onNotesChange={(value) => {
+                        setNotesTexts((prev) => ({ ...prev, [call.id]: value }));
+                      }}
+                      onNotesFocus={() => {
+                        notesFocusedRef.current = call.id;
+                      }}
+                      onNotesBlur={async () => {
+                        notesFocusedRef.current = null;
+                        const text = notesTexts[call.id] ?? '';
+                        const callNow = event?.calls.find((currentCall: Call) => currentCall.id === call.id);
+                        if (!callNow) return;
 
-                          
-                          {/* Log - Editable Textarea */}
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <strong>Log for Call #{callDisplayNumberMap.get(call.id)}:</strong>
-                            <Textarea
-                              value={logTexts[call.id] ?? (() => {
-                                if (call.log && call.log.length > 0) {
-                                  return call.log.map((entry: LogEntry) => entry.message).join('\n');
-                                }
-                                return '';
-                              })()}
-                              onChange={(e) => {
-                                setLogTexts(prev => ({ ...prev, [call.id]: e.target.value }));
-                              }}
-                              onBlur={async () => {
-                                logFocusedRef.current = null;
-                                const text = logTexts[call.id] ?? '';
-                                const callNow = event?.calls.find((c: Call) => c.id === call.id);
-                                if (!callNow) return;
-                                
-                                // Convert text back to log entries
-                                const lines = text.split('\n').filter(line => line.trim());
-                                const newLog: LogEntry[] = lines.map(line => ({
-                                  timestamp: Date.now(),
-                                  message: line
-                                }));
-                                
-                                const updatedCall = { ...callNow, log: newLog };
-                                const updated = event!.calls.map((c: Call) => 
-                                  c.id === call.id ? updatedCall : c
-                                );
-                                await updateEvent({ calls: updated });
-                              }}
-                              onFocus={() => {
-                                logFocusedRef.current = call.id;
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  const now = new Date();
-                                  const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                                  setLogTexts(prev => ({ ...prev, [call.id]: (prev[call.id] || '') + `\n${hhmm} - ` }));
-                                }
-                              }}
-                              minRows={4}
-                              variant="flat"
-                              placeholder="No log entries"
-                              className="min-w-0"
-                              classNames={{
-                                input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm",
-                                inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
+                        if ((callNow.notes || '') !== text) {
+                          const updatedCall = { ...callNow, notes: text };
+                          const updated = event!.calls.map((currentCall: Call) =>
+                            currentCall.id === call.id ? updatedCall : currentCall
+                          );
+                          await updateEvent({ calls: updated });
+                        }
+                      }}
+                      logText={logTexts[call.id] ?? (() => {
+                        if (call.log && call.log.length > 0) {
+                          return call.log.map((entry: LogEntry) => entry.message).join('\n');
+                        }
+                        return '';
+                      })()}
+                      onLogChange={(value) => {
+                        setLogTexts((prev) => ({ ...prev, [call.id]: value }));
+                      }}
+                      onLogFocus={() => {
+                        logFocusedRef.current = call.id;
+                      }}
+                      onLogBlur={async () => {
+                        logFocusedRef.current = null;
+                        const text = logTexts[call.id] ?? '';
+                        const callNow = event?.calls.find((currentCall: Call) => currentCall.id === call.id);
+                        if (!callNow) return;
+
+                        const lines = text.split('\n').filter((line) => line.trim());
+                        const newLog: LogEntry[] = lines.map((line) => ({
+                          timestamp: Date.now(),
+                          message: line,
+                        }));
+
+                        const updatedCall = { ...callNow, log: newLog };
+                        const updated = event!.calls.map((currentCall: Call) =>
+                          currentCall.id === call.id ? updatedCall : currentCall
+                        );
+                        await updateEvent({ calls: updated });
+                      }}
+                      onLogInsertTimestamp={() => {
+                        const now = new Date();
+                        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+                        setLogTexts((prev) => ({ ...prev, [call.id]: (prev[call.id] || '') + `\n${hhmm} - ` }));
+                      }}
+                      onClose={() => setOpenCallId(null)}
+                      priority={call.priority}
+                    />
                   )}
                 </React.Fragment>
                 );
