@@ -7,13 +7,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Event, Venue, Staff, Supervisor, Post, EventEquipment } from '@/app/types';
 import { getAuth } from 'firebase/auth';
 import Image from 'next/image';
-import { Tabs, Tab, Input, DatePicker, Select, SelectItem, Checkbox, Button, Card, ScrollShadow, Chip, TimeInput } from '@heroui/react';
+import { Tabs, Tab, Button, Card, ScrollShadow } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { useTeamForm } from '@/hooks/useTeamForm';
 import { useZoomPan } from '@/hooks/useZoomPan';
+import MetadataSection from '@/components/event-create/MetadataSection';
+import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
+import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
+import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
+import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/event-create/PostsEquipmentSection';
 import { stripUndefined } from '@/lib/utils';
 import AddTeamModal from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
@@ -537,33 +542,12 @@ export default function EventCreation() {
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <div className="px-6 pt-4 pb-0">
                     {/* Event Name and Date (side-by-side) */}
-                    <div className="flex items-end gap-4">
-                      <div style={{ flex: 4 }}>
-                        <Input
-                          label="Event Name"
-                          labelPlacement="outside"
-                          placeholder="Enter event name"
-                          value={eventData.name || ''}
-                          onValueChange={(value) => setEventData(prev => ({ ...prev, name: value }))}
-                          classNames={inputClassNames}
-                          size="lg"
-                        />
-                      </div>
-                      <div style={{ flex: 3 }}>
-                        <DatePicker
-                          label="Event Date"
-                          labelPlacement="outside"
-                          value={getCalendarDate()}
-                          onChange={(date) => {
-                            if (date) {
-                              setEventData(prev => ({ ...prev, date: date.toString() }));
-                            }
-                          }}
-                          classNames={inputClassNames}
-                          size="lg"
-                        />
-                      </div>
-                    </div>
+                    <MetadataSection
+                      eventData={eventData}
+                      setEventData={setEventData}
+                      getCalendarDate={getCalendarDate}
+                      inputClassNames={inputClassNames}
+                    />
 
                     {/* Tabs with blurred background - extends to bottom */}
                     <Card
@@ -582,323 +566,63 @@ export default function EventCreation() {
                       }}
                     >
                       <Tab key="teams" title="Teams" className="flex flex-col h-full">
-                        {/* Teams header with add button (sticky at top) */}
-                        <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
-                          <h3 className="text-white font-semibold text-lg">Teams</h3>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            onPress={() => setIsTeamModalOpen(true)}
-                            className="min-w-8 w-8 h-8"
-                            style={{ backgroundColor: '#27272a' }}
-                          >
-                            <Plus className="h-4 w-4 text-white" />
-                          </Button>
-                        </div>
-
-                        {/* Teams list (scrollable) */}
-                        <div className="px-4 py-3">
-                          <ScrollShadow className="space-y-2 pr-2 scrollbar-hide" hideScrollBar style={{ minHeight: 'calc(100vh - 334px)', maxHeight: 'calc(100vh - 334px)', overflow: 'auto' }}>
-                            {(eventData.staff || []).map((staff, idx) => (
-                              <div key={idx} className="rounded-2xl p-3" style={{ backgroundColor: '#27272a' }}>
-                                <div
-                                  className="flex items-center justify-between cursor-pointer"
-                                  onClick={() => setOpenTeams(prev => ({ ...prev, [idx]: !prev[idx] }))}
-                                >
-                                  <span className="text-white font-medium">{staff.team}</span>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteTeam(idx); }}
-                                      className="p-1 rounded bg-transparent"
-                                      aria-label="Delete team"
-                                    >
-                                      <Trash2 className="h-4 w-4 text-white" />
-                                    </button>
-                                  </div>
-                                </div>
-                                {openTeams[idx] && (
-                                  <ul className="mt-2 list-disc list-inside text-sm text-gray-300">
-                                    {staff.members.map((member, mIdx) => (
-                                      <li key={mIdx}>{member}</li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
-                            ))}
-                          </ScrollShadow>
-                        </div>
+                        <TeamStaffingSection
+                          staff={eventData.staff || []}
+                          openTeams={openTeams}
+                          setOpenTeams={setOpenTeams}
+                          onDeleteTeam={handleDeleteTeam}
+                          onAddTeam={() => setIsTeamModalOpen(true)}
+                        />
                       </Tab>
 
                       <Tab key="supervisors" title="Supervisors" className="flex flex-col h-full">
-                        {/* Supervisors header with add button (sticky at top) */}
-                        <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
-                          <h3 className="text-white font-semibold text-lg">Supervisors</h3>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            onPress={() => setIsSupervisorModalOpen(true)}
-                            className="min-w-8 w-8 h-8"
-                            style={{ backgroundColor: '#27272a' }}
-                          >
-                            <Plus className="h-4 w-4 text-white" />
-                          </Button>
-                        </div>
-
-                        {/* Supervisors list (scrollable) */}
-                        <div className="px-4 py-3">
-                          <ScrollShadow className="space-y-2 pr-2 scrollbar-hide" hideScrollBar style={{ minHeight: 'calc(100vh - 334px)', maxHeight: 'calc(100vh - 334px)', overflow: 'auto' }}>
-                            {(eventData.supervisor || []).map((supervisor, idx) => (
-                              <div key={idx} className="rounded-2xl p-3" style={{ backgroundColor: '#27272a' }}>
-                                <div
-                                  className="flex items-center justify-between cursor-pointer"
-                                  onClick={() => setOpenSupervisors(prev => ({ ...prev, [idx]: !prev[idx] }))}
-                                >
-                                  <span className="text-white font-medium">{supervisor.team}</span>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => { e.stopPropagation(); handleDeleteSupervisor(idx); }}
-                                      className="p-1 rounded bg-transparent"
-                                      aria-label="Delete supervisor"
-                                    >
-                                      <Trash2 className="h-4 w-4 text-white" />
-                                    </button>
-                                  </div>
-                                </div>
-                                {openSupervisors[idx] && (
-                                  <ul className="mt-2 list-disc list-inside text-sm text-gray-300">
-                                    <li>{supervisor.member}</li>
-                                  </ul>
-                                )}
-                              </div>
-                            ))}
-                          </ScrollShadow>
-                        </div>
+                        <SupervisorStaffingSection
+                          supervisors={eventData.supervisor || []}
+                          openSupervisors={openSupervisors}
+                          setOpenSupervisors={setOpenSupervisors}
+                          onDeleteSupervisor={handleDeleteSupervisor}
+                          onAddSupervisor={() => setIsSupervisorModalOpen(true)}
+                        />
                       </Tab>
 
                       <Tab key="posts" title="Posts" className="flex flex-col h-full">
-                        <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
-                          <h3 className="text-white font-semibold text-lg">Posts</h3>
-                          <Checkbox
-                            isSelected={postsEnabled}
-                            onValueChange={setPostsEnabled}
-                            size="sm"
-                          >
-                            <span className="text-sm text-white">Enable Posts</span>
-                          </Checkbox>
-                        </div>
-
                         <div className="px-4 py-3">
                           <ScrollShadow className="space-y-4 pr-2 scrollbar-hide" hideScrollBar style={{ minHeight: 'calc(100vh - 334px)', maxHeight: 'calc(100vh - 334px)', overflow: 'auto' }}>
-                            {hasVenue && (
-                              <>
-                                <div className={`space-y-3 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
-                                  <Select
-                                    label="Select Posts"
-                                    labelPlacement="outside"
-                                    placeholder="Choose posts for this event"
-                                    selectionMode="multiple"
-                                    // Controlled selection via eventData.eventPosts
-                                    selectedKeys={new Set((eventData.eventPosts || []).map(p => getPostName(p)))}
-                                    // We'll manage selection via click handlers to support shift-range
-                                    isDisabled={!postsEnabled}
-                                    classNames={selectClassNames}
-                                    size="lg"
-                                    disabledKeys={[]}
-                                  >
-                                    {flattenedPosts.map(({ post, layerName }, idx) => {
-                                      const postName = getPostName(post);
-                                      return (
-                                        <SelectItem
-                                          key={postName}
-                                          textValue={postName}
-                                          onClick={(e: React.MouseEvent) => {
-                                            // Use native MouseEvent to detect shiftKey
-                                            const me = e as React.MouseEvent;
-                                            // Prevent the Select component from toggling selection itself; we'll control state
-                                            me.preventDefault();
-                                            me.stopPropagation();
-                                            // Range selection when shift is held
-                                            if (me.shiftKey && lastSelectedPostIndex !== null) {
-                                              const start = Math.min(lastSelectedPostIndex, idx);
-                                              const end = Math.max(lastSelectedPostIndex, idx);
-                                              const namesInRange = flattenedPosts.slice(start, end + 1).map(fp => getPostName(fp.post));
-                                              const uniqueNames = Array.from(new Set([...(eventData.eventPosts || []).map(p => getPostName(p)), ...namesInRange]));
-                                              const newPosts = uniqueNames.map(name => allPosts.find(p => getPostName(p) === name)!).filter(Boolean);
-                                              setEventData(prev => ({ ...prev, eventPosts: newPosts }));
-                                              setLastSelectedPostIndex(idx);
-                                              return;
-                                            }
-
-                                            const selectedSet = new Set((eventData.eventPosts || []).map(p => getPostName(p)));
-
-                                            // Shift+click: add the range between last and current to selection
-                                            if (me.shiftKey && lastSelectedPostIndex !== null) {
-                                              const start = Math.min(lastSelectedPostIndex, idx);
-                                              const end = Math.max(lastSelectedPostIndex, idx);
-                                              const namesInRange = flattenedPosts.slice(start, end + 1).map(fp => getPostName(fp.post));
-                                              for (const n of namesInRange) selectedSet.add(n);
-                                              const newPosts = Array.from(selectedSet).map(name => allPosts.find(p => getPostName(p) === name)!).filter(Boolean);
-                                              setEventData(prev => ({ ...prev, eventPosts: newPosts }));
-                                              setLastSelectedPostIndex(idx);
-                                              return;
-                                            }
-
-                                            // Ctrl/Cmd click: toggle single item
-                                            if (me.ctrlKey || me.metaKey) {
-                                              if (selectedSet.has(postName)) selectedSet.delete(postName);
-                                              else selectedSet.add(postName);
-                                              const newPosts = Array.from(selectedSet).map(name => allPosts.find(p => getPostName(p) === name)!).filter(Boolean);
-                                              setEventData(prev => ({ ...prev, eventPosts: newPosts }));
-                                              setLastSelectedPostIndex(idx);
-                                              return;
-                                            }
-
-                                            // Default click: toggle single item (preserve other selections)
-                                            if (selectedSet.has(postName)) selectedSet.delete(postName);
-                                            else selectedSet.add(postName);
-                                            const newPosts = Array.from(selectedSet).map(name => allPosts.find(p => getPostName(p) === name)!).filter(Boolean);
-                                            setEventData(prev => ({ ...prev, eventPosts: newPosts }));
-                                            setLastSelectedPostIndex(idx);
-                                          }}
-                                        >
-                                          {postName} ({layerName})
-                                        </SelectItem>
-                                      );
-                                    })}
-                                  </Select>
-
-                                  {(eventData.eventPosts || []).length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
-                                      {(eventData.eventPosts || []).map((post, idx) => {
-                                        const postName = getPostName(post);
-                                        return (
-                                          <Chip
-                                            key={idx}
-                                            onClose={() => {
-                                              setEventData(prev => ({
-                                                ...prev,
-                                                eventPosts: (prev.eventPosts || []).filter((_, i) => i !== idx)
-                                              }));
-                                            }}
-                                            variant="flat"
-                                            style={{ backgroundColor: '#3eb1fd33', color: '#3eb1fd' }}
-                                          >
-                                            {postName}
-                                          </Chip>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className={`space-y-3 mt-6 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
-                                  <h3 className="text-white font-semibold text-lg">Schedule</h3>
-                                  
-                                  <div className="grid grid-cols-3 gap-3">
-                                    <TimeInput
-                                      label="From"
-                                      labelPlacement="inside"
-                                      value={scheduleFrom}
-                                      onChange={(value) => value && setScheduleFrom(value)}
-                                      hourCycle={24}
-                                      isDisabled={!postsEnabled}
-                                      classNames={inputClassNames}
-                                      size="md"
-                                    />
-                                    <TimeInput
-                                      label="To"
-                                      labelPlacement="inside"
-                                      value={scheduleTo}
-                                      onChange={(value) => value && setScheduleTo(value)}
-                                      hourCycle={24}
-                                      isDisabled={!postsEnabled}
-                                      classNames={inputClassNames}
-                                      size="md"
-                                    />
-                                    <Input
-                                      label="By"
-                                      labelPlacement="inside"
-                                      placeholder="75"
-                                      value={scheduleBy}
-                                      onValueChange={setScheduleBy}
-                                      type="number"
-                                      min="1"
-                                      endContent="min"
-                                      isDisabled={!postsEnabled}
-                                      classNames={inputClassNames}
-                                      size="md"
-                                    />
-                                  </div>
-
-                                  {scheduleChips.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mt-4">
-                                      {scheduleChips.map((chip) => (
-                                        <Chip
-                                          key={chip.id}
-                                          onClose={() => {
-                                            const timeToRemove = chip.time;
-                                            setScheduleChips(prev => prev.filter(c => c.id !== chip.id));
-                                            setEventData(prev => ({
-                                              ...prev,
-                                              postingTimes: (prev.postingTimes || []).filter(t => t !== timeToRemove)
-                                            }));
-                                          }}
-                                          variant="flat"
-                                          style={{ backgroundColor: '#3eb1fd33', color: '#3eb1fd' }}
-                                          onClick={() => {
-                                            setEditingChipId(chip.id);
-                                            setEditingChipValue(chip.time);
-                                          }}
-                                          className="cursor-pointer"
-                                        >
-                                          {editingChipId === chip.id ? (
-                                            <input
-                                              type="text"
-                                              value={editingChipValue}
-                                              onChange={(e) => setEditingChipValue(e.target.value)}
-                                              onBlur={() => {
-                                                const oldTime = scheduleChips.find(c => c.id === chip.id)?.time;
-                                                setScheduleChips(prev => prev.map(c => 
-                                                  c.id === chip.id ? { ...c, time: editingChipValue } : c
-                                                ));
-                                                if (oldTime) {
-                                                  setEventData(prev => ({
-                                                    ...prev,
-                                                    postingTimes: (prev.postingTimes || []).map(t => t === oldTime ? editingChipValue : t)
-                                                  }));
-                                                }
-                                                setEditingChipId(null);
-                                              }}
-                                              onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                  const oldTime = scheduleChips.find(c => c.id === chip.id)?.time;
-                                                  setScheduleChips(prev => prev.map(c => 
-                                                    c.id === chip.id ? { ...c, time: editingChipValue } : c
-                                                  ));
-                                                  if (oldTime) {
-                                                    setEventData(prev => ({
-                                                      ...prev,
-                                                      postingTimes: (prev.postingTimes || []).map(t => t === oldTime ? editingChipValue : t)
-                                                    }));
-                                                  }
-                                                  setEditingChipId(null);
-                                                }
-                                              }}
-                                              autoFocus
-                                              className="bg-transparent outline-none w-16 text-center"
-                                            />
-                                          ) : (
-                                            chip.time
-                                          )}
-                                        </Chip>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </>
-                            )}
+                            <PostsSelectionSection
+                              hasVenue={hasVenue}
+                              postsEnabled={postsEnabled}
+                              setPostsEnabled={setPostsEnabled}
+                              flattenedPosts={flattenedPosts}
+                              allPosts={allPosts}
+                              getPostName={getPostName}
+                              eventData={eventData as Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] }}
+                              setEventData={setEventData as React.Dispatch<React.SetStateAction<Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] }>>}
+                              lastSelectedPostIndex={lastSelectedPostIndex}
+                              setLastSelectedPostIndex={setLastSelectedPostIndex}
+                              selectClassNames={selectClassNames}
+                            />
+                            <PostingScheduleSection
+                              postsEnabled={postsEnabled}
+                              scheduleFrom={scheduleFrom}
+                              setScheduleFrom={setScheduleFrom}
+                              scheduleTo={scheduleTo}
+                              setScheduleTo={setScheduleTo}
+                              scheduleBy={scheduleBy}
+                              setScheduleBy={setScheduleBy}
+                              scheduleChips={scheduleChips}
+                              setScheduleChips={setScheduleChips}
+                              editingChipId={editingChipId}
+                              setEditingChipId={setEditingChipId}
+                              editingChipValue={editingChipValue}
+                              setEditingChipValue={setEditingChipValue}
+                              setPostingTimes={(updater) =>
+                                setEventData((prev) => ({
+                                  ...prev,
+                                  postingTimes: updater(prev.postingTimes || []),
+                                }))
+                              }
+                              inputClassNames={inputClassNames}
+                            />
                           </ScrollShadow>
                         </div>
                       </Tab>
@@ -909,70 +633,14 @@ export default function EventCreation() {
                           <h3 className="text-white font-semibold text-lg">Equipment</h3>
                           <div />
                         </div>
-
-                        <div className="flex-1 px-4 py-3">
-                          {hasVenue && (
-                            <ScrollShadow className="space-y-2 pr-2 scrollbar-hide" hideScrollBar style={{ minHeight: 'calc(100vh - 334px)', maxHeight: 'calc(100vh - 334px)', overflow: 'auto' }}>
-                              {eventData.venue?.equipment?.map(equip => {
-                                const selectedEquip = eventData.eventEquipment.find(e => e.id === equip.id);
-                                const isSelected = !!selectedEquip;
-                                return (
-                                  <div key={equip.id} className="rounded-2xl p-3" style={{ backgroundColor: '#27272a' }}>
-                                    <div className="flex items-center gap-3">
-                                      <Checkbox
-                                        isSelected={isSelected}
-                                        onValueChange={(checked) => {
-                                          if (checked) {
-                                            setEventData(prev => ({ 
-                                              ...prev, 
-                                              eventEquipment: [...prev.eventEquipment, { ...equip, defaultLocation: undefined }] 
-                                            }));
-                                          } else {
-                                            setEventData(prev => ({ 
-                                              ...prev, 
-                                              eventEquipment: prev.eventEquipment.filter(e => e.id !== equip.id) 
-                                            }));
-                                          }
-                                        }}
-                                      />
-                                      <span className="text-white font-medium flex-shrink-0">{equip.name}</span>
-                                      {isSelected && (
-                                        <Select
-                                          placeholder="Select Default Location"
-                                          selectedKeys={selectedEquip?.defaultLocation ? [selectedEquip.defaultLocation] : []}
-                                          onSelectionChange={(keys) => {
-                                            const locName = Array.from(keys)[0] as string;
-                                            setEventData(prev => ({
-                                              ...prev,
-                                              eventEquipment: prev.eventEquipment.map(e =>
-                                                e.id === equip.id ? { ...e, defaultLocation: locName } : e
-                                              ),
-                                            }));
-                                          }}
-                                          classNames={{
-                                            ...selectClassNames,
-                                            base: 'max-w-[200px]',
-                                          }}
-                                          size="sm"
-                                          className="ml-auto"
-                                        >
-                                          {allPosts.map(post => {
-                                            const postName = getPostName(post);
-                                            return (
-                                              <SelectItem key={postName}>
-                                                {postName}
-                                              </SelectItem>
-                                            );
-                                          })}
-                                        </Select>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </ScrollShadow>
-                          )}
-                        </div>
+                        <EquipmentSelectionSection
+                          hasVenue={hasVenue}
+                          eventData={eventData as Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] }}
+                          setEventData={setEventData as React.Dispatch<React.SetStateAction<Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] }>>}
+                          selectClassNames={selectClassNames}
+                          allPosts={allPosts}
+                          getPostName={getPostName}
+                        />
                       </Tab>
                     </Tabs>
                     </Card>

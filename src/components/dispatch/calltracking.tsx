@@ -56,7 +56,6 @@ interface CallTrackingTableProps {
   computeCallStatus: (call: Call) => string;
   formatAgeSex: (age?: string | number, gender?: string) => string;
   TableColGroup: React.ComponentType;
-  PortalDropdown: React.ComponentType<unknown>;
 }
 
 interface DetachedTeam {

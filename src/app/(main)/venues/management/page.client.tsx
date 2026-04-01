@@ -11,16 +11,19 @@ import { addDoc, collection, doc, getDoc, updateDoc } from 'firebase/firestore';
 import {
   getStorage,
   ref,
-  uploadBytes,
-  getDownloadURL,
-  type StorageReference,
 } from 'firebase/storage';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
+import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import NewLayerModal from '@/components/modals/venue/newlayer';
 import LocationEditModal from '@/components/modals/venue/locationedit';
+import EquipmentManagementSection from '@/components/venue-management/EquipmentManagementSection';
+import LayerControlBar from '@/components/venue-management/LayerControlBar';
+import MarkerModeToggleButton from '@/components/venue-management/MarkerModeToggleButton';
+import PendingMarkerDialog from '@/components/venue-management/PendingMarkerDialog';
+import MarkerPlacementInstruction from '@/components/venue-management/MarkerPlacementInstruction';
 import {
   Button,
   Input,
@@ -37,11 +40,8 @@ import {
   Trash2, 
   Edit2,
   MapPinned,
-  MousePointer2,
   ZoomIn,
   ZoomOut,
-  ChevronLeft,
-  ChevronRight
 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -520,42 +520,6 @@ export default function VenueManagementPageClient() {
       });
   };
 
-  // Upload w/ retry
-  const uploadWithRetry = async (
-    storageRef: StorageReference,
-    file: File,
-    maxRetries = 3,
-    baseDelay = 1200
-  ): Promise<string> => {
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
-      } catch (err: unknown) {
-        const code =
-          typeof err === 'object' && err !== null && 'code' in err
-            ? (err as { code?: unknown }).code
-            : undefined;
-
-        const isRetryable =
-          code === 'storage/retry-limit-exceeded' ||
-          code === 'storage/unknown' ||
-          code === 'storage/canceled' ||
-          code === 'storage/quota-exceeded' ||
-          code === 'storage/unauthenticated';
-
-        if (attempt < maxRetries - 1 && isRetryable) {
-          const wait = baseDelay * Math.pow(2, attempt);
-          await new Promise((res) => setTimeout(res, wait));
-          continue;
-        }
-
-        throw new Error('Upload failed');
-      }
-    }
-    throw new Error('Max retries exceeded');
-  };
-
   // Create venue
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -820,122 +784,19 @@ export default function VenueManagementPageClient() {
                       )}
                     </Tab>
                     <Tab key="equipment" title="Equipment">
-                      <label className="mb-2 block text-sm font-medium text-white">
-                        Equipment <span className="text-surface-light text-xs">(Optional)</span>
-                      </label>
-                      <div className="flex gap-2 mb-3">
-                        <Input
-                          placeholder="e.g., Gurney 1"
-                          value={equipmentInput}
-                          onValueChange={setEquipmentInput}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addEquipment();
-                            }
-                          }}
-                          variant="flat"
-                          classNames={{
-                            input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                            inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
-                          }}
-                        />
-                        <Button
-                          isIconOnly
-                          onPress={addEquipment}
-                          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-white"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {venueData.equipment.length > 0 && (
-                        <ScrollShadow className="space-y-2 pr-2 max-h-[calc(100vh-430px)] scrollbar-hide">
-                          {venueData.equipment.map((item, idx) => (
-                            <Card
-                              key={idx}
-                              isBlurred
-                              className="border-2 rounded-2xl border-default-200 bg-transparent"
-                            >
-                              <div className="flex items-center justify-between px-3 py-2">
-                                {editingEquipmentIndex === idx ? (
-                                  <>
-                                    <Input
-                                      value={equipmentEditInput}
-                                      onValueChange={setEquipmentEditInput}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          saveEquipmentEdit();
-                                        } else if (e.key === 'Escape') {
-                                          e.preventDefault();
-                                          cancelEquipmentEdit();
-                                        }
-                                      }}
-                                      variant="flat"
-                                      size="sm"
-                                      autoFocus
-                                      classNames={{
-                                        input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                                        inputWrapper: 'rounded-lg px-2 hover:bg-surface-deep',
-                                      }}
-                                    />
-                                    <div className="flex items-center gap-1 ml-2">
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        variant="light"
-                                        color="success"
-                                        onPress={saveEquipmentEdit}
-                                        className="min-w-6 w-6 h-6 flex-shrink-0"
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        variant="light"
-                                        onPress={cancelEquipmentEdit}
-                                        className="min-w-6 w-6 h-6 flex-shrink-0"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                      <span className="text-sm text-white truncate">
-                                        {item.name}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        variant="light"
-                                        onPress={() => startEditEquipment(idx)}
-                                        className="min-w-6 w-6 h-6 flex-shrink-0"
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        variant="light"
-                                        color="danger"
-                                        onPress={() => removeEquipment(idx)}
-                                        className="min-w-6 w-6 h-6 flex-shrink-0"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </Card>
-                          ))}
-                        </ScrollShadow>
-                      )}
+                      <EquipmentManagementSection
+                        equipmentInput={equipmentInput}
+                        setEquipmentInput={setEquipmentInput}
+                        addEquipment={addEquipment}
+                        equipment={venueData.equipment}
+                        editingEquipmentIndex={editingEquipmentIndex}
+                        equipmentEditInput={equipmentEditInput}
+                        setEquipmentEditInput={setEquipmentEditInput}
+                        saveEquipmentEdit={saveEquipmentEdit}
+                        cancelEquipmentEdit={cancelEquipmentEdit}
+                        startEditEquipment={startEditEquipment}
+                        removeEquipment={removeEquipment}
+                      />
                     </Tab>
                   </Tabs>
                 </div>
@@ -989,16 +850,10 @@ export default function VenueManagementPageClient() {
                 </div>
                 {previewUrl && (
                   <div className="flex gap-2">
-                    <Button
-                      size="md"
-                      variant={isAddMarkerMode ? 'solid' : 'bordered'}
-                      color={isAddMarkerMode ? 'primary' : 'default'}
-                      onPress={() => setIsAddMarkerMode(!isAddMarkerMode)}
-                      startContent={isAddMarkerMode ? <MousePointer2 className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
-                      className={isAddMarkerMode ? 'bg-accent hover:bg-accent/90' : ''}
-                    >
-                      {isAddMarkerMode ? 'Click to Place' : 'Add Markers'}
-                    </Button>
+                    <MarkerModeToggleButton
+                      isAddMarkerMode={isAddMarkerMode}
+                      onToggle={() => setIsAddMarkerMode(!isAddMarkerMode)}
+                    />
                   </div>
                 )}
               </div>
@@ -1064,54 +919,13 @@ export default function VenueManagementPageClient() {
                       </div>
 
                       {pendingMarker && (
-                        <div
-                          className="fixed z-30 w-52 rounded-lg border border-status-blue bg-surface-deepest p-3 shadow-xl"
-                          style={{
-                            left: '50%',
-                            top: '50%',
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                        >
-                          <p className="mb-2 text-xs font-medium text-white">Name this location:</p>
-                          <Input
-                            ref={markerInputRef}
-                            value={markerNameInput}
-                            onValueChange={setMarkerNameInput}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                confirmMarkerName();
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                cancelMarkerName();
-                              }
-                            }}
-                            placeholder="Location name"
-                            size="sm"
-                            variant="bordered"
-                            classNames={{
-                              input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                              inputWrapper: 'px-4 hover:bg-surface-deep mb-2',
-                            }}
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              onPress={cancelMarkerName}
-                              className="flex-1"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onPress={confirmMarkerName}
-                              className="flex-1 bg-accent hover:bg-accent/90 text-white"
-                            >
-                              Confirm
-                            </Button>
-                          </div>
-                        </div>
+                        <PendingMarkerDialog
+                          markerNameInput={markerNameInput}
+                          markerInputRef={markerInputRef}
+                          setMarkerNameInput={setMarkerNameInput}
+                          onConfirm={confirmMarkerName}
+                          onCancel={cancelMarkerName}
+                        />
                       )}
 
                       {/* Zoom Controls - Top Right */}
@@ -1147,78 +961,21 @@ export default function VenueManagementPageClient() {
                       </div>
 
                       {/* Instructions overlay - Top Left */}
-                      {isAddMarkerMode && !pendingMarker && (
-                        <div className="absolute left-3 top-3 rounded-lg border border-status-blue/50 bg-surface-deepest/95 px-3 py-2 z-20 pointer-events-none">
-                          <p className="text-xs text-status-blue">
-                            Click on the map to place a location marker
-                          </p>
-                        </div>
-                      )}
+                      {isAddMarkerMode && !pendingMarker && <MarkerPlacementInstruction />}
                     </div>
 
                     {/* Bottom Info Bar - Now OUTSIDE and BELOW the image container */}
-                    <Card
-                      isBlurred
-                      className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <MapPinned className="h-4 w-4 text-accent" />
-                          <span className="text-xs text-surface-light truncate max-w-[120px]">{mapFileName}</span>
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            onPress={() => fileInputRef.current?.click()}
-                            startContent={<Upload className="h-3 w-3" />}
-                            className="ml-2"
-                          >
-                            Replace
-                          </Button>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            isDisabled={currentLayer <= 0}
-                            onPress={() => setCurrentLayer(currentLayer - 1)}
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </Button>
-                          <span
-                            className="text-xs text-surface-light min-w-[100px] text-center"
-                          >
-                            {venueData.layers?.[currentLayer]?.name || 'Layer'}
-                          </span>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            isDisabled={!venueData.layers || currentLayer >= venueData.layers.length - 1}
-                            onPress={() => setCurrentLayer(currentLayer + 1)}
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            color="danger"
-                            onPress={deleteLayer}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            onPress={() => setIsNewLayerModalOpen(true)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
+                    <LayerControlBar
+                      mapFileName={mapFileName}
+                      onReplaceMap={() => fileInputRef.current?.click()}
+                      currentLayer={currentLayer}
+                      totalLayers={venueData.layers?.length ?? 0}
+                      currentLayerName={venueData.layers?.[currentLayer]?.name || 'Layer'}
+                      onPreviousLayer={() => setCurrentLayer(currentLayer - 1)}
+                      onNextLayer={() => setCurrentLayer(currentLayer + 1)}
+                      onDeleteLayer={deleteLayer}
+                      onAddLayer={() => setIsNewLayerModalOpen(true)}
+                    />
                   </div>
                 ) : (
                   <Card

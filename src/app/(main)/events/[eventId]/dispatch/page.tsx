@@ -29,7 +29,6 @@ import { ShieldAlert } from 'lucide-react';
 import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip } from "@heroui/react"
 import EquipmentCard from '@/components/dispatch/equipmentcard';
 import LoadingScreen from '@/components/ui/loading-screen';
-import PortalDropdown from '@/components/ui/portal-dropdown';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 
 interface DispatchRoutePageProps {
@@ -3246,7 +3245,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         computeCallStatus={computeCallStatus}
                         formatAgeSex={formatAgeSex}
                         TableColGroup={TableColGroup}
-                        PortalDropdown={PortalDropdown as unknown as React.ComponentType<unknown>}
                       />
                     </div>
 
