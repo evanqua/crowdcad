@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { Button, Card } from '@heroui/react';
 import { ChevronLeft, ChevronRight, MapPinned, Plus, Trash2, Upload } from 'lucide-react';
@@ -51,6 +53,8 @@ export default function LayerControlBar({
             variant="flat"
             isDisabled={currentLayer <= 0}
             onPress={onPreviousLayer}
+            aria-label="Previous layer"
+            title="Previous layer"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -61,6 +65,8 @@ export default function LayerControlBar({
             variant="flat"
             isDisabled={totalLayers <= 1 || currentLayer >= totalLayers - 1}
             onPress={onNextLayer}
+            aria-label="Next layer"
+            title="Next layer"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -70,6 +76,8 @@ export default function LayerControlBar({
             variant="flat"
             color="danger"
             onPress={onDeleteLayer}
+            aria-label="Delete layer"
+            title="Delete layer"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -78,6 +86,8 @@ export default function LayerControlBar({
             size="sm"
             variant="flat"
             onPress={onAddLayer}
+            aria-label="Add layer"
+            title="Add layer"
           >
             <Plus className="h-4 w-4" />
           </Button>

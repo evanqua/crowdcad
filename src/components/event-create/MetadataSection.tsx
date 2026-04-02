@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { DateValue } from '@internationalized/date';
 import { DatePicker, Input } from '@heroui/react';

@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { Button, ButtonGroup } from '@heroui/react';
 import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
@@ -22,14 +24,14 @@ export default function MapZoomControls({
   return (
     <div className={className}>
       <ButtonGroup>
-        <Button isIconOnly size="sm" variant="flat" onPress={onZoomIn} className={buttonClassName}>
+        <Button isIconOnly size="sm" variant="flat" onPress={onZoomIn} className={buttonClassName} aria-label="Zoom in" title="Zoom in">
           <ZoomIn className="h-4 w-4" />
         </Button>
-        <Button isIconOnly size="sm" variant="flat" onPress={onZoomOut} className={buttonClassName}>
+        <Button isIconOnly size="sm" variant="flat" onPress={onZoomOut} className={buttonClassName} aria-label="Zoom out" title="Zoom out">
           <ZoomOut className="h-4 w-4" />
         </Button>
       </ButtonGroup>
-      <Button size="sm" variant="flat" onPress={onReset} className={resetButtonClassName}>
+      <Button size="sm" variant="flat" onPress={onReset} className={resetButtonClassName} aria-label="Reset zoom" title="Reset zoom">
         <RotateCcw className="h-4 w-4" />
       </Button>
     </div>

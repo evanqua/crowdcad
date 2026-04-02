@@ -6,11 +6,14 @@ export const uploadWithRetry = async (
   maxRetries = 3,
   baseDelay = 1200
 ): Promise<string> => {
+  let lastError: unknown;
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       await uploadBytes(storageRef, file);
       return await getDownloadURL(storageRef);
     } catch (err: unknown) {
+      lastError = err;
       const code =
         typeof err === 'object' && err !== null && 'code' in err
           ? (err as { code?: unknown }).code
@@ -18,10 +21,7 @@ export const uploadWithRetry = async (
 
       const isRetryable =
         code === 'storage/retry-limit-exceeded' ||
-        code === 'storage/unknown' ||
-        code === 'storage/canceled' ||
-        code === 'storage/quota-exceeded' ||
-        code === 'storage/unauthenticated';
+        code === 'storage/unknown';
 
       if (attempt < maxRetries - 1 && isRetryable) {
         const wait = baseDelay * Math.pow(2, attempt);
@@ -29,8 +29,12 @@ export const uploadWithRetry = async (
         continue;
       }
 
-      throw new Error('Upload failed');
+      throw err;
     }
+  }
+
+  if (lastError instanceof Error) {
+    throw lastError;
   }
 
   throw new Error('Max retries exceeded');

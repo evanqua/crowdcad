@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { Button, Card, Input, ScrollShadow } from '@heroui/react';
 import { Edit2, Plus, Trash2 } from 'lucide-react';
@@ -64,7 +66,7 @@ export default function EquipmentManagementSection({
         <ScrollShadow className="space-y-2 pr-2 max-h-[calc(100vh-430px)] scrollbar-hide">
           {equipment.map((item, idx) => (
             <Card
-              key={idx}
+              key={item.id}
               isBlurred
               className="border-2 rounded-2xl border-default-200 bg-transparent"
             >

@@ -1230,6 +1230,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                   {openCallId === call.id && (
                     <CallTrackingDetails
                       key={`${call.id}-details`}
+                      rowClassName={getCallRowClass(call)}
                       callDisplayNumber={callDisplayNumberMap.get(call.id)}
                       notesText={notesTexts[call.id] ?? (call.notes || '')}
                       onNotesChange={(value) => {

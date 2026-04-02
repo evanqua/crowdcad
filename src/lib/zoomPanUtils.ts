@@ -11,10 +11,10 @@ export function clampPanPosition(params: {
   containerHeight: number;
   scale: number;
 }): { x: number; y: number } {
-  const { newX, newY, imgWidth, imgHeight, containerWidth, containerHeight, scale } = params;
+  const { newX, newY, imgWidth, imgHeight, containerWidth, containerHeight } = params;
 
-  const maxX = Math.max(0, (imgWidth - containerWidth) / scale);
-  const maxY = Math.max(0, (imgHeight - containerHeight) / scale);
+  const maxX = Math.max(0, imgWidth - containerWidth);
+  const maxY = Math.max(0, imgHeight - containerHeight);
 
   return {
     x: Math.min(0, Math.max(-maxX, newX)),

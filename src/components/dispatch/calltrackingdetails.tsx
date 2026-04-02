@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { Textarea } from '@heroui/react';
 
@@ -14,6 +16,7 @@ type Props = {
   onLogInsertTimestamp: () => void;
   onClose: () => void;
   priority?: boolean;
+  rowClassName?: string;
 };
 
 export default function CallTrackingDetails({
@@ -29,9 +32,10 @@ export default function CallTrackingDetails({
   onLogInsertTimestamp,
   onClose,
   priority,
+  rowClassName,
 }: Props) {
   return (
-    <tr>
+    <tr className={rowClassName}>
       <td
         colSpan={7}
         className="p-2 border-b border-surface-liner"
