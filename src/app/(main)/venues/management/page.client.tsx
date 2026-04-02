@@ -24,10 +24,11 @@ import LayerControlBar from '@/components/venue-management/LayerControlBar';
 import MarkerModeToggleButton from '@/components/venue-management/MarkerModeToggleButton';
 import PendingMarkerDialog from '@/components/venue-management/PendingMarkerDialog';
 import MarkerPlacementInstruction from '@/components/venue-management/MarkerPlacementInstruction';
+import MapZoomControls from '@/components/ui/map-zoom-controls';
+import MapPanSurface from '@/components/ui/map-pan-surface';
 import {
   Button,
   Input,
-  ButtonGroup,
   Card,
   Tabs,
   Tab,
@@ -40,8 +41,6 @@ import {
   Trash2, 
   Edit2,
   MapPinned,
-  ZoomIn,
-  ZoomOut,
 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -864,10 +863,12 @@ export default function VenueManagementPageClient() {
                 {previewUrl ? (
                   <div className="w-full flex flex-col gap-3 max-h-full">
                     <div className="relative w-full overflow-hidden rounded-2xl">
-                      <div 
-                        ref={imgContainerRef}
-                        className="relative overflow-auto scrollbar-hide"
+                      <MapPanSurface
+                        containerRef={imgContainerRef}
                         onWheel={handleWheel}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
                         style={{ 
                           cursor: isAddMarkerMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
                           maxHeight: 'calc(100vh - 200px)',
@@ -875,10 +876,6 @@ export default function VenueManagementPageClient() {
                       >
                         <div
                           className="relative inline-block"
-                          onMouseDown={handleMouseDown}
-                          onMouseMove={handleMouseMove}
-                          onMouseUp={handleMouseUp}
-                          onMouseLeave={handleMouseUp}
                           onClick={handleImageClick}
                           style={{
                             transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
@@ -916,7 +913,7 @@ export default function VenueManagementPageClient() {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </MapPanSurface>
 
                       {pendingMarker && (
                         <PendingMarkerDialog
@@ -929,36 +926,13 @@ export default function VenueManagementPageClient() {
                       )}
 
                       {/* Zoom Controls - Top Right */}
-                      <div className="absolute top-3 right-3 flex flex-row gap-1 z-20">
-                        <ButtonGroup>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            onPress={() => zoomIn(0.5)}
-                            className="bg-surface-deepest/95"
-                          >
-                            <ZoomIn className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            onPress={() => zoomOut(0.5)}
-                            className="bg-surface-deepest/95"
-                          >
-                            <ZoomOut className="h-4 w-4" />
-                          </Button>
-                        </ButtonGroup>
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          onPress={resetZoom}
-                          className="bg-surface-deepest/95 text-xs px-2"
-                        >
-                          Reset
-                        </Button>
-                      </div>
+                      <MapZoomControls
+                        onZoomIn={() => zoomIn(0.5)}
+                        onZoomOut={() => zoomOut(0.5)}
+                        onReset={resetZoom}
+                        buttonClassName="bg-surface-deepest/95"
+                        resetButtonClassName="bg-surface-deepest/95 text-xs px-2"
+                      />
 
                       {/* Instructions overlay - Top Left */}
                       {isAddMarkerMode && !pendingMarker && <MarkerPlacementInstruction />}

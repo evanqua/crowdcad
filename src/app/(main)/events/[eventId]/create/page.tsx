@@ -9,8 +9,10 @@ import { getAuth } from 'firebase/auth';
 import Image from 'next/image';
 import { Tabs, Tab, Button, Card, ScrollShadow } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
+import MapZoomControls from '@/components/ui/map-zoom-controls';
+import MapPanSurface from '@/components/ui/map-pan-surface';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { useTeamForm } from '@/hooks/useTeamForm';
 import { useZoomPan } from '@/hooks/useZoomPan';
@@ -472,7 +474,7 @@ export default function EventCreation() {
 
   if (loading) return <LoadingScreen label="Loading event data…" />;
   
-  const hasVenue = eventData.venue && eventData.venue.name;
+  const hasVenue = Boolean(eventData.venue?.name && eventData.venue?.layers?.length);
   const hasMap = hasVenue && Boolean(eventData.venue?.layers?.[currentLayer]?.mapUrl);
   const allPosts = hasVenue ? (eventData.venue?.layers?.flatMap(layer => layer.posts || []) || []) : [];
   const currentLayerPosts = hasVenue ? (eventData.venue?.layers?.[currentLayer]?.posts || []) : [];
@@ -676,10 +678,12 @@ export default function EventCreation() {
                 {hasMap ? (
                   <div className="w-full flex flex-col gap-3">
                     <div className="relative w-full overflow-hidden rounded-2xl">
-                        <div
-                          ref={imgContainerRef}
-                          className="relative overflow-auto scrollbar-hide"
+                        <MapPanSurface
+                          containerRef={imgContainerRef}
                           onWheel={handleWheel}
+                          onMouseDown={handleMouseDown}
+                          onMouseMove={handleMouseMove}
+                          onMouseUp={handleMouseUp}
                           style={{
                             cursor: isPanning ? 'grabbing' : 'grab',
                             maxHeight: 'calc(100vh - 215px)',
@@ -692,10 +696,6 @@ export default function EventCreation() {
                             transformOrigin: 'center center',
                             transition: isPanning ? 'none' : 'transform 0.1s ease-out',
                           }}
-                          onMouseDown={handleMouseDown}
-                          onMouseMove={handleMouseMove}
-                          onMouseUp={handleMouseUp}
-                          onMouseLeave={handleMouseUp}
                         >
                           <Image
                             ref={imgRef}
@@ -714,38 +714,15 @@ export default function EventCreation() {
                           />
                           {renderMarkers()}
                         </div>
-                      </div>
+                      </MapPanSurface>
 
-                      {/* Zoom Controls */}
-                      <div className="absolute top-3 right-3 flex flex-row gap-1 z-20">
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="flat"
-                          onPress={handleZoomIn}
-                          className="bg-surface-deepest/90 backdrop-blur"
-                        >
-                          <ZoomIn className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="flat"
-                          onPress={handleZoomOut}
-                          className="bg-surface-deepest/90 backdrop-blur"
-                        >
-                          <ZoomOut className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="flat"
-                          onPress={handleResetZoom}
-                          className="bg-surface-deepest/90 backdrop-blur"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <MapZoomControls
+                        onZoomIn={handleZoomIn}
+                        onZoomOut={handleZoomOut}
+                        onReset={handleResetZoom}
+                        buttonClassName="bg-surface-deepest/90 backdrop-blur"
+                        resetButtonClassName="bg-surface-deepest/90 backdrop-blur"
+                      />
                     </div>
 
                     {/* Bottom Control Bar */}
