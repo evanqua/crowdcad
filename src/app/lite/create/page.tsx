@@ -18,7 +18,7 @@ import {
 } from '@heroui/react';
 import { getLocalTimeZone, parseDate, Time, today } from '@internationalized/date';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { Edit2, Plus, Trash2 } from 'lucide-react';
+import { Edit2, Trash2 } from 'lucide-react';
 import type { Post, Staff, Supervisor, Equipment } from '@/app/types';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
@@ -31,10 +31,11 @@ import {
   type LiteEventDraft,
   saveLiteEvent,
 } from '@/lib/liteEventStore';
+import { formatTimeValue, parseTimeValue } from '@/lib/scheduleUtils';
+import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
+import { useTeamForm } from '@/hooks/useTeamForm';
 
 const LICENSES = ['CPR', 'EMT-B', 'EMT-A', 'EMT-P', 'RN', 'MD/DO'];
-
-type TeamMemberDraft = { name: string; cert: string; lead: boolean };
 
 type ScheduleChip = {
   id: string;
@@ -53,54 +54,6 @@ const getPostName = (post: Post): string =>
 
 const setPostName = (post: Post, name: string): Post =>
   typeof post === 'string' ? { name, x: null, y: null } : { ...post, name };
-
-const parseTimeValue = (value: string, fallback: Time): Time => {
-  const [hourRaw, minuteRaw] = value.split(':');
-  const hour = Number(hourRaw);
-  const minute = Number(minuteRaw);
-
-  if (
-    Number.isInteger(hour) &&
-    Number.isInteger(minute) &&
-    hour >= 0 &&
-    hour <= 23 &&
-    minute >= 0 &&
-    minute <= 59
-  ) {
-    return new Time(hour, minute);
-  }
-
-  return fallback;
-};
-
-const formatTimeValue = (value: Time) =>
-  `${value.hour.toString().padStart(2, '0')}:${value.minute.toString().padStart(2, '0')}`;
-
-const buildPostingTimes = (from: Time, to: Time, byMinutesRaw: string): string[] => {
-  const byMinutes = Number.parseInt(byMinutesRaw, 10);
-  if (!Number.isFinite(byMinutes) || byMinutes <= 0) return [];
-
-  const minutesInDay = 24 * 60;
-  const startMinutes = from.hour * 60 + from.minute;
-  const toMinutes = to.hour * 60 + to.minute;
-  const endMinutes = toMinutes <= startMinutes ? toMinutes + minutesInDay : toMinutes;
-
-  const times: string[] = [];
-  const maxIterations = Math.ceil((endMinutes - startMinutes) / Math.max(1, byMinutes)) + 2;
-  let iteration = 0;
-
-  for (let value = startMinutes; value <= endMinutes; value += byMinutes) {
-    iteration += 1;
-    if (iteration > maxIterations) break;
-
-    const normalized = value % minutesInDay;
-    const hour = Math.floor(normalized / 60);
-    const minute = normalized % 60;
-    times.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
-  }
-
-  return times;
-};
 
 function LiteCreateContent() {
   const router = useRouter();
@@ -126,11 +79,21 @@ function LiteCreateContent() {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [teamModalMode, setTeamModalMode] = useState<'create' | 'edit'>('create');
   const [editingTeamIndex, setEditingTeamIndex] = useState<number | null>(null);
-  const [teamName, setTeamName] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [memberCert, setMemberCert] = useState('');
-  const [isTeamLead, setIsTeamLead] = useState(false);
-  const [currentMembers, setCurrentMembers] = useState<TeamMemberDraft[]>([]);
+  const {
+    teamName,
+    setTeamName,
+    memberName,
+    setMemberName,
+    memberCert,
+    setMemberCert,
+    isTeamLead,
+    setIsTeamLead,
+    currentMembers,
+    setCurrentMembers,
+    addMember,
+    removeMember,
+    reset: resetTeamForm,
+  } = useTeamForm();
   const [openTeams, setOpenTeams] = useState<Record<number, boolean>>({});
 
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
@@ -141,9 +104,15 @@ function LiteCreateContent() {
 
   const [postsEnabled, setPostsEnabled] = useState(true);
 
-  const [scheduleFrom, setScheduleFrom] = useState<Time>(new Time(16, 0));
-  const [scheduleTo, setScheduleTo] = useState<Time>(new Time(23, 59));
-  const [scheduleBy, setScheduleBy] = useState('75');
+  const {
+    scheduleFrom,
+    setScheduleFrom,
+    scheduleTo,
+    setScheduleTo,
+    scheduleBy,
+    setScheduleBy,
+    postingTimes,
+  } = useScheduleGeneration({ enabled: postsEnabled });
   const [scheduleChips, setScheduleChips] = useState<ScheduleChip[]>([]);
   const [editingChipId, setEditingChipId] = useState<string | null>(null);
   const [editingChipValue, setEditingChipValue] = useState('');
@@ -242,7 +211,7 @@ function LiteCreateContent() {
     }
 
     initializedScheduleRef.current = eventDraft.id;
-  }, [eventDraft]);
+  }, [eventDraft, setScheduleBy, setScheduleFrom, setScheduleTo]);
 
   useEffect(() => {
     if (!eventDraft) return;
@@ -457,27 +426,6 @@ function LiteCreateContent() {
     setEquipmentEditInput('');
   };
 
-  const addMember = () => {
-    if (!memberName.trim() || !memberCert) return;
-
-    setCurrentMembers((current) => [
-      ...current,
-      {
-        name: memberName.trim(),
-        cert: memberCert,
-        lead: isTeamLead,
-      },
-    ]);
-
-    setMemberName('');
-    setMemberCert('');
-    setIsTeamLead(false);
-  };
-
-  const removeMember = (index: number) => {
-    setCurrentMembers((current) => current.filter((_, idx) => idx !== index));
-  };
-
   const handleAddTeam = () => {
     if (!teamName.trim()) {
       alert('Please enter a team name.');
@@ -545,11 +493,7 @@ function LiteCreateContent() {
       }
     });
 
-    setTeamName('');
-    setMemberName('');
-    setMemberCert('');
-    setIsTeamLead(false);
-    setCurrentMembers([]);
+    resetTeamForm();
     setIsTeamModalOpen(false);
     setTeamModalMode('create');
     setEditingTeamIndex(null);
@@ -633,8 +577,6 @@ function LiteCreateContent() {
   useEffect(() => {
     if (!eventDraftId) return;
 
-    const postingTimes = postsEnabled ? buildPostingTimes(scheduleFrom, scheduleTo, scheduleBy) : [];
-
     setScheduleChips(
       postingTimes.map((time) => ({
         id: makeId(),
@@ -652,7 +594,7 @@ function LiteCreateContent() {
         by: scheduleBy,
       },
     }));
-  }, [eventDraftId, postsEnabled, scheduleFrom, scheduleTo, scheduleBy]);
+  }, [eventDraftId, postingTimes, postsEnabled, scheduleFrom, scheduleTo, scheduleBy]);
 
   const removeScheduleChip = (chipId: string) => {
     setScheduleChips((current) => {
@@ -1437,8 +1379,7 @@ function LiteCreateContent() {
           setIsTeamModalOpen(false);
           setTeamModalMode('create');
           setEditingTeamIndex(null);
-          setTeamName('');
-          setCurrentMembers([]);
+          resetTeamForm();
         }}
         mode={teamModalMode}
         onSubmit={handleAddTeam}

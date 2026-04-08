@@ -21,8 +21,18 @@ Directory highlights
 - `src/components/dispatch/` — feature-specific UI used on the dispatch dashboard:
   - `teamcard.tsx`, `calltrackingcard.tsx`, `clinictrackingcard.tsx` — cards and tracking widgets.
 
+- `src/components/event-create/` — event creation sections used by the event create page:
+  - metadata, staffing, posting schedule, and posts/equipment are split into focused components rather than a single page-local block.
+
+- `src/components/venue-management/` — venue management sections used by the venue editor:
+  - layer controls, marker placement UI, upload handling, and equipment management are separated into dedicated components.
+
 - `src/components/layout/` — layout-level components (global navigation, header):
   - `appnavbar.tsx` — top navigation used in `layout.tsx`.
+
+- `src/components/ui/` also contains shared interaction chrome used by multiple pages:
+  - `map-pan-surface.tsx` — reusable pan/wheel surface for map canvases.
+  - `map-zoom-controls.tsx` — shared zoom/reset button cluster for map viewers.
 
 - Root helpers
   - `src/components/devServiceWorkerCleanup.tsx` — helper for service worker cleanup in dev.
@@ -32,6 +42,7 @@ Styling and design tokens
 - TailwindCSS powers styling. Use the `cn()` helper in `src/lib/utils.ts` for conditional class merging.
 - Use `tailwind-merge` (`tailwind-merge` is already a dependency) for combining utility classes safely.
 - Follow existing token and utility patterns when adding new classes to preserve visual consistency.
+- Keep feature sections small and typed explicitly; prefer local prop types for section components and avoid passing untyped page state through multiple layers.
 
 Third-party UI libraries
 
@@ -71,6 +82,7 @@ Tips
 
 - Keep components small and focused — prefer composition over large monolithic components.
 - Reuse primitives from `src/components/ui` rather than adding duplicated styles.
+- Reuse shared map controls and viewport wrappers from `src/components/ui` before creating page-specific zoom/pan implementations.
 - When creating new modals, follow the `*modal.tsx` naming convention so they are easy to locate.
 
 Where to find examples

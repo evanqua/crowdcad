@@ -8,102 +8,11 @@ import { Event, Call, TeamLogEntry, CallLogEntry, InteractionSession } from '@/a
 import dynamic from 'next/dynamic';
 import { Button, Card, CardBody } from '@heroui/react';
 import { DiagonalStreaks } from '@/components/ui/diagonal-streaks';
+import { buildHourlySeries, getScheduleWindow, teamPieData } from '@/lib/analyticsUtils';
 
 const SummaryCharts = dynamic(() => import('./SummaryCharts'), { ssr: false, loading: () => <div className="rounded-2xl p-6 bg-surface-deep border border-surface-liner">Loading charts...</div> });
 
-// --- TIME WINDOW [posting window ± 2h]; falls back to logs if missing ---
 const TWO_HOURS = 2 * 60 * 60 * 1000;
-function getScheduleWindow(event: Event): { start: number; end: number } {
-  const getNum = (v: unknown): number | undefined => {
-    if (typeof v === 'number') return v;
-    if (typeof v === 'string') {
-      const parsed = Date.parse(v);
-      return isNaN(parsed) ? undefined : parsed;
-    }
-    return undefined;
-  };
-
-  // Adjust these keys if your event stores posting window differently
-  const startFields = ['postingStart', 'scheduleStart', 'startTime', 'start'];
-  const endFields   = ['postingEnd',   'scheduleEnd',   'endTime',   'end'];
-
-  const starts = startFields
-  .map(k => getNum(event[k as keyof Event]))
-  .filter(Boolean) as number[];
-
-  const ends = endFields
-    .map(k => getNum(event[k as keyof Event]))
-    .filter(Boolean) as number[];
-
-  // Fallback: derive from logs
-  let minTs = Number.POSITIVE_INFINITY;
-  let maxTs = Number.NEGATIVE_INFINITY;
-  for (const call of event.calls || []) {
-    for (const entry of call.log || []) {
-      if (typeof entry.timestamp === 'number') {
-        if (entry.timestamp < minTs) minTs = entry.timestamp;
-        if (entry.timestamp > maxTs) maxTs = entry.timestamp;
-      }
-    }
-  }
-  const derivedStart = Number.isFinite(minTs) ? minTs : Date.now();
-  const derivedEnd = Number.isFinite(maxTs) ? maxTs : derivedStart + 4 * 60 * 60 * 1000;
-
-  const start = (starts.length ? Math.min(...starts) : derivedStart) - TWO_HOURS;
-  const end   = (ends.length   ? Math.max(...ends)   : derivedEnd)   + TWO_HOURS;
-  return { start, end };
-}
-
-// --- Build hourly series between [start, end] at 1-hour bins ---
-function buildHourlySeries(event: Event, start: number, end: number) {
-  const hour = 60 * 60 * 1000;
-  const s = Math.floor(start / hour) * hour;
-  const e = Math.ceil(end / hour) * hour;
-  const buckets: { ts: number; label: string; count: number }[] = [];
-
-  const pad2 = (n: number) => String(n).padStart(2, '0');
-
-  for (let t = s; t <= e; t += hour) {
-    const d = new Date(t);
-    const label = `${pad2(d.getHours())}:00`; // 24h label
-    buckets.push({ ts: t, label, count: 0 });
-  }
-
-  // Count a call by its first log timestamp
-  for (const call of event.calls || []) {
-    const firstTs = (call.log || []).reduce<number | null>((min, e) => {
-      if (typeof e.timestamp !== 'number') return min;
-      return min == null ? e.timestamp : Math.min(min, e.timestamp);
-    }, null);
-    if (firstTs == null || firstTs < s || firstTs > e) continue;
-    const idx = Math.floor((firstTs - s) / hour);
-    if (idx >= 0 && idx < buckets.length) buckets[idx].count += 1;
-  }
-  return buckets;
-}
-
-
-// Reuse your callsByTeam helper to build Recharts-friendly pie data
-function teamPieData(event: Event) {
-  return callsByTeam(event).map(d => ({ name: d.team || 'Unassigned', value: d.count }));
-}
-
-
-// Count 1 call per team for each call that team is involved in
-function callsByTeam(event: Event) {
-  const counts: Record<string, number> = {};
-  for (const call of event.calls || []) {
-    const assigned = call.assignedTeam ?? [];
-    const detached = (call.detachedTeams ?? []).map(d => d.team);
-    const involved = new Set([...assigned, ...detached].filter(Boolean));
-
-    // If your schema sometimes stores a single team differently, you can add a fallback:
-    // if (!involved.size && (call as any).team) involved.add((call as any).team);
-
-    for (const t of involved) counts[t] = (counts[t] ?? 0) + 1;
-  }
-  return Object.entries(counts).map(([team, count]) => ({ team, count }));
-}
 
 // Simple donut via stroked arcs
 // function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {

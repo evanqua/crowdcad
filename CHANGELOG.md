@@ -16,10 +16,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- Foundation refactor: extracted core utilities to `src/lib/` for reuse across features:
+  - `uploadUtils.ts` — file upload with exponential backoff retry logic (transient error detection, original error preservation).
+  - `zoomPanUtils.ts` — viewport math utilities (`clampScale`, `clampPanPosition`) for consistent zoom/pan behavior.
+  - `markerUtils.ts` — marker detection and placement helpers.
+- Shared React hooks extracted to `src/hooks/` for reuse:
+  - `useZoomPan` — manages zoom/pan state and mouse/wheel event handlers for map-based interfaces.
+  - `useScheduleGeneration` — generates shift schedules from event duration and team coverage.
+  - `useTeamForm` — team/supervisor form submission and validation.
+- Shared UI primitives added to `src/components/ui/`:
+  - `map-zoom-controls.tsx` — zoom in/out/reset button cluster with accessibility labels (reused across event create and venue management).
+  - `map-pan-surface.tsx` — reusable pan/wheel interaction surface for canvas-based viewers.
+- Event creation flow decomposed into focused section components under `src/components/event-create/`:
+  - `MetadataSection.tsx` — event name, date, and venue selection.
+  - `TeamStaffingSection.tsx` — team roster assignment.
+  - `SupervisorStaffingSection.tsx` — supervisor roster assignment.
+  - `PostingScheduleSection.tsx` — shift schedule generation and management.
+  - `PostsEquipmentSection.tsx` — posts and equipment selection with multi-select state.
+- Venue management flow decomposed into focused section components under `src/components/venue-management/`:
+  - `EquipmentManagementSection.tsx` — add/edit/delete equipment with stable React keys.
+  - `LayerControlBar.tsx` — layer navigation (previous/next/add/delete) with accessibility labels.
+  - `MarkerModeToggleButton.tsx` — toggle marker placement mode.
+  - `PendingMarkerDialog.tsx` — marker naming dialog.
+  - `MarkerPlacementInstruction.tsx` — on-screen guidance during marker placement.
 - Lite event drafts now persist a `postingScheduleEnabled` flag to keep posting schedule behavior consistent between setup and dispatch.
 
 ### Changed
 
+- Event creation page (`src/app/(main)/events/[eventId]/create/page.tsx`) now uses decomposed section components instead of a monolithic page layout, improving maintainability and testability.
+- Venue management page (`src/app/(main)/venues/management/page.client.tsx`) now uses decomposed section components and shared map controls instead of page-local implementations.
+- Dispatch call tracking page now threads styling through `rowClassName` prop to restore per-status visual differentiation.
+- Pan math in `zoomPanUtils.clampPanPosition` corrected to properly clamp against scaled image overflow (fixes off-by-factor error at different zoom levels).
 - Lite setup Locations/Equipment add row now uses an attached input + action button style with aligned corner radii and consistent spacing.
 - Teams and Supervisors panel actions in Lite setup now use explicit `Add Team` and `Add Supervisor` buttons.
 - Lite dispatch navbar now hides `Posting Schedule` when posting schedule is disabled in event setup.
@@ -29,7 +56,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 
+- Upload retry logic now only retries on transient Firebase Storage errors (`storage/retry-limit-exceeded`, `storage/unknown`) to avoid masking real failures, and preserves original error for diagnostics.
 - Removed initial navbar mount flicker/layout shift on page reload by rendering the main app navbar in the initial render path instead of client-only lazy loading.
+- Equipment list now uses stable React keys (`item.id`) instead of array indices to prevent component state loss on edit/delete operations.
 
 ---
 

@@ -17,8 +17,10 @@ Repository layout (important folders)
 - `src/components/` — UI components grouped by role:
   - `src/components/modals/` — modal components (modal files follow `*modal.tsx` naming)
   - `src/components/dispatch/` — dispatch-specific UI (cards, tracking widgets)
+  - `src/components/event-create/` — event creation sections split by responsibility (metadata, staffing, schedule, posts/equipment)
+  - `src/components/venue-management/` — venue management sections split by responsibility (layers, marker placement, uploads, equipment)
   - `src/components/layout/` — layout-level components (navbar, etc.)
-  - `src/components/ui/` — small reusable primitives (Button, Input, Tooltip, Sidebar)
+  - `src/components/ui/` — small reusable primitives and shared controls (Button, Input, Tooltip, Sidebar, map pan/zoom overlays)
 
 - `src/hooks/` — shared React hooks (auth, mobile helpers, data collection)
 - `src/lib/` — utilities (e.g., `utils.ts` and `cn()` helpers)
@@ -30,6 +32,7 @@ Key architectural decisions
 - App Router / Server Components: Pages under `src/app` are server components by default. Client interactivity (hooks, event handlers) requires the `'use client'` directive at the top of the file.
 - Firebase-first: The app uses Firebase for auth, realtime persistence, storage and hosting. `src/app/firebase.ts` centralizes initialization and should not be edited lightly.
 - Component-first UI: UI is organized around modular components and small primitives in `src/components/ui` so features compose cleanly.
+- Feature decomposition: page-level screens should be split into focused section components when a page starts to accumulate unrelated responsibilities.
 - Tailwind + HeroUI: Tailwind utility classes are used for styling; HeroUI provides higher-level components.
 
 Data model and types
@@ -68,3 +71,4 @@ Notes
 
 - Keep changes small and scoped; add tests for backend rules when modifying data shapes.
 - When adding client components, remember to add `'use client'` and import only client-safe modules.
+- Prefer one-responsibility feature sections over large page-local JSX blocks, and reuse shared viewport controls and other primitives from `src/components/ui` before introducing page-specific copies.
