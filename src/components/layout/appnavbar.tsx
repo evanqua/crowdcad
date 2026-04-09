@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { signOut } from "firebase/auth";
 import { auth } from "@/app/firebase";
@@ -22,18 +22,11 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
-  Avatar,
 } from "@heroui/react";
 
-import { Menu, UserRound, LogOut } from "lucide-react";
+import { Menu, Moon, UserRound, LogOut, Sun } from "lucide-react";
 
 const LoginModalLazy = dynamic(() => import("@/components/modals/auth/loginmodal"), { ssr: false });
-
-function initialsFromUser(u?: { displayName?: string | null; email?: string | null }) {
-  const fromName = u?.displayName?.trim().split(/\s+/).map((s) => s[0]?.toUpperCase()).join("") ?? "";
-  if (fromName) return fromName.slice(0, 2);
-  return (u?.email?.[0] ?? "U").toUpperCase();
-}
 
 function LiveClock() {
   const [now, setNow] = useState<Date>(() => new Date());
@@ -56,11 +49,34 @@ export default function AppNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginMode, setLoginMode] = useState<"login" | "signup">("login");
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const hasDarkClass = root.classList.contains("dark");
+    setIsDarkTheme(hasDarkClass);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    const nextIsDark = !isDarkTheme;
+    const root = document.documentElement;
+
+    root.classList.toggle("dark", nextIsDark);
+    root.setAttribute("data-theme", nextIsDark ? "dark" : "light");
+
+    try {
+      localStorage.setItem("ccad-theme", nextIsDark ? "dark" : "light");
+    } catch {
+      // Ignore localStorage failures (private mode / restricted storage).
+    }
+
+    setIsDarkTheme(nextIsDark);
+  }, [isDarkTheme]);
 
   const isDispatch = !!(pathname && /^\/events\/[^/]+\/dispatch(?:$|\/|\?)/.test(pathname));
+  const isVenueRoute = !!(pathname && pathname.startsWith('/venues'));
 
   const navItems = [
-    { label: "Home", href: "/" },
     { label: "Venues", href: "/venues/selection" },
   ];
 
@@ -86,9 +102,9 @@ export default function AppNavbar() {
 
   const isActive = (href: string) => pathname === href;
   const wrapperHeightClass = isDispatch ? 'h-16 md:h-16' : 'h-14 md:h-14';
-  const containerWidthClass = isDispatch ? 'max-w-none' : 'max-w-[1280px]';
+  const containerWidthClass = (isDispatch || isVenueRoute) ? 'max-w-none' : 'max-w-[1280px]';
   const logoWidthClass = 'w-20';
-  const desktopNavGapClass = 'gap-2 pl-3';
+  const desktopNavGapClass = 'gap-1 pl-2';
 
   // Optional: You can add logic here to check if the user is actually an admin
   // const isAdmin = user?.email === "admin@yourdomain.com"; 
@@ -113,7 +129,7 @@ export default function AppNavbar() {
             "sticky top-0 z-[300] bg-surface-deepest/70 backdrop-blur-md",
           wrapper:
             `${wrapperHeightClass} px-4 sm:px-6 md:px-6 lg:px-6 xl:px-6 2xl:px-6 flex items-center`,
-          item: "text-[18px] leading-6",
+          item: "text-[16px] leading-6",
           content: "items-center",
           toggle: "lg:hidden",
           menu:
@@ -127,7 +143,7 @@ export default function AppNavbar() {
             <NavbarBrand>
               <button onClick={() => router.push("/")} className="flex items-center">
                 <Image
-                  src="/logo.svg"
+                  src={isDarkTheme ? "/logo.svg" : "/logo-dark.svg"}
                   alt="Logo"
                   width={118}
                   height={30}
@@ -165,80 +181,46 @@ export default function AppNavbar() {
                 </NavbarItem>
               ))
             ) : (
-              // Regular navigation (About has submenu)
-              navItems.map(({ label, href }) => {
-                if (label === "About") {
-                  const aboutActive = pathname?.startsWith("/about");
-                  return (
-                    <Dropdown key={href}>
-                        <NavbarItem isActive={aboutActive}>
-                        <DropdownTrigger>
-                          <button
-                            type="button"
-                            aria-haspopup="menu"
-                            className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition bg-transparent data-[hover=true]:bg-transparent ${aboutActive ? 'text-surface-light' : 'text-surface-faint hover:text-accent'}`}
-                          >
-                            About
-                          </button>
-                        </DropdownTrigger>
-                      </NavbarItem>
-                      <DropdownMenu
-                        aria-label="About menu"
-                        itemClasses={{
-                          base: "gap-2",
-                        }}
-                      >
-                        <DropdownItem
-                          key="overview"
-                          onPress={() => router.push('/about')}
-                        >
-                          Overview
-                        </DropdownItem>
-                        <DropdownItem
-                          key="hosting"
-                          onPress={() => router.push('/about/hosting')}
-                        >
-                          Hosting & HIPAA
-                        </DropdownItem>
-                        <DropdownItem
-                          key="firebase"
-                          onPress={() => router.push('/about/firebase')}
-                        >
-                          Firebase Setup
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
-                  );
-                }
-                return (
-                  <NavbarItem key={href} isActive={isActive(href)}>
-                    <Link
-                      href={href}
-                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition ${
-                        isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
-                      }`}
-                    >
-                      {label}
-                    </Link>
-                  </NavbarItem>
-                );
-              })
+              navItems.map(({ label, href }) => (
+                <NavbarItem key={href} isActive={isActive(href)}>
+                  <Link
+                    href={href}
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition ${
+                      isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                </NavbarItem>
+              ))
             )}
           </NavbarContent>
           </div>
 
           {/* RIGHT: auth + mobile toggle */}
-          <NavbarContent justify="end" className="gap-2 sm:gap-3 md:gap-4">
+          <NavbarContent justify="end" className="gap-1 sm:gap-2 md:gap-2">
             {/* Mobile toggle */}
             <div className="lg:hidden">
               <NavbarMenuToggle
                 aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-                className="text-white"
+                className="text-surface-light"
                 icon={(open) => (
-                  <Menu className={`size-6 transition ${open ? "rotate-90" : ""}`} color="white" />
+                  <Menu className={`size-6 transition ${open ? "rotate-90" : ""} text-surface-light`} />
                 )}
               />
             </div>
+
+            <NavbarItem>
+              <Button
+                isIconOnly
+                variant="flat"
+                aria-label={isDarkTheme ? "Switch to light mode" : "Switch to dark mode"}
+                className="h-8 w-8 min-w-8 rounded-full bg-surface-deeper/70 text-surface-light hover:bg-surface-deeper"
+                onPress={toggleTheme}
+              >
+                {isDarkTheme ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              </Button>
+            </NavbarItem>
 
             {/* Show nothing while loading */}
             {!ready ? (
@@ -250,7 +232,7 @@ export default function AppNavbar() {
                 <Button
                   variant="bordered"
                   aria-label="Log in"
-                  className="h-8 min-w-8 rounded-full border-white px-3 text-surface-light hover:bg-white/10"
+                  className="h-8 min-w-8 rounded-full border-surface-liner px-3 text-surface-light hover:bg-surface-deeper"
                   onPress={() => {
                     setIsMenuOpen(false);
                     setLoginMode("login");
@@ -269,15 +251,9 @@ export default function AppNavbar() {
                         aria-label="Open profile menu"
                         className="relative rounded-full p-0.5 bg-gradient-to-br from-accent/70 to-[rgba(240,28,28,0.4)] cursor-pointer"
                       >
-                        <Avatar
-                          showFallback
-                          name={initialsFromUser(user)}
-                          classNames={{
-                            base: "bg-surface-base border-white",
-                            name: "text-surface-light text-sm font-bold",
-                          }}
-                          className="h-7 w-7 border-white"
-                        />
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-surface-liner bg-surface-base text-surface-light">
+                          <UserRound className="size-4" />
+                        </span>
                       </button>
                   </DropdownTrigger>
 
@@ -327,59 +303,34 @@ export default function AppNavbar() {
               </NavbarMenuItem>
             ))
           ) : (
-            navItems.map(({ label, href }) => {
-              if (label === "About") {
-                return (
-                  <div key={href}>
-                    <NavbarMenuItem>
-                      <Link
-                        href={href}
-                        onClick={() => setIsMenuOpen(false)}
-                        className={`w-full text-lg font-medium transition ${
-                          isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
-                        }`}
-                      >
-                        {label}
-                      </Link>
-                    </NavbarMenuItem>
-                    <NavbarMenuItem>
-                      <Link
-                        href="/about/hosting"
-                        onClick={() => setIsMenuOpen(false)}
-                        className="w-full text-lg font-medium transition text-surface-faint hover:text-accent pl-4"
-                      >
-                        Hosting & HIPAA
-                      </Link>
-                    </NavbarMenuItem>
-                      <NavbarMenuItem>
-                        <Link
-                          href="/about/firebase"
-                          onClick={() => setIsMenuOpen(false)}
-                          className="w-full text-lg font-medium transition text-surface-faint hover:text-accent pl-4"
-                        >
-                          Firebase Setup
-                        </Link>
-                      </NavbarMenuItem>
-                  </div>
-                );
-              }
-              return (
-                <NavbarMenuItem key={href}>
-                  <Link
-                    href={href}
-                    onClick={() => setIsMenuOpen(false)}
-                    className={`w-full text-lg font-medium transition ${
-                      isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
-                    }`}
-                  >
-                    {label}
-                  </Link>
-                </NavbarMenuItem>
-              );
-            })
+            navItems.map(({ label, href }) => (
+              <NavbarMenuItem key={href}>
+                <Link
+                  href={href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`w-full text-base font-medium transition ${
+                    isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
+                  }`}
+                >
+                  {label}
+                </Link>
+              </NavbarMenuItem>
+            ))
           )}
 
           <div className="my-2 border-t border-surface-liner" />
+
+          <NavbarMenuItem className="mt-1">
+            <button
+              className="block w-full text-left text-[18px] px-2 py-2 rounded-md text-surface-light hover:text-accent"
+              onClick={() => {
+                toggleTheme();
+                setIsMenuOpen(false);
+              }}
+            >
+              {isDarkTheme ? "Switch to light mode" : "Switch to dark mode"}
+            </button>
+          </NavbarMenuItem>
 
           {!user ? (
             <>

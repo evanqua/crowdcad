@@ -21,8 +21,8 @@ type EquipmentCardProps = {
 };
 
 function equipmentBg(status: string) {
-  if (status === 'In Clinic') return 'bg-status-blue/20';
-  if (status.startsWith('Call ') || status === 'In Use') return 'bg-[#2d2123]';
+  if (status === 'In Clinic') return 'bg-status-card-blue';
+  if (status.startsWith('Call ') || status === 'In Use') return 'bg-status-card-red';
   return 'bg-surface-deep';
 }
 

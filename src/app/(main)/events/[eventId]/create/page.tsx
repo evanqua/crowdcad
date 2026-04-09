@@ -483,14 +483,14 @@ export default function EventCreation() {
   
 
   const inputClassNames = {
-    label: 'text-white font-medium',
+    label: 'text-surface-light font-medium',
     inputWrapper: 'rounded-2xl px-4',
-    input: 'text-white outline-none focus:outline-none data-[focus=true]:outline-none',
+    input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
   };
 
   const selectClassNames = {
-    label: 'text-white font-medium',
-    input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+    label: 'text-surface-light font-medium',
+    input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
     inputWrapper: 'rounded-2xl px-4 pr-6',
   };
 
@@ -533,7 +533,7 @@ export default function EventCreation() {
   };
 
   return (
-    <main className="relative bg-surface-deepest text-white h-[calc(100vh-3rem)] overflow-hidden leading-none">
+    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)] overflow-hidden leading-none">
       <DiagonalStreaksFixed />
       <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden">
         <div className="h-full overflow-hidden">
@@ -563,7 +563,7 @@ export default function EventCreation() {
                       className="flex-1 flex flex-col h-full"
                       classNames={{
                         tabList: 'p-1 flex-shrink-0',
-                        tab: 'text-white data-[selected=true]:text-white',
+                        tab: 'text-surface-light data-[selected=true]:text-surface-light',
                         panel: 'pt-0 flex-1 flex flex-col overflow-hidden',
                       }}
                     >
@@ -632,7 +632,7 @@ export default function EventCreation() {
 
                       <Tab key="equipment" title="Equipment" className="flex flex-col h-full">
                         <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
-                          <h3 className="text-white font-semibold text-lg">Equipment</h3>
+                          <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
                           <div />
                         </div>
                         <EquipmentSelectionSection
@@ -660,14 +660,14 @@ export default function EventCreation() {
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between flex-shrink-0">
                           <div>
-                            {hasVenue && <h2 className="text-white text-xl font-semibold">{eventData.venue?.name}</h2>}
+                            {hasVenue && <h2 className="text-surface-light text-xl font-semibold">{eventData.venue?.name}</h2>}
                           </div>
                           <div>
                             <Button
                               onPress={handleSubmit}
                               size="md"
                               radius="lg"
-                              className="bg-accent hover:bg-accent/90 text-white"
+                              className="bg-accent hover:bg-accent/90 text-surface-light"
                             >
                               Create Event
                             </Button>
@@ -733,7 +733,7 @@ export default function EventCreation() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-surface-light">Layer:</span>
-                          <span className="text-sm font-medium text-white">
+                          <span className="text-sm font-medium text-surface-light">
                             {eventData.venue?.layers?.[currentLayer]?.name || 'Main Floor'}
                           </span>
                         </div>
@@ -780,7 +780,7 @@ export default function EventCreation() {
           {tooltip && (
             <div
               style={{ left: tooltip.left, top: tooltip.top }}
-              className="pointer-events-none fixed z-50 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg border border-default whitespace-nowrap"
+              className="pointer-events-none fixed z-50 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
             >
               {tooltip.text}
             </div>

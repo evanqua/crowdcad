@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Input } from '@heroui/react';
-import { AuroraBackground } from '@/components/ui/aurora-background';
+import HomePageStreaks from '@/components/layout/homepagestreaks';
 import { ArrowRight } from 'lucide-react';
 
 /**
@@ -58,24 +58,15 @@ export default function LiteLandingPage() {
   };
 
   return (
-    <main className="h-full w-full max-w-full overflow-hidden relative flex flex-col text-surface-light bg-surface-deepest">
-      {/* Aurora background */}
-      <AuroraBackground className="absolute inset-0 h-full w-full" showRadialGradient={true} />
-
-      {/* Vignette overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none z-[5]"
-        style={{
-          background: 'radial-gradient(ellipse 70% 70% at 50% 50%, transparent 20%, rgba(13,13,14,0.85) 100%)',
-        }}
-      />
+    <main className="h-[calc(100dvh-3.5rem)] w-full max-w-full overflow-hidden relative flex flex-col text-surface-light bg-surface-deepest">
+      <HomePageStreaks />
 
       {/* Main content */}
       <div className="relative z-10 flex flex-col items-center justify-center flex-1 px-6 gap-12 py-12">
         {/* Header and tagline */}
         <div className="flex flex-col items-center gap-4 max-w-2xl">
           <div className="flex items-center gap-2">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white text-center leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-surface-light text-center leading-tight">
               CrowdCAD Lite
             </h1>
           </div>

@@ -76,6 +76,15 @@
 
   /* ── CSS variables for shadcn/radix primitives ───────────── */
   :root {
+    --surface-text: 223 28% 18%;
+    --surface-text-strong: 220 35% 10%;
+    --surface-text-muted: 220 10% 44%;
+    --surface-border: 220 16% 84%;
+    --surface-bg-0: 220 20% 98%;
+    --surface-bg-1: 220 22% 96%;
+    --surface-bg-2: 220 18% 93%;
+    --surface-bg-3: 220 16% 89%;
+
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
@@ -99,9 +108,19 @@
     --color-neutral-800: #27272a;
     --color-neutral-900: #18181b;
     --ripple-accent-rgb: 62, 177, 253;
+    --streak-neutral-rgb: 36, 46, 66;
   }
 
   .dark {
+    --surface-text: 255 12% 87%;
+    --surface-text-strong: 48 33% 97%;
+    --surface-text-muted: 48 8% 76%;
+    --surface-border: 240 2% 15%;
+    --surface-bg-0: 240 3% 5%;
+    --surface-bg-1: 240 3% 9%;
+    --surface-bg-2: 240 2% 11%;
+    --surface-bg-3: 240 2% 8%;
+
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 10% 3.9%;
@@ -115,6 +134,7 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+    --streak-neutral-rgb: 233, 233, 240;
   }
 }
 
@@ -126,6 +146,33 @@
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .minimal-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(113, 113, 122, 0.5) transparent;
+  }
+
+  .minimal-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .minimal-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .minimal-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(113, 113, 122, 0.5);
+    border-radius: 9999px;
+  }
+
+  .minimal-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(161, 161, 170, 0.7);
+  }
+
+  .minimal-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 
@@ -158,7 +205,7 @@
   height: 80vh; /* 80% of viewport height */
   max-width: 1200px; /* Optional max width */
   max-height: 900px; /* Optional max height */
-  background: white;
+  background: hsl(var(--surface-bg-1));
   border-radius: 8px;
   box-shadow: 0 0 10px rgba(0,0,0,0.3);
   overflow: hidden;
@@ -172,39 +219,38 @@
   * {
     @apply border-border;
   }
+  html {
+    /* Clip any extension-injected elements that bleed beyond the viewport
+       without creating a scroll container (unlike overflow-x: hidden) */
+    overflow-x: clip;
+  }
   body {
     @apply bg-surface-deepest text-foreground;
+    max-width: 100vw;
+    color-scheme: light;
+  }
+
+  .dark body {
+    color-scheme: dark;
   }
 }
 
-/* ── Custom scrollbar — thin, transparent track, HeroUI-grey thumb ── */
-@layer base {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(113, 113, 122, 0.5) transparent;
-  }
-
-  *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  *::-webkit-scrollbar-thumb {
-    background: rgba(113, 113, 122, 0.5);
-    border-radius: 9999px;
-  }
-
-  *::-webkit-scrollbar-thumb:hover {
-    background: rgba(161, 161, 170, 0.7);
-  }
-
-  *::-webkit-scrollbar-corner {
-    background: transparent;
-  }
+/* ── Neutralize Grammarly extension layout interference ─────── */
+grammarly-desktop-integration,
+grammarly-extension,
+grammarly-button,
+grammarly-card,
+[data-grammarly-shadow-root],
+[id^="grammarly"],
+[class*="grammarly"] {
+  display: none !important;
+  position: fixed !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
 }
 
 @keyframes scroll {
@@ -219,6 +265,79 @@
 .animate-scroll {
   animation: scroll var(--animation-duration, 40s) 
     var(--animation-direction, forwards) linear infinite;
+}
+
+@keyframes hero-cta-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.hero-cta-gradient {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  background-image: linear-gradient(115deg, rgba(62, 177, 253, 0.86), rgba(128, 199, 247, 0.8), rgba(215, 122, 122, 0.76), rgba(210, 96, 96, 0.74));
+  background-size: 220% 220%;
+  animation: hero-cta-shift 7s ease-in-out infinite;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 8px 22px rgba(62, 177, 253, 0.16);
+}
+
+.hero-cta-gradient::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -5px;
+  border-radius: 9999px;
+  background-image: linear-gradient(115deg, rgba(62, 177, 253, 0.28), rgba(128, 199, 247, 0.24), rgba(215, 122, 122, 0.22), rgba(210, 96, 96, 0.2));
+  background-size: 220% 220%;
+  animation: hero-cta-shift 7s ease-in-out infinite;
+  filter: blur(8px);
+  opacity: 0.9;
+}
+
+.hero-cta-gradient:hover {
+  filter: brightness(1.04);
+}
+
+@media (max-width: 1024px) {
+  .animate-aurora {
+    animation-duration: 140s !important;
+    opacity: 0.32 !important;
+    filter: none !important;
+  }
+}
+
+/* ── Respect user's motion preferences ──────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-aurora {
+    animation: none !important;
+    opacity: 0.18 !important;
+  }
+
+  .hero-cta-gradient {
+    animation: none !important;
+    background-position: 50% 50%;
+  }
+
+  .hero-cta-gradient::before {
+    animation: none !important;
+    background-position: 50% 50%;
+  }
 }
 
 /* ── NProgress loading bar styles ──────────────────────────── */

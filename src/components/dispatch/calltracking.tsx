@@ -414,7 +414,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                         ...inactiveTeams.map(team => (
                                           <DropdownMenuItem
                                             key={team}
-                                            className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-blue/20"
+                                            className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-card-blue"
                                             onClick={() => handleAddTeamToCall(call.id, team)}
                                           >
                                             {team}
@@ -448,7 +448,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                         return (
                                           <DropdownMenuItem
                                             key={`supervisor-${supervisor.team}`}
-                                            className={`text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer ${isInactive ? 'bg-status-blue/20' : ''}`}
+                                            className={`text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer ${isInactive ? 'bg-status-card-blue' : ''}`}
                                             onClick={async () => {
                                               const now = new Date();
                                               const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
@@ -619,7 +619,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                                 ...inactiveTeams.map((team: Staff) => (
                                                   <DropdownMenuItem
                                                     key={`equip-team-inactive-${team.team}`}
-                                                    className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-blue/20"
+                                                    className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-card-blue"
                                                     onClick={async () => {
                                                       const now = new Date();
                                                       const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
@@ -778,7 +778,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                                   return (
                                                     <DropdownMenuItem
                                                       key={`equip-supervisor-inactive-${supervisor.team}`}
-                                                      className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-blue/20"
+                                                      className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-card-blue"
                                                       onClick={async () => {
                                                         const now = new Date();
                                                         const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
@@ -847,7 +847,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                         // In Clinic equipment (blue highlighting)
                                         ...inClinicEquipment.map((equipment: Equipment) => (
                                         <DropdownMenuSub key={equipment.id}>
-                                          <DropdownMenuSubTrigger className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-blue/20">
+                                          <DropdownMenuSubTrigger className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-card-blue">
                                             {equipment.name}
                                           </DropdownMenuSubTrigger>
                                           <DropdownMenuSubContent className="bg-surface-deep border-surface-liner">
@@ -939,7 +939,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                                 ...inactiveTeams.map((team: Staff) => (
                                                   <DropdownMenuItem
                                                     key={`equip-team-inactive-clinic-${team.team}`}
-                                                    className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-blue/20"
+                                                    className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-card-blue"
                                                     onClick={async () => {
                                                       const now = new Date();
                                                       const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
@@ -1098,7 +1098,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                                   return (
                                                     <DropdownMenuItem
                                                       key={`equip-supervisor-inactive-clinic-${supervisor.team}`}
-                                                      className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-blue/20"
+                                                      className="text-surface-light hover:bg-surface-liner focus:bg-surface-liner cursor-pointer bg-status-card-blue"
                                                       onClick={async () => {
                                                         const now = new Date();
                                                         const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');

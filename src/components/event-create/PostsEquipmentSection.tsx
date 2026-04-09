@@ -43,9 +43,9 @@ export function PostsSelectionSection({
   return (
     <>
       <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
-        <h3 className="text-white font-semibold text-lg">Posts</h3>
+        <h3 className="text-surface-light font-semibold text-lg">Posts</h3>
         <Checkbox isSelected={postsEnabled} onValueChange={setPostsEnabled} size="sm">
-          <span className="text-sm text-white">Enable Posts</span>
+          <span className="text-sm text-surface-light">Enable Posts</span>
         </Checkbox>
       </div>
 
@@ -176,7 +176,7 @@ export function EquipmentSelectionSection({
                       }
                     }}
                   />
-                  <span className="text-white font-medium flex-shrink-0">{equip.name}</span>
+                  <span className="text-surface-light font-medium flex-shrink-0">{equip.name}</span>
                   {isSelected && (
                     <Select
                       placeholder="Select Default Location"

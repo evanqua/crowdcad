@@ -745,7 +745,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       .filter((status): status is string => status !== undefined);
 
     if (statuses.some(status => ['En Route', 'On Scene', 'Transporting'].includes(status))) {
-      return 'bg-status-red/10';
+      return 'bg-status-card-red';
     }
 
     return 'bg-surface-deep';
@@ -2884,7 +2884,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           {isAdmin && (
             <button 
               onClick={() => setShowDebugModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/50 rounded hover:bg-red-500 hover:text-white transition-all text-sm font-bold"
+              className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/50 rounded hover:bg-red-500 hover:text-surface-light transition-all text-sm font-bold"
             >
               <ShieldAlert className="w-4 h-4" />
               Debug View
@@ -3940,7 +3940,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         <td className="px-3 py-2">
                           <Button
                             onClick={() => handleResolveDuplicate(selectedDuplicateCallId, call.id)}
-                            className="px-3 py-1 bg-status-red hover:bg-status-red/80 text-white rounded text-sm"
+                            className="px-3 py-1 bg-status-red hover:bg-status-red/80 text-surface-light rounded text-sm"
                           >
                             Select
                           </Button>

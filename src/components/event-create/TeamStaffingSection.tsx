@@ -21,7 +21,7 @@ export default function TeamStaffingSection({
   return (
     <>
       <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
-        <h3 className="text-white font-semibold text-lg">Teams</h3>
+        <h3 className="text-surface-light font-semibold text-lg">Teams</h3>
         <Button
           isIconOnly
           size="sm"
@@ -29,7 +29,7 @@ export default function TeamStaffingSection({
           className="min-w-8 w-8 h-8"
           style={{ backgroundColor: '#27272a' }}
         >
-          <Plus className="h-4 w-4 text-white" />
+          <Plus className="h-4 w-4 text-surface-light" />
         </Button>
       </div>
 
@@ -41,7 +41,7 @@ export default function TeamStaffingSection({
                 className="flex items-center justify-between cursor-pointer"
                 onClick={() => setOpenTeams((prev) => ({ ...prev, [idx]: !prev[idx] }))}
               >
-                <span className="text-white font-medium">{team.team}</span>
+                <span className="text-surface-light font-medium">{team.team}</span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -52,7 +52,7 @@ export default function TeamStaffingSection({
                     className="p-1 rounded bg-transparent"
                     aria-label="Delete team"
                   >
-                    <Trash2 className="h-4 w-4 text-white" />
+                    <Trash2 className="h-4 w-4 text-surface-light" />
                   </button>
                 </div>
               </div>

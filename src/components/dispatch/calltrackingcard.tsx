@@ -59,7 +59,7 @@ function callBg(call: Call, event: Event) {
     .filter((status): status is string => status !== undefined);
 
   if (statuses.some(status => ['En Route', 'On Scene', 'Transporting'].includes(status))) {
-    return 'bg-[#2d2123]';
+    return 'bg-status-card-red';
   }
 
   return 'bg-surface-deep';
@@ -402,7 +402,7 @@ export default function CallTrackingCard({
                           key={s.team}
                           onClick={() => onAddTeamToCall(call.id, s.team)}
                           className={`hover:bg-surface-liner focus:bg-surface-liner cursor-pointer ${
-                            isBreakOrClinic ? 'bg-status-blue/20 text-surface-light' : 'text-surface-light'
+                            isBreakOrClinic ? 'bg-status-card-blue text-surface-light' : 'text-surface-light'
                           }`}
                         >
                           {s.team} {isBreakOrClinic && `(${s.status})`}
@@ -431,7 +431,7 @@ export default function CallTrackingCard({
                           key={s.team}
                           onClick={() => onAddTeamToCall(call.id, s.team)}
                           className={`hover:bg-surface-liner focus:bg-surface-liner cursor-pointer ${
-                            isBreakOrClinic ? 'bg-status-blue/20 text-surface-light' : 'text-surface-light'
+                            isBreakOrClinic ? 'bg-status-card-blue text-surface-light' : 'text-surface-light'
                           }`}
                         >
                           {s.team} {isBreakOrClinic && `(${s.status})`}
@@ -529,7 +529,7 @@ export default function CallTrackingCard({
                                     });
                                   }}
                                   className={`hover:bg-surface-liner focus:bg-surface-liner cursor-pointer ${
-                                    isBreakOrClinic ? 'bg-status-blue/20 text-surface-light' : 'text-surface-light'
+                                    isBreakOrClinic ? 'bg-status-card-blue text-surface-light' : 'text-surface-light'
                                   }`}
                                 >
                                   {t.team} {isBreakOrClinic && `(${t.status})`}

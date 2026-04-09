@@ -59,7 +59,7 @@ function teamBg(status: string, event: Event, team: string) {
       c.equipmentTeams?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
     ) || ['En Route Eq', 'Assisting'].includes(status);
   
-  if (onEqRun) return 'bg-status-orange/15';
+  if (onEqRun) return 'bg-status-card-yellow';
   
   // Check if team is on active patient care call (red)
   const activeCare =
@@ -67,9 +67,9 @@ function teamBg(status: string, event: Event, team: string) {
       c.assignedTeam?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
     );
   
-  if (activeCare) return 'bg-[#2d2123]';
+  if (activeCare) return 'bg-status-card-red';
   
-  if (['On Break','In Clinic'].includes(status)) return 'bg-status-blue/20';
+  if (['On Break','In Clinic'].includes(status)) return 'bg-status-card-blue';
   
   return 'bg-surface-deep';
 }

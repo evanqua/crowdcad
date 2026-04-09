@@ -430,7 +430,7 @@ export default function ProfilePage() {
       {/* Message Toast */}
       {message && (
         <div className="fixed bottom-4 right-4 z-50 p-4 bg-accent/90 border border-accent/20 rounded shadow-lg">
-          <p className="text-white">{message}</p>
+          <p className="text-surface-light">{message}</p>
         </div>
       )}
 

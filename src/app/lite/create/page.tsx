@@ -122,11 +122,11 @@ function LiteCreateContent() {
   const allPosts = useMemo(() => eventDraft?.venue.posts ?? [], [eventDraft?.venue.posts]);
 
   const inputClassNames = {
-    label: 'text-white font-medium',
+    label: 'text-surface-light font-medium',
     inputWrapper:
       'rounded-2xl px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
     input:
-      'text-white outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
+      'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   } as const;
 
   const attachedInputClassNames = {
@@ -134,12 +134,12 @@ function LiteCreateContent() {
     inputWrapper:
       'rounded-l-2xl rounded-r-none px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
     input:
-      'text-white outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
+      'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   } as const;
 
   const selectClassNames = {
-    label: 'text-white font-medium',
-    input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+    label: 'text-surface-light font-medium',
+    input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
     inputWrapper:
       'rounded-2xl px-4 pr-6 hover:bg-surface-deep shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
   } as const;
@@ -669,13 +669,13 @@ function LiteCreateContent() {
   }
 
   return (
-    <main className="relative bg-surface-deepest text-white h-full overflow-hidden leading-none">
+    <main className="relative bg-surface-deepest text-surface-light h-full overflow-hidden leading-none">
       <DiagonalStreaksFixed />
 
       <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden flex flex-col">
         <div className="px-6 pt-4 pb-4 flex-shrink-0 space-y-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white text-left">Lite Event Setup</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-surface-light text-left">Lite Event Setup</h1>
             <p className="text-sm text-surface-light mt-1">
               Build your event locally with locations, staffing, posts, and schedule before dispatch.
             </p>
@@ -713,7 +713,7 @@ function LiteCreateContent() {
                 onPress={handleCreateLiteEvent}
                 size="lg"
                 radius="lg"
-                className="bg-accent hover:bg-accent/90 text-white"
+                className="bg-accent hover:bg-accent/90 text-surface-light"
               >
                 Create Event
               </Button>
@@ -732,7 +732,7 @@ function LiteCreateContent() {
                       onSelectionChange={(key) => setSelectedLeftTab(key as 'locations' | 'equipment')}
                       classNames={{
                         tabList: 'p-1 rounded-2xl flex-shrink-0',
-                        tab: 'rounded-2xl px-4 text-white data-[selected=true]:text-white',
+                        tab: 'rounded-2xl px-4 text-surface-light data-[selected=true]:text-surface-light',
                         panel: 'hidden',
                         cursor: 'rounded-2xl',
                       }}
@@ -768,7 +768,7 @@ function LiteCreateContent() {
                       />
                       <Button
                         onPress={selectedLeftTab === 'locations' ? addLocation : addEquipment}
-                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-2xl text-white"
+                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-2xl text-surface-light"
                       >
                         Add
                       </Button>
@@ -824,7 +824,7 @@ function LiteCreateContent() {
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-sm text-white truncate">{getPostName(post)}</span>
+                                  <span className="text-sm text-surface-light truncate">{getPostName(post)}</span>
                                   <div className="flex items-center gap-1">
                                     <Button
                                       isIconOnly
@@ -894,7 +894,7 @@ function LiteCreateContent() {
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-sm text-white truncate">{item.name}</span>
+                                  <span className="text-sm text-surface-light truncate">{item.name}</span>
                                   <div className="flex items-center gap-1">
                                     <Button
                                       isIconOnly
@@ -946,7 +946,7 @@ function LiteCreateContent() {
                         className="w-full flex-shrink-0"
                         classNames={{
                           tabList: 'p-1 w-full flex-shrink-0',
-                          tab: 'text-white data-[selected=true]:text-white',
+                          tab: 'text-surface-light data-[selected=true]:text-surface-light',
                           cursor: 'rounded-2xl',
                           panel: 'hidden',
                         }}
@@ -960,7 +960,7 @@ function LiteCreateContent() {
                       <div className="flex-shrink-0 min-h-12 px-3 py-2 flex items-center justify-between border-b border-surface-liner">
                         {selectedRightTab === 'teams' && (
                           <>
-                            <h3 className="text-white font-semibold text-lg">Teams</h3>
+                            <h3 className="text-surface-light font-semibold text-lg">Teams</h3>
                             <Button
                               size="sm"
                               onPress={() => {
@@ -970,7 +970,7 @@ function LiteCreateContent() {
                                 setCurrentMembers([]);
                                 setIsTeamModalOpen(true);
                               }}
-                              className="h-8 px-3 text-sm text-white"
+                              className="h-8 px-3 text-sm text-surface-light"
                               style={{ backgroundColor: '#27272a' }}
                             >
                               Add Team
@@ -980,11 +980,11 @@ function LiteCreateContent() {
 
                         {selectedRightTab === 'supervisors' && (
                           <>
-                            <h3 className="text-white font-semibold text-lg">Supervisors</h3>
+                            <h3 className="text-surface-light font-semibold text-lg">Supervisors</h3>
                             <Button
                               size="sm"
                               onPress={() => setIsSupervisorModalOpen(true)}
-                              className="h-8 px-3 text-sm text-white"
+                              className="h-8 px-3 text-sm text-surface-light"
                               style={{ backgroundColor: '#27272a' }}
                             >
                               Add Supervisor
@@ -994,14 +994,14 @@ function LiteCreateContent() {
 
                         {selectedRightTab === 'posts' && (
                           <>
-                            <h3 className="text-white font-semibold text-lg">Posts</h3>
+                            <h3 className="text-surface-light font-semibold text-lg">Posts</h3>
                             <div className="h-8 flex items-center">
                               <Checkbox
                                 isSelected={postsEnabled}
                                 onValueChange={setPostsEnabled}
                                 size="sm"
                               >
-                                <span className="text-sm text-white">Enable Posts</span>
+                                <span className="text-sm text-surface-light">Enable Posts</span>
                               </Checkbox>
                             </div>
                           </>
@@ -1009,7 +1009,7 @@ function LiteCreateContent() {
 
                         {selectedRightTab === 'equipment' && (
                           <>
-                            <h3 className="text-white font-semibold text-lg">Equipment</h3>
+                            <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
                             <div className="w-8 h-8" />
                           </>
                         )}
@@ -1033,7 +1033,7 @@ function LiteCreateContent() {
                                   <div className="flex items-center justify-between px-3 py-2 gap-2">
                                     <button
                                       type="button"
-                                      className="text-sm text-white truncate text-left flex-1"
+                                      className="text-sm text-surface-light truncate text-left flex-1"
                                       onClick={() =>
                                         setOpenTeams((current) => ({
                                           ...current,
@@ -1097,7 +1097,7 @@ function LiteCreateContent() {
                                   <div className="flex items-center justify-between px-3 py-2 gap-2">
                                     <button
                                       type="button"
-                                      className="text-sm text-white truncate text-left flex-1"
+                                      className="text-sm text-surface-light truncate text-left flex-1"
                                       onClick={() =>
                                         setOpenSupervisors((current) => ({
                                           ...current,
@@ -1199,7 +1199,7 @@ function LiteCreateContent() {
                             </div>
 
                             <div className={`space-y-3 mt-6 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
-                              <h3 className="text-white font-semibold text-lg">Schedule</h3>
+                              <h3 className="text-surface-light font-semibold text-lg">Schedule</h3>
 
                               <div className="grid grid-cols-3 gap-3">
                                 <TimeInput
@@ -1318,7 +1318,7 @@ function LiteCreateContent() {
                                       }}
                                     />
 
-                                    <span className="text-white font-medium flex-shrink-0">{equipment.name}</span>
+                                    <span className="text-surface-light font-medium flex-shrink-0">{equipment.name}</span>
 
                                     {selectedEquipment && (
                                       <Select

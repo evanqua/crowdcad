@@ -45,7 +45,7 @@ export default function PostingScheduleSection({
 }: Props) {
   return (
     <div className={`space-y-3 mt-6 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
-      <h3 className="text-white font-semibold text-lg">Schedule</h3>
+      <h3 className="text-surface-light font-semibold text-lg">Schedule</h3>
 
       <div className="grid grid-cols-3 gap-3">
         <TimeInput

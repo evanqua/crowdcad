@@ -330,7 +330,7 @@ export default function VenueSelection() {
 
   if (!user) {
     return (
-      <div className="bg-surface-deepest text-white min-h-screen pt-24 px-6 flex items-center justify-center">
+      <div className="bg-surface-deepest text-surface-light min-h-screen pt-24 px-6 flex items-center justify-center">
         <div>Redirecting...</div>
       </div>
     );
@@ -339,7 +339,7 @@ export default function VenueSelection() {
   // Mobile View - Show venue list or event details
   if (isMobile) {
     return (
-      <main className="relative bg-surface-deepest text-white h-[calc(100vh-3.5rem)]">
+      <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3.5rem)]">
         <DiagonalStreaksFixed />
         
         <div className="relative z-10 pt-10 px-4 pb-8">
@@ -473,7 +473,7 @@ export default function VenueSelection() {
                 <Button
                   size="lg"
                   startContent={<Play className="w-5 h-5" />}
-                  className="w-full bg-accent hover:bg-accent/90 text-white"
+                  className="w-full bg-accent hover:bg-accent/90 text-surface-light"
                   onPress={() => handleStartNewEvent(selectedVenueId)}
                 >
                   Start New Event
@@ -603,7 +603,7 @@ export default function VenueSelection() {
 
   // Desktop View - Master-Detail Pattern
   return (
-    <main className="relative bg-surface-deepest text-white h-[calc(100vh-3.5rem)]">
+    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3.5rem)]">
       <DiagonalStreaksFixed />
       
       <div className="relative z-10 pt-10 px-6">
@@ -622,7 +622,7 @@ export default function VenueSelection() {
                 <Button
                   size="lg"
                   startContent={<Plus className="w-5 h-5" />}
-                  className="w-full bg-accent hover:bg-accent/90 text-white"
+                  className="w-full bg-accent hover:bg-accent/90 text-surface-light"
                   onPress={() => router.push('/venues/management')}
                 >
                   New Venue
@@ -754,7 +754,7 @@ export default function VenueSelection() {
                     <Button
                       size="lg"
                       startContent={<Play className="w-5 h-5" />}
-                      className="bg-accent hover:bg-accent/90 text-white"
+                      className="bg-accent hover:bg-accent/90 text-surface-light"
                       onPress={() => handleStartNewEvent(selectedVenueId)}
                     >
                       Start New Event

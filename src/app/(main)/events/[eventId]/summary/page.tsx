@@ -514,7 +514,7 @@ export default function SummaryPage() {
                 onPress={handleCSVDownload}
                 variant="flat"
                 radius="lg"
-                className="px-4 py-2 bg-accent hover:bg-accent/90 text-white font-semibold"
+                className="px-4 py-2 bg-accent hover:bg-accent/90 text-surface-light font-semibold"
               >
                 Export Logs
               </Button>
@@ -523,7 +523,7 @@ export default function SummaryPage() {
                   onPress={handleDataCollectionCSVDownload}
                   variant="flat"
                   radius="lg"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-surface-light font-semibold"
                 >
                   Export Testing Data
                 </Button>

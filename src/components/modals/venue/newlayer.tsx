@@ -98,7 +98,7 @@ export default function NewLayerModal({ isOpen, onClose, onSubmit }: Props) {
                 {file ? (
                   <div className="flex items-center gap-2 rounded-xl border border-default bg-surface-deep p-2">
                     <Upload className="ml-2 h-6 w-6 text-accent" />
-                    <span className="text-sm text-white truncate">{file.name}</span>
+                    <span className="text-sm text-surface-light truncate">{file.name}</span>
                     <Button
                       size="sm"
                       variant="light"
@@ -137,7 +137,7 @@ export default function NewLayerModal({ isOpen, onClose, onSubmit }: Props) {
               </Button>
               <Button
                 onPress={handleSubmit}
-                className="flex-1 bg-accent hover:bg-accent/90 text-white"
+                className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
                 isDisabled={!name.trim() || !file}
               >
                 Add Layer

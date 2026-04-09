@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/app/firebase';
 import { useAuth } from '@/hooks/useauth';
@@ -25,7 +25,7 @@ import {
   NavbarMenuToggle,
   Chip,
 } from '@heroui/react';
-import { LogOut, Menu, UserRound } from 'lucide-react';
+import { LogOut, Menu, Moon, Sun, UserRound } from 'lucide-react';
 
 const LoginModalLazy = dynamic(() => import('@/components/modals/auth/loginmodal'), {
   ssr: false,
@@ -67,6 +67,7 @@ export default function LiteNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginMode, setLoginMode] = useState<'login' | 'signup'>('login');
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
   const [postingScheduleEnabled, setPostingScheduleEnabled] = useState(true);
   const isDispatch = !!(pathname && /^\/lite\/events\/[^/]+\/dispatch(?:$|\/|\?)/.test(pathname));
   const liteDispatchEventId = pathname?.match(/^\/lite\/events\/([^/?#]+)\/dispatch(?:$|[/?#])/)?.[1] ?? null;
@@ -74,10 +75,32 @@ export default function LiteNavbar() {
   const isActive = (href: string) => pathname === href;
   const showPostingSchedule = isDispatch && postingScheduleEnabled;
   const wrapperHeightClass = isDispatch ? 'h-16 md:h-16' : 'h-14 md:h-14';
-  const containerWidthClass = isDispatch ? 'max-w-none' : 'max-w-[1360px]';
+  const containerWidthClass = isDispatch ? 'max-w-none' : 'max-w-[1280px]';
   const logoWidthClass = 'w-20';
   const desktopNavGapClass = 'gap-2 pl-3';
-  const menuOffsetClass = isDispatch ? 'top-16 h-[calc(100dvh-4rem)]' : 'top-14 h-[calc(100dvh-3.5rem)]';
+  const menuOffsetClass = 'top-14 h-[calc(100dvh-3.5rem)]';
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const hasDarkClass = root.classList.contains('dark');
+    setIsDarkTheme(hasDarkClass);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    const nextIsDark = !isDarkTheme;
+    const root = document.documentElement;
+
+    root.classList.toggle('dark', nextIsDark);
+    root.setAttribute('data-theme', nextIsDark ? 'dark' : 'light');
+
+    try {
+      localStorage.setItem('ccad-theme', nextIsDark ? 'dark' : 'light');
+    } catch {
+      // Ignore localStorage failures (private mode / restricted storage).
+    }
+
+    setIsDarkTheme(nextIsDark);
+  }, [isDarkTheme]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,7 +171,7 @@ export default function LiteNavbar() {
             <NavbarBrand>
               <button onClick={() => router.push("/")} className="flex items-center">
                 <Image
-                  src="/logo.svg"
+                  src={isDarkTheme ? '/logo.svg' : '/logo-dark.svg'}
                   alt="Logo"
                   width={118}
                   height={30}
@@ -229,12 +252,24 @@ export default function LiteNavbar() {
             <div className="lg:hidden">
               <NavbarMenuToggle
                 aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-                className="text-white"
+                className="text-surface-light"
                 icon={(open) => (
-                  <Menu className={`size-6 transition ${open ? 'rotate-90' : ''}`} color="white" />
+                  <Menu className={`size-6 transition ${open ? 'rotate-90' : ''} text-surface-light`} />
                 )}
               />
             </div>
+
+            <NavbarItem>
+              <Button
+                isIconOnly
+                variant="flat"
+                aria-label={isDarkTheme ? 'Switch to light mode' : 'Switch to dark mode'}
+                className="h-8 w-8 min-w-8 rounded-full bg-surface-deeper/70 text-surface-light hover:bg-surface-deeper"
+                onPress={toggleTheme}
+              >
+                {isDarkTheme ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              </Button>
+            </NavbarItem>
 
             {!ready ? (
               <NavbarItem>
@@ -266,10 +301,10 @@ export default function LiteNavbar() {
                           showFallback
                           name={initialsFromUser(user)}
                           classNames={{
-                            base: "bg-surface-base border-white",
+                            base: "bg-surface-base border-surface-liner",
                             name: "text-surface-light text-sm font-bold",
                           }}
-                          className="h-7 w-7 border-white"
+                          className="h-7 w-7 border-surface-liner"
                         />
                       </button>
                   </DropdownTrigger>
@@ -357,6 +392,18 @@ export default function LiteNavbar() {
           )}
 
           <div className="my-2 border-t border-surface-liner" />
+
+          <NavbarMenuItem className="mt-1">
+            <button
+              className="block w-full text-left text-[18px] px-2 py-2 rounded-md text-surface-light hover:text-accent"
+              onClick={() => {
+                toggleTheme();
+                setIsMenuOpen(false);
+              }}
+            >
+              {isDarkTheme ? 'Switch to light mode' : 'Switch to dark mode'}
+            </button>
+          </NavbarMenuItem>
 
           {!user ? (
             <>

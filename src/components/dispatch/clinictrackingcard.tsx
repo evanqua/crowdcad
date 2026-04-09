@@ -261,7 +261,7 @@ export default function ClinicTrackingCard({
                 <Button
                   variant="flat"
                   radius="md"
-                  className="w-full h-full justify-start bg-surface-deep border border-surface-liner hover:bg-surface-muted text-white px-2"
+                  className="w-full h-full justify-start bg-surface-deep border border-surface-liner hover:bg-surface-muted text-surface-light px-2"
                 >
                   <div className="text-left flex-4 pl-0.5">
                     <div className="text-xs text-[#d4d4d8] pb-0.5">Status</div>
