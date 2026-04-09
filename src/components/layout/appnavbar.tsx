@@ -74,7 +74,6 @@ export default function AppNavbar() {
   }, [isDarkTheme]);
 
   const isDispatch = !!(pathname && /^\/events\/[^/]+\/dispatch(?:$|\/|\?)/.test(pathname));
-  const isVenueRoute = !!(pathname && pathname.startsWith('/venues'));
 
   const navItems = [
     { label: "Venues", href: "/venues/selection" },
@@ -101,8 +100,8 @@ export default function AppNavbar() {
   ];
 
   const isActive = (href: string) => pathname === href;
-  const wrapperHeightClass = isDispatch ? 'h-16 md:h-16' : 'h-14 md:h-14';
-  const containerWidthClass = (isDispatch || isVenueRoute) ? 'max-w-none' : 'max-w-[1280px]';
+  const wrapperHeightClass = 'h-14 md:h-14';
+  const containerWidthClass = isDispatch ? 'max-w-none' : 'max-w-[1280px]';
   const logoWidthClass = 'w-20';
   const desktopNavGapClass = 'gap-1 pl-2';
 
@@ -126,14 +125,14 @@ export default function AppNavbar() {
         onMenuOpenChange={setIsMenuOpen}
         classNames={{
           base:
-            "sticky top-0 z-[300] bg-surface-deepest/70 backdrop-blur-md",
+            `sticky top-0 z-[300] ${isDispatch ? 'bg-surface-deep' : 'bg-surface-deepest/70'} backdrop-blur-md`,
           wrapper:
             `${wrapperHeightClass} px-4 sm:px-6 md:px-6 lg:px-6 xl:px-6 2xl:px-6 flex items-center`,
           item: "text-[16px] leading-6",
           content: "items-center",
           toggle: "lg:hidden",
           menu:
-            `fixed inset-x-0 ${isDispatch ? 'top-16 h-[calc(100dvh-4rem)]' : 'top-14 h-[calc(100dvh-3.5rem)]'} z-[350] bg-surface-deep/95 backdrop-blur supports-[backdrop-filter]:bg-opacity-90 ` +
+            `fixed inset-x-0 top-14 h-[calc(100dvh-3.5rem)] z-[350] bg-surface-deep/95 backdrop-blur supports-[backdrop-filter]:bg-opacity-90 ` +
             'overflow-y-auto pt-2 pb-6 border-t border-base-200',
           menuItem: "justify-center text-surface-light",
         }}

@@ -74,7 +74,7 @@ export default function LiteNavbar() {
 
   const isActive = (href: string) => pathname === href;
   const showPostingSchedule = isDispatch && postingScheduleEnabled;
-  const wrapperHeightClass = isDispatch ? 'h-16 md:h-16' : 'h-14 md:h-14';
+  const wrapperHeightClass = 'h-14 md:h-14';
   const containerWidthClass = isDispatch ? 'max-w-none' : 'max-w-[1280px]';
   const logoWidthClass = 'w-20';
   const desktopNavGapClass = 'gap-2 pl-3';
@@ -154,7 +154,7 @@ export default function LiteNavbar() {
         isMenuOpen={isMenuOpen}
         onMenuOpenChange={setIsMenuOpen}
         classNames={{
-          base: 'sticky top-0 z-[300] bg-surface-deepest/70 backdrop-blur-md',
+          base: `sticky top-0 z-[300] ${isDispatch ? 'bg-surface-deep' : 'bg-surface-deepest/70'} backdrop-blur-md`,
           wrapper:
             `${wrapperHeightClass} px-4 sm:px-6 md:px-6 lg:px-6 xl:px-6 2xl:px-6 flex items-center`,
           item: 'text-[18px] leading-6',
