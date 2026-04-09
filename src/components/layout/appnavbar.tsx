@@ -307,7 +307,7 @@ export default function AppNavbar() {
                 <Link
                   href={href}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`w-full text-base font-medium transition ${
+                  className={`block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition ${
                     isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
                   }`}
                 >
@@ -321,7 +321,7 @@ export default function AppNavbar() {
 
           <NavbarMenuItem className="mt-1">
             <button
-              className="block w-full text-left text-[18px] px-2 py-2 rounded-md text-surface-light hover:text-accent"
+              className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-surface-light hover:text-accent"
               onClick={() => {
                 toggleTheme();
                 setIsMenuOpen(false);
@@ -335,7 +335,7 @@ export default function AppNavbar() {
             <>
               <NavbarMenuItem className="mt-1">
                 <button
-                  className="block w-full text-left text-[18px] px-2 py-2 rounded-md"
+                  className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-surface-light hover:text-accent"
                   onClick={() => {
                     setIsMenuOpen(false);
                     setLoginMode("login");
@@ -347,7 +347,7 @@ export default function AppNavbar() {
               </NavbarMenuItem>
               <NavbarMenuItem className="mt-1">
                 <button
-                  className="block w-full text-left text-[18px] px-2 py-2 rounded-md"
+                  className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-surface-light hover:text-accent"
                   onClick={() => {
                     setIsMenuOpen(false);
                     setLoginMode("signup");
@@ -363,7 +363,7 @@ export default function AppNavbar() {
               <NavbarMenuItem>
                 <Link
                   href="/profile"
-                  className="w-full text-lg font-medium transition text-surface-faint hover:text-accent"
+                  className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-surface-light hover:text-accent"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Profile
@@ -371,7 +371,7 @@ export default function AppNavbar() {
               </NavbarMenuItem>
               <NavbarMenuItem>
                 <button
-                  className="w-full text-left text-lg font-medium transition text-status-red hover:opacity-80"
+                  className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-status-red hover:text-status-red/80"
                   onClick={() => {
                     setIsMenuOpen(false);
                     onLogout();
