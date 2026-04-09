@@ -339,7 +339,7 @@ export default function VenueSelection() {
   // Mobile View - Show venue list or event details
   if (isMobile) {
     return (
-      <main className="relative bg-surface-deepest text-white h-[calc(100vh-4rem)]">
+      <main className="relative bg-surface-deepest text-white h-[calc(100vh-3.5rem)]">
         <DiagonalStreaksFixed />
         
         <div className="relative z-10 pt-10 px-4 pb-8">
@@ -603,7 +603,7 @@ export default function VenueSelection() {
 
   // Desktop View - Master-Detail Pattern
   return (
-    <main className="relative bg-surface-deepest text-white h-[calc(100vh-4rem)]">
+    <main className="relative bg-surface-deepest text-white h-[calc(100vh-3.5rem)]">
       <DiagonalStreaksFixed />
       
       <div className="relative z-10 pt-10 px-6">

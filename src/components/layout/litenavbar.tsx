@@ -49,7 +49,7 @@ function LiveClock() {
     return () => clearInterval(id);
   }, []);
   return (
-    <span suppressHydrationWarning={true} className="tabular-nums text-surface-light text-lg font-semibold font-arial">
+    <span suppressHydrationWarning={true} className="tabular-nums text-surface-light text-sm font-semibold font-arial">
       {now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
     </span>
   );
@@ -72,8 +72,12 @@ export default function LiteNavbar() {
   const liteDispatchEventId = pathname?.match(/^\/lite\/events\/([^/?#]+)\/dispatch(?:$|[/?#])/)?.[1] ?? null;
 
   const isActive = (href: string) => pathname === href;
-  const initials = initialsFromUser(user ?? undefined);
   const showPostingSchedule = isDispatch && postingScheduleEnabled;
+  const wrapperHeightClass = isDispatch ? 'h-16 md:h-16' : 'h-14 md:h-14';
+  const containerWidthClass = isDispatch ? 'max-w-none' : 'max-w-[1360px]';
+  const logoWidthClass = 'w-20';
+  const desktopNavGapClass = 'gap-2 pl-3';
+  const menuOffsetClass = isDispatch ? 'top-16 h-[calc(100dvh-4rem)]' : 'top-14 h-[calc(100dvh-3.5rem)]';
 
   useEffect(() => {
     let cancelled = false;
@@ -129,47 +133,42 @@ export default function LiteNavbar() {
         classNames={{
           base: 'sticky top-0 z-[300] bg-surface-deepest/70 backdrop-blur-md',
           wrapper:
-            'h-16 md:h-16 px-4 sm:px-6 md:px-6 lg:px-6 xl:px-6 2xl:px-6 flex items-center',
+            `${wrapperHeightClass} px-4 sm:px-6 md:px-6 lg:px-6 xl:px-6 2xl:px-6 flex items-center`,
           item: 'text-[18px] leading-6',
           content: 'items-center',
           toggle: 'lg:hidden',
           menu:
-            'fixed inset-x-0 top-16 z-[350] bg-surface-deep/95 backdrop-blur supports-[backdrop-filter]:bg-opacity-90 ' +
-            'h-[calc(100dvh-4rem)] overflow-y-auto pt-2 pb-6 border-t border-base-200',
+            `fixed inset-x-0 ${menuOffsetClass} z-[350] bg-surface-deep/95 backdrop-blur supports-[backdrop-filter]:bg-opacity-90 ` +
+            'overflow-y-auto pt-2 pb-6 border-t border-base-200',
           menuItem: 'justify-center text-surface-light',
         }}
       >
-        <div className={`flex items-center justify-between w-full ${!isDispatch ? 'max-w-[1200px] mx-auto' : ''}`}>
-          {/* LEFT: brand */}
-          <NavbarContent justify="start" className="min-w-0">
+        <div className={`flex w-full items-center justify-between ${containerWidthClass} mx-auto`}>
+          <div className="relative z-[30] min-w-0 flex items-center gap-2 sm:gap-4 md:gap-6">
             <NavbarBrand>
               <button onClick={() => router.push("/")} className="flex items-center">
                 <Image
                   src="/logo.svg"
                   alt="Logo"
-                  width={140}
+                  width={118}
                   height={30}
                   priority
                   sizes="(max-width: 600px) 7rem, (max-width: 800px) 8rem, 110px"
-                  className="cursor-pointer w-24 h-auto"
+                  className={`cursor-pointer h-auto shrink-0 ${logoWidthClass}`}
                 />
               </button>
 
               {isDispatch && (
-                <div className="ml-4 sm:ml-6 md:ml-8">
+                <div className="ml-3 sm:ml-4 md:ml-6">
                   <LiveClock />
-                  <Chip size="lg" color="success" variant="flat" className="ml-4">
-                    Lite Mode
-                  </Chip>
                 </div>
                 
               )}
             </NavbarBrand>
-          </NavbarContent>
 
           <NavbarContent
-            className={`hidden lg:flex gap-8 ${!isDispatch ? 'max-w-[500px]' : ''}`}
-            justify="center"
+            className={`hidden lg:flex flex-none ${desktopNavGapClass}`}
+            justify="start"
           >
             {isDispatch ? (
               <>
@@ -177,7 +176,7 @@ export default function LiteNavbar() {
                   <NavbarItem>
                     <button
                       onClick={openPostingSchedule}
-                      className="text-lg font-medium transition text-surface-light hover:text-accent"
+                      className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition text-surface-light hover:text-accent"
                     >
                       Posting Schedule
                     </button>
@@ -189,7 +188,7 @@ export default function LiteNavbar() {
                     <DropdownTrigger>
                       <button
                         type="button"
-                        className="text-lg font-medium transition text-surface-light hover:text-accent"
+                        className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition text-surface-light hover:text-accent"
                       >
                         End Event
                       </button>
@@ -214,7 +213,7 @@ export default function LiteNavbar() {
                 <NavbarItem key={href} isActive={isActive(href)}>
                   <Link
                     href={href}
-                    className={`text-lg font-medium transition ${
+                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition ${
                       isActive(href) ? 'text-surface-light' : 'text-surface-faint hover:text-accent'
                     }`}
                   >
@@ -224,6 +223,7 @@ export default function LiteNavbar() {
               ))
             )}
           </NavbarContent>
+          </div>
 
           <NavbarContent justify="end" className="gap-2 sm:gap-3 md:gap-4">
             <div className="lg:hidden">
@@ -243,6 +243,9 @@ export default function LiteNavbar() {
             ) : !user ? (
               <NavbarItem>
                 <Button
+                  size="sm"
+                  variant="bordered"
+                  className="h-8 rounded-full border-surface-liner bg-transparent px-3 text-surface-light font-semibold"
                   onClick={() => {
                     setIsMenuOpen(false);
                     setLoginOpen(true);
@@ -256,20 +259,19 @@ export default function LiteNavbar() {
                 <Dropdown placement="bottom-end">
                   <DropdownTrigger>
                     <button
-                      aria-label="Open profile menu"
-                      className="relative p-0.5 rounded-full bg-gradient-to-br from-accent/70 to-[rgba(240,28,28,0.4)] cursor-pointer"
-                    >
-                      <Avatar
-                        isBordered
-                        showFallback
-                        name={initials}
-                        classNames={{
-                          base: 'bg-surface-base',
-                          name: 'text-surface-light text-xs',
-                        }}
-                        className="w-8 h-8"
-                      />
-                    </button>
+                        aria-label="Open profile menu"
+                        className="relative rounded-full p-0.5 bg-gradient-to-br from-accent/70 to-[rgba(240,28,28,0.4)] cursor-pointer"
+                      >
+                        <Avatar
+                          showFallback
+                          name={initialsFromUser(user)}
+                          classNames={{
+                            base: "bg-surface-base border-white",
+                            name: "text-surface-light text-sm font-bold",
+                          }}
+                          className="h-7 w-7 border-white"
+                        />
+                      </button>
                   </DropdownTrigger>
 
                   <DropdownMenu

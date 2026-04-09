@@ -20,7 +20,7 @@ export default function LoadingScreen({
     'flex flex-col items-center justify-center gap-3';
   const wrapper =
     variant === 'page'
-      ? `${base} w-full bg-surface-deepest min-h-[calc(100vh-72px)]`
+      ? `${base} w-full bg-surface-deepest min-h-[calc(100dvh-3.5rem)]`
       : `${base} w-full h-full min-h-[120px]`;
 
   return (

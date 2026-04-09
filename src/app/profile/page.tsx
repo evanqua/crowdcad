@@ -185,10 +185,10 @@ export default function ProfilePage() {
   };
 
   return (
-    <main className="relative h-[calc(100vh-4rem)] bg-surface-deepest text-surface-light overflow-hidden">
+    <main className="relative h-[calc(100vh-3.5rem)] bg-surface-deepest text-surface-light overflow-hidden">
       <DiagonalStreaksFixed />
       <div className="relative z-10 h-full">
-        <div className="flex h-[calc(100vh-4rem)] max-w-[1200px] mx-auto">
+        <div className="flex h-[calc(100vh-3.5rem)] max-w-[1200px] mx-auto">
           <Tabs
             isVertical
             selectedKey={activeSection}

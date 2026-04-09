@@ -40,7 +40,7 @@ export default function LandingPage() {
   const [initialError, setInitialError] = useState<string | null>(null);
 
   return (
-    <main className="h-[calc(100dvh-4rem)] w-full max-w-full overflow-hidden relative flex flex-col text-surface-light bg-surface-deepest">
+    <main className="h-[calc(100dvh-3.5rem)] w-full max-w-full overflow-hidden relative flex flex-col text-surface-light bg-surface-deepest">
       {/* Aurora fills the entire viewport */}
       <AuroraBackground className="absolute inset-0 h-full w-full" showRadialGradient={true} />
 

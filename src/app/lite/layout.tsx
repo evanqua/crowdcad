@@ -30,7 +30,7 @@ export default function LiteLayout({ children }: { children: React.ReactNode }) 
   return (
     <LiteProvider isLiteMode={true}>
       <LiteNavbar />
-      <div className="h-[calc(100dvh-4rem)]">{children}</div>
+      <div className="h-[calc(100dvh-3.5rem)]">{children}</div>
     </LiteProvider>
   );
 }
