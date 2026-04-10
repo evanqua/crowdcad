@@ -124,7 +124,7 @@ function LiteCreateContent() {
   const inputClassNames = {
     label: 'text-surface-light font-medium',
     inputWrapper:
-      'rounded-2xl px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+      'rounded-2xl px-4 bg-surface-deeper/90 hover:bg-surface-deeper shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
     input:
       'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   } as const;
@@ -132,7 +132,7 @@ function LiteCreateContent() {
   const attachedInputClassNames = {
     label: inputClassNames.label,
     inputWrapper:
-      'rounded-l-2xl rounded-r-none px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+      'rounded-l-2xl rounded-r-none px-4 bg-surface-deeper/90 hover:bg-surface-deeper shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
     input:
       'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   } as const;
@@ -141,7 +141,7 @@ function LiteCreateContent() {
     label: 'text-surface-light font-medium',
     input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
     inputWrapper:
-      'rounded-2xl px-4 pr-6 hover:bg-surface-deep shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+      'rounded-2xl px-4 pr-6 bg-surface-deeper/90 hover:bg-surface-deeper shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
   } as const;
 
   useEffect(() => {
@@ -768,7 +768,7 @@ function LiteCreateContent() {
                       />
                       <Button
                         onPress={selectedLeftTab === 'locations' ? addLocation : addEquipment}
-                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-2xl text-surface-light"
+                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-2xl text-surface-light bg-surface-deeper/90 hover:bg-surface-deeper"
                       >
                         Add
                       </Button>
@@ -777,8 +777,7 @@ function LiteCreateContent() {
 
                   <Card
                     isBlurred
-                    className="flex-1 overflow-hidden"
-                    style={{ backgroundColor: 'rgba(39, 39, 42, 0.5)' }}
+                    className="flex-1 overflow-hidden bg-surface-deeper/90"
                   >
                     {selectedLeftTab === 'locations' ? (
                       <ScrollShadow
@@ -790,8 +789,7 @@ function LiteCreateContent() {
                           <Card
                             key={`${getPostName(post)}_${index}`}
                             isBlurred
-                            className="rounded-2xl"
-                            style={{ backgroundColor: '#27272a' }}
+                            className="rounded-2xl bg-surface-deeper/90"
                           >
                             <div className="flex items-center justify-between px-3 py-2 gap-2">
                               {editingLocationIndex === index ? (
@@ -860,8 +858,7 @@ function LiteCreateContent() {
                           <Card
                             key={item.id}
                             isBlurred
-                            className="rounded-2xl"
-                            style={{ backgroundColor: '#27272a' }}
+                            className="rounded-2xl bg-surface-deeper/90"
                           >
                             <div className="flex items-center justify-between px-3 py-2 gap-2">
                               {editingEquipmentIndex === index ? (
@@ -933,8 +930,7 @@ function LiteCreateContent() {
                 <div className="flex flex-col h-full relative overflow-hidden px-6 pt-0 pb-4">
                   <Card
                     isBlurred
-                    className="flex-1 flex flex-col overflow-hidden"
-                    style={{ backgroundColor: 'rgba(39, 39, 42, 0.5)' }}
+                    className="flex-1 flex flex-col overflow-hidden bg-surface-deeper/90"
                   >
                     <div className="flex-1 flex flex-col h-full overflow-hidden">
                       <Tabs
@@ -970,8 +966,7 @@ function LiteCreateContent() {
                                 setCurrentMembers([]);
                                 setIsTeamModalOpen(true);
                               }}
-                              className="h-8 px-3 text-sm text-surface-light"
-                              style={{ backgroundColor: '#27272a' }}
+                              className="h-8 px-3 text-sm text-surface-light bg-surface-deeper/90 hover:bg-surface-deeper"
                             >
                               Add Team
                             </Button>
@@ -984,8 +979,7 @@ function LiteCreateContent() {
                             <Button
                               size="sm"
                               onPress={() => setIsSupervisorModalOpen(true)}
-                              className="h-8 px-3 text-sm text-surface-light"
-                              style={{ backgroundColor: '#27272a' }}
+                              className="h-8 px-3 text-sm text-surface-light bg-surface-deeper/90 hover:bg-surface-deeper"
                             >
                               Add Supervisor
                             </Button>
@@ -1027,8 +1021,7 @@ function LiteCreateContent() {
                                 <Card
                                   key={`${staff.team}_${index}`}
                                   isBlurred
-                                  className="rounded-2xl h-fit"
-                                  style={{ backgroundColor: '#27272a' }}
+                                  className="rounded-2xl h-fit bg-surface-deeper/90"
                                 >
                                   <div className="flex items-center justify-between px-3 py-2 gap-2">
                                     <button
@@ -1066,7 +1059,7 @@ function LiteCreateContent() {
                                   </div>
 
                                   {openTeams[index] && (
-                                    <ul className="px-3 pb-2 list-disc list-inside text-xs text-gray-300">
+                                    <ul className="px-3 pb-2 list-disc list-inside text-xs text-surface-faint">
                                       {staff.members.map((member, memberIndex) => (
                                         <li key={`${staff.team}_${memberIndex}`}>{member}</li>
                                       ))}
@@ -1091,8 +1084,7 @@ function LiteCreateContent() {
                                 <Card
                                   key={`${supervisor.team}_${index}`}
                                   isBlurred
-                                  className="rounded-2xl h-fit"
-                                  style={{ backgroundColor: '#27272a' }}
+                                  className="rounded-2xl h-fit bg-surface-deeper/90"
                                 >
                                   <div className="flex items-center justify-between px-3 py-2 gap-2">
                                     <button
@@ -1120,7 +1112,7 @@ function LiteCreateContent() {
                                   </div>
 
                                   {openSupervisors[index] && (
-                                    <ul className="px-3 pb-2 list-disc list-inside text-xs text-gray-300">
+                                    <ul className="px-3 pb-2 list-disc list-inside text-xs text-surface-faint">
                                       <li>{supervisor.member}</li>
                                     </ul>
                                   )}
@@ -1188,7 +1180,7 @@ function LiteCreateContent() {
                                           }));
                                         }}
                                         variant="flat"
-                                        style={{ backgroundColor: '#3eb1fd33', color: '#3eb1fd' }}
+                                        className="bg-accent/20 text-accent"
                                       >
                                         {postName}
                                       </Chip>
@@ -1244,12 +1236,11 @@ function LiteCreateContent() {
                                       key={chip.id}
                                       onClose={() => removeScheduleChip(chip.id)}
                                       variant="flat"
-                                      style={{ backgroundColor: '#3eb1fd33', color: '#3eb1fd' }}
                                       onClick={() => {
                                         setEditingChipId(chip.id);
                                         setEditingChipValue(chip.time);
                                       }}
-                                      className="cursor-pointer"
+                                      className="cursor-pointer bg-accent/20 text-accent"
                                     >
                                       {editingChipId === chip.id ? (
                                         <input
@@ -1294,7 +1285,7 @@ function LiteCreateContent() {
                               );
 
                               return (
-                                <div key={equipment.id} className="rounded-2xl p-3" style={{ backgroundColor: '#27272a' }}>
+                                <div key={equipment.id} className="rounded-2xl p-3 bg-surface-deeper/90">
                                   <div className="flex items-center gap-3">
                                     <Checkbox
                                       isSelected={Boolean(selectedEquipment)}

@@ -79,11 +79,11 @@
     --surface-text: 223 28% 18%;
     --surface-text-strong: 220 35% 10%;
     --surface-text-muted: 220 10% 44%;
-    --surface-border: 220 16% 84%;
+    --surface-border: 220 16% 78%;
     --surface-bg-0: 220 20% 98%;
-    --surface-bg-1: 220 22% 96%;
-    --surface-bg-2: 220 18% 93%;
-    --surface-bg-3: 220 16% 89%;
+    --surface-bg-1: 220 22% 95%;
+    --surface-bg-2: 220 18% 87%;
+    --surface-bg-3: 220 16% 83%;
 
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
@@ -109,6 +109,7 @@
     --color-neutral-900: #18181b;
     --ripple-accent-rgb: 62, 177, 253;
     --streak-neutral-rgb: 36, 46, 66;
+    --streak-opacity-multiplier: 1.85;
   }
 
   .dark {
@@ -135,6 +136,7 @@
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
     --streak-neutral-rgb: 233, 233, 240;
+    --streak-opacity-multiplier: 1;
   }
 }
 
