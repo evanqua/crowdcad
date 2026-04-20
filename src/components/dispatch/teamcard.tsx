@@ -35,21 +35,14 @@ function useMMSS(since?: number) {
   return `${mm}:${ss}`;
 }
 
-function getLeadNameCert(staff: Staff) {
-  const isSupervisor =
-    Array.isArray(staff.members) &&
-    staff.members.length === 1 &&
-    typeof staff.members[0] === 'string' &&
-    !staff.members[0].includes('(Lead)');
-
-  if (isSupervisor) {
-    const m = staff.members?.[0] ?? '';
-    const rx = m.match(/^(.+?)\s\[(.+?)\]/);
-    return { name: rx?.[1] ?? m, cert: rx?.[2] ?? '' };
-  }
-  const lead = (staff.members || []).find(m => typeof m === 'string' && m.includes('(Lead)')) || '';
-  const rx = lead.match(/^(.+?)\s\[(.+?)\]/);
-  return { name: rx?.[1] ?? 'No Lead', cert: rx?.[2] ?? '' };
+function formatMemberLine(member: string) {
+  const isLead = member.includes('(Lead)');
+  const withoutLead = member.replace(/\s*\(Lead\)\s*/g, '').trim();
+  const certMatches = [...withoutLead.matchAll(/\[(.+?)\]/g)].map(match => match[1]).filter(Boolean);
+  const name = withoutLead.replace(/\s*\[.+?\]/g, '').trim();
+  const certText = certMatches.map(cert => `[${cert}]`).join(' ');
+  const leadText = isLead ? ' [Lead]' : '';
+  return `${name}${certText ? ` ${certText}` : ''}${leadText}`.trim();
 }
 
 function teamStatusTone(status: string, event: Event, team: string) {
@@ -125,7 +118,12 @@ export default function TeamCard({
   useEffect(() => {
     setLocationInput(staff.location || '');
   }, [staff.location]);
-  const {name, cert} = useMemo(() => getLeadNameCert(staff), [staff]);
+  const memberLines = useMemo(() => {
+    const members = Array.isArray(staff.members) ? staff.members : [];
+    return members
+      .filter((member): member is string => typeof member === 'string' && member.trim().length > 0)
+      .map(formatMemberLine);
+  }, [staff.members]);
   const timer = useMMSS(sinceMs);
 
   // Status options
@@ -164,9 +162,6 @@ export default function TeamCard({
         <div className="min-w-0">
           <div className="text-[15px] sm:text-base font-semibold text-surface-light truncate">
             {staff.team}
-          </div>
-          <div className="text-xs text-surface-faint truncate">
-            {name} {cert ? `[${cert}]` : ''}
           </div>
         </div>
 
@@ -308,7 +303,19 @@ export default function TeamCard({
         {/* Expanded section — same bg, no border, no extra spacing from header */}
         {expanded && (
           <div className="mt-3" onClick={e => e.stopPropagation()}>
-            <div className="text-sm font-semibold text-surface-light mb-2">Activity Log</div>
+            <div className="text-xs font-bold text-surface-light mb-1">Team</div>
+            <div className="space-y-1 mb-3">
+              {memberLines.map((line, index) => (
+                <div key={`${staff.team}-member-${index}`} className="text-xs text-surface-faint truncate">
+                  {line}
+                </div>
+              ))}
+              {memberLines.length === 0 && (
+                <div className="text-xs text-surface-faint italic">No members</div>
+              )}
+            </div>
+
+            <div className="text-xs font-bold text-surface-light mb-1">Activity Log</div>
             <Textarea
               value={logText}
               onChange={(e) => {
