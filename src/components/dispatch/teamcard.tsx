@@ -300,9 +300,14 @@ export default function TeamCard({
           </div>
         </div>
 
-        {/* Expanded section — same bg, no border, no extra spacing from header */}
-        {expanded && (
-          <div className="mt-3" onClick={e => e.stopPropagation()}>
+        {/* Expanded section — animated in normal flow */}
+        <div className={`dispatch-expand-grid ${expanded ? 'dispatch-expand-grid--open' : ''}`}>
+          <div className="dispatch-expand-inner">
+            <div
+              className={`mt-3 dispatch-expand-fade ${expanded ? 'dispatch-expand-fade--open pointer-events-auto' : 'pointer-events-none'}`}
+              onClick={e => e.stopPropagation()}
+              aria-hidden={!expanded}
+            >
             <div className="text-xs font-bold text-surface-light mb-1">Team</div>
             <div className="space-y-1 mb-3">
               {memberLines.map((line, index) => (
@@ -356,8 +361,9 @@ export default function TeamCard({
                 inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
               }}
             />
+            </div>
           </div>
-        )}
+        </div>
       </CardBody>
     </Card>
   );

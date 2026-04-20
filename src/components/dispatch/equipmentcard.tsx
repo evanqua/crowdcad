@@ -212,8 +212,13 @@ export default function EquipmentCard({
           </div>
 
           {/* Expanded section */}
-          {expanded && (
-            <div className="mt-3" onClick={e => e.stopPropagation()}>
+          <div className={`dispatch-expand-grid ${expanded ? 'dispatch-expand-grid--open' : ''}`}>
+            <div className="dispatch-expand-inner">
+              <div
+                className={`mt-3 dispatch-expand-fade ${expanded ? 'dispatch-expand-fade--open pointer-events-auto' : 'pointer-events-none'}`}
+                onClick={e => e.stopPropagation()}
+                aria-hidden={!expanded}
+              >
               <div className="text-sm font-semibold text-surface-light mb-2">Equipment Details</div>
               <div className="text-sm text-surface-light mb-2 space-y-1">
                 <div>Staging Location: {equipment.stagingLocation || 'Not Set'}</div>
@@ -247,8 +252,9 @@ export default function EquipmentCard({
                   inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
                 }}
               />
+              </div>
             </div>
-          )}
+          </div>
         </div>
     </Card>
   );

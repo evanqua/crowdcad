@@ -213,8 +213,12 @@ export default function TeamCardCondensed({
       </CardHeader>
 
       {/* EXPANDED BODY */}
-      {expanded && (
-        <CardBody className="px-3 pb-3 pt-0 space-y-3">
+      <div className={`dispatch-expand-grid ${expanded ? 'dispatch-expand-grid--open' : ''}`}>
+        <div className="dispatch-expand-inner">
+          <CardBody
+            className={`px-3 pb-3 pt-0 space-y-3 dispatch-expand-fade ${expanded ? 'dispatch-expand-fade--open pointer-events-auto' : 'pointer-events-none'}`}
+            aria-hidden={!expanded}
+          >
           {/* Status and Location controls */}
           <div className="flex items-center gap-3">
             {/* Status */}
@@ -368,8 +372,9 @@ export default function TeamCardCondensed({
               }}
             />
           </div>
-        </CardBody>
-      )}
+          </CardBody>
+        </div>
+      </div>
     </Card>
   );
 }
