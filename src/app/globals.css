@@ -8,79 +8,16 @@
 }
 
 #nprogress .bar {
-  background: #3eb1fd;
-  position: fixed;
-  z-index: 9999;
-  top: 64px; /* Below navbar (navbar is h-16 = 64px) */
-  left: 0;
-  width: 100%;
-  height: 4px;
-  box-shadow: 0 0 10px #3eb1fd, 0 0 5px #3eb1fd;
-}
-
-#nprogress .peg {
-  display: block;
-  position: absolute;
-  right: 0px;
   width: 100px;
   height: 100%;
-  box-shadow: 0 0 10px #3eb1fd, 0 0 5px #3eb1fd;
-  opacity: 1.0;
-  transform: rotate(3deg) translate(0px, -4px);
-}
-
-#nprogress .spinner {
-  display: block;
-  position: fixed;
-  z-index: 9999;
-  bottom: 24px;
-  right: 24px;
-}
-
-#nprogress .spinner-icon {
-  width: 48px;
-  height: 48px;
-  box-sizing: border-box;
   border: solid 4px transparent;
-  border-top-color: #3eb1fd;
-  border-left-color: #3eb1fd;
-  border-radius: 50%;
-  animation: nprogress-spinner 400ms linear infinite;
-  box-shadow: 0 0 20px rgba(62, 177, 253, 0.3);
+  background: hsl(var(--surface-bg-1));
 }
 
 @keyframes nprogress-spinner {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
-/* ── Toast notification theming ────────────────────────────── */
 :root {
-  --toastify-color-dark:      #262624;
-  --toastify-text-color-dark: #faf9f5;
-  --toastify-color-info:      #5eaae8;
-  --toastify-color-success:   #98c379;
-  --toastify-color-warning:   #ce9864;
-  --toastify-color-error:     #e56a6a;
-}
-
-@layer base {
-  .Toastify__toast-theme--dark {
-    @apply rounded-xl border border-surface-liner shadow-xl;
-  }
-  .Toastify__toast--info    { @apply border-status-blue/40; }
-  .Toastify__toast--success { @apply border-status-green/40; }
-  .Toastify__toast--warning { @apply border-yellow-400/40; }
-  .Toastify__toast--error   { @apply border-status-red/40; }
-  .Toastify__progress-bar   { @apply bg-status-blue; }
-
-  /* ── CSS variables for shadcn/radix primitives ───────────── */
-  :root {
-    --surface-text: 223 28% 18%;
-    --surface-text-strong: 220 35% 10%;
-    --surface-text-muted: 220 10% 44%;
-    --surface-border: 220 16% 78%;
-    --surface-bg-0: 220 20% 98%;
     --surface-bg-1: 220 22% 95%;
     --surface-bg-2: 220 18% 87%;
     --surface-bg-3: 220 16% 83%;
@@ -110,7 +47,7 @@
     --ripple-accent-rgb: 62, 177, 253;
     --streak-neutral-rgb: 36, 46, 66;
     --streak-opacity-multiplier: 1.85;
-  }
+}
 
   .dark {
     --surface-text: 255 12% 87%;
@@ -138,7 +75,6 @@
     --streak-neutral-rgb: 233, 233, 240;
     --streak-opacity-multiplier: 1;
   }
-}
 
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar {
@@ -181,6 +117,23 @@
 .animate-cell-ripple {
   animation: cell-ripple var(--duration, 400ms) ease-out forwards;
   animation-delay: var(--delay, 0ms);
+}
+
+.tab-chrome {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  --tab-chrome-top-radius: 20px;
+}
+
+.tab-chrome.tab-active {
+  background: hsl(var(--surface-bg-1));
+  color: hsl(var(--surface-text-strong));
+  z-index: 30;
+  border-top-left-radius: var(--tab-chrome-top-radius);
+  border-top-right-radius: var(--tab-chrome-top-radius);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .dispatch-shell-list > .dispatch-shell-card + .dispatch-shell-card {

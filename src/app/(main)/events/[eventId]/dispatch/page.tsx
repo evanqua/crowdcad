@@ -3219,20 +3219,29 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               {/* RIGHT SIDE - Calls and Clinic Tabs */}
               <ResizablePanel defaultSize={75} minSize={50}>
                 <div className="h-full overflow-auto scrollbar-hide pt-2 pb-2">
-                  <Tabs
-                    selectedKey={selectedRightTab}
-                    onSelectionChange={(key) => setSelectedRightTab(String(key))}
-                    variant="underlined"
-                    classNames={{
-                      base: 'w-full',
-                      tabList: 'inline-flex w-auto',
-                      tab: 'h-8 px-2',
-                      tabContent: 'text-lg font-medium text-surface-light group-data-[selected=true]:text-surface-lightest',
-                      panel: 'w-full pl-2 pr-0 pt-1',
-                    }}
-                  >
-                    <Tab key="calls" title={`Calls (${activeCallsCount})`}>
-                      <div className="space-y-1">
+                  <div className="w-full">
+                    <div className="relative z-30 pl-8 pr-2 pb-0 flex items-end gap-1 h-10">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRightTab('calls')}
+                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? 'tab-active bg-surface-deep text-surface-lightest' : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                        aria-pressed={selectedRightTab === 'calls'}
+                      >
+                        Calls ({activeCallsCount})
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRightTab('clinic')}
+                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'clinic' ? 'tab-active bg-surface-deep text-surface-lightest' : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                        aria-pressed={selectedRightTab === 'clinic'}
+                      >
+                        Clinic ({activeClinicCount})
+                      </button>
+                    </div>
+
+                    {selectedRightTab === 'calls' && (
+                      <div className="relative z-10 -mt-px mx-2 rounded-2xl bg-surface-deep p-3 pt-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
                           <h3 className="text-md font-semibold text-surface-light">Total Calls: {totalCallsCount}</h3>
                           <Tooltip content="Add Call (Ctrl+Enter)" placement="top">
@@ -3277,10 +3286,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           TableColGroup={TableColGroup}
                         />
                       </div>
-                    </Tab>
+                    )}
 
-                    <Tab key="clinic" title={`Clinic (${activeClinicCount})`}>
-                      <div className="space-y-1">
+                    {selectedRightTab === 'clinic' && (
+                      <div className="relative z-10 -mt-px mx-2 rounded-2xl bg-surface-deep p-3 pt-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
                           <h3 className="text-md font-semibold text-surface-light">Total Patients: {totalPatientsCount}</h3>
                           <Tooltip content="Add Patient" placement="top">
@@ -3316,8 +3325,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           formatAgeSex={formatAgeSex}
                         />
                       </div>
-                    </Tab>
-                  </Tabs>
+                    )}
+                  </div>
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -3587,26 +3596,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Tab key="clinic" title="Clinic">
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">
-                        Clinic ({(event.calls || []).filter(c => c.status === 'Delivered' && !c.outcome).length})
-                      </h2>
-                      <div className="flex items-center gap-2">
-                        <Tooltip content="Add clinic walk-up" placement="top">
-                          <div>
-                            <Button 
-                              isIconOnly 
-                              size="md" 
-                              variant="flat" 
-                              aria-label="Add Clinic Call"
-                              onPress={() => setShowQuickClinicCallForm(true)}
-                            >
-                              <Plus className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </Tooltip>
-                      </div>
-                    </div>
                     <div className="space-y-3">
                       {[
                         // Unresolved clinic (Delivered with no outcome)

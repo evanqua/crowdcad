@@ -13,6 +13,7 @@ import {
 import { MoreVertical } from 'lucide-react';
 import type { Event, Call, CallLogEntry, ClinicOutcome } from '@/app/types';
 import DispatchMotionCell from './motioncell';
+import TrackingTableBase from './trackingtablebase';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 
 type EditableCallField = keyof Call | 'ageSex';
@@ -114,22 +115,11 @@ export default function ClinicTrackingTable({
 
   return (
     <div className="w-full">
-      <div className="overflow-x-auto">
-        <table className="min-w-[870px] w-full text-[14px] sm:text-[15px] text-surface-light table-fixed border-separate border-spacing-0">
-          <TableColGroup />
-          <thead>
-            <tr className="border-b border-surface-liner">
-              <th className="px-3 py-2.5 text-left text-surface-faint w-16">Call #</th>
-              <th className="px-3 py-2.5 text-left text-surface-faint w-40">Chief Complaint</th>
-              <th className="px-3 py-2.5 text-left text-surface-faint w-16">A/S</th>
-              <th className="px-3 py-2.5 text-left text-surface-faint w-48">Location</th>
-              <th className="px-3 py-2.5 text-left text-surface-faint w-28">Status</th>
-              <th className="px-3 py-2.5 text-left text-surface-faint">Team</th>
-              <th className="px-3 py-2.5 text-right text-surface-faint w-12"></th>
-            </tr>
-          </thead>
-
-          <tbody className="[&>tr>td]:border-b [&>tr>td]:border-surface-liner">
+      <TrackingTableBase
+        TableColGroup={TableColGroup}
+        showStatusColumn={true}
+        showTeamAssignmentChips={false}
+      >
             {[
               // Unresolved clinic (Delivered with no outcome)
               ...unresolvedClinicCalls,
@@ -145,14 +135,14 @@ export default function ClinicTrackingTable({
                   const motionDelayMs = isResolvedClinicCall && resolvedIndex >= 0 ? resolvedIndex * 30 : 0;
                   return (
                 <tr
-                  className={`cursor-pointer min-h-[3.25rem] bg-transparent rounded-none ${getCallRowClass(call)} ${openClinicCallId === call.id || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors`}
+                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${openClinicCallId === call.id || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors`}
                   onClick={(e) => {
                     const t = e.target as HTMLElement;
                     if (t.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;
                     setOpenClinicCallId(openClinicCallId === call.id ? null : call.id);
                   }}
                 >
-                  <td className="px-3 py-2.5">
+                  <td className="p-0">
                     <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {callDisplayNumberMap.get(call.id)}
                     </DispatchMotionCell>
@@ -160,7 +150,7 @@ export default function ClinicTrackingTable({
 
                   {/* Chief Complaint (inline edit) */}
                   <td
-                    className="px-3 py-2.5 truncate"
+                    className="p-0"
                     onClick={() => handleCellClick(call.id, 'chiefComplaint', call.chiefComplaint)}
                   >
                     <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
@@ -192,7 +182,7 @@ export default function ClinicTrackingTable({
 
                   {/* A/S (inline edit) */}
                   <td
-                    className="px-3 py-2.5"
+                    className="p-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingCell({ callId: call.id, field: 'ageSex' });
@@ -230,7 +220,7 @@ export default function ClinicTrackingTable({
 
                   {/* Location (inline edit) */}
                   <td
-                    className="px-3 py-2.5 truncate"
+                    className="p-0"
                     onClick={() => handleCellClick(call.id, 'location', call.location)}
                   >
                     <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
@@ -259,7 +249,7 @@ export default function ClinicTrackingTable({
                   </td>
 
                   {/* Status - Using HeroUI Dropdown */}
-                  <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                  <td className="p-0" onClick={e => e.stopPropagation()}>
                     <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
                       <Dropdown>
                         <DropdownTrigger>
@@ -306,7 +296,7 @@ export default function ClinicTrackingTable({
                   </td>
 
                   {/* Team (inline edit) */}
-                  <td className="px-3 py-2.5">
+                  <td className="p-0">
                     <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {(call.assignedTeam && call.assignedTeam.length > 0)
                         ? (Array.isArray(call.assignedTeam) ? call.assignedTeam.join(', ') : call.assignedTeam)
@@ -314,7 +304,7 @@ export default function ClinicTrackingTable({
                     </DispatchMotionCell>
                   </td>
                   {/* Options Ellipsis */}
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="p-0">
                     <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
                       <Dropdown placement="bottom-end" offset={6}>
                         <DropdownTrigger>
@@ -469,9 +459,7 @@ export default function ClinicTrackingTable({
                 )}
               </React.Fragment>
             ))}
-          </tbody>
-        </table>
-      </div>
+      </TrackingTableBase>
       
       <div className="flex justify-center pt-3">
         <button

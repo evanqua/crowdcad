@@ -15,6 +15,7 @@ import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment } from 
 import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
 import DispatchMotionCell from './motioncell';
+import TrackingTableBase from './trackingtablebase';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 
 import {
@@ -127,21 +128,11 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
   return (
     <div className="col-span-2 text-black w-full">
-      <div className="overflow-x-auto w-full">
-          <table className="min-w-[870px] w-full text-[14px] sm:text-[15px] text-surface-light table-fixed border-separate border-spacing-0">
-            <TableColGroup />
-            <thead>
-              <tr className="border-b border-surface-liner">
-                <th className="px-3 py-2.5 text-left text-surface-faint w-16">Call #</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint w-40">Chief Complaint</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint w-16">A/S</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint w-48">Location</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint">Team</th>
-                <th className="px-3 py-2.5 text-right text-surface-faint w-12"></th>
-              </tr>
-            </thead>
-
-            <tbody className="[&>tr>td]:border-b [&>tr>td]:border-surface-liner">
+      <TrackingTableBase
+        TableColGroup={TableColGroup}
+        showStatusColumn={false}
+        showTeamAssignmentChips={true}
+      >
               {[
                 // Active calls first
                 ...activeCalls,
@@ -1312,9 +1303,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                 </React.Fragment>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+      </TrackingTableBase>
         
         <div className="flex justify-center pt-3">
           <button
