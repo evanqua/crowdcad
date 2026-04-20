@@ -14,6 +14,7 @@ import { Plus, MoreVertical } from "lucide-react";
 import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment } from '@/app/types';
 import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
+import DispatchMotionCell from './motioncell';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 
 import {
@@ -106,6 +107,23 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
     markPendingValue,
   } = useCallTrackingState(event, formatAgeSex);
 
+  const resolvedCallStatuses = [
+    'Delivered',
+    'Refusal',
+    'NMM',
+    'Rolled',
+    'Resolved',
+    'Unable to Locate',
+  ];
+
+  const resolvedCalls = event.calls
+    .filter((call: Call) => resolvedCallStatuses.includes(call.status))
+    .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
+
+  const activeCalls = event.calls
+    .filter((call: Call) => !resolvedCallStatuses.includes(call.status))
+    .sort((a: Call, b: Call) => parseInt(b.id) - parseInt(a.id));
+
 
   return (
     <div className="col-span-2 text-black w-full">
@@ -126,159 +144,169 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
             <tbody className="[&>tr>td]:border-b [&>tr>td]:border-surface-liner">
               {[
                 // Active calls first
-                ...event.calls
-                  .filter((call: Call) => !["Delivered", "Refusal", "NMM", "Rolled", "Resolved", "Unable to Locate"].includes(call.status))
-                  .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id)),
-                // Show resolved calls when showResolvedCalls is true
-                ...(showResolvedCalls
-                  ? event.calls
-                      .filter((c: Call) => ["Delivered", "Refusal", "NMM", "Rolled", "Resolved", "Unable to Locate"].includes(c.status))
-                      .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id))
-                  : [])
+                ...activeCalls,
+                ...resolvedCalls,
               ].map((call: Call) => {
                 const pendingForCall = pendingValues[call.id] || {};
+                const isResolvedCall = resolvedCallStatuses.includes(call.status);
+                const resolvedIndex = isResolvedCall ? resolvedCalls.findIndex((resolvedCall) => resolvedCall.id === call.id) : -1;
+                const isMotionVisible = !isResolvedCall || showResolvedCalls;
+                const motionDelayMs = isResolvedCall && resolvedIndex >= 0 ? resolvedIndex * 30 : 0;
                 return (
                 <React.Fragment key={call.id}>
                   {(() => {
-                    const rowToneClass = getCallRowClass(call);
                     const isOpen = openCallId === call.id;
-                    const hoverClass = !isOpen && !rowToneClass ? TEAM_CARD_ROW_HOVER_CLASS : '';
+                    const hoverClass = !isOpen ? TEAM_CARD_ROW_HOVER_CLASS : '';
                     return (
                   <tr
-                    className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${rowToneClass} ${hoverClass} transition-colors`}
+                    className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${hoverClass} transition-colors ${isResolvedCall && !isMotionVisible ? '[&>td]:!border-b-0 pointer-events-none' : ''}`}
+                    aria-hidden={isResolvedCall && !isMotionVisible}
                     onClick={(e) => handleRowClick(e, call.id)}
                   >
-                        <td className="px-3 py-2.5">{callDisplayNumberMap.get(call.id)}</td>
+                        <td className="p-0">
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5">
+                            {callDisplayNumberMap.get(call.id)}
+                          </DispatchMotionCell>
+                        </td>
                         
                         {/* Chief Complaint */}
                         <td
-                          className="px-3 py-2.5 truncate"
+                          className="p-0"
                           onClick={() => handleCellClick(call.id, 'chiefComplaint', call.chiefComplaint)}
                         >
-                          {editingCell?.callId === call.id && editingCell.field === 'chiefComplaint' ? (
-                            <input
-                              type="text"
-                              value={editValue}
-                              autoFocus
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onFocus={(e) => {
-                                // If this was the placeholder value, clear it on focus
-                                if (e.target instanceof HTMLInputElement && e.target.value === '[Edit]') {
-                                  setEditValue('');
-                                }
-                              }}
-                              onBlur={async () => {
-                                markPendingValue(call.id, 'chiefComplaint', editValue);
-                                try {
-                                  await handleCellBlur(call.id, 'chiefComplaint');
-                                } catch {
-                                  // ignore - pending will be cleared by effect if updated
-                                }
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  (e.target as HTMLInputElement).blur();
-                                } else if (e.key === 'Tab' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  handleCellBlur(call.id, 'chiefComplaint').then(() => {
-                                    setEditingCell({ callId: call.id, field: 'ageSex' });
-                                    setEditValue(formatAgeSex(call.age, call.gender));
-                                  });
-                                }
-                              }}
-                              className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
-                            />
-                          ) : (
-                            // Prefer a pending value while saving to avoid flashing the placeholder
-                            (pendingForCall.chiefComplaint !== undefined
-                              ? (pendingForCall.chiefComplaint || <span className="text-surface-light whitespace-nowrap">[Edit]</span>)
-                              : (call.chiefComplaint ? call.chiefComplaint : <span className="text-surface-light whitespace-nowrap">[Edit]</span>))
-                          )}
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
+                            {editingCell?.callId === call.id && editingCell.field === 'chiefComplaint' ? (
+                              <input
+                                type="text"
+                                value={editValue}
+                                autoFocus
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onFocus={(e) => {
+                                  // If this was the placeholder value, clear it on focus
+                                  if (e.target instanceof HTMLInputElement && e.target.value === '[Edit]') {
+                                    setEditValue('');
+                                  }
+                                }}
+                                onBlur={async () => {
+                                  markPendingValue(call.id, 'chiefComplaint', editValue);
+                                  try {
+                                    await handleCellBlur(call.id, 'chiefComplaint');
+                                  } catch {
+                                    // ignore - pending will be cleared by effect if updated
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    (e.target as HTMLInputElement).blur();
+                                  } else if (e.key === 'Tab' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleCellBlur(call.id, 'chiefComplaint').then(() => {
+                                      setEditingCell({ callId: call.id, field: 'ageSex' });
+                                      setEditValue(formatAgeSex(call.age, call.gender));
+                                    });
+                                  }
+                                }}
+                                className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                              />
+                            ) : (
+                              // Prefer a pending value while saving to avoid flashing the placeholder
+                              (pendingForCall.chiefComplaint !== undefined
+                                ? (pendingForCall.chiefComplaint || <span className="text-surface-light whitespace-nowrap">[Edit]</span>)
+                                : (call.chiefComplaint ? call.chiefComplaint : <span className="text-surface-light whitespace-nowrap">[Edit]</span>))
+                            )}
+                          </DispatchMotionCell>
                         </td>
                         
                         {/* Age/Sex */}
                         <td
-                          className="px-3 py-2.5"
+                          className="p-0"
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingCell({ callId: call.id, field: 'ageSex' });
                             setEditValue(formatAgeSex(call.age, call.gender));
                           }}
                         >
-                          {editingCell?.callId === call.id && editingCell.field === 'ageSex' ? (
-                            <input
-                              type="text"
-                              value={editValue}
-                              autoFocus
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onBlur={async () => {
-                                markPendingValue(call.id, 'ageSex', editValue);
-                                try {
-                                  await handleAgeSexBlur(call.id);
-                                } catch {}
-                              }}
-                              onFocus={(e) => {
-                                // Clear [Edit] placeholder on focus
-                                if (e.target.value === '[Edit]') {
-                                  setEditValue('');
-                                }
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  (e.target as HTMLInputElement).blur();
-                                } else if (e.key === 'Tab' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  handleAgeSexBlur(call.id).then(() => {
-                                    setEditingCell({ callId: call.id, field: 'location' });
-                                    setEditValue(call.location || '');
-                                  });
-                                }
-                              }}
-                             className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
-                            />
-                          ) : (
-                            <span className="truncate">
-                              {(() => {
-                                if (pendingForCall.ageSex !== undefined) {
-                                  return pendingForCall.ageSex || <span className="text-surface-light whitespace-nowrap">[Edit]</span>;
-                                }
-                                const formatted = formatAgeSex(call.age, call.gender);
-                                return formatted || <span className="text-surface-light whitespace-nowrap">[Edit]</span>;
-                              })()}
-                            </span>
-                          )}
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5">
+                            {editingCell?.callId === call.id && editingCell.field === 'ageSex' ? (
+                              <input
+                                type="text"
+                                value={editValue}
+                                autoFocus
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onBlur={async () => {
+                                  markPendingValue(call.id, 'ageSex', editValue);
+                                  try {
+                                    await handleAgeSexBlur(call.id);
+                                  } catch {}
+                                }}
+                                onFocus={(e) => {
+                                  // Clear [Edit] placeholder on focus
+                                  if (e.target.value === '[Edit]') {
+                                    setEditValue('');
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    (e.target as HTMLInputElement).blur();
+                                  } else if (e.key === 'Tab' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleAgeSexBlur(call.id).then(() => {
+                                      setEditingCell({ callId: call.id, field: 'location' });
+                                      setEditValue(call.location || '');
+                                    });
+                                  }
+                                }}
+                               className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                              />
+                            ) : (
+                              <span className="truncate">
+                                {(() => {
+                                  if (pendingForCall.ageSex !== undefined) {
+                                    return pendingForCall.ageSex || <span className="text-surface-light whitespace-nowrap">[Edit]</span>;
+                                  }
+                                  const formatted = formatAgeSex(call.age, call.gender);
+                                  return formatted || <span className="text-surface-light whitespace-nowrap">[Edit]</span>;
+                                })()}
+                              </span>
+                            )}
+                          </DispatchMotionCell>
                         </td>
                         
                         {/* Location */}
-                        <td className="px-3 py-2.5" onClick={() => handleCellClick(call.id, 'location', call.location)}>
-                          {editingCell?.callId === call.id && editingCell.field === 'location' ? (
-                            <input
-                              type="text"
-                              value={editValue}
-                              autoFocus
-                              onChange={e => setEditValue(e.target.value)}
-                              onFocus={e => {
-                                // If the value is "Unknown", select all text so it's easy to replace
-                                if (editValue === 'Unknown') {
-                                  e.target.select();
-                                }
-                              }}
-                              onBlur={() => handleCellBlur(call.id, 'location')}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                  (e.target as HTMLInputElement).blur();
-                                }
-                              }}
-                              className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
-                            />
-                          ) : (
-                            call.location || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
-                          )}
+                        <td className="p-0" onClick={() => handleCellClick(call.id, 'location', call.location)}>
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
+                            {editingCell?.callId === call.id && editingCell.field === 'location' ? (
+                              <input
+                                type="text"
+                                value={editValue}
+                                autoFocus
+                                onChange={e => setEditValue(e.target.value)}
+                                onFocus={e => {
+                                  // If the value is "Unknown", select all text so it's easy to replace
+                                  if (editValue === 'Unknown') {
+                                    e.target.select();
+                                  }
+                                }}
+                                onBlur={() => handleCellBlur(call.id, 'location')}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                                className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                              />
+                            ) : (
+                              call.location || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
+                            )}
+                          </DispatchMotionCell>
                         </td>
                         
                         {/* Team - Updated with larger Chips and shadcn dropdown */}
-                        <td className="px-3 py-2.5 relative z-0 whitespace-nowrap">
-                          <div className="relative z-0 flex flex-nowrap items-center gap-2 min-w-max w-max">
+                        <td
+                          className="p-0 relative z-0 whitespace-nowrap"
+                        >
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5">
+                            <div className="relative z-0 flex flex-nowrap items-center gap-2 min-w-max w-max">
                             {/* Active assigned teams - Larger chips with centered dropdown */}
                             {(Array.isArray(call.assignedTeam) ? call.assignedTeam : []).map((team: string) => {
                               const isEquipmentOnlyTeam = call.equipmentTeams?.includes(team);
@@ -1157,54 +1185,59 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 </DropdownMenuSub>
                               </DropdownMenuContent>
                             </Dropdownmenu>
-                          </div>
+                            </div>
+                          </DispatchMotionCell>
                         </td>
                         {/* Options Ellipsis */}
-                        <td className="px-3 py-2.5 text-right w-12 min-w-12 max-w-12 whitespace-nowrap">
-                          <Dropdown placement="bottom-end" offset={6} shouldBlockScroll={false}>
-                            <DropdownTrigger>
-                              <button
-                                className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center ml-auto shrink-0 w-4 h-4"
-                                aria-label="Call actions"
-                                type="button"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                            </DropdownTrigger>
-                            <DropdownMenu aria-label="Call actions">
-                              <DropdownItem 
-                                key="showLog"
-                                onPress={() => setOpenCallId(openCallId === call.id ? null : call.id)}
-                              >
-                                {openCallId === call.id ? 'Hide Log' : 'Show Log'}
-                              </DropdownItem>
-                              <DropdownItem 
-                                key="duplicate"
-                                onPress={() => handleMarkDuplicate(call.id)}
-                              >
-                                Mark as Duplicate
-                              </DropdownItem>
-                              <DropdownItem 
-                                key="priority"
-                                onPress={() => handleTogglePriorityFromMenu(call.id)}
-                              >
-                                {call.priority ? 'Remove Priority' : 'Mark as Priority'}
-                              </DropdownItem>
-                              <DropdownItem 
-                                key="delete"
-                                className="text-danger"
-                                color="danger"
-                                onPress={() => {
-                                  if (confirm('Are you sure you want to delete this call? This action cannot be undone.')) {
-                                    handleDeleteCall(call.id);
-                                  }
-                                }}
-                              >
-                                Delete Call
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
+                        <td
+                          className="p-0 text-right w-12 min-w-12 max-w-12 whitespace-nowrap"
+                        >
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right w-12 min-w-12 max-w-12 whitespace-nowrap">
+                            <Dropdown placement="bottom-end" offset={6} shouldBlockScroll={false}>
+                              <DropdownTrigger>
+                                <button
+                                  className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center ml-auto shrink-0 w-4 h-4"
+                                  aria-label="Call actions"
+                                  type="button"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </button>
+                              </DropdownTrigger>
+                              <DropdownMenu aria-label="Call actions">
+                                <DropdownItem 
+                                  key="showLog"
+                                  onPress={() => setOpenCallId(openCallId === call.id ? null : call.id)}
+                                >
+                                  {openCallId === call.id ? 'Hide Log' : 'Show Log'}
+                                </DropdownItem>
+                                <DropdownItem 
+                                  key="duplicate"
+                                  onPress={() => handleMarkDuplicate(call.id)}
+                                >
+                                  Mark as Duplicate
+                                </DropdownItem>
+                                <DropdownItem 
+                                  key="priority"
+                                  onPress={() => handleTogglePriorityFromMenu(call.id)}
+                                >
+                                  {call.priority ? 'Remove Priority' : 'Mark as Priority'}
+                                </DropdownItem>
+                                <DropdownItem 
+                                  key="delete"
+                                  className="text-danger"
+                                  color="danger"
+                                  onPress={() => {
+                                    if (confirm('Are you sure you want to delete this call? This action cannot be undone.')) {
+                                      handleDeleteCall(call.id);
+                                    }
+                                  }}
+                                >
+                                  Delete Call
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </DispatchMotionCell>
                         </td>
                       </tr>
                         );
@@ -1214,7 +1247,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                   {openCallId === call.id && (
                     <CallTrackingDetails
                       key={`${call.id}-details`}
-                      rowClassName={getCallRowClass(call)}
+                      rowClassName=""
                       callDisplayNumber={callDisplayNumberMap.get(call.id)}
                       notesText={notesTexts[call.id] ?? (call.notes || '')}
                       onNotesChange={(value) => {

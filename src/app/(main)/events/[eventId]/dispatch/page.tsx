@@ -2658,7 +2658,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const handleRowClick = (e: React.MouseEvent, id: string) => {
     const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, select, Button, a, [contenteditable="true"]')) return;
+    if (target.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;
     setOpenCallId(openCallId === id ? null : id);
   };
 

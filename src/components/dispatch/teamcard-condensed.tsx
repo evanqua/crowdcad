@@ -9,6 +9,7 @@ import {
 import {ChevronDown, ChevronUp, MapPin, MoreVertical} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
+import DispatchMotionCell from './motioncell';
 
 type TeamCardCondensedProps = {
   staff: Staff;
@@ -170,10 +171,9 @@ export default function TeamCardCondensed({
       </CardHeader>
 
       {/* EXPANDED BODY */}
-      <div className={`dispatch-expand-grid ${expanded ? 'dispatch-expand-grid--open' : ''}`}>
-        <div className="dispatch-expand-inner">
+      <DispatchMotionCell isOpen={expanded} animate={true} className="px-3 pb-3 pt-0 space-y-3">
           <CardBody
-            className={`px-3 pb-3 pt-0 space-y-3 dispatch-expand-fade ${expanded ? 'dispatch-expand-fade--open pointer-events-auto' : 'pointer-events-none'}`}
+            className="px-0 py-0"
             aria-hidden={!expanded}
           >
           {/* Status and Location controls */}
@@ -334,8 +334,7 @@ export default function TeamCardCondensed({
             />
           </div>
           </CardBody>
-        </div>
-      </div>
+      </DispatchMotionCell>
     </Card>
   );
 }

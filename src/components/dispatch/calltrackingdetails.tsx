@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Textarea } from '@heroui/react';
+import DispatchMotionCell from './motioncell';
 
 type Props = {
   callDisplayNumber: number | undefined;
@@ -41,7 +42,7 @@ export default function CallTrackingDetails({
         className="p-2 border-b border-surface-liner"
         onClick={onClose}
       >
-        <div className="cursor-pointer">
+        <DispatchMotionCell isOpen={true} animate={true} className="cursor-pointer">
           {priority && (
             <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
               ⚠️ PRIORITY CALL: Life threat to patient/provider
@@ -92,7 +93,7 @@ export default function CallTrackingDetails({
               }}
             />
           </div>
-        </div>
+        </DispatchMotionCell>
       </td>
     </tr>
   );

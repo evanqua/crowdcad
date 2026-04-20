@@ -12,6 +12,7 @@ import {
 } from '@heroui/react';
 import { MoreVertical } from 'lucide-react';
 import type { Event, Call, CallLogEntry, ClinicOutcome } from '@/app/types';
+import DispatchMotionCell from './motioncell';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 
 type EditableCallField = keyof Call | 'ageSex';
@@ -71,6 +72,13 @@ export default function ClinicTrackingTable({
   const [logTexts, setLogTexts] = React.useState<Record<string, string>>({});
   const logFocusedRef = React.useRef<string | null>(null);
 
+  const resolvedClinicCalls = (event?.calls || [])
+    .filter(c => c.status === 'Delivered' && !!c.outcome)
+    .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+  const unresolvedClinicCalls = (event?.calls || [])
+    .filter(c => c.status === 'Delivered' && !c.outcome)
+    .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+
   // Sync notes from props when not focused
   React.useEffect(() => {
     if (!event?.calls) return;
@@ -124,18 +132,18 @@ export default function ClinicTrackingTable({
           <tbody className="[&>tr>td]:border-b [&>tr>td]:border-surface-liner">
             {[
               // Unresolved clinic (Delivered with no outcome)
-              ...(event?.calls || [])
-                .filter(c => c.status === 'Delivered' && !c.outcome)
-                .sort((a, b) => parseInt(a.id) - parseInt(b.id)),
+              ...unresolvedClinicCalls,
 
               // Resolved clinic (Delivered with an outcome) when toggled on
-              ...(showResolvedClinicCalls
-                ? (event?.calls || [])
-                    .filter(c => c.status === 'Delivered' && !!c.outcome)
-                    .sort((a, b) => parseInt(a.id) - parseInt(b.id))
-                : []),
+              ...resolvedClinicCalls,
             ].map(call => (
               <React.Fragment key={call.id}>
+                {(() => {
+                  const isResolvedClinicCall = call.status === 'Delivered' && !!call.outcome;
+                  const resolvedIndex = isResolvedClinicCall ? resolvedClinicCalls.findIndex((resolvedCall) => resolvedCall.id === call.id) : -1;
+                  const isMotionVisible = !isResolvedClinicCall || showResolvedClinicCalls;
+                  const motionDelayMs = isResolvedClinicCall && resolvedIndex >= 0 ? resolvedIndex * 30 : 0;
+                  return (
                 <tr
                   className={`cursor-pointer min-h-[3.25rem] bg-transparent rounded-none ${getCallRowClass(call)} ${openClinicCallId === call.id || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors`}
                   onClick={(e) => {
@@ -144,36 +152,42 @@ export default function ClinicTrackingTable({
                     setOpenClinicCallId(openClinicCallId === call.id ? null : call.id);
                   }}
                 >
-                  <td className="px-3 py-2.5">{callDisplayNumberMap.get(call.id)}</td>
+                  <td className="px-3 py-2.5">
+                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
+                      {callDisplayNumberMap.get(call.id)}
+                    </DispatchMotionCell>
+                  </td>
 
                   {/* Chief Complaint (inline edit) */}
                   <td
                     className="px-3 py-2.5 truncate"
                     onClick={() => handleCellClick(call.id, 'chiefComplaint', call.chiefComplaint)}
                   >
-                    {editingCell?.callId === call.id && editingCell.field === 'chiefComplaint' ? (
-                      <input
-                        type="text"
-                        value={editValue}
-                        autoFocus
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={() => handleCellBlur(call.id, 'chiefComplaint')}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            (e.target as HTMLInputElement).blur();
-                          } else if (e.key === 'Tab' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleCellBlur(call.id, 'chiefComplaint').then(() => {
-                              setEditingCell({ callId: call.id, field: 'ageSex' });
-                              setEditValue(formatAgeSex(call.age, call.gender));
-                            });
-                          }
-                        }}
-                        className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
-                      />
-                    ) : (
-                      call.chiefComplaint || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
-                    )}
+                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
+                      {editingCell?.callId === call.id && editingCell.field === 'chiefComplaint' ? (
+                        <input
+                          type="text"
+                          value={editValue}
+                          autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onBlur={() => handleCellBlur(call.id, 'chiefComplaint')}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            } else if (e.key === 'Tab' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleCellBlur(call.id, 'chiefComplaint').then(() => {
+                                setEditingCell({ callId: call.id, field: 'ageSex' });
+                                setEditValue(formatAgeSex(call.age, call.gender));
+                              });
+                            }
+                          }}
+                          className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                        />
+                      ) : (
+                        call.chiefComplaint || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
+                      )}
+                    </DispatchMotionCell>
                   </td>
 
                   {/* A/S (inline edit) */}
@@ -185,29 +199,31 @@ export default function ClinicTrackingTable({
                       setEditValue(formatAgeSex(call.age, call.gender));
                     }}
                   >
-                    {editingCell?.callId === call.id && editingCell.field === 'ageSex' ? (
-                      <input
-                        type="text"
-                        value={editValue}
-                        autoFocus
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={() => handleAgeSexBlur(call.id)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            (e.target as HTMLInputElement).blur();
-                          } else if (e.key === 'Tab' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAgeSexBlur(call.id).then(() => {
-                              setEditingCell({ callId: call.id, field: 'location' });
-                              setEditValue(call.location || '');
-                            });
-                          }
-                        }}
-                        className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
-                      />
-                    ) : (
-                      formatAgeSex(call.age, call.gender) || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
-                    )}
+                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
+                      {editingCell?.callId === call.id && editingCell.field === 'ageSex' ? (
+                        <input
+                          type="text"
+                          value={editValue}
+                          autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onBlur={() => handleAgeSexBlur(call.id)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            } else if (e.key === 'Tab' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAgeSexBlur(call.id).then(() => {
+                                setEditingCell({ callId: call.id, field: 'location' });
+                                setEditValue(call.location || '');
+                              });
+                            }
+                          }}
+                          className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                        />
+                      ) : (
+                        formatAgeSex(call.age, call.gender) || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
+                      )}
+                    </DispatchMotionCell>
                   </td>
 
 
@@ -217,117 +233,127 @@ export default function ClinicTrackingTable({
                     className="px-3 py-2.5 truncate"
                     onClick={() => handleCellClick(call.id, 'location', call.location)}
                   >
-                    {editingCell?.callId === call.id && editingCell.field === 'location' ? (
-                      <input
-                        type="text"
-                        value={editValue}
-                        autoFocus
-                        onChange={e => setEditValue(e.target.value)}
-                        onFocus={e => {
-                          // If the value is "Unknown", select all text so it's easy to replace
-                          if (editValue === 'Unknown') {
-                            e.target.select();
-                          }
-                        }}
-                        onBlur={() => handleCellBlur(call.id, 'location')}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                        }}
-                        className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
-                      />
-                    ) : (
-                      call.location || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
-                    )}
+                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
+                      {editingCell?.callId === call.id && editingCell.field === 'location' ? (
+                        <input
+                          type="text"
+                          value={editValue}
+                          autoFocus
+                          onChange={e => setEditValue(e.target.value)}
+                          onFocus={e => {
+                            // If the value is "Unknown", select all text so it's easy to replace
+                            if (editValue === 'Unknown') {
+                              e.target.select();
+                            }
+                          }}
+                          onBlur={() => handleCellBlur(call.id, 'location')}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                          }}
+                          className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                        />
+                      ) : (
+                        call.location || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
+                      )}
+                    </DispatchMotionCell>
                   </td>
 
                   {/* Status - Using HeroUI Dropdown */}
                   <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                    <Dropdown>
-                      <DropdownTrigger>
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          className="min-w-0 h-7 px-2 text-xs justify-start bg-surface-liner hover:bg-surface-muted"
+                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
+                      <Dropdown>
+                        <DropdownTrigger>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            className="min-w-0 h-7 px-2 text-xs justify-start bg-surface-liner hover:bg-surface-muted"
+                          >
+                            {call.outcome || 'In Clinic'}
+                          </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu
+                          aria-label="Clinic Status"
+                          onAction={async (key) => {
+                            const val = key as string;
+                            const now = new Date();
+                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+
+                            const updatedCalls = event.calls.map((c: Call) => {
+                              if (c.id !== call.id) return c;
+                              return {
+                                ...c,
+                                outcome: val === 'In Clinic' ? undefined : val as ClinicOutcome,
+                                log: [
+                                  ...(c.log || []),
+                                  {
+                                    timestamp: now.getTime(),
+                                    message: `${hhmm} - Clinic Status: ${val}`
+                                  }
+                                ]
+                              } as Call;
+                            });
+
+                            await updateEvent({ calls: updatedCalls });
+                          }}
                         >
-                          {call.outcome || 'In Clinic'}
-                        </Button>
-                      </DropdownTrigger>
-                      <DropdownMenu
-                        aria-label="Clinic Status"
-                        onAction={async (key) => {
-                          const val = key as string;
-                          const now = new Date();
-                          const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-
-                          const updatedCalls = event.calls.map((c: Call) => {
-                            if (c.id !== call.id) return c;
-                            return {
-                              ...c,
-                              outcome: val === 'In Clinic' ? undefined : val as ClinicOutcome,
-                              log: [
-                                ...(c.log || []),
-                                {
-                                  timestamp: now.getTime(),
-                                  message: `${hhmm} - Clinic Status: ${val}`
-                                }
-                              ]
-                            } as Call;
-                          });
-
-                          await updateEvent({ calls: updatedCalls });
-                        }}
-                      >
-                        <DropdownItem key="In Clinic">In Clinic</DropdownItem>
-                        <DropdownItem key="Transported">Transported</DropdownItem>
-                        <DropdownItem key="AMA">AMA</DropdownItem>
-                        <DropdownItem key="Discharged">Discharged</DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
+                          <DropdownItem key="In Clinic">In Clinic</DropdownItem>
+                          <DropdownItem key="Transported">Transported</DropdownItem>
+                          <DropdownItem key="AMA">AMA</DropdownItem>
+                          <DropdownItem key="Discharged">Discharged</DropdownItem>
+                        </DropdownMenu>
+                      </Dropdown>
+                    </DispatchMotionCell>
                   </td>
 
                   {/* Team (inline edit) */}
                   <td className="px-3 py-2.5">
-                    {(call.assignedTeam && call.assignedTeam.length > 0)
-                      ? (Array.isArray(call.assignedTeam) ? call.assignedTeam.join(', ') : call.assignedTeam)
-                      : (call.detachedTeams?.map(d => d.team).join(', ') || 'Walkup')}
+                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
+                      {(call.assignedTeam && call.assignedTeam.length > 0)
+                        ? (Array.isArray(call.assignedTeam) ? call.assignedTeam.join(', ') : call.assignedTeam)
+                        : (call.detachedTeams?.map(d => d.team).join(', ') || 'Walkup')}
+                    </DispatchMotionCell>
                   </td>
                   {/* Options Ellipsis */}
                   <td className="px-3 py-2.5 text-right">
-                    <Dropdown placement="bottom-end" offset={6}>
-                      <DropdownTrigger>
-                        <button
-                          className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
-                          aria-label="Call actions"
-                          type="button"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </DropdownTrigger>
-                      <DropdownMenu aria-label="Call actions">
-                        <DropdownItem 
-                          key="showLog"
-                          onPress={() => setOpenClinicCallId(openClinicCallId === call.id ? null : call.id)}
-                        >
-                          {openClinicCallId === call.id ? 'Hide Log' : 'Show Log'}
-                        </DropdownItem>
-                        <DropdownItem 
-                          key="delete"
-                          className="text-danger"
-                          color="danger"
-                          onPress={async () => {
-                            if (confirm('Are you sure you want to delete this call? This action cannot be undone.')) {
-                              const updatedCalls = event.calls.filter((c: Call) => c.id !== call.id);
-                              await updateEvent({ calls: updatedCalls });
-                            }
-                          }}
-                        >
-                          Delete Call
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
+                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
+                      <Dropdown placement="bottom-end" offset={6}>
+                        <DropdownTrigger>
+                          <button
+                            className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
+                            aria-label="Call actions"
+                            type="button"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </DropdownTrigger>
+                        <DropdownMenu aria-label="Call actions">
+                          <DropdownItem 
+                            key="showLog"
+                            onPress={() => setOpenClinicCallId(openClinicCallId === call.id ? null : call.id)}
+                          >
+                            {openClinicCallId === call.id ? 'Hide Log' : 'Show Log'}
+                          </DropdownItem>
+                          <DropdownItem 
+                            key="delete"
+                            className="text-danger"
+                            color="danger"
+                            onPress={async () => {
+                              if (confirm('Are you sure you want to delete this call? This action cannot be undone.')) {
+                                const updatedCalls = event.calls.filter((c: Call) => c.id !== call.id);
+                                await updateEvent({ calls: updatedCalls });
+                              }
+                            }}
+                          >
+                            Delete Call
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </Dropdown>
+                    </DispatchMotionCell>
                   </td>
                 </tr>
+                  );
+                })()}
 
                 {/* Expanded row for notes and log - NO ANIMATION */}
                 {openClinicCallId === call.id && (
