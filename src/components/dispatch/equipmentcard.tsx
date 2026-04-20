@@ -7,7 +7,7 @@ import {
   Card, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
 } from '@heroui/react';
-import { ChevronDown, ChevronUp, MoreVertical } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, MoreVertical } from 'lucide-react';
 import type { Event, EquipmentItem } from '@/app/types';
 
 type EquipmentCardProps = {
@@ -137,13 +137,11 @@ export default function EquipmentCard({
       {/* BODY*/}
       <div className="px-4 pb-3 pt-0">
           {/* Controls row */}
-          <div className="grid grid-cols-5 gap-1">
+          <div className="flex items-center gap-3">
             {/* Status */}
-            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="col-span-2">
+            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1]">
               <Select
                 aria-label="Status"
-                label="Status"
-                labelPlacement="inside"
                 selectedKeys={new Set([(isMobile ? derivedSelectStatus : derivedSelectStatus).trim()])}
                 onSelectionChange={(keys) => {
                   const raw = Array.from(keys as Set<string>)[0] || '';
@@ -152,7 +150,7 @@ export default function EquipmentCard({
                 }}
                 classNames={{
                   base: 'min-w-0',
-                  trigger: `${statusTone.fillClass} text-surface-light border ${statusTone.borderClass} transition-colors`
+                  trigger: `${statusTone.fillClass} text-surface-light border ${statusTone.borderClass} rounded-full transition-colors`
                 }}
               >
                 {statusOptions.map((s) => (
@@ -162,11 +160,10 @@ export default function EquipmentCard({
             </div>
 
             {/* Location */}
-            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="col-span-3">
+            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1.5]">
               <Autocomplete
                 aria-label="Location"
-                label="Location"
-                labelPlacement="inside"
+                startContent={<MapPin className="h-4 w-4 text-surface-faint" />}
                 inputValue={locationInput}
                 onInputChange={(val) => {
                   setLocationInput(val);
@@ -199,8 +196,8 @@ export default function EquipmentCard({
                 }}
                 inputProps={{
                   classNames: {
-                    inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
-                    input: 'bg-surface-deep data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
+                    inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner rounded-full pl-3 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
+                    input: 'bg-surface-deep pl-1 data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
                   }
                 }}
               >
