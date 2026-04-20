@@ -10,7 +10,7 @@ import {
   DropdownItem,
   Textarea
 } from '@heroui/react';
-import { Plus, MoreVertical } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 import type { Event, Call, CallLogEntry, ClinicOutcome } from '@/app/types';
 
 type EditableCallField = keyof Call | 'ageSex';
@@ -20,7 +20,6 @@ interface ClinicTrackingTableProps {
   callDisplayNumberMap: Map<string, number>;
   showResolvedClinicCalls: boolean;
   setShowResolvedClinicCalls: (value: boolean | ((prev: boolean) => boolean)) => void;
-  setShowQuickClinicCallForm: (value: boolean) => void;
   openClinicCallId: string | null;
   setOpenClinicCallId: (value: string | null) => void;
   editingCell: { callId: string; field: EditableCallField } | null;
@@ -52,7 +51,6 @@ export default function ClinicTrackingTable({
   callDisplayNumberMap,
   showResolvedClinicCalls,
   setShowResolvedClinicCalls,
-  setShowQuickClinicCallForm,
   openClinicCallId,
   setOpenClinicCallId,
   editingCell,
@@ -66,8 +64,6 @@ export default function ClinicTrackingTable({
   getCallRowClass,
   formatAgeSex,
 }: ClinicTrackingTableProps) {
-
-  const unresolvedClinicCount = (event?.calls || []).filter(c => c.status === 'Delivered' && !c.outcome).length;
   // Persistent local state for notes/log text per call — never goes null to prevent flicker
   const [notesTexts, setNotesTexts] = React.useState<Record<string, string>>({});
   const notesFocusedRef = React.useRef<string | null>(null);
@@ -108,24 +104,7 @@ export default function ClinicTrackingTable({
   
 
   return (
-    <div className="mt-6 p-4 bg-surface-deep rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-semibold text-surface-light">
-          Clinic ({unresolvedClinicCount})
-        </h3>
-        {/* Add Clinic Walkup Button */}
-        <div>
-          <Button
-            isIconOnly
-            size="md"
-            variant="flat"
-            aria-label="Add Clinic Call"
-            onPress={() => setShowQuickClinicCallForm(true)}
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
+    <div className="px-4 pb-4 pt-1 bg-surface-deep rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-[870px] w-full text-[14px] sm:text-[15px] text-surface-light table-fixed border-separate border-spacing-0">
           <TableColGroup />

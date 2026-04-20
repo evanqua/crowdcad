@@ -1393,6 +1393,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [cardViewMode, setCardViewMode] = useState<'normal' | 'condensed'>('normal');
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
+  const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
 
 
   
@@ -2495,26 +2496,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     setEditingCell(null);
   }
 
-  const computeCallStatus = (call: Call): string => {
-    if (!Array.isArray(call.assignedTeam)) return call.status || 'Pending';
-
-    if (!event) return call.status || 'Pending';
-    
-    if (!call.assignedTeam || call.assignedTeam.length === 0) {
-      return call.status || 'Pending';
-    }
-  
-    const teamStatuses = call.assignedTeam
-      .map(teamName => event.staff.find(t => t.team === teamName)?.status)
-      .filter(Boolean) as string[];
-  
-    if (teamStatuses.includes('Transporting')) return 'Transporting';
-    if (teamStatuses.includes('On Scene')) return 'On Scene';
-    if (teamStatuses.includes('En Route')) return 'En Route';
-    
-    return call.status || 'Assigned';
-  };  
-  
   function notifyPostAssignmentChange(reason: string, details: Record<string, unknown>) {
     console.log("Post Assignment Change Notification Triggered", new Date().toLocaleTimeString(), "Reason:", reason, details);
     // Play sound
@@ -2751,11 +2732,28 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   if (!event) return <LoadingScreen label="Loading event…" />;
 
+  const resolvedCallStatuses = [
+    'Delivered',
+    'Refusal',
+    'NMM',
+    'Rolled',
+    'Resolved',
+    'Unable to Locate',
+  ];
+
+  const activeCallsCount = (event.calls || []).filter(
+    call => !resolvedCallStatuses.includes(call.status)
+  ).length;
+  const activeClinicCount = (event.calls || []).filter(
+    call => call.status === 'Delivered' && !call.outcome
+  ).length;
+  const totalCallsCount = event.calls?.length || 0;
+  const totalPatientsCount = (event.calls || []).filter(call => call.status === 'Delivered').length;
+
   const COLW = {
     CALLNO: '5rem',   // Call #
     CC:     '10rem',  // Chief Complaint
     AS:     '4rem',   // A/S
-    STATUS: '9rem',   // Status
     LOC:    '10rem',  // Location
   };
 
@@ -2765,7 +2763,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         <col style={{ width: COLW.CALLNO }} />
         <col style={{ width: COLW.CC }} />
         <col style={{ width: COLW.AS }} />
-        <col style={{ width: COLW.STATUS }} />
         <col style={{ width: COLW.LOC }} />
         <col />
       </colgroup>
@@ -2781,6 +2778,167 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     await updateEvent({ calls: updatedCalls });
     setContextMenu(null);
   };
+
+  const TeamActionButtonGroup = ({
+    selectedTab,
+  }: {
+    selectedTab: 'teams' | 'supervisors' | 'equipment';
+  }) => (
+    <div className="flex items-center gap-1 p-1 rounded-full bg-surface-deep border border-surface-liner">
+      <Tooltip
+        content={
+          selectedTab === 'teams'
+            ? 'Add Team'
+            : selectedTab === 'supervisors'
+              ? 'Add Supervisor'
+              : 'Add Equipment'
+        }
+        placement="top"
+      >
+        <div>
+          <Dropdown>
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                className="rounded-full bg-transparent hover:bg-surface-liner"
+                aria-label="Add Team or Supervisor"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="Team Actions"
+              onAction={(key) => {
+                if (key === 'team') {
+                  handleAddNewTeam();
+                } else if (key === 'supervisor') {
+                  handleAddNewSupervisor();
+                }
+              }}
+            >
+              <DropdownItem key="team">Add Team</DropdownItem>
+              <DropdownItem key="supervisor">Add Supervisor</DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      </Tooltip>
+
+      <Tooltip
+        content={selectedTab === 'teams' ? 'Refresh all team posts from schedule' : 'Update all locations'}
+        placement="top"
+      >
+        <div>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="flat"
+            className="rounded-full bg-transparent hover:bg-surface-liner"
+            onPress={refreshAllPostsFromSchedule}
+            aria-label="Update all posts"
+            isDisabled={selectedTab === 'supervisors' || selectedTab === 'equipment'}
+          >
+            <RotateCw className="h-5 w-5" />
+          </Button>
+        </div>
+      </Tooltip>
+
+      <Tooltip content="Sort and view options" placement="top">
+        <div>
+          <Dropdown
+            classNames={{
+              content: 'min-w-[140px] w-[140px] max-w-[140px]',
+            }}
+          >
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                className="rounded-full bg-transparent hover:bg-surface-liner"
+                aria-label="Sort teams"
+              >
+                <ArrowDownWideNarrow className="h-5 w-5" />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="Sort and view options"
+            >
+              <DropdownItem
+                key="view-toggle"
+                isReadOnly
+                className="cursor-default hover:bg-transparent px-0 py-0"
+                textValue="View toggle"
+              >
+                <Tabs
+                  selectedKey={cardViewMode}
+                  onSelectionChange={(key) => setCardViewMode(key as 'normal' | 'condensed')}
+                  size="sm"
+                  fullWidth
+                  classNames={{
+                    tabList: 'gap-0 w-full bg-surface-deep p-0.5 rounded-lg',
+                    tab: 'h-7 data-[selected=true]:text-surface-light data-[hover=true]:opacity-100 transition-colors',
+                    cursor: 'bg-surface-liner',
+                  }}
+                >
+                  <Tab
+                    key="normal"
+                    title={
+                      <Tooltip content="Standard card view with full details" placement="top">
+                        <div className="flex items-center gap-1 pointer-events-none">
+                          <Rows2 className="h-4 w-4" />
+                        </div>
+                      </Tooltip>
+                    }
+                  />
+                  <Tab
+                    key="condensed"
+                    title={
+                      <Tooltip content="Compact card view for more teams on screen" placement="top">
+                        <div className="flex items-center gap-1 pointer-events-none">
+                          <Rows4 className="h-4 w-4" />
+                        </div>
+                      </Tooltip>
+                    }
+                  />
+                </Tabs>
+              </DropdownItem>
+              <DropdownItem
+                key="divider"
+                isReadOnly
+                className="p-0 m-0 h-px bg-surface-liner cursor-default"
+                textValue="divider"
+              >
+                <div className="h-px" />
+              </DropdownItem>
+              <DropdownItem
+                key="availability"
+                onClick={() => setTeamSortMode('availability')}
+                className={teamSortMode === 'availability' ? 'bg-surface-liner' : ''}
+              >
+                Availability
+              </DropdownItem>
+              <DropdownItem
+                key="asc"
+                onClick={() => setTeamSortMode('asc')}
+                className={teamSortMode === 'asc' ? 'bg-surface-liner' : ''}
+              >
+                Ascending
+              </DropdownItem>
+              <DropdownItem
+                key="desc"
+                onClick={() => setTeamSortMode('desc')}
+                className={teamSortMode === 'desc' ? 'bg-surface-liner' : ''}
+              >
+                Descending
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      </Tooltip>
+    </div>
+  );
 
   return (
     <>
@@ -2878,7 +3036,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       />
       {/* Main Layout */}
       <div className="w-full bg-surface-deepest h-[calc(100vh-72px)]">
-        <div className="max-w-[1750px] mx-auto px-3 sm:px-4 h-full">
+        <div className="max-w-[1750px] mx-auto px-2 sm:px-4 h-full">
 
 
           {isAdmin && (
@@ -2919,159 +3077,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       <SelectItem key="equipment">Equipment</SelectItem>
                     </Select>
 
-
-                    <div className="flex items-center gap-1 p-1 rounded-full bg-surface-deep border border-surface-liner">
-                      <Tooltip 
-                        content={
-                          selectedLeftTab === 'teams' 
-                            ? 'Add Team' 
-                            : selectedLeftTab === 'supervisors' 
-                            ? 'Add Supervisor' 
-                            : 'Add Equipment'
-                        } 
-                        placement="top"
-                      >
-                        <div>
-                          <Dropdown>
-                            <DropdownTrigger>
-                              <Button
-                                isIconOnly
-                                size="sm"
-                                variant="flat"
-                                className="rounded-full bg-transparent hover:bg-surface-liner"
-                                aria-label="Add Team or Supervisor"
-                              >
-                                <Plus className="h-5 w-5" />
-                              </Button>
-                            </DropdownTrigger>
-                            <DropdownMenu
-                              aria-label="Team Actions"
-                              onAction={(key) => {
-                                if (key === "team") {
-                                  handleAddNewTeam();
-                                } else if (key === "supervisor") {
-                                  handleAddNewSupervisor();
-                                }
-                              }}
-                            >
-                              <DropdownItem key="team">Add Team</DropdownItem>
-                              <DropdownItem key="supervisor">Add Supervisor</DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      </Tooltip>
-                      <Tooltip 
-                        content={selectedLeftTab === 'teams' ? 'Refresh all team posts from schedule' : 'Update all locations'} 
-                        placement="top"
-                      >
-                        <div>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            className="rounded-full bg-transparent hover:bg-surface-liner"
-                            onPress={refreshAllPostsFromSchedule}
-                            aria-label="Update all posts"
-                            isDisabled={selectedLeftTab === 'supervisors' || selectedLeftTab === 'equipment'}
-                          >
-                            <RotateCw className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </Tooltip>
-                      <Tooltip content="Sort and view options" placement="top">
-                        <div>
-                          <Dropdown
-                            classNames={{
-                              content: "min-w-[140px] w-[140px] max-w-[140px]", // Adjust dropdown width here
-                            }}
-                          >
-                            <DropdownTrigger>
-                              <Button
-                                isIconOnly
-                                size="sm"
-                                variant="flat"
-                                className="rounded-full bg-transparent hover:bg-surface-liner"
-                                aria-label="Sort teams"
-                              >
-                                <ArrowDownWideNarrow className="h-5 w-5" />
-                              </Button>
-                            </DropdownTrigger>
-                            <DropdownMenu
-                              aria-label="Sort and view options"
-                            >
-                              <DropdownItem
-                                key="view-toggle"
-                                isReadOnly
-                                className="cursor-default hover:bg-transparent px-0 py-0"
-                                textValue="View toggle"
-                              >
-                                <Tabs
-                                  selectedKey={cardViewMode}
-                                  onSelectionChange={(key) => setCardViewMode(key as 'normal' | 'condensed')}
-                                  size="sm"
-                                  fullWidth
-                                  classNames={{
-                                    tabList: "gap-0 w-full bg-surface-deep p-0.5 rounded-lg",
-                                    tab: "h-7 data-[selected=true]:text-surface-light data-[hover=true]:opacity-100 transition-colors",
-                                    cursor: "bg-surface-liner",
-                                  }}
-                                >
-                                  <Tab
-                                    key="normal"
-                                    title={
-                                      <Tooltip content="Standard card view with full details" placement="top">
-                                        <div className="flex items-center gap-1 pointer-events-none">
-                                          <Rows2 className="h-4 w-4" />
-                                        </div>
-                                      </Tooltip>
-                                    }
-                                  />
-                                  <Tab
-                                    key="condensed"
-                                    title={
-                                      <Tooltip content="Compact card view for more teams on screen" placement="top">
-                                        <div className="flex items-center gap-1 pointer-events-none">
-                                          <Rows4 className="h-4 w-4" />
-                                        </div>
-                                      </Tooltip>
-                                    }
-                                  />
-                                </Tabs>
-                              </DropdownItem>
-                              <DropdownItem
-                                key="divider"
-                                isReadOnly
-                                className="p-0 m-0 h-px bg-surface-liner cursor-default"
-                                textValue="divider"
-                              >
-                                <div className="h-px" />
-                              </DropdownItem>
-                              <DropdownItem
-                                key="availability"
-                                onClick={() => setTeamSortMode('availability')}
-                                className={teamSortMode === 'availability' ? 'bg-surface-liner' : ''}
-                              >
-                                Availability
-                              </DropdownItem>
-                              <DropdownItem
-                                key="asc"
-                                onClick={() => setTeamSortMode('asc')}
-                                className={teamSortMode === 'asc' ? 'bg-surface-liner' : ''}
-                              >
-                                Ascending
-                              </DropdownItem>
-                              <DropdownItem
-                                key="desc"
-                                onClick={() => setTeamSortMode('desc')}
-                                className={teamSortMode === 'desc' ? 'bg-surface-liner' : ''}
-                              >
-                                Descending
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      </Tooltip>
-                    </div>
+                    <TeamActionButtonGroup selectedTab={selectedLeftTab as 'teams' | 'supervisors' | 'equipment'} />
                   </div>
 
                   {/* Content with ScrollShadow */}
@@ -3211,66 +3217,111 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
               <ResizableHandle withHandle />
 
-              {/* RIGHT SIDE - Calls and Clinic Stacked */}
+              {/* RIGHT SIDE - Calls and Clinic Tabs */}
               <ResizablePanel defaultSize={75} minSize={50}>
                 <div className="h-full overflow-auto scrollbar-hide pt-2 pb-2">
-                  <div className="">
-                    {/* Call Tracking */}
-                    <div className="rounded-xl overflow-hidden">
-                      <CallTrackingTable
-                        event={event}
-                        callDisplayNumberMap={callDisplayNumberMap}
-                        showResolvedCalls={showResolvedCalls}
-                        setShowResolvedCalls={setShowResolvedCalls}
-                        setShowQuickCallForm={setShowQuickCallForm}
-                        openCallId={openCallId}
-                        setOpenCallId={setOpenCallId}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                        editValue={editValue}
-                        setEditValue={setEditValue}
-                        teamStatusMap={teamStatusMap}
-                        updateEvent={updateEvent}
-                        handleCellClick={handleCellClick}
-                        handleCellBlur={handleCellBlur}
-                        handleAgeSexBlur={handleAgeSexBlur}
-                        handleRowClick={handleRowClick}
-                        handleMarkDuplicate={handleMarkDuplicate}
-                        handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
-                        handleDeleteCall={handleDeleteCall}
-                        handleTeamStatusChange={handleTeamStatusChange}
-                        handleRemoveTeamFromCall={handleRemoveTeamFromCall}
-                        handleAddTeamToCall={handleAddTeamToCall}
-                        getCallRowClass={getCallRowClass}
-                        computeCallStatus={computeCallStatus}
-                        formatAgeSex={formatAgeSex}
-                        TableColGroup={TableColGroup}
-                      />
-                    </div>
+                  <Tabs
+                    selectedKey={selectedRightTab}
+                    onSelectionChange={(key) => setSelectedRightTab(String(key))}
+                    variant="underlined"
+                    classNames={{
+                      base: 'w-auto',
+                      tab: 'h-8 px-2',
+                      tabContent: 'text-lg font-medium text-surface-light group-data-[selected=true]:text-surface-lightest',
+                      panel: 'pl-2 pr-0 pt-1',
+                    }}
+                  >
+                    <Tab key="calls" title={`Calls (${activeCallsCount})`}>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between py-1">
+                          <h3 className="text-md font-semibold text-surface-light">Total Calls: {totalCallsCount}</h3>
+                          <Tooltip content="Add Call (Ctrl+Enter)" placement="top">
+                            <div>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                onPress={() => setShowQuickCallForm(true)}
+                              >
+                                Add Call
+                              </Button>
+                            </div>
+                          </Tooltip>
+                        </div>
 
-                    {/* Clinic Tracking */}
-                    <div className="rounded-xl overflow-hidden">
-                      <ClinicTrackingTable
-                        event={event}
-                        callDisplayNumberMap={callDisplayNumberMap}
-                        showResolvedClinicCalls={showResolvedClinicCalls}
-                        setShowResolvedClinicCalls={setShowResolvedClinicCalls}
-                        setShowQuickClinicCallForm={setShowQuickClinicCallForm}
-                        openClinicCallId={openClinicCallId}
-                        setOpenClinicCallId={setOpenClinicCallId}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                        editValue={editValue}
-                        setEditValue={setEditValue}
-                        updateEvent={updateEvent}
-                        handleCellClick={handleCellClick}
-                        handleCellBlur={handleCellBlur}
-                        handleAgeSexBlur={handleAgeSexBlur}
-                        getCallRowClass={getCallRowClass}
-                        formatAgeSex={formatAgeSex}
-                      />
-                    </div>
-                  </div>
+                        <div className="rounded-xl overflow-hidden">
+                          <CallTrackingTable
+                            event={event}
+                            callDisplayNumberMap={callDisplayNumberMap}
+                            showResolvedCalls={showResolvedCalls}
+                            setShowResolvedCalls={setShowResolvedCalls}
+                            openCallId={openCallId}
+                            setOpenCallId={setOpenCallId}
+                            editingCell={editingCell}
+                            setEditingCell={setEditingCell}
+                            editValue={editValue}
+                            setEditValue={setEditValue}
+                            teamStatusMap={teamStatusMap}
+                            updateEvent={updateEvent}
+                            handleCellClick={handleCellClick}
+                            handleCellBlur={handleCellBlur}
+                            handleAgeSexBlur={handleAgeSexBlur}
+                            handleRowClick={handleRowClick}
+                            handleMarkDuplicate={handleMarkDuplicate}
+                            handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
+                            handleDeleteCall={handleDeleteCall}
+                            handleTeamStatusChange={handleTeamStatusChange}
+                            handleRemoveTeamFromCall={handleRemoveTeamFromCall}
+                            handleAddTeamToCall={handleAddTeamToCall}
+                            getCallRowClass={getCallRowClass}
+                            formatAgeSex={formatAgeSex}
+                            TableColGroup={TableColGroup}
+                          />
+                        </div>
+                      </div>
+                    </Tab>
+
+                    <Tab key="clinic" title={`Clinic (${activeClinicCount})`}>
+                      <div className="space-y-0">
+                        <div className="flex items-center justify-between pt-1 pb-0.5">
+                          <h3 className="text-md font-semibold text-surface-light">Total Patients: {totalPatientsCount}</h3>
+                          <Tooltip content="Add Patient" placement="top">
+                            <div>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                className="rounded-full bg-transparent hover:bg-surface-liner"
+                                onPress={() => setShowQuickClinicCallForm(true)}
+                              >
+                                Add Patient
+                              </Button>
+                            </div>
+                          </Tooltip>
+                        </div>
+
+                        <div className="rounded-xl overflow-hidden">
+                          <ClinicTrackingTable
+                            event={event}
+                            callDisplayNumberMap={callDisplayNumberMap}
+                            showResolvedClinicCalls={showResolvedClinicCalls}
+                            setShowResolvedClinicCalls={setShowResolvedClinicCalls}
+                            openClinicCallId={openClinicCallId}
+                            setOpenClinicCallId={setOpenClinicCallId}
+                            editingCell={editingCell}
+                            setEditingCell={setEditingCell}
+                            editValue={editValue}
+                            setEditValue={setEditValue}
+                            updateEvent={updateEvent}
+                            handleCellClick={handleCellClick}
+                            handleCellBlur={handleCellBlur}
+                            handleAgeSexBlur={handleAgeSexBlur}
+                            getCallRowClass={getCallRowClass}
+                            formatAgeSex={formatAgeSex}
+                          />
+                        </div>
+                      </div>
+                    </Tab>
+                  </Tabs>
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -3298,127 +3349,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <h2 className="text-xl font-bold text-surface-light">Teams</h2>
-                      <div className="flex items-center gap-2">
-                        <Tooltip content="Add Team or Supervisor" placement="top">
-                          <div>
-                            <Dropdown>
-                              <DropdownTrigger>
-                                <Button isIconOnly size="md" variant="flat" aria-label="Add Team or Supervisor">
-                                  <Plus className="h-5 w-5" />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu
-                                aria-label="Team Actions"
-                                onAction={(key) => {
-                                  if (key === "team") handleAddNewTeam();
-                                  else if (key === "supervisor") handleAddNewSupervisor();
-                                }}
-                              >
-                                <DropdownItem key="team">Add Team</DropdownItem>
-                                <DropdownItem key="supervisor">Add Supervisor</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </Tooltip>
-                        <Tooltip content="Refresh all team posts from schedule" placement="top">
-                          <div>
-                            <Button isIconOnly size="md" variant="flat" onPress={refreshAllPostsFromSchedule}>
-                              <RotateCw className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </Tooltip>
-                        <Tooltip content="Sort and view options" placement="top">
-                          <div>
-                            <Dropdown
-                              classNames={{
-                                content: "min-w-[140px] w-[140px] max-w-[140px]", // Adjust dropdown width here
-                              }}
-                            >
-                              <DropdownTrigger>
-                                <Button isIconOnly size="md" variant="flat" aria-label="Sort teams">
-                                  <ArrowDownWideNarrow className="h-5 w-5" />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu
-                                aria-label="Sort and view options"
-                              >
-                                <DropdownItem
-                                  key="view-toggle"
-                                  isReadOnly
-                                  className="cursor-default hover:bg-transparent px-2 py-1"
-                                  textValue="View toggle"
-                                >
-                                  <Tabs
-                                    selectedKey={cardViewMode}
-                                    onSelectionChange={(key) => setCardViewMode(key as 'normal' | 'condensed')}
-                                    size="sm"
-                                    fullWidth
-                                    disableAnimation
-                                    classNames={{
-                                      tabList: "gap-0 w-full bg-surface-deep p-0.5 rounded-lg",
-                                      tab: "h-7 px-2 data-[selected=true]:bg-surface-liner data-[selected=true]:text-surface-light data-[hover=true]:opacity-100 transition-colors",
-                                      cursor: "bg-surface-liner",
-                                    }}
-                                  >
-                                    <Tab
-                                      key="normal"
-                                      title={
-                                        <Tooltip content="Standard card view with full details" placement="top">
-                                          <div className="flex items-center gap-1 pointer-events-none">
-                                            <Rows2 className="h-4 w-4" />
-                                          </div>
-                                        </Tooltip>
-                                      }
-                                    />
-                                    <Tab
-                                      key="condensed"
-                                      title={
-                                        <Tooltip content="Compact card view for more teams on screen" placement="top">
-                                          <div className="flex items-center gap-1 pointer-events-none">
-                                            <Rows4 className="h-4 w-4" />
-                                          </div>
-                                        </Tooltip>
-                                      }
-                                    />
-                                  </Tabs>
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="divider"
-                                  isReadOnly
-                                  className="p-0 m-0 h-px bg-surface-liner cursor-default"
-                                  textValue="divider"
-                                >
-                                  <div className="h-px" />
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="availability"
-                                  onClick={() => setTeamSortMode('availability')}
-                                  className={teamSortMode === 'availability' ? 'bg-surface-liner' : ''}
-                                >
-                                  Availability
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="asc"
-                                  onClick={() => setTeamSortMode('asc')}
-                                  className={teamSortMode === 'asc' ? 'bg-surface-liner' : ''}
-                                >
-                                  Ascending
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="desc"
-                                  onClick={() => setTeamSortMode('desc')}
-                                  className={teamSortMode === 'desc' ? 'bg-surface-liner' : ''}
-                                >
-                                  Descending
-                                </DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </Tooltip>
-                      </div>
+                      <TeamActionButtonGroup selectedTab="teams" />
                     </div>
                     <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
-                      <div className="grid grid-cols-1 gap-3">
+                      <div className="dispatch-shell-list">
                         {[...(event?.staff || [])]
                           .sort((a, b) => {
                             const statusRank = (status: string) => {
@@ -3460,7 +3394,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       <div className="flex justify-between items-center mb-2">
                         <h2 className="text-xl font-bold text-surface-light">Supervisors</h2>
                       </div>
-                      <div className="grid grid-cols-1 gap-3">
+                      <div className="dispatch-shell-list">
                         {event.supervisor
                           ?.sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
                           .map(supervisor => {
@@ -3504,79 +3438,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <h2 className="text-xl font-bold text-surface-light">Equipment</h2>
-                      <div className="flex items-center gap-2">
-                        <Tooltip content="Add Equipment from venue" placement="top">
-                          <div>
-                            <Dropdown>
-                              <DropdownTrigger>
-                                <Button 
-                                  isIconOnly 
-                                  size="md" 
-                                  variant="flat" 
-                                  aria-label="Add Equipment"
-                                >
-                                  <Plus className="h-5 w-5" />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu
-                                aria-label="Add Equipment"
-                                onAction={(key) => handleAddVenueEquipment(key as string)}
-                              >
-                                {getAvailableVenueEquipment().length > 0 ? (
-                                  getAvailableVenueEquipment().map(equipName => (
-                                    <DropdownItem key={equipName}>{equipName}</DropdownItem>
-                                  ))
-                                ) : (
-                                  <DropdownItem key="none" textValue="No equipment available" isReadOnly>
-                                    No equipment left to add
-                                  </DropdownItem>
-                                )}
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </Tooltip>
-                        <Tooltip content="Reset all equipment locations to defaults" placement="top">
-                          <div>
-                            <Button 
-                              isIconOnly 
-                              size="md" 
-                              variant="flat" 
-                              onPress={handleResetEquipmentLocations}
-                              aria-label="Reset equipment locations"
-                            >
-                              <RotateCw className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </Tooltip>
-                        <Tooltip content="Sort equipment" placement="top">
-                          <div>
-                            <Dropdown>
-                              <DropdownTrigger>
-                                <Button isIconOnly size="md" variant="flat" aria-label="Sort equipment">
-                                  <ArrowDownWideNarrow className="h-5 w-5" />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu
-                                aria-label="Sort options"
-                                selectedKeys={[teamSortMode]}
-                                selectionMode="single"
-                                onSelectionChange={(keys) => {
-                                  const selected = Array.from(keys)[0] as 'availability' | 'asc' | 'desc';
-                                  setTeamSortMode(selected);
-                                }}
-                              >
-                                <DropdownItem key="availability">Availability</DropdownItem>
-                                <DropdownItem key="asc">Ascending</DropdownItem>
-                                <DropdownItem key="desc">Descending</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </Tooltip>
-                      </div>
+                      <TeamActionButtonGroup selectedTab="equipment" />
                     </div>
                     <div className="space-y-3">
                       {(event?.venue?.equipment?.length || event?.eventEquipment?.length) ? (
-                        <div className="grid grid-cols-1 gap-3">
+                        <div className="dispatch-shell-list">
                           {getEquipmentItems()
                             .sort((a, b) => {
                               const aOnCall = a.status !== 'Available' ? 1 : 0;

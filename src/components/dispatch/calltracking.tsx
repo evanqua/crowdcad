@@ -33,7 +33,6 @@ interface CallTrackingTableProps {
   callDisplayNumberMap: Map<string, number>;
   showResolvedCalls: boolean;
   setShowResolvedCalls: (value: boolean | ((prev: boolean) => boolean)) => void;
-  setShowQuickCallForm: (value: boolean) => void;
   openCallId: string | null;
   setOpenCallId: (value: string | null) => void;
   editingCell: { callId: string; field: EditableCallField } | null;
@@ -53,7 +52,6 @@ interface CallTrackingTableProps {
   handleRemoveTeamFromCall: (callId: string, team: string) => Promise<void>;
   handleAddTeamToCall: (callId: string, team: string) => Promise<void>;
   getCallRowClass: (call: Call) => string;
-  computeCallStatus: (call: Call) => string;
   formatAgeSex: (age?: string | number, gender?: string) => string;
   TableColGroup: React.ComponentType;
 }
@@ -73,7 +71,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   callDisplayNumberMap,
   showResolvedCalls,
   setShowResolvedCalls,
-  setShowQuickCallForm,
   openCallId,
   setOpenCallId,
   editingCell,
@@ -93,7 +90,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   handleRemoveTeamFromCall,
   handleAddTeamToCall,
   getCallRowClass,
-  computeCallStatus,
   formatAgeSex,
   TableColGroup,
 }) => {
@@ -111,25 +107,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
 
   return (
-    <div className="col-span-2 space-y-4 text-black">
+    <div className="col-span-2 text-black">
       <div className="p-4 bg-surface-deep rounded-xl overflow-hidden">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-lg font-semibold text-surface-light">
-            Total Calls: {event.calls?.length || 0}
-          </h3>
-          <div className="flex gap-2">
-            <Button
-              isIconOnly
-              size="md"
-              variant="flat"
-              aria-label="Add Team or Supervisor"
-              onPress={() => setShowQuickCallForm(true)}
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-        
         <div className="overflow-x-auto">
           <table className="min-w-[870px] w-full text-[14px] sm:text-[15px] text-surface-light table-fixed border-separate border-spacing-0">
             <TableColGroup />
@@ -138,7 +117,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                 <th className="px-3 py-2.5 text-left text-surface-faint w-16">Call #</th>
                 <th className="px-3 py-2.5 text-left text-surface-faint w-40">Chief Complaint</th>
                 <th className="px-3 py-2.5 text-left text-surface-faint w-16">A/S</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint w-40">Status</th>
                 <th className="px-3 py-2.5 text-left text-surface-faint w-48">Location</th>
                 <th className="px-3 py-2.5 text-left text-surface-faint">Team</th>
                 <th className="px-3 py-2.5 text-right text-surface-faint w-12"></th>
@@ -265,9 +243,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                             </span>
                           )}
                         </td>
-                        
-                        {/* Status */}
-                        <td className="px-3 py-2.5">{computeCallStatus(call)}</td>
                         
                         {/* Location */}
                         <td className="px-3 py-2.5" onClick={() => handleCellClick(call.id, 'location', call.location)}>
