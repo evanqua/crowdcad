@@ -14,6 +14,7 @@ import { Plus, MoreVertical } from "lucide-react";
 import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment } from '@/app/types';
 import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
+import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 
 import {
   Dropdownmenu,
@@ -107,9 +108,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
 
   return (
-    <div className="col-span-2 text-black">
-      <div className="p-4 bg-surface-deep rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
+    <div className="col-span-2 text-black w-full">
+      <div className="overflow-x-auto w-full">
           <table className="min-w-[870px] w-full text-[14px] sm:text-[15px] text-surface-light table-fixed border-separate border-spacing-0">
             <TableColGroup />
             <thead>
@@ -139,8 +139,13 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                 const pendingForCall = pendingValues[call.id] || {};
                 return (
                 <React.Fragment key={call.id}>
+                  {(() => {
+                    const rowToneClass = getCallRowClass(call);
+                    const isOpen = openCallId === call.id;
+                    const hoverClass = !isOpen && !rowToneClass ? TEAM_CARD_ROW_HOVER_CLASS : '';
+                    return (
                   <tr
-                    className={`cursor-pointer min-h-3.25rem ${getCallRowClass(call)} transition-colors`}
+                    className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${rowToneClass} ${hoverClass} transition-colors`}
                     onClick={(e) => handleRowClick(e, call.id)}
                   >
                         <td className="px-3 py-2.5">{callDisplayNumberMap.get(call.id)}</td>
@@ -272,14 +277,16 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                         </td>
                         
                         {/* Team - Updated with larger Chips and shadcn dropdown */}
-                        <td className="px-3 py-2.5 relative z-0">
-                          <div className="relative z-0 flex flex-wrap items-center gap-2">
+                        <td className="px-3 py-2.5 relative z-0 whitespace-nowrap">
+                          <div className="relative z-0 flex flex-nowrap items-center gap-2 min-w-max w-max">
                             {/* Active assigned teams - Larger chips with centered dropdown */}
                             {(Array.isArray(call.assignedTeam) ? call.assignedTeam : []).map((team: string) => {
                               const isEquipmentOnlyTeam = call.equipmentTeams?.includes(team);
                               const statusOptions = isEquipmentOnlyTeam
                                 ? ['En Route Eq', 'Assisting', 'Delivered Eq',]
                                 : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
+                              const currentTeamStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
+                              const teamStatusColor = getStatusColor(currentTeamStatus);
                            
                               return (
                                 <Chip
@@ -287,7 +294,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   size="lg"
                                   variant="flat"
                                   color="default"
-                                  className="text-surface-light h-9"
+                                  className={`text-surface-light h-9 shrink-0 ${teamStatusColor.chipClass}`}
                                   onClose={() => handleRemoveTeamFromCall(call.id, team)}
                                 >
                                   <div className="flex items-center gap-2">
@@ -297,9 +304,9 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                         <Button
                                           size="sm"
                                           variant="light"
-                                          className="min-w-0 h-6 px-2 text-xs"
+                                          className="min-w-0 h-6 px-2 text-xs shrink-0"
                                         >
-                                          {teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route'}
+                                          {currentTeamStatus}
                                         </Button>
                                       </DropdownTrigger>
                                       <DropdownMenu
@@ -342,7 +349,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   size="sm"
                                   variant="flat"
                                   aria-label="Add"
-                                  className="w-8 h-8 rounded-full hover:bg-surface-liner"
+                                  className="w-8 h-8 rounded-full hover:bg-surface-liner shrink-0"
                                 >
                                   <Plus className="h-4 w-4" />
                                 </Button>
@@ -1153,11 +1160,11 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                           </div>
                         </td>
                         {/* Options Ellipsis */}
-                        <td className="px-3 py-2.5 text-right">
-                          <Dropdown placement="bottom-end" offset={6}>
+                        <td className="px-3 py-2.5 text-right w-12 min-w-12 max-w-12 whitespace-nowrap">
+                          <Dropdown placement="bottom-end" offset={6} shouldBlockScroll={false}>
                             <DropdownTrigger>
                               <button
-                                className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center ml-auto"
+                                className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center ml-auto shrink-0 w-4 h-4"
                                 aria-label="Call actions"
                                 type="button"
                                 onClick={(e) => e.stopPropagation()}
@@ -1200,6 +1207,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                           </Dropdown>
                         </td>
                       </tr>
+                        );
+                      })()}
                   
                   {/* Expanded row for notes and log - NO ANIMATION */}
                   {openCallId === call.id && (
@@ -1283,7 +1292,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
             {showResolvedCalls ? 'Hide Resolved Calls' : 'Show Resolved Calls'}
           </button>
         </div>
-      </div>
     </div>
   );
 };

@@ -12,6 +12,7 @@ import {
 } from '@heroui/react';
 import { MoreVertical } from 'lucide-react';
 import type { Event, Call, CallLogEntry, ClinicOutcome } from '@/app/types';
+import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 
 type EditableCallField = keyof Call | 'ageSex';
 
@@ -104,7 +105,7 @@ export default function ClinicTrackingTable({
   
 
   return (
-    <div className="px-4 pb-4 pt-1 bg-surface-deep rounded-xl overflow-hidden">
+    <div className="w-full">
       <div className="overflow-x-auto">
         <table className="min-w-[870px] w-full text-[14px] sm:text-[15px] text-surface-light table-fixed border-separate border-spacing-0">
           <TableColGroup />
@@ -136,7 +137,7 @@ export default function ClinicTrackingTable({
             ].map(call => (
               <React.Fragment key={call.id}>
                 <tr
-                  className={`cursor-pointer min-h-[3.25rem] ${getCallRowClass(call)} transition-colors`}
+                  className={`cursor-pointer min-h-[3.25rem] bg-transparent rounded-none ${getCallRowClass(call)} ${openClinicCallId === call.id || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors`}
                   onClick={(e) => {
                     const t = e.target as HTMLElement;
                     if (t.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;

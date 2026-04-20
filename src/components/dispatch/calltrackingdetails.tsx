@@ -37,7 +37,7 @@ export default function CallTrackingDetails({
   return (
     <tr className={rowClassName}>
       <td
-        colSpan={7}
+        colSpan={6}
         className="p-2 border-b border-surface-liner"
         onClick={onClose}
       >

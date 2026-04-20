@@ -30,6 +30,7 @@ import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, Dropd
 import EquipmentCard from '@/components/dispatch/equipmentcard';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
+import { getRowStatusClass } from '@/lib/statusColors';
 
 interface DispatchRoutePageProps {
   params: Promise<{ eventId: string }>;
@@ -736,19 +737,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [teamStatusMap, setTeamStatusMap] = useState<{ [callId: string]: { [team: string]: string } }>({});
 
   const getCallRowClass = (call: Call) => {
-    if (!Array.isArray(call.assignedTeam)) return 'bg-surface-deep';
+    if (!Array.isArray(call.assignedTeam)) return '';
 
-    if (!event) return 'bg-surface-deep';
+    if (!event) return '';
 
     const statuses = call.assignedTeam
       .map(t => event?.staff.find(s => s.team === t)?.status)
       .filter((status): status is string => status !== undefined);
 
-    if (statuses.some(status => ['En Route', 'On Scene', 'Transporting'].includes(status))) {
-      return 'bg-status-card-red';
-    }
-
-    return 'bg-surface-deep';
+    return getRowStatusClass(statuses);
   };
 
 
@@ -2755,6 +2752,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     CC:     '10rem',  // Chief Complaint
     AS:     '4rem',   // A/S
     LOC:    '10rem',  // Location
+    ACTION: '3rem',   // Row actions
   };
 
   function TableColGroup() {
@@ -2765,6 +2763,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         <col style={{ width: COLW.AS }} />
         <col style={{ width: COLW.LOC }} />
         <col />
+        <col style={{ width: COLW.ACTION }} />
       </colgroup>
     );
   }
@@ -3225,10 +3224,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     onSelectionChange={(key) => setSelectedRightTab(String(key))}
                     variant="underlined"
                     classNames={{
-                      base: 'w-auto',
+                      base: 'w-full',
+                      tabList: 'inline-flex w-auto',
                       tab: 'h-8 px-2',
                       tabContent: 'text-lg font-medium text-surface-light group-data-[selected=true]:text-surface-lightest',
-                      panel: 'pl-2 pr-0 pt-1',
+                      panel: 'w-full pl-2 pr-0 pt-1',
                     }}
                   >
                     <Tab key="calls" title={`Calls (${activeCallsCount})`}>
@@ -3249,48 +3249,46 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           </Tooltip>
                         </div>
 
-                        <div className="rounded-xl overflow-hidden">
-                          <CallTrackingTable
-                            event={event}
-                            callDisplayNumberMap={callDisplayNumberMap}
-                            showResolvedCalls={showResolvedCalls}
-                            setShowResolvedCalls={setShowResolvedCalls}
-                            openCallId={openCallId}
-                            setOpenCallId={setOpenCallId}
-                            editingCell={editingCell}
-                            setEditingCell={setEditingCell}
-                            editValue={editValue}
-                            setEditValue={setEditValue}
-                            teamStatusMap={teamStatusMap}
-                            updateEvent={updateEvent}
-                            handleCellClick={handleCellClick}
-                            handleCellBlur={handleCellBlur}
-                            handleAgeSexBlur={handleAgeSexBlur}
-                            handleRowClick={handleRowClick}
-                            handleMarkDuplicate={handleMarkDuplicate}
-                            handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
-                            handleDeleteCall={handleDeleteCall}
-                            handleTeamStatusChange={handleTeamStatusChange}
-                            handleRemoveTeamFromCall={handleRemoveTeamFromCall}
-                            handleAddTeamToCall={handleAddTeamToCall}
-                            getCallRowClass={getCallRowClass}
-                            formatAgeSex={formatAgeSex}
-                            TableColGroup={TableColGroup}
-                          />
-                        </div>
+                        <CallTrackingTable
+                          event={event}
+                          callDisplayNumberMap={callDisplayNumberMap}
+                          showResolvedCalls={showResolvedCalls}
+                          setShowResolvedCalls={setShowResolvedCalls}
+                          openCallId={openCallId}
+                          setOpenCallId={setOpenCallId}
+                          editingCell={editingCell}
+                          setEditingCell={setEditingCell}
+                          editValue={editValue}
+                          setEditValue={setEditValue}
+                          teamStatusMap={teamStatusMap}
+                          updateEvent={updateEvent}
+                          handleCellClick={handleCellClick}
+                          handleCellBlur={handleCellBlur}
+                          handleAgeSexBlur={handleAgeSexBlur}
+                          handleRowClick={handleRowClick}
+                          handleMarkDuplicate={handleMarkDuplicate}
+                          handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
+                          handleDeleteCall={handleDeleteCall}
+                          handleTeamStatusChange={handleTeamStatusChange}
+                          handleRemoveTeamFromCall={handleRemoveTeamFromCall}
+                          handleAddTeamToCall={handleAddTeamToCall}
+                          getCallRowClass={getCallRowClass}
+                          formatAgeSex={formatAgeSex}
+                          TableColGroup={TableColGroup}
+                        />
                       </div>
                     </Tab>
 
                     <Tab key="clinic" title={`Clinic (${activeClinicCount})`}>
-                      <div className="space-y-0">
-                        <div className="flex items-center justify-between pt-1 pb-0.5">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between py-1">
                           <h3 className="text-md font-semibold text-surface-light">Total Patients: {totalPatientsCount}</h3>
                           <Tooltip content="Add Patient" placement="top">
                             <div>
                               <Button
                                 size="sm"
                                 variant="flat"
-                                className="rounded-full bg-transparent hover:bg-surface-liner"
+                                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
                                 onPress={() => setShowQuickClinicCallForm(true)}
                               >
                                 Add Patient
@@ -3299,26 +3297,24 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           </Tooltip>
                         </div>
 
-                        <div className="rounded-xl overflow-hidden">
-                          <ClinicTrackingTable
-                            event={event}
-                            callDisplayNumberMap={callDisplayNumberMap}
-                            showResolvedClinicCalls={showResolvedClinicCalls}
-                            setShowResolvedClinicCalls={setShowResolvedClinicCalls}
-                            openClinicCallId={openClinicCallId}
-                            setOpenClinicCallId={setOpenClinicCallId}
-                            editingCell={editingCell}
-                            setEditingCell={setEditingCell}
-                            editValue={editValue}
-                            setEditValue={setEditValue}
-                            updateEvent={updateEvent}
-                            handleCellClick={handleCellClick}
-                            handleCellBlur={handleCellBlur}
-                            handleAgeSexBlur={handleAgeSexBlur}
-                            getCallRowClass={getCallRowClass}
-                            formatAgeSex={formatAgeSex}
-                          />
-                        </div>
+                        <ClinicTrackingTable
+                          event={event}
+                          callDisplayNumberMap={callDisplayNumberMap}
+                          showResolvedClinicCalls={showResolvedClinicCalls}
+                          setShowResolvedClinicCalls={setShowResolvedClinicCalls}
+                          openClinicCallId={openClinicCallId}
+                          setOpenClinicCallId={setOpenClinicCallId}
+                          editingCell={editingCell}
+                          setEditingCell={setEditingCell}
+                          editValue={editValue}
+                          setEditValue={setEditValue}
+                          updateEvent={updateEvent}
+                          handleCellClick={handleCellClick}
+                          handleCellBlur={handleCellBlur}
+                          handleAgeSexBlur={handleAgeSexBlur}
+                          getCallRowClass={getCallRowClass}
+                          formatAgeSex={formatAgeSex}
+                        />
                       </div>
                     </Tab>
                   </Tabs>

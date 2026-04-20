@@ -8,6 +8,7 @@ import {
 } from '@heroui/react';
 import {ChevronDown, ChevronUp, MapPin, MoreVertical} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
+import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 
 type TeamCardProps = {
   staff: Staff;
@@ -43,46 +44,6 @@ function formatMemberLine(member: string) {
   const certText = certMatches.map(cert => `[${cert}]`).join(' ');
   const leadText = isLead ? ' [Lead]' : '';
   return `${name}${certText ? ` ${certText}` : ''}${leadText}`.trim();
-}
-
-function teamStatusTone(status: string, event: Event, team: string) {
-  // Check if team is assisting with equipment (orange)
-  const onEqRun =
-    !!event.calls?.some(c =>
-      c.equipmentTeams?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
-    ) || ['En Route Eq', 'Assisting'].includes(status);
-  
-  if (onEqRun) {
-    return {
-      borderClass: 'border-status-card-yellow',
-      fillClass: 'bg-status-card-yellow/20'
-    };
-  }
-  
-  // Check if team is on active patient care call (red)
-  const activeCare =
-    !!event.calls?.some(c =>
-      c.assignedTeam?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
-    );
-  
-  if (activeCare) {
-    return {
-      borderClass: 'border-status-card-red',
-      fillClass: 'bg-status-card-red/20'
-    };
-  }
-  
-  if (['On Break','In Clinic'].includes(status)) {
-    return {
-      borderClass: 'border-status-card-blue',
-      fillClass: 'bg-status-card-blue/20'
-    };
-  }
-  
-  return {
-    borderClass: 'border-surface-liner',
-    fillClass: 'bg-surface-liner/30'
-  };
 }
 
 export default function TeamCard({
@@ -147,7 +108,7 @@ export default function TeamCard({
     return Array.from(new Set([...base, ...posts]));
   }, [event.venue?.posts]);
 
-  const statusTone = teamStatusTone(staff.status, event, staff.team);
+  const statusTone = getStatusColor(deriveTeamVisualStatus(staff.status, event, staff.team));
 
   return (
     <Card
