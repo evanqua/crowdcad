@@ -250,7 +250,11 @@ export default function TeamCard({
           <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1.5]">
             <Autocomplete
               aria-label="Location"
-              startContent={<MapPin className="h-4 w-4 text-surface-faint" />}
+              startContent={(
+                <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                  <MapPin className="h-[18px] w-[18px] shrink-0 text-surface-faint" />
+                </span>
+              )}
               inputValue={locationInput}
               onInputChange={(val) => {
                 // Update local state as user types - makes it editable

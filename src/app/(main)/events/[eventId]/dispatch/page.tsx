@@ -2899,7 +2899,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <ResizablePanel defaultSize={25} minSize={20} maxSize={37}>
                 <div className="h-full rounded-xl pb-16">
                   {/* Header with Select and Action Buttons */}
-                  <div className="flex justify-between items-center px-4 pt-2 pb-2 border-b border-surface-liner">
+                  <div className="flex w-full justify-between items-center pt-2 pb-2 border-b border-surface-liner">
                     <Select
                       selectedKeys={[selectedLeftTab]}
                       onSelectionChange={(keys) => {
@@ -2907,9 +2907,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         setSelectedLeftTab(selected);
                       }}
                       aria-label="Select section"
-                      className="max-w-[140px]"
+                      className="w-auto min-w-[180px]"
                       classNames={{
-                        trigger: "bg-surface-deep hover:bg-surface-liner h-10 min-h-10",
+                        trigger: "bg-surface-deep border border-surface-liner rounded-full hover:bg-surface-liner h-10 min-h-10",
                         value: "text-surface-lightest",
                         popoverContent: "bg-surface-deep border-surface-liner",
                       }}
@@ -2920,7 +2920,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     </Select>
 
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 p-1 rounded-full bg-surface-deep border border-surface-liner">
                       <Tooltip 
                         content={
                           selectedLeftTab === 'teams' 
@@ -2936,9 +2936,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             <DropdownTrigger>
                               <Button
                                 isIconOnly
-                                size="md"
+                                size="sm"
                                 variant="flat"
-                                className="bg-surface-deep hover:bg-surface-liner"
+                                className="rounded-full bg-transparent hover:bg-surface-liner"
                                 aria-label="Add Team or Supervisor"
                               >
                                 <Plus className="h-5 w-5" />
@@ -2967,9 +2967,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         <div>
                           <Button
                             isIconOnly
-                            size="md"
+                            size="sm"
                             variant="flat"
-                            className="bg-surface-deep hover:bg-surface-liner"
+                            className="rounded-full bg-transparent hover:bg-surface-liner"
                             onPress={refreshAllPostsFromSchedule}
                             aria-label="Update all posts"
                             isDisabled={selectedLeftTab === 'supervisors' || selectedLeftTab === 'equipment'}
@@ -2988,9 +2988,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             <DropdownTrigger>
                               <Button
                                 isIconOnly
-                                size="md"
+                                size="sm"
                                 variant="flat"
-                                className="bg-surface-deep hover:bg-surface-liner"
+                                className="rounded-full bg-transparent hover:bg-surface-liner"
                                 aria-label="Sort teams"
                               >
                                 <ArrowDownWideNarrow className="h-5 w-5" />
