@@ -183,6 +183,18 @@
   animation-delay: var(--delay, 0ms);
 }
 
+.dispatch-shell-list > .dispatch-shell-card + .dispatch-shell-card {
+  border-top: 1px solid hsl(var(--surface-border) / 0.6);
+}
+
+.dispatch-shell-list > .dispatch-shell-card.dispatch-shell-card--open {
+  border-top-color: transparent;
+}
+
+.dispatch-shell-list > .dispatch-shell-card.dispatch-shell-card--open + .dispatch-shell-card {
+  border-top-color: transparent;
+}
+
 @keyframes cell-ripple {
   0% {
     opacity: calc(0.3 * (1 - var(--distance-ratio, 0)));

@@ -7,7 +7,7 @@ import {
   Card, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
 } from '@heroui/react';
-import { MoreVertical } from 'lucide-react';
+import { ChevronDown, ChevronUp, MoreVertical } from 'lucide-react';
 import type { Event, EquipmentItem } from '@/app/types';
 
 type EquipmentCardProps = {
@@ -20,10 +20,23 @@ type EquipmentCardProps = {
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
 
-function equipmentBg(status: string) {
-  if (status === 'In Clinic') return 'bg-status-card-blue';
-  if (status.startsWith('Call ') || status === 'In Use') return 'bg-status-card-red';
-  return 'bg-surface-deep';
+function equipmentStatusTone(status: string) {
+  if (status === 'In Clinic') {
+    return {
+      borderClass: 'border-status-card-blue',
+      fillClass: 'bg-status-card-blue/20'
+    };
+  }
+  if (status.startsWith('Call ') || status === 'In Use') {
+    return {
+      borderClass: 'border-status-card-red',
+      fillClass: 'bg-status-card-red/20'
+    };
+  }
+  return {
+    borderClass: 'border-surface-liner',
+    fillClass: 'bg-surface-liner/30'
+  };
 }
 
 export default function EquipmentCard({
@@ -70,11 +83,11 @@ export default function EquipmentCard({
     return 'Available';
   })();
 
-  const bg = equipmentBg(equipment.status);
+  const statusTone = equipmentStatusTone(equipment.status);
 
   return (
     <Card
-      className={`rounded-2xl shadow-sm border-0 ${bg}`}
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
     >
       <div
         onClick={() => setExpanded(v => !v)}
@@ -85,6 +98,10 @@ export default function EquipmentCard({
         </div>
 
         <div className="absolute top-3 right-3 flex items-center gap-2">
+          <div className="text-surface-light/70">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+
           <div
             onClick={e => e.stopPropagation()}
             onKeyDown={e => e.stopPropagation()}
@@ -135,7 +152,7 @@ export default function EquipmentCard({
                 }}
                 classNames={{
                   base: 'min-w-0',
-                  trigger: 'bg-surface-deep text-surface-light border border-surface-liner'
+                  trigger: `${statusTone.fillClass} text-surface-light border ${statusTone.borderClass} transition-colors`
                 }}
               >
                 {statusOptions.map((s) => (

@@ -6,7 +6,7 @@ import {
   Card, CardHeader, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
 } from '@heroui/react';
-import {MoreVertical} from 'lucide-react';
+import {ChevronDown, ChevronUp, MoreVertical} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
 
 type TeamCardProps = {
@@ -52,14 +52,19 @@ function getLeadNameCert(staff: Staff) {
   return { name: rx?.[1] ?? 'No Lead', cert: rx?.[2] ?? '' };
 }
 
-function teamBg(status: string, event: Event, team: string) {
+function teamStatusTone(status: string, event: Event, team: string) {
   // Check if team is assisting with equipment (orange)
   const onEqRun =
     !!event.calls?.some(c =>
       c.equipmentTeams?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
     ) || ['En Route Eq', 'Assisting'].includes(status);
   
-  if (onEqRun) return 'bg-status-card-yellow';
+  if (onEqRun) {
+    return {
+      borderClass: 'border-status-card-yellow',
+      fillClass: 'bg-status-card-yellow/20'
+    };
+  }
   
   // Check if team is on active patient care call (red)
   const activeCare =
@@ -67,11 +72,24 @@ function teamBg(status: string, event: Event, team: string) {
       c.assignedTeam?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
     );
   
-  if (activeCare) return 'bg-status-card-red';
+  if (activeCare) {
+    return {
+      borderClass: 'border-status-card-red',
+      fillClass: 'bg-status-card-red/20'
+    };
+  }
   
-  if (['On Break','In Clinic'].includes(status)) return 'bg-status-card-blue';
+  if (['On Break','In Clinic'].includes(status)) {
+    return {
+      borderClass: 'border-status-card-blue',
+      fillClass: 'bg-status-card-blue/20'
+    };
+  }
   
-  return 'bg-surface-deep';
+  return {
+    borderClass: 'border-surface-liner',
+    fillClass: 'bg-surface-liner/30'
+  };
 }
 
 export default function TeamCard({
@@ -131,12 +149,12 @@ export default function TeamCard({
     return Array.from(new Set([...base, ...posts]));
   }, [event.venue?.posts]);
 
-  const bg = teamBg(staff.status, event, staff.team);
+  const statusTone = teamStatusTone(staff.status, event, staff.team);
 
   return (
     <Card
-      // No outside border; unified bg for header + body
-      className={`rounded-2xl shadow-sm border-0 ${bg}`}
+      // Closed cards are transparent/sharp; open cards retain active dark shell.
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
     >
       {/* HEADER (click to toggle). Not a <button>, so no nested <button> issues */}
       <CardHeader
@@ -154,6 +172,10 @@ export default function TeamCard({
 
         {/* Right section: Timer and Menu aligned horizontally at top */}
         <div className="absolute top-3 right-3 flex items-center gap-2">
+          <div className="text-surface-light/70">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+
           {/* Timer */}
           <div className="text-[15px] sm:text-base font-semibold text-surface-light tabular-nums">
             {timer}
@@ -223,7 +245,7 @@ export default function TeamCard({
               }}
               classNames={{
                 base: 'min-w-0',
-                trigger: 'bg-surface-deep text-surface-light border border-surface-liner'
+                trigger: `${statusTone.fillClass} text-surface-light border ${statusTone.borderClass} transition-colors`
               }}
             >
               {statusOptions.map((s) => (

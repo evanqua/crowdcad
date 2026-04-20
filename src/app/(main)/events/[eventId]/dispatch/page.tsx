@@ -3076,11 +3076,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
                   {/* Content with ScrollShadow */}
                   <div className="h-full overflow-auto scrollbar-hide">
-                    <div className="p-4">
+                    <div className="p-0">
                       
                       {/* TEAMS CONTENT */}
                       {selectedLeftTab === 'teams' && (
-                        <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
+                        <div className="dispatch-shell-list">
                           {[...(event?.staff || [])]
                             .sort((a, b) => {
                               const statusRank = (status: string) => {
@@ -3127,7 +3127,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
                       {/* SUPERVISORS CONTENT */}
                       {selectedLeftTab === 'supervisors' && (
-                        <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
+                        <div className="dispatch-shell-list">
                           {event?.supervisor && event.supervisor.length > 0 ? (
                             event.supervisor
                               .sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
@@ -3173,7 +3173,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
                       {/* EQUIPMENT CONTENT */}
                       {selectedLeftTab === 'equipment' && (
-                        <div className="space-y-2">
+                        <div className="dispatch-shell-list">
                           {(event?.venue?.equipment?.length || event?.eventEquipment?.length) ? (
                             <>
                               {/* Sort equipment: active calls at bottom */}
