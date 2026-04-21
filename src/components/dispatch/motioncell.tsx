@@ -34,7 +34,7 @@ export default function DispatchMotionCell({
     <div
       className={`dispatch-expand-grid ${open ? 'dispatch-expand-grid--open' : ''}`}
       style={{
-        ['--dispatch-expand-delay' as unknown as string]: `${delayMs}ms`,
+        ['--dispatch-expand-delay' as unknown as string]: `${open ? delayMs : 0}ms`,
       }}
       aria-hidden={!open}
     >

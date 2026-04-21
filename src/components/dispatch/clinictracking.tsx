@@ -114,7 +114,7 @@ export default function ClinicTrackingTable({
   
 
   return (
-    <div className="w-full">
+    <div className="col-span-2 text-black w-full">
       <TrackingTableBase
         TableColGroup={TableColGroup}
         showStatusColumn={true}
@@ -135,7 +135,8 @@ export default function ClinicTrackingTable({
                   const motionDelayMs = isResolvedClinicCall && resolvedIndex >= 0 ? resolvedIndex * 30 : 0;
                   return (
                 <tr
-                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${openClinicCallId === call.id || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors`}
+                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${openClinicCallId === call.id || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors ${isResolvedClinicCall && !isMotionVisible ? '[&>td]:!border-b-0 pointer-events-none' : ''}`}
+                  aria-hidden={isResolvedClinicCall && !isMotionVisible}
                   onClick={(e) => {
                     const t = e.target as HTMLElement;
                     if (t.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;
@@ -143,7 +144,7 @@ export default function ClinicTrackingTable({
                   }}
                 >
                   <td className="p-0">
-                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
+                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {callDisplayNumberMap.get(call.id)}
                     </DispatchMotionCell>
                   </td>
@@ -153,7 +154,7 @@ export default function ClinicTrackingTable({
                     className="p-0"
                     onClick={() => handleCellClick(call.id, 'chiefComplaint', call.chiefComplaint)}
                   >
-                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
+                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
                       {editingCell?.callId === call.id && editingCell.field === 'chiefComplaint' ? (
                         <input
                           type="text"
@@ -189,7 +190,7 @@ export default function ClinicTrackingTable({
                       setEditValue(formatAgeSex(call.age, call.gender));
                     }}
                   >
-                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
+                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {editingCell?.callId === call.id && editingCell.field === 'ageSex' ? (
                         <input
                           type="text"
@@ -223,7 +224,7 @@ export default function ClinicTrackingTable({
                     className="p-0"
                     onClick={() => handleCellClick(call.id, 'location', call.location)}
                   >
-                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
+                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
                       {editingCell?.callId === call.id && editingCell.field === 'location' ? (
                         <input
                           type="text"
@@ -250,7 +251,7 @@ export default function ClinicTrackingTable({
 
                   {/* Status - Using HeroUI Dropdown */}
                   <td className="p-0" onClick={e => e.stopPropagation()}>
-                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
+                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                       <Dropdown>
                         <DropdownTrigger>
                           <Button
@@ -297,7 +298,7 @@ export default function ClinicTrackingTable({
 
                   {/* Team (inline edit) */}
                   <td className="p-0">
-                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5">
+                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {(call.assignedTeam && call.assignedTeam.length > 0)
                         ? (Array.isArray(call.assignedTeam) ? call.assignedTeam.join(', ') : call.assignedTeam)
                         : (call.detachedTeams?.map(d => d.team).join(', ') || 'Walkup')}
@@ -305,7 +306,7 @@ export default function ClinicTrackingTable({
                   </td>
                   {/* Options Ellipsis */}
                   <td className="p-0">
-                    <DispatchMotionCell isOpen={isMotionVisible} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
+                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
                       <Dropdown placement="bottom-end" offset={6}>
                         <DropdownTrigger>
                           <button

@@ -164,10 +164,12 @@
 
 .dispatch-expand-fade {
   opacity: 0;
+  transform: translateY(-3px);
 }
 
 .dispatch-expand-fade--open {
   opacity: 1;
+  transform: translateY(0);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -177,9 +179,9 @@
   }
 
   .dispatch-expand-fade {
-    transition: opacity 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1), transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
     transition-delay: var(--dispatch-expand-delay, 0ms);
-    will-change: opacity;
+    will-change: opacity, transform;
   }
 }
 
