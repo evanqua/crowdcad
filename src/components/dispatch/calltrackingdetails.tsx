@@ -1,11 +1,12 @@
 "use client";
 
 import React from 'react';
-import { Textarea } from '@heroui/react';
 import DispatchMotionCell from './motioncell';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 
 type Props = {
   callDisplayNumber: number | undefined;
+  isOpen: boolean;
   notesText: string;
   onNotesChange: (value: string) => void;
   onNotesFocus: () => void;
@@ -22,6 +23,7 @@ type Props = {
 
 export default function CallTrackingDetails({
   callDisplayNumber,
+  isOpen,
   notesText,
   onNotesChange,
   onNotesFocus,
@@ -39,10 +41,10 @@ export default function CallTrackingDetails({
     <tr className={rowClassName}>
       <td
         colSpan={6}
-        className="p-2 border-b border-surface-liner"
+        className="p-2 pt-1.5 pb-3 border-b border-surface-liner align-top"
         onClick={onClose}
       >
-        <DispatchMotionCell isOpen={true} animate={true} className="cursor-pointer">
+        <DispatchMotionCell isOpen={isOpen} animate={true} className="cursor-pointer">
           {priority && (
             <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
               ⚠️ PRIORITY CALL: Life threat to patient/provider
@@ -50,29 +52,28 @@ export default function CallTrackingDetails({
           )}
 
           <div
-            className="mt-1 mb-3 text-sm text-surface-light"
+            className="mt-0 mb-1.5 text-sm text-surface-light"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="font-semibold mb-1">Notes</div>
-            <Textarea
+            <TrackingTextEntry
+              mode="note"
               value={notesText}
               onChange={(e) => onNotesChange(e.target.value)}
               onBlur={onNotesBlur}
               onFocus={onNotesFocus}
               minRows={2}
+              maxRows={3}
               variant="flat"
               placeholder="Add notes"
               className="min-w-0"
-              classNames={{
-                input: 'text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
-                inputWrapper: 'bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0',
-              }}
             />
           </div>
 
           <div onClick={(e) => e.stopPropagation()}>
             <strong>Log for Call #{callDisplayNumber}:</strong>
-            <Textarea
+            <TrackingTextEntry
+              mode="log"
               value={logText}
               onChange={(e) => onLogChange(e.target.value)}
               onBlur={onLogBlur}
@@ -84,13 +85,10 @@ export default function CallTrackingDetails({
                 }
               }}
               minRows={4}
+              maxRows={5}
               variant="flat"
               placeholder="No log entries"
               className="min-w-0"
-              classNames={{
-                input: 'text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm',
-                inputWrapper: 'bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0',
-              }}
             />
           </div>
         </DispatchMotionCell>

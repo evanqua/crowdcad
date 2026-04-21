@@ -5,10 +5,11 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Card, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
+  Select, SelectItem, Autocomplete, AutocompleteItem
 } from '@heroui/react';
 import { ChevronDown, ChevronUp, MapPin, MoreVertical } from 'lucide-react';
 import type { Event, EquipmentItem } from '@/app/types';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 
 type EquipmentCardProps = {
   equipment: EquipmentItem;
@@ -230,7 +231,8 @@ export default function EquipmentCard({
                 {equipment.deliveryTeam && <div>Delivery Team: {equipment.deliveryTeam}</div>}
               </div>
               <div className="text-sm font-semibold text-surface-light mb-1">Notes</div>
-              <Textarea
+              <TrackingTextEntry
+                mode="note"
                 value={notesText}
                 onChange={(e) => {
                   setNotesText(e.target.value);
@@ -248,13 +250,10 @@ export default function EquipmentCard({
                   notesFocusedRef.current = true;
                 }}
                 minRows={2}
+                maxRows={3}
                 variant="flat"
                 placeholder="Add notes about this equipment"
                 className="min-w-0"
-                classNames={{
-                  input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm",
-                  inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                }}
               />
               </div>
             </div>

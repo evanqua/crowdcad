@@ -69,6 +69,13 @@ interface LogEntry {
   message: string;
 }
 
+const dropdownMotionProps = {
+  initial: { opacity: 0, y: -8, scale: 0.98 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: -8, scale: 0.98 },
+  transition: { duration: 0.16, ease: 'easeOut' },
+} as const;
+
 export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   event,
   callDisplayNumberMap,
@@ -97,6 +104,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   TableColGroup,
 }) => {
   // const ButtonRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [closingCallId, setClosingCallId] = React.useState<string | null>(null);
+  const previousOpenCallIdRef = React.useRef<string | null>(null);
   const {
     notesTexts,
     setNotesTexts,
@@ -125,6 +134,33 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
     .filter((call: Call) => !resolvedCallStatuses.includes(call.status))
     .sort((a: Call, b: Call) => parseInt(b.id) - parseInt(a.id));
 
+  React.useEffect(() => {
+    const previousOpenCallId = previousOpenCallIdRef.current;
+
+    if (previousOpenCallId && previousOpenCallId !== openCallId) {
+      setClosingCallId(previousOpenCallId);
+      const timeout = window.setTimeout(() => {
+        setClosingCallId((current) => (current === previousOpenCallId ? null : current));
+      }, 180);
+
+      previousOpenCallIdRef.current = openCallId;
+      return () => window.clearTimeout(timeout);
+    }
+
+    if (!openCallId && closingCallId) {
+      const closingId = closingCallId;
+      const timeout = window.setTimeout(() => {
+        setClosingCallId((current) => (current === closingId ? null : current));
+      }, 180);
+
+      previousOpenCallIdRef.current = openCallId;
+      return () => window.clearTimeout(timeout);
+    }
+
+    previousOpenCallIdRef.current = openCallId;
+    return undefined;
+  }, [closingCallId, openCallId]);
+
 
   return (
     <div className="col-span-2 text-black w-full">
@@ -146,11 +182,11 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                 return (
                 <React.Fragment key={call.id}>
                   {(() => {
-                    const isOpen = openCallId === call.id;
+                    const isOpen = openCallId === call.id || closingCallId === call.id;
                     const hoverClass = !isOpen ? TEAM_CARD_ROW_HOVER_CLASS : '';
                     return (
                   <tr
-                    className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${hoverClass} transition-colors ${isResolvedCall && !isMotionVisible ? '[&>td]:!border-b-0 pointer-events-none' : ''}`}
+                      className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${hoverClass} transition-colors ${isResolvedCall && !isMotionVisible ? '[&>td]:!border-b-0 pointer-events-none' : ''} ${isOpen ? '[&>td]:!border-b-0' : ''}`}
                     aria-hidden={isResolvedCall && !isMotionVisible}
                     onClick={(e) => handleRowClick(e, call.id)}
                   >
@@ -318,7 +354,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 >
                                   <div className="flex items-center gap-2">
                                     <span>{team}</span>
-                                    <Dropdown>
+                                    <Dropdown motionProps={dropdownMotionProps}>
                                       <DropdownTrigger>
                                         <Button
                                           size="sm"
@@ -1184,7 +1220,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                           className="p-0 text-right w-12 min-w-12 max-w-12 whitespace-nowrap"
                         >
                           <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right w-12 min-w-12 max-w-12 whitespace-nowrap">
-                            <Dropdown placement="bottom-end" offset={6} shouldBlockScroll={false}>
+                            <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={6} shouldBlockScroll={false}>
                               <DropdownTrigger>
                                 <button
                                   className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center ml-auto shrink-0 w-4 h-4"
@@ -1235,11 +1271,12 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                       })()}
                   
                   {/* Expanded row for notes and log - NO ANIMATION */}
-                  {openCallId === call.id && (
+                  {(openCallId === call.id || closingCallId === call.id) && (
                     <CallTrackingDetails
                       key={`${call.id}-details`}
                       rowClassName=""
                       callDisplayNumber={callDisplayNumberMap.get(call.id)}
+                      isOpen={openCallId === call.id}
                       notesText={notesTexts[call.id] ?? (call.notes || '')}
                       onNotesChange={(value) => {
                         setNotesTexts((prev) => ({ ...prev, [call.id]: value }));

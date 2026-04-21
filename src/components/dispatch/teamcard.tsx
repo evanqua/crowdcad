@@ -4,10 +4,11 @@
 import React, {useEffect, useMemo, useState, useRef} from 'react';
 import {
   Card, CardHeader, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
+  Select, SelectItem, Autocomplete, AutocompleteItem
 } from '@heroui/react';
 import {ChevronDown, ChevronUp, MapPin, MoreVertical} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 import DispatchMotionCell from './motioncell';
 
@@ -285,7 +286,8 @@ export default function TeamCard({
             </div>
 
             <div className="text-xs font-bold text-surface-light mb-1">Activity Log</div>
-            <Textarea
+            <TrackingTextEntry
+              mode="log"
               value={logText}
               onChange={(e) => {
                 setLogText(e.target.value);
@@ -317,13 +319,10 @@ export default function TeamCard({
                 }
               }}
               minRows={4}
+              maxRows={5}
               variant="flat"
               placeholder="No log entries"
               className="min-w-0"
-              classNames={{
-                input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm",
-                inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-              }}
             />
           </div>
         </DispatchMotionCell>

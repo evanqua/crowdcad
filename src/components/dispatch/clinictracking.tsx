@@ -7,14 +7,14 @@ import {
   Dropdown, 
   DropdownTrigger, 
   DropdownMenu, 
-  DropdownItem,
-  Textarea
+  DropdownItem
 } from '@heroui/react';
 import { MoreVertical } from 'lucide-react';
 import type { Event, Call, CallLogEntry, ClinicOutcome } from '@/app/types';
 import DispatchMotionCell from './motioncell';
 import TrackingTableBase from './trackingtablebase';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 
 type EditableCallField = keyof Call | 'ageSex';
 
@@ -36,6 +36,13 @@ interface ClinicTrackingTableProps {
   getCallRowClass: (call: Call) => string;
   formatAgeSex: (age?: string | number, gender?: string) => string;
 }
+
+const dropdownMotionProps = {
+  initial: { opacity: 0, y: -8, scale: 0.98 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: -8, scale: 0.98 },
+  transition: { duration: 0.16, ease: 'easeOut' },
+} as const;
 
 const TableColGroup = () => (
   <colgroup>
@@ -72,6 +79,8 @@ export default function ClinicTrackingTable({
   const notesFocusedRef = React.useRef<string | null>(null);
   const [logTexts, setLogTexts] = React.useState<Record<string, string>>({});
   const logFocusedRef = React.useRef<string | null>(null);
+  const [closingClinicCallId, setClosingClinicCallId] = React.useState<string | null>(null);
+  const previousOpenClinicCallIdRef = React.useRef<string | null>(null);
 
   const resolvedClinicCalls = (event?.calls || [])
     .filter(c => c.status === 'Delivered' && !!c.outcome)
@@ -93,6 +102,33 @@ export default function ClinicTrackingTable({
       return next;
     });
   }, [event?.calls]);
+
+  React.useEffect(() => {
+    const previousOpenClinicCallId = previousOpenClinicCallIdRef.current;
+
+    if (previousOpenClinicCallId && previousOpenClinicCallId !== openClinicCallId) {
+      setClosingClinicCallId(previousOpenClinicCallId);
+      const timeout = window.setTimeout(() => {
+        setClosingClinicCallId((current) => (current === previousOpenClinicCallId ? null : current));
+      }, 180);
+
+      previousOpenClinicCallIdRef.current = openClinicCallId;
+      return () => window.clearTimeout(timeout);
+    }
+
+    if (!openClinicCallId && closingClinicCallId) {
+      const closingId = closingClinicCallId;
+      const timeout = window.setTimeout(() => {
+        setClosingClinicCallId((current) => (current === closingId ? null : current));
+      }, 180);
+
+      previousOpenClinicCallIdRef.current = openClinicCallId;
+      return () => window.clearTimeout(timeout);
+    }
+
+    previousOpenClinicCallIdRef.current = openClinicCallId;
+    return undefined;
+  }, [closingClinicCallId, openClinicCallId]);
 
   // Sync log from props when not focused
   React.useEffect(() => {
@@ -133,9 +169,10 @@ export default function ClinicTrackingTable({
                   const resolvedIndex = isResolvedClinicCall ? resolvedClinicCalls.findIndex((resolvedCall) => resolvedCall.id === call.id) : -1;
                   const isMotionVisible = !isResolvedClinicCall || showResolvedClinicCalls;
                   const motionDelayMs = isResolvedClinicCall && resolvedIndex >= 0 ? resolvedIndex * 30 : 0;
+                  const isOpen = openClinicCallId === call.id || closingClinicCallId === call.id;
                   return (
                 <tr
-                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${openClinicCallId === call.id || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors ${isResolvedClinicCall && !isMotionVisible ? '[&>td]:!border-b-0 pointer-events-none' : ''}`}
+                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${isOpen || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors ${isResolvedClinicCall && !isMotionVisible ? '[&>td]:!border-b-0 pointer-events-none' : ''} ${isOpen ? '[&>td]:!border-b-0' : ''}`}
                   aria-hidden={isResolvedClinicCall && !isMotionVisible}
                   onClick={(e) => {
                     const t = e.target as HTMLElement;
@@ -252,7 +289,7 @@ export default function ClinicTrackingTable({
                   {/* Status - Using HeroUI Dropdown */}
                   <td className="p-0" onClick={e => e.stopPropagation()}>
                     <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
-                      <Dropdown>
+                      <Dropdown motionProps={dropdownMotionProps}>
                         <DropdownTrigger>
                           <Button
                             size="sm"
@@ -307,7 +344,7 @@ export default function ClinicTrackingTable({
                   {/* Options Ellipsis */}
                   <td className="p-0">
                     <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
-                      <Dropdown placement="bottom-end" offset={6}>
+                      <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={6}>
                         <DropdownTrigger>
                           <button
                             className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
@@ -347,14 +384,14 @@ export default function ClinicTrackingTable({
                 })()}
 
                 {/* Expanded row for notes and log - NO ANIMATION */}
-                {openClinicCallId === call.id && (
+                {(openClinicCallId === call.id || closingClinicCallId === call.id) && (
                   <tr>
                     <td
                       colSpan={7}
-                      className={`p-2 border-b border-surface-liner ${getCallRowClass(call)}`}
+                      className={`p-2 pt-1.5 pb-3 border-b border-surface-liner align-top ${getCallRowClass(call)}`}
                       onClick={() => setOpenClinicCallId(null)}
                     >
-                      <div className="cursor-pointer">
+                      <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer min-h-[calc(100vh-20rem)]">
                         {call.priority && (
                           <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
                             ⚠️ PRIORITY CALL: Life threat to patient/provider
@@ -363,11 +400,12 @@ export default function ClinicTrackingTable({
                         
                         {/* Notes - Using HeroUI Textarea - NO LOG ENTRY */}
                         <div
-                          className="mt-1 mb-3 text-sm text-surface-light"
+                          className="mt-0 mb-1.5 text-sm text-surface-light"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="font-semibold mb-1">Notes</div>
-                          <Textarea
+                          <TrackingTextEntry
+                            mode="note"
                             value={notesTexts[call.id] ?? (call.notes || '')}
                             onChange={(e) => {
                               setNotesTexts(prev => ({ ...prev, [call.id]: e.target.value }));
@@ -390,13 +428,10 @@ export default function ClinicTrackingTable({
                               notesFocusedRef.current = call.id;
                             }}
                             minRows={2}
+                            maxRows={3}
                             variant="flat"
                             placeholder="Add notes"
                             className="min-w-0"
-                            classNames={{
-                              input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0",
-                              inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                            }}
                           />
                         </div>
 
@@ -404,7 +439,8 @@ export default function ClinicTrackingTable({
                         {/* Log - Using HeroUI ScrollShadow */}
                         <div onClick={(e) => e.stopPropagation()}>
                           <strong>Log for Call #{callDisplayNumberMap.get(call.id)}:</strong>
-                            <Textarea
+                            <TrackingTextEntry
+                              mode="log"
                               value={logTexts[call.id] ?? (() => {
                                 if (call.log && call.log.length > 0) {
                                   return call.log.map((entry: CallLogEntry) => entry.message).join('\n');
@@ -445,16 +481,13 @@ export default function ClinicTrackingTable({
                                 }
                               }}
                               minRows={4}
+                              maxRows={5}
                               variant="flat"
                               placeholder="No log entries"
                               className="min-w-0"
-                              classNames={{
-                                input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm",
-                                inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                              }}
                             />
                         </div>
-                      </div>
+                      </DispatchMotionCell>
                     </td>
                   </tr>
                 )}
