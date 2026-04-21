@@ -44,6 +44,8 @@ const dropdownMotionProps = {
   transition: { duration: 0.16, ease: 'easeOut' },
 } as const;
 
+const DETAILS_CLOSE_ANIMATION_MS = 320;
+
 const TableColGroup = () => (
   <colgroup>
     <col className="w-16" />
@@ -80,6 +82,7 @@ export default function ClinicTrackingTable({
   const [logTexts, setLogTexts] = React.useState<Record<string, string>>({});
   const logFocusedRef = React.useRef<string | null>(null);
   const [closingClinicCallId, setClosingClinicCallId] = React.useState<string | null>(null);
+  const [openMenuToken, setOpenMenuToken] = React.useState<string | null>(null);
   const previousOpenClinicCallIdRef = React.useRef<string | null>(null);
 
   const resolvedClinicCalls = (event?.calls || [])
@@ -88,6 +91,46 @@ export default function ClinicTrackingTable({
   const unresolvedClinicCalls = (event?.calls || [])
     .filter(c => c.status === 'Delivered' && !c.outcome)
     .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+
+  const isClinicCallVisible = React.useCallback(
+    (call: Call) => !(call.status === 'Delivered' && !!call.outcome) || showResolvedClinicCalls,
+    [showResolvedClinicCalls]
+  );
+
+  React.useEffect(() => {
+    if (!openMenuToken) return;
+
+    const [, tokenCallId] = openMenuToken.split(':');
+    const tokenCall = (event.calls || []).find((call: Call) => call.id === tokenCallId);
+    if (!tokenCall) {
+      setOpenMenuToken(null);
+      return;
+    }
+
+    const tokenCallIsResolved = tokenCall.status === 'Delivered' && !!tokenCall.outcome;
+    if (tokenCallIsResolved) {
+      setOpenMenuToken(null);
+    }
+  }, [openMenuToken, event.calls, showResolvedClinicCalls]);
+
+  React.useEffect(() => {
+    if (!openClinicCallId) return;
+
+    const openCall = (event.calls || []).find((call: Call) => call.id === openClinicCallId);
+    if (!openCall) {
+      setOpenClinicCallId(null);
+      setClosingClinicCallId(null);
+      setOpenMenuToken(null);
+      return;
+    }
+
+    const isOpenCallResolved = openCall.status === 'Delivered' && !!openCall.outcome;
+    if (isOpenCallResolved && !showResolvedClinicCalls) {
+      setOpenClinicCallId(null);
+      setClosingClinicCallId(null);
+      setOpenMenuToken(null);
+    }
+  }, [event.calls, openClinicCallId, setOpenClinicCallId, showResolvedClinicCalls]);
 
   // Sync notes from props when not focused
   React.useEffect(() => {
@@ -103,14 +146,14 @@ export default function ClinicTrackingTable({
     });
   }, [event?.calls]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const previousOpenClinicCallId = previousOpenClinicCallIdRef.current;
 
     if (previousOpenClinicCallId && previousOpenClinicCallId !== openClinicCallId) {
       setClosingClinicCallId(previousOpenClinicCallId);
       const timeout = window.setTimeout(() => {
         setClosingClinicCallId((current) => (current === previousOpenClinicCallId ? null : current));
-      }, 180);
+      }, DETAILS_CLOSE_ANIMATION_MS);
 
       previousOpenClinicCallIdRef.current = openClinicCallId;
       return () => window.clearTimeout(timeout);
@@ -120,7 +163,7 @@ export default function ClinicTrackingTable({
       const closingId = closingClinicCallId;
       const timeout = window.setTimeout(() => {
         setClosingClinicCallId((current) => (current === closingId ? null : current));
-      }, 180);
+      }, DETAILS_CLOSE_ANIMATION_MS);
 
       previousOpenClinicCallIdRef.current = openClinicCallId;
       return () => window.clearTimeout(timeout);
@@ -167,13 +210,16 @@ export default function ClinicTrackingTable({
                 {(() => {
                   const isResolvedClinicCall = call.status === 'Delivered' && !!call.outcome;
                   const resolvedIndex = isResolvedClinicCall ? resolvedClinicCalls.findIndex((resolvedCall) => resolvedCall.id === call.id) : -1;
-                  const isMotionVisible = !isResolvedClinicCall || showResolvedClinicCalls;
                   const motionDelayMs = isResolvedClinicCall && resolvedIndex >= 0 ? resolvedIndex * 30 : 0;
+                  const isStatusMenuOpen = openMenuToken === `status:${call.id}` && isClinicCallVisible(call);
+                  const isActionMenuOpen = openMenuToken === `action:${call.id}` && isClinicCallVisible(call);
                   const isOpen = openClinicCallId === call.id || closingClinicCallId === call.id;
+                  const rowRenderKey = `${call.id}:${isResolvedClinicCall ? 'resolved' : 'active'}:${isClinicCallVisible(call) ? 'visible' : 'hidden'}`;
                   return (
                 <tr
-                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${isOpen || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors ${isResolvedClinicCall && !isMotionVisible ? '[&>td]:!border-b-0 pointer-events-none' : ''} ${isOpen ? '[&>td]:!border-b-0' : ''}`}
-                  aria-hidden={isResolvedClinicCall && !isMotionVisible}
+                  key={rowRenderKey}
+                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${openClinicCallId === call.id || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors ${isResolvedClinicCall && !isClinicCallVisible(call) ? '[&>td]:!border-b-0 pointer-events-none' : ''} ${openClinicCallId === call.id ? '[&>td]:!border-b-0' : ''}`}
+                  aria-hidden={isResolvedClinicCall && !isClinicCallVisible(call)}
                   onClick={(e) => {
                     const t = e.target as HTMLElement;
                     if (t.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;
@@ -181,7 +227,7 @@ export default function ClinicTrackingTable({
                   }}
                 >
                   <td className="p-0">
-                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
+                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {callDisplayNumberMap.get(call.id)}
                     </DispatchMotionCell>
                   </td>
@@ -191,7 +237,7 @@ export default function ClinicTrackingTable({
                     className="p-0"
                     onClick={() => handleCellClick(call.id, 'chiefComplaint', call.chiefComplaint)}
                   >
-                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
+                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
                       {editingCell?.callId === call.id && editingCell.field === 'chiefComplaint' ? (
                         <input
                           type="text"
@@ -227,7 +273,7 @@ export default function ClinicTrackingTable({
                       setEditValue(formatAgeSex(call.age, call.gender));
                     }}
                   >
-                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
+                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {editingCell?.callId === call.id && editingCell.field === 'ageSex' ? (
                         <input
                           type="text"
@@ -261,7 +307,7 @@ export default function ClinicTrackingTable({
                     className="p-0"
                     onClick={() => handleCellClick(call.id, 'location', call.location)}
                   >
-                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
+                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
                       {editingCell?.callId === call.id && editingCell.field === 'location' ? (
                         <input
                           type="text"
@@ -288,8 +334,19 @@ export default function ClinicTrackingTable({
 
                   {/* Status - Using HeroUI Dropdown */}
                   <td className="p-0" onClick={e => e.stopPropagation()}>
-                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
-                      <Dropdown motionProps={dropdownMotionProps}>
+                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
+                      <Dropdown
+                        motionProps={dropdownMotionProps}
+                        isOpen={isStatusMenuOpen}
+                        onOpenChange={(isOpen) => {
+                          if (isOpen) {
+                            if (isResolvedClinicCall && !showResolvedClinicCalls) return;
+                            setOpenMenuToken(`status:${call.id}`);
+                            return;
+                          }
+                          setOpenMenuToken((current) => (current === `status:${call.id}` ? null : current));
+                        }}
+                      >
                         <DropdownTrigger>
                           <Button
                             size="sm"
@@ -302,6 +359,7 @@ export default function ClinicTrackingTable({
                         <DropdownMenu
                           aria-label="Clinic Status"
                           onAction={async (key) => {
+                            setOpenMenuToken(null);
                             const val = key as string;
                             const now = new Date();
                             const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
@@ -335,7 +393,7 @@ export default function ClinicTrackingTable({
 
                   {/* Team (inline edit) */}
                   <td className="p-0">
-                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
+                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {(call.assignedTeam && call.assignedTeam.length > 0)
                         ? (Array.isArray(call.assignedTeam) ? call.assignedTeam.join(', ') : call.assignedTeam)
                         : (call.detachedTeams?.map(d => d.team).join(', ') || 'Walkup')}
@@ -343,8 +401,21 @@ export default function ClinicTrackingTable({
                   </td>
                   {/* Options Ellipsis */}
                   <td className="p-0">
-                    <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
-                      <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={6}>
+                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
+                      <Dropdown
+                        motionProps={dropdownMotionProps}
+                        placement="bottom-end"
+                        offset={6}
+                        isOpen={isActionMenuOpen}
+                        onOpenChange={(isOpen) => {
+                          if (isOpen) {
+                            if (isResolvedClinicCall && !showResolvedClinicCalls) return;
+                            setOpenMenuToken(`action:${call.id}`);
+                            return;
+                          }
+                          setOpenMenuToken((current) => (current === `action:${call.id}` ? null : current));
+                        }}
+                      >
                         <DropdownTrigger>
                           <button
                             className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
@@ -358,7 +429,10 @@ export default function ClinicTrackingTable({
                         <DropdownMenu aria-label="Call actions">
                           <DropdownItem 
                             key="showLog"
-                            onPress={() => setOpenClinicCallId(openClinicCallId === call.id ? null : call.id)}
+                            onPress={() => {
+                              setOpenMenuToken(null);
+                              setOpenClinicCallId(openClinicCallId === call.id ? null : call.id);
+                            }}
                           >
                             {openClinicCallId === call.id ? 'Hide Log' : 'Show Log'}
                           </DropdownItem>
@@ -367,6 +441,7 @@ export default function ClinicTrackingTable({
                             className="text-danger"
                             color="danger"
                             onPress={async () => {
+                              setOpenMenuToken(null);
                               if (confirm('Are you sure you want to delete this call? This action cannot be undone.')) {
                                 const updatedCalls = event.calls.filter((c: Call) => c.id !== call.id);
                                 await updateEvent({ calls: updatedCalls });
@@ -384,110 +459,118 @@ export default function ClinicTrackingTable({
                 })()}
 
                 {/* Expanded row for notes and log - NO ANIMATION */}
-                {(openClinicCallId === call.id || closingClinicCallId === call.id) && (
+                {(isClinicCallVisible(call) && (openClinicCallId === call.id || closingClinicCallId === call.id)) && (
                   <tr>
                     <td
                       colSpan={7}
-                      className={`p-2 pt-1.5 pb-3 border-b border-surface-liner align-top ${getCallRowClass(call)}`}
+                      className={`p-0 align-top !border-b-0 ${getCallRowClass(call)}`}
                       onClick={() => setOpenClinicCallId(null)}
                     >
-                      <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer min-h-[calc(100vh-20rem)]">
-                        {call.priority && (
-                          <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
-                            ⚠️ PRIORITY CALL: Life threat to patient/provider
-                          </div>
-                        )}
-                        
-                        {/* Notes - Using HeroUI Textarea - NO LOG ENTRY */}
-                        <div
-                          className="mt-0 mb-1.5 text-sm text-surface-light"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="font-semibold mb-1">Notes</div>
-                          <TrackingTextEntry
-                            mode="note"
-                            value={notesTexts[call.id] ?? (call.notes || '')}
-                            onChange={(e) => {
-                              setNotesTexts(prev => ({ ...prev, [call.id]: e.target.value }));
-                            }}
-                            onBlur={async () => {
-                              notesFocusedRef.current = null;
-                              const text = notesTexts[call.id] ?? '';
-                              const callNow = event?.calls.find((c: Call) => c.id === call.id);
-                              if (!callNow) return;
-                              
-                              if ((callNow.notes || '') !== text) {
-                                const updatedCall = { ...callNow, notes: text };
-                                const updated = event!.calls.map((c: Call) => 
-                                  c.id === call.id ? updatedCall : c
-                                );
-                                await updateEvent({ calls: updated });
-                              }
-                            }}
-                            onFocus={() => {
-                              notesFocusedRef.current = call.id;
-                            }}
-                            minRows={2}
-                            maxRows={3}
-                            variant="flat"
-                            placeholder="Add notes"
-                            className="min-w-0"
-                          />
-                        </div>
-
-                        
-                        {/* Log - Using HeroUI ScrollShadow */}
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <strong>Log for Call #{callDisplayNumberMap.get(call.id)}:</strong>
+                      <div
+                        className={`px-2 overflow-hidden transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                          openClinicCallId === call.id
+                            ? 'pt-1.5 pb-3'
+                            : 'pt-0 pb-0'
+                        }`}
+                      >
+                        <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer">
+                          {call.priority && (
+                            <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
+                              ⚠️ PRIORITY CALL: Life threat to patient/provider
+                            </div>
+                          )}
+                          
+                          {/* Notes - Using HeroUI Textarea - NO LOG ENTRY */}
+                          <div
+                            className="mt-0 mb-1.5 text-sm text-surface-light"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="font-semibold mb-1">Notes</div>
                             <TrackingTextEntry
-                              mode="log"
-                              value={logTexts[call.id] ?? (() => {
-                                if (call.log && call.log.length > 0) {
-                                  return call.log.map((entry: CallLogEntry) => entry.message).join('\n');
-                                }
-                                return '';
-                              })()}
+                              mode="note"
+                              value={notesTexts[call.id] ?? (call.notes || '')}
                               onChange={(e) => {
-                                setLogTexts(prev => ({ ...prev, [call.id]: e.target.value }));
+                                setNotesTexts(prev => ({ ...prev, [call.id]: e.target.value }));
                               }}
                               onBlur={async () => {
-                                logFocusedRef.current = null;
-                                const text = logTexts[call.id] ?? '';
+                                notesFocusedRef.current = null;
+                                const text = notesTexts[call.id] ?? '';
                                 const callNow = event?.calls.find((c: Call) => c.id === call.id);
                                 if (!callNow) return;
                                 
-                                // Convert text back to log entries
-                                const lines = text.split('\n').filter(line => line.trim());
-                                const newLog: CallLogEntry[] = lines.map(line => ({
-                                  timestamp: Date.now(),
-                                  message: line
-                                }));
-                                
-                                const updatedCall = { ...callNow, log: newLog };
-                                const updated = event!.calls.map((c: Call) => 
-                                  c.id === call.id ? updatedCall : c
-                                );
-                                await updateEvent({ calls: updated });
-                              }}
-                              onFocus={() => {
-                                logFocusedRef.current = call.id;
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                  e.preventDefault();
-                                  const now = new Date();
-                                  const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                                  setLogTexts(prev => ({ ...prev, [call.id]: (prev[call.id] || '') + `\n${hhmm} - ` }));
+                                if ((callNow.notes || '') !== text) {
+                                  const updatedCall = { ...callNow, notes: text };
+                                  const updated = event!.calls.map((c: Call) => 
+                                    c.id === call.id ? updatedCall : c
+                                  );
+                                  await updateEvent({ calls: updated });
                                 }
                               }}
-                              minRows={4}
-                              maxRows={5}
+                              onFocus={() => {
+                                notesFocusedRef.current = call.id;
+                              }}
+                              minRows={2}
+                              maxRows={3}
                               variant="flat"
-                              placeholder="No log entries"
+                              placeholder="Add notes"
                               className="min-w-0"
                             />
-                        </div>
-                      </DispatchMotionCell>
+                          </div>
+
+                          
+                          {/* Log - Using HeroUI ScrollShadow */}
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <strong>Log for Call #{callDisplayNumberMap.get(call.id)}:</strong>
+                              <TrackingTextEntry
+                                mode="log"
+                                value={logTexts[call.id] ?? (() => {
+                                  if (call.log && call.log.length > 0) {
+                                    return call.log.map((entry: CallLogEntry) => entry.message).join('\n');
+                                  }
+                                  return '';
+                                })()}
+                                onChange={(e) => {
+                                  setLogTexts(prev => ({ ...prev, [call.id]: e.target.value }));
+                                }}
+                                onBlur={async () => {
+                                  logFocusedRef.current = null;
+                                  const text = logTexts[call.id] ?? '';
+                                  const callNow = event?.calls.find((c: Call) => c.id === call.id);
+                                  if (!callNow) return;
+                                  
+                                  // Convert text back to log entries
+                                  const lines = text.split('\n').filter(line => line.trim());
+                                  const newLog: CallLogEntry[] = lines.map(line => ({
+                                    timestamp: Date.now(),
+                                    message: line
+                                  }));
+                                  
+                                  const updatedCall = { ...callNow, log: newLog };
+                                  const updated = event!.calls.map((c: Call) => 
+                                    c.id === call.id ? updatedCall : c
+                                  );
+                                  await updateEvent({ calls: updated });
+                                }}
+                                onFocus={() => {
+                                  logFocusedRef.current = call.id;
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    const now = new Date();
+                                    const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+                                    setLogTexts(prev => ({ ...prev, [call.id]: (prev[call.id] || '') + `\n${hhmm} - ` }));
+                                  }
+                                }}
+                                minRows={4}
+                                maxRows={5}
+                                variant="flat"
+                                placeholder="No log entries"
+                                className="min-w-0"
+                              />
+                          </div>
+                        </DispatchMotionCell>
+                      </div>
                     </td>
                   </tr>
                 )}
