@@ -2748,10 +2748,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const totalPatientsCount = (event.calls || []).filter(call => call.status === 'Delivered').length;
 
   const COLW = {
-    CALLNO: '5rem',   // Call #
-    CC:     '10rem',  // Chief Complaint
+    CALLNO: '4rem',   // Call #
+    CC:     '11rem',  // Chief Complaint
     AS:     '4rem',   // A/S
-    LOC:    '10rem',  // Location
+    LOC:    '11rem',  // Location
     ACTION: '3rem',   // Row actions
   };
 
@@ -3220,11 +3220,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <ResizablePanel defaultSize={75} minSize={50}>
                 <div className="h-full overflow-auto scrollbar-hide pt-2 pb-2">
                   <div className="w-full">
-                    <div className="relative z-30 pl-8 pr-2 pb-0 flex items-end gap-1 h-10">
+                    <div className="relative z-30 mx-1.5 pb-0 flex items-end gap-1 h-10">
                       <button
                         type="button"
                         onClick={() => setSelectedRightTab('calls')}
-                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? 'tab-active bg-surface-deep text-surface-lightest' : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? 'tab-active bg-surface-deep text-surface-lightest after:content-["\"] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep' : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
                         aria-pressed={selectedRightTab === 'calls'}
                       >
                         Calls ({activeCallsCount})
@@ -3233,7 +3233,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       <button
                         type="button"
                         onClick={() => setSelectedRightTab('clinic')}
-                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'clinic' ? 'tab-active bg-surface-deep text-surface-lightest' : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'clinic' ? 'tab-active bg-surface-deep text-surface-lightest after:content-["\"] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep' : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
                         aria-pressed={selectedRightTab === 'clinic'}
                       >
                         Clinic ({activeClinicCount})
@@ -3241,7 +3241,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     </div>
 
                     {selectedRightTab === 'calls' && (
-                      <div className="relative z-10 -mt-px mx-2 rounded-2xl bg-surface-deep p-3 pt-2 space-y-2">
+                      <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
                           <h3 className="text-md font-semibold text-surface-light">Total Calls: {totalCallsCount}</h3>
                           <Tooltip content="Add Call (Ctrl+Enter)" placement="top">
@@ -3289,7 +3289,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     )}
 
                     {selectedRightTab === 'clinic' && (
-                      <div className="relative z-10 -mt-px mx-2 rounded-2xl bg-surface-deep p-3 pt-2 space-y-2">
+                      <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
                           <h3 className="text-md font-semibold text-surface-light">Total Patients: {totalPatientsCount}</h3>
                           <Tooltip content="Add Patient" placement="top">
