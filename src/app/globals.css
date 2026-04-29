@@ -6,21 +6,19 @@
 #nprogress {
   pointer-events: none;
 }
-
-#nprogress .bar {
-  width: 100px;
-  height: 100%;
-  border: solid 4px transparent;
-  background: hsl(var(--surface-bg-1));
-}
-
-@keyframes nprogress-spinner {
-}
+/* note: canonical nprogress styles appear later in this file; the early duplicate was removed */
 
 :root {
-    --surface-bg-1: 220 22% 95%;
-    --surface-bg-2: 220 18% 87%;
-    --surface-bg-3: 220 16% 83%;
+  --surface-bg-0: 0 0% 100%;
+  --surface-bg-1: 220 22% 95%;
+  --surface-bg-2: 220 18% 87%;
+  --surface-bg-3: 220 16% 83%;
+
+  /* Surface text & border variables used by Tailwind surface.* tokens (light theme) */
+  --surface-text: 240 10% 3.9%;
+  --surface-text-strong: 240 6% 2.5%;
+  --surface-text-muted: 240 3.8% 46.1%;
+  --surface-border: 240 5.9% 90%;
 
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;

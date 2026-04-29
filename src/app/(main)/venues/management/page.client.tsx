@@ -649,7 +649,7 @@ export default function VenueManagementPageClient() {
   };
 
   return (
-    <main className="relative bg-surface-deepest text-surface-light h-[calc(10-0vh-3rem)]">
+    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)]">
       <DiagonalStreaksFixed />
       
       <div className="relative z-10 pt-4 max-w-[1200px] mx-auto">

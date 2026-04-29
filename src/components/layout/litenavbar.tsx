@@ -23,7 +23,6 @@ import {
   NavbarMenu,
   NavbarMenuItem,
   NavbarMenuToggle,
-  Chip,
 } from '@heroui/react';
 import { LogOut, Menu, Moon, Sun, UserRound } from 'lucide-react';
 

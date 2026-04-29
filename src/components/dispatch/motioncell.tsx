@@ -17,16 +17,23 @@ export default function DispatchMotionCell({
   className = '',
   children,
 }: DispatchMotionCellProps) {
-  if (!animate) {
-    return <div className={className}>{children}</div>;
-  }
-
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
+    // If animation is disabled, reset mounted and skip the RAF.
+    if (!animate) {
+      setMounted(false);
+      return;
+    }
+
     const frame = window.requestAnimationFrame(() => setMounted(true));
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [animate]);
+
+  // Preserve the old "no animation" behavior when `animate` is false.
+  if (!animate) {
+    return <div className={className}>{children}</div>;
+  }
 
   const open = mounted && isOpen;
 

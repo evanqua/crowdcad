@@ -3067,7 +3067,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       className="w-auto min-w-[180px]"
                       classNames={{
                         trigger: "bg-surface-deep border border-surface-liner rounded-full hover:bg-surface-liner h-10 min-h-10",
-                        value: "text-surface-lightest",
+                        value: "text-surface-light",
                         popoverContent: "bg-surface-deep border-surface-liner",
                       }}
                     >
@@ -3224,7 +3224,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       <button
                         type="button"
                         onClick={() => setSelectedRightTab('calls')}
-                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? 'tab-active bg-surface-deep text-surface-lightest after:content-["\"] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep' : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
                         aria-pressed={selectedRightTab === 'calls'}
                       >
                         Calls ({activeCallsCount})
@@ -3233,7 +3233,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       <button
                         type="button"
                         onClick={() => setSelectedRightTab('clinic')}
-                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'clinic' ? 'tab-active bg-surface-deep text-surface-lightest after:content-["\"] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep' : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'clinic' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
                         aria-pressed={selectedRightTab === 'clinic'}
                       >
                         Clinic ({activeClinicCount})
@@ -3345,7 +3345,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 tabList: "fixed bottom-0 left-0 right-0 w-full bg-surface-deep border-t border-surface-light/10 z-50",
                 cursor: "bg-blue-600",
                 tab: "h-10",
-                tabContent: "text-lg text-surface-light group-data-[selected=true]:text-surface-lightest"
+                tabContent: "text-lg text-surface-light group-data-[selected=true]:text-surface-light"
               }}
             >
               {/* TEAMS TAB */}

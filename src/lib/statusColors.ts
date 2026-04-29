@@ -27,7 +27,7 @@ export const STATUS_COLORS: Record<string, DispatchStatusColor> = {
   'Delivered Eq': {
     borderClass: 'border-status-card-yellow',
     fillClass: 'bg-status-card-yellow/20',
-    textClass: 'text-status-yellow',
+    textClass: 'text-status-orange',
     chipClass: 'border border-status-card-yellow bg-status-card-yellow/20',
     rowClass: '',
   },
@@ -54,14 +54,14 @@ export const STATUS_COLORS: Record<string, DispatchStatusColor> = {
   'En Route Eq': {
     borderClass: 'border-status-card-yellow',
     fillClass: 'bg-status-card-yellow/20',
-    textClass: 'text-status-yellow',
+    textClass: 'text-status-orange',
     chipClass: 'border border-status-card-yellow bg-status-card-yellow/20',
     rowClass: '',
   },
   Assisting: {
     borderClass: 'border-status-card-yellow',
     fillClass: 'bg-status-card-yellow/20',
-    textClass: 'text-status-yellow',
+    textClass: 'text-status-orange',
     chipClass: 'border border-status-card-yellow bg-status-card-yellow/20',
     rowClass: '',
   },
