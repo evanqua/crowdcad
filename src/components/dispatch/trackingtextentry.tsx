@@ -31,7 +31,7 @@ export default function TrackingTextEntry({
           classNames?.input
         ),
         inputWrapper: cn(
-          'bg-surface-deep shadow-none border border-surface-liner !pr-1 group-data-[hover=true]:bg-surface-deep group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[pressed=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0',
+          'bg-surface-deep shadow-none border border-surface-liner !py-1 !pr-1 group-data-[hover=true]:bg-surface-deep group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[pressed=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0',
           classNames?.inputWrapper
         ),
       }}
