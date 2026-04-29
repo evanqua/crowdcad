@@ -5,10 +5,11 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   Card, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
+  Select, SelectItem, Autocomplete, AutocompleteItem
 } from '@heroui/react';
-import { MoreVertical } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, MoreVertical } from 'lucide-react';
 import type { Event, EquipmentItem } from '@/app/types';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 
 type EquipmentCardProps = {
   equipment: EquipmentItem;
@@ -20,10 +21,23 @@ type EquipmentCardProps = {
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
 
-function equipmentBg(status: string) {
-  if (status === 'In Clinic') return 'bg-status-blue/20';
-  if (status.startsWith('Call ') || status === 'In Use') return 'bg-[#2d2123]';
-  return 'bg-surface-deep';
+function equipmentStatusTone(status: string) {
+  if (status === 'In Clinic') {
+    return {
+      borderClass: 'border-status-card-blue',
+      fillClass: 'bg-status-card-blue/20'
+    };
+  }
+  if (status.startsWith('Call ') || status === 'In Use') {
+    return {
+      borderClass: 'border-status-card-red',
+      fillClass: 'bg-status-card-red/20'
+    };
+  }
+  return {
+    borderClass: 'border-surface-liner',
+    fillClass: 'bg-surface-liner/30'
+  };
 }
 
 export default function EquipmentCard({
@@ -70,11 +84,11 @@ export default function EquipmentCard({
     return 'Available';
   })();
 
-  const bg = equipmentBg(equipment.status);
+  const statusTone = equipmentStatusTone(equipment.status);
 
   return (
     <Card
-      className={`rounded-2xl shadow-sm border-0 ${bg}`}
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
     >
       <div
         onClick={() => setExpanded(v => !v)}
@@ -85,6 +99,10 @@ export default function EquipmentCard({
         </div>
 
         <div className="absolute top-3 right-3 flex items-center gap-2">
+          <div className="text-surface-light/70">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+
           <div
             onClick={e => e.stopPropagation()}
             onKeyDown={e => e.stopPropagation()}
@@ -120,13 +138,11 @@ export default function EquipmentCard({
       {/* BODY*/}
       <div className="px-4 pb-3 pt-0">
           {/* Controls row */}
-          <div className="grid grid-cols-5 gap-1">
+          <div className="flex items-center gap-3">
             {/* Status */}
-            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="col-span-2">
+            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1]">
               <Select
                 aria-label="Status"
-                label="Status"
-                labelPlacement="inside"
                 selectedKeys={new Set([(isMobile ? derivedSelectStatus : derivedSelectStatus).trim()])}
                 onSelectionChange={(keys) => {
                   const raw = Array.from(keys as Set<string>)[0] || '';
@@ -135,7 +151,7 @@ export default function EquipmentCard({
                 }}
                 classNames={{
                   base: 'min-w-0',
-                  trigger: 'bg-surface-deep text-surface-light border border-surface-liner'
+                  trigger: `${statusTone.fillClass} text-surface-light border ${statusTone.borderClass} rounded-full transition-colors`
                 }}
               >
                 {statusOptions.map((s) => (
@@ -145,11 +161,14 @@ export default function EquipmentCard({
             </div>
 
             {/* Location */}
-            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="col-span-3">
+            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1.5]">
               <Autocomplete
                 aria-label="Location"
-                label="Location"
-                labelPlacement="inside"
+                startContent={(
+                  <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                    <MapPin className="h-[18px] w-[18px] shrink-0 text-surface-faint" />
+                  </span>
+                )}
                 inputValue={locationInput}
                 onInputChange={(val) => {
                   setLocationInput(val);
@@ -182,8 +201,8 @@ export default function EquipmentCard({
                 }}
                 inputProps={{
                   classNames: {
-                    inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
-                    input: 'bg-surface-deep data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
+                    inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner rounded-full pl-3 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
+                    input: 'bg-surface-deep pl-1 data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
                   }
                 }}
               >
@@ -198,8 +217,13 @@ export default function EquipmentCard({
           </div>
 
           {/* Expanded section */}
-          {expanded && (
-            <div className="mt-3" onClick={e => e.stopPropagation()}>
+          <div className={`dispatch-expand-grid ${expanded ? 'dispatch-expand-grid--open' : ''}`}>
+            <div className="dispatch-expand-inner">
+              <div
+                className={`mt-3 dispatch-expand-fade ${expanded ? 'dispatch-expand-fade--open pointer-events-auto' : 'pointer-events-none'}`}
+                onClick={e => e.stopPropagation()}
+                aria-hidden={!expanded}
+              >
               <div className="text-sm font-semibold text-surface-light mb-2">Equipment Details</div>
               <div className="text-sm text-surface-light mb-2 space-y-1">
                 <div>Staging Location: {equipment.stagingLocation || 'Not Set'}</div>
@@ -207,7 +231,8 @@ export default function EquipmentCard({
                 {equipment.deliveryTeam && <div>Delivery Team: {equipment.deliveryTeam}</div>}
               </div>
               <div className="text-sm font-semibold text-surface-light mb-1">Notes</div>
-              <Textarea
+              <TrackingTextEntry
+                mode="note"
                 value={notesText}
                 onChange={(e) => {
                   setNotesText(e.target.value);
@@ -225,16 +250,14 @@ export default function EquipmentCard({
                   notesFocusedRef.current = true;
                 }}
                 minRows={2}
+                maxRows={3}
                 variant="flat"
                 placeholder="Add notes about this equipment"
                 className="min-w-0"
-                classNames={{
-                  input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm",
-                  inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                }}
               />
+              </div>
             </div>
-          )}
+          </div>
         </div>
     </Card>
   );

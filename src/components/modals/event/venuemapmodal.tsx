@@ -102,7 +102,7 @@ function PostMarker({ post, rect }: PostMarkerProps) {
             pointerEvents: 'none',
           }}
         >
-          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
+          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
             {post.name}
           </div>
         </div>,
@@ -257,7 +257,7 @@ function EquipmentMarker({
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
         }}
       >
-        <EquipmentIcon type={iconType} className="h-4 w-4 text-white" />
+        <EquipmentIcon type={iconType} className="h-4 w-4 text-surface-light" />
       </div>
       {/* Hover tooltip with fixed positioning using portal */}
       {hovered && typeof window !== 'undefined' && createPortal(
@@ -270,7 +270,7 @@ function EquipmentMarker({
             pointerEvents: 'none',
           }}
         >
-          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
+          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
             <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}>
               {equipment.name}
             </div>
@@ -384,7 +384,7 @@ function TeamMarker({
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
         }}
       >
-        <ShieldPlus className="h-6 w-6 text-white" strokeWidth={2.5} />
+        <ShieldPlus className="h-6 w-6 text-surface-light" strokeWidth={2.5} />
       </div>
       {/* Hover card with fixed positioning using portal */}
       {hovered && typeof window !== 'undefined' && createPortal(
@@ -397,7 +397,7 @@ function TeamMarker({
             pointerEvents: 'none',
           }}
         >
-          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
+          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
             <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}>
               {team.team}
             </div>
@@ -872,7 +872,7 @@ export default function VenueMapModal({
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-white font-medium">
+                  <span className="text-sm text-surface-light font-medium">
                     {mapFileName || 'No map'}
                   </span>
                 </div>
@@ -883,11 +883,11 @@ export default function VenueMapModal({
                       variant="flat"
                       onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
                       isDisabled={currentLayer === 0}
-                      className="text-white"
+                      className="text-surface-light"
                     >
                       Previous
                     </Button>
-                    <span className="text-sm text-white">
+                    <span className="text-sm text-surface-light">
                       {layers[currentLayer]?.name || `Layer ${currentLayer + 1}`}
                     </span>
                     <Button
@@ -895,7 +895,7 @@ export default function VenueMapModal({
                       variant="flat"
                       onPress={() => setCurrentLayer(prev => Math.min(layers.length - 1, prev + 1))}
                       isDisabled={currentLayer === layers.length - 1}
-                      className="text-white"
+                      className="text-surface-light"
                     >
                       Next
                     </Button>

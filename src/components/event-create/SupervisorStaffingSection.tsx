@@ -21,7 +21,7 @@ export default function SupervisorStaffingSection({
   return (
     <>
       <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
-        <h3 className="text-white font-semibold text-lg">Supervisors</h3>
+        <h3 className="text-surface-light font-semibold text-lg">Supervisors</h3>
         <Button
           isIconOnly
           size="sm"
@@ -29,7 +29,7 @@ export default function SupervisorStaffingSection({
           className="min-w-8 w-8 h-8"
           style={{ backgroundColor: '#27272a' }}
         >
-          <Plus className="h-4 w-4 text-white" />
+          <Plus className="h-4 w-4 text-surface-light" />
         </Button>
       </div>
 
@@ -41,7 +41,7 @@ export default function SupervisorStaffingSection({
                 className="flex items-center justify-between cursor-pointer"
                 onClick={() => setOpenSupervisors((prev) => ({ ...prev, [idx]: !prev[idx] }))}
               >
-                <span className="text-white font-medium">{supervisor.team}</span>
+                <span className="text-surface-light font-medium">{supervisor.team}</span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -52,7 +52,7 @@ export default function SupervisorStaffingSection({
                     className="p-1 rounded bg-transparent"
                     aria-label="Delete supervisor"
                   >
-                    <Trash2 className="h-4 w-4 text-white" />
+                    <Trash2 className="h-4 w-4 text-surface-light" />
                   </button>
                 </div>
               </div>

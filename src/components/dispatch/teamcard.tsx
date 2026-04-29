@@ -4,10 +4,13 @@
 import React, {useEffect, useMemo, useState, useRef} from 'react';
 import {
   Card, CardHeader, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
+  Select, SelectItem, Autocomplete, AutocompleteItem
 } from '@heroui/react';
-import {MoreVertical} from 'lucide-react';
+import {ChevronDown, ChevronUp, MapPin, MoreVertical} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
+import DispatchMotionCell from './motioncell';
 
 type TeamCardProps = {
   staff: Staff;
@@ -35,43 +38,14 @@ function useMMSS(since?: number) {
   return `${mm}:${ss}`;
 }
 
-function getLeadNameCert(staff: Staff) {
-  const isSupervisor =
-    Array.isArray(staff.members) &&
-    staff.members.length === 1 &&
-    typeof staff.members[0] === 'string' &&
-    !staff.members[0].includes('(Lead)');
-
-  if (isSupervisor) {
-    const m = staff.members?.[0] ?? '';
-    const rx = m.match(/^(.+?)\s\[(.+?)\]/);
-    return { name: rx?.[1] ?? m, cert: rx?.[2] ?? '' };
-  }
-  const lead = (staff.members || []).find(m => typeof m === 'string' && m.includes('(Lead)')) || '';
-  const rx = lead.match(/^(.+?)\s\[(.+?)\]/);
-  return { name: rx?.[1] ?? 'No Lead', cert: rx?.[2] ?? '' };
-}
-
-function teamBg(status: string, event: Event, team: string) {
-  // Check if team is assisting with equipment (orange)
-  const onEqRun =
-    !!event.calls?.some(c =>
-      c.equipmentTeams?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
-    ) || ['En Route Eq', 'Assisting'].includes(status);
-  
-  if (onEqRun) return 'bg-status-orange/15';
-  
-  // Check if team is on active patient care call (red)
-  const activeCare =
-    !!event.calls?.some(c =>
-      c.assignedTeam?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
-    );
-  
-  if (activeCare) return 'bg-[#2d2123]';
-  
-  if (['On Break','In Clinic'].includes(status)) return 'bg-status-blue/20';
-  
-  return 'bg-surface-deep';
+function formatMemberLine(member: string) {
+  const isLead = member.includes('(Lead)');
+  const withoutLead = member.replace(/\s*\(Lead\)\s*/g, '').trim();
+  const certMatches = [...withoutLead.matchAll(/\[(.+?)\]/g)].map(match => match[1]).filter(Boolean);
+  const name = withoutLead.replace(/\s*\[.+?\]/g, '').trim();
+  const certText = certMatches.map(cert => `[${cert}]`).join(' ');
+  const leadText = isLead ? ' [Lead]' : '';
+  return `${name}${certText ? ` ${certText}` : ''}${leadText}`.trim();
 }
 
 export default function TeamCard({
@@ -107,7 +81,12 @@ export default function TeamCard({
   useEffect(() => {
     setLocationInput(staff.location || '');
   }, [staff.location]);
-  const {name, cert} = useMemo(() => getLeadNameCert(staff), [staff]);
+  const memberLines = useMemo(() => {
+    const members = Array.isArray(staff.members) ? staff.members : [];
+    return members
+      .filter((member): member is string => typeof member === 'string' && member.trim().length > 0)
+      .map(formatMemberLine);
+  }, [staff.members]);
   const timer = useMMSS(sinceMs);
 
   // Status options
@@ -131,12 +110,12 @@ export default function TeamCard({
     return Array.from(new Set([...base, ...posts]));
   }, [event.venue?.posts]);
 
-  const bg = teamBg(staff.status, event, staff.team);
+  const statusTone = getStatusColor(deriveTeamVisualStatus(staff.status, event, staff.team));
 
   return (
     <Card
-      // No outside border; unified bg for header + body
-      className={`rounded-2xl shadow-sm border-0 ${bg}`}
+      // Closed cards are transparent/sharp; open cards retain active dark shell.
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
     >
       {/* HEADER (click to toggle). Not a <button>, so no nested <button> issues */}
       <CardHeader
@@ -147,13 +126,14 @@ export default function TeamCard({
           <div className="text-[15px] sm:text-base font-semibold text-surface-light truncate">
             {staff.team}
           </div>
-          <div className="text-xs text-surface-faint truncate">
-            {name} {cert ? `[${cert}]` : ''}
-          </div>
         </div>
 
         {/* Right section: Timer and Menu aligned horizontally at top */}
         <div className="absolute top-3 right-3 flex items-center gap-2">
+          <div className="text-surface-light/70">
+            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+
           {/* Timer */}
           <div className="text-[15px] sm:text-base font-semibold text-surface-light tabular-nums">
             {timer}
@@ -195,13 +175,11 @@ export default function TeamCard({
       {/* BODY (collapsed/expanded). Same bg, no extra borders, no extra gap */}
       <CardBody className="px-4 pb-3 pt-0">
         {/* Controls row */}
-        <div className="grid grid-cols-5 gap-3">
+        <div className="flex items-center gap-3">
           {/* Status */}
-          <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="col-span-2">
+          <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1]">
             <Select
               aria-label="Status"
-              label="Status"
-              labelPlacement="inside"
               selectedKeys={new Set([staff.status ?? ''])}
               onSelectionChange={(keys) => {
                 const val = Array.from(keys as Set<string>)[0] || '';
@@ -223,7 +201,7 @@ export default function TeamCard({
               }}
               classNames={{
                 base: 'min-w-0',
-                trigger: 'bg-surface-deep text-surface-light border border-surface-liner'
+                trigger: `${statusTone.fillClass} text-surface-light border ${statusTone.borderClass} rounded-full transition-colors`
               }}
             >
               {statusOptions.map((s) => (
@@ -232,11 +210,14 @@ export default function TeamCard({
             </Select>
           </div>
           {/* Location */}
-          <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="col-span-3">
+          <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1.5]">
             <Autocomplete
               aria-label="Location"
-              label="Location"
-              labelPlacement="inside"
+              startContent={(
+                <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                  <MapPin className="h-[18px] w-[18px] shrink-0 text-surface-faint" />
+                </span>
+              )}
               inputValue={locationInput}
               onInputChange={(val) => {
                 // Update local state as user types - makes it editable
@@ -274,8 +255,8 @@ export default function TeamCard({
               }}
               inputProps={{
                 classNames: {
-                  inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
-                  input: 'bg-surface-deep data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
+                  inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner rounded-full pl-3 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
+                  input: 'bg-surface-deep pl-1 pe-0 !pe-0 w-full min-w-0 data-[has-end-content=true]:pe-0 group-data-[has-end-content=true]:pe-0 data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
                 }
               }}
             >
@@ -286,11 +267,27 @@ export default function TeamCard({
           </div>
         </div>
 
-        {/* Expanded section — same bg, no border, no extra spacing from header */}
-        {expanded && (
-          <div className="mt-3" onClick={e => e.stopPropagation()}>
-            <div className="text-sm font-semibold text-surface-light mb-2">Activity Log</div>
-            <Textarea
+        {/* Expanded section — animated in normal flow */}
+        <DispatchMotionCell isOpen={expanded} animate={true} className="mt-3" >
+          <div
+            onClick={e => e.stopPropagation()}
+            aria-hidden={!expanded}
+          >
+            <div className="text-xs font-bold text-surface-light mb-1">Team</div>
+            <div className="space-y-1 mb-3">
+              {memberLines.map((line, index) => (
+                <div key={`${staff.team}-member-${index}`} className="text-xs text-surface-faint truncate">
+                  {line}
+                </div>
+              ))}
+              {memberLines.length === 0 && (
+                <div className="text-xs text-surface-faint italic">No members</div>
+              )}
+            </div>
+
+            <div className="text-xs font-bold text-surface-light mb-1">Activity Log</div>
+            <TrackingTextEntry
+              mode="log"
               value={logText}
               onChange={(e) => {
                 setLogText(e.target.value);
@@ -322,16 +319,13 @@ export default function TeamCard({
                 }
               }}
               minRows={4}
+              maxRows={5}
               variant="flat"
               placeholder="No log entries"
               className="min-w-0"
-              classNames={{
-                input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm",
-                inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-              }}
             />
           </div>
-        )}
+        </DispatchMotionCell>
       </CardBody>
     </Card>
   );

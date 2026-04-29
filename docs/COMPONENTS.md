@@ -20,6 +20,9 @@ Directory highlights
 
 - `src/components/dispatch/` — feature-specific UI used on the dispatch dashboard:
   - `teamcard.tsx`, `calltrackingcard.tsx`, `clinictrackingcard.tsx` — cards and tracking widgets.
+  - `trackingtablebase.tsx` — shared table scaffold used by both call and clinic tracking.
+  - `trackingtextentry.tsx` — shared inline text field for dispatch and team-card updates.
+  - `motioncell.tsx` — reusable animated cell wrapper used for row transitions.
 
 - `src/components/event-create/` — event creation sections used by the event create page:
   - metadata, staffing, posting schedule, and posts/equipment are split into focused components rather than a single page-local block.
@@ -42,6 +45,7 @@ Styling and design tokens
 - TailwindCSS powers styling. Use the `cn()` helper in `src/lib/utils.ts` for conditional class merging.
 - Use `tailwind-merge` (`tailwind-merge` is already a dependency) for combining utility classes safely.
 - Follow existing token and utility patterns when adding new classes to preserve visual consistency.
+- Dispatch status colors should come from `src/lib/statusColors.ts` so team cards and tracking rows remain visually consistent.
 - Keep feature sections small and typed explicitly; prefer local prop types for section components and avoid passing untyped page state through multiple layers.
 
 Third-party UI libraries
@@ -83,12 +87,14 @@ Tips
 - Keep components small and focused — prefer composition over large monolithic components.
 - Reuse primitives from `src/components/ui` rather than adding duplicated styles.
 - Reuse shared map controls and viewport wrappers from `src/components/ui` before creating page-specific zoom/pan implementations.
+- Reuse shared dispatch primitives (`trackingtablebase.tsx`, `trackingtextentry.tsx`, `motioncell.tsx`) before adding table/entry logic directly inside call or clinic cards.
 - When creating new modals, follow the `*modal.tsx` naming convention so they are easy to locate.
 
 Where to find examples
 
 - Modal example: `src/components/modals/event/venuemapmodal.tsx`
-- Dispatch card examples: `src/components/dispatch/teamcard.tsx`, `calltrackingcard.tsx`
+- Dispatch card examples: `src/components/dispatch/teamcard.tsx`, `src/components/dispatch/calltrackingcard.tsx`, `src/components/dispatch/clinictrackingcard.tsx`
+- Shared dispatch primitive examples: `src/components/dispatch/trackingtablebase.tsx`, `src/components/dispatch/trackingtextentry.tsx`
 - UI primitives: `src/components/ui/button.tsx`, `input.tsx`
 
 If you need a component added to a shared export index, open a small PR and reference this doc.

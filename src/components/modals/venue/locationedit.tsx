@@ -132,7 +132,7 @@ export default function LocationEditModal({
               </Button>
               <Button
                 onPress={handleSubmit}
-                className="flex-1 bg-accent hover:bg-accent/90 text-white"
+                className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
                 isDisabled={!name.trim()}
               >
                 Save

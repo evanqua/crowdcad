@@ -4,10 +4,11 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Card, CardHeader, CardBody, Input, Button,
-  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea
+  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem
 } from '@heroui/react';
 import { MoreVertical } from 'lucide-react';
 import type { Event, Call } from '@/app/types';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 
 type ClinicTrackingCardProps = {
   call: Call;
@@ -41,6 +42,12 @@ function callBg() {
   // Clinic calls always use default background
   return 'bg-surface-deep';
 }
+const dropdownMotionProps = {
+  initial: { opacity: 0, y: -8, scale: 0.98 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: -8, scale: 0.98 },
+  transition: { duration: 0.16, ease: 'easeOut' },
+} as const;
 
 export default function ClinicTrackingCard({
   call,
@@ -141,7 +148,7 @@ export default function ClinicTrackingCard({
 
           {/* 3-dot menu */}
           <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-            <Dropdown placement="bottom-end" offset={6}>
+            <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={6}>
               <DropdownTrigger>
                 <button
                   className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
@@ -256,12 +263,12 @@ export default function ClinicTrackingCard({
         <div className="flex gap-2">
           {/* Status Dropdown */}
           <div className="flex-1" onClick={e => e.stopPropagation()}>
-            <Dropdown>
+            <Dropdown motionProps={dropdownMotionProps}>
               <DropdownTrigger>
                 <Button
                   variant="flat"
                   radius="md"
-                  className="w-full h-full justify-start bg-surface-deep border border-surface-liner hover:bg-surface-muted text-white px-2"
+                  className="w-full h-full justify-start bg-surface-deep border border-surface-liner hover:bg-surface-muted text-surface-light px-2"
                 >
                   <div className="text-left flex-4 pl-0.5">
                     <div className="text-xs text-[#d4d4d8] pb-0.5">Status</div>
@@ -302,7 +309,8 @@ export default function ClinicTrackingCard({
             {/* Notes - NO LOG ENTRY */}
             <div className="text-sm text-surface-light">
               <div className="font-semibold mb-1">Notes</div>
-              <Textarea
+              <TrackingTextEntry
+                mode="note"
                 value={notesText}
                 onChange={(e) => {
                   setNotesText(e.target.value);
@@ -322,20 +330,18 @@ export default function ClinicTrackingCard({
                   notesFocusedRef.current = true;
                 }}
                 minRows={2}
+                maxRows={3}
                 variant="flat"
                 placeholder="Add notes"
                 className="min-w-0"
-                classNames={{
-                  input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0",
-                  inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                }}
               />
             </div>
 
             {/* Log - Editable Textarea */}
             <div className="text-sm text-surface-light">
               <div className="font-semibold mb-1">Log for Call #{callDisplayNumber}:</div>
-              <Textarea
+              <TrackingTextEntry
+                mode="log"
                 value={logText}
                 onChange={(e) => {
                   setLogText(e.target.value);
@@ -369,13 +375,10 @@ export default function ClinicTrackingCard({
                   }
                 }}
                 minRows={4}
+                maxRows={5}
                 variant="flat"
                 placeholder="No log entries"
                 className="min-w-0"
-                classNames={{
-                  input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm",
-                  inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                }}
               />
             </div>
           </div>

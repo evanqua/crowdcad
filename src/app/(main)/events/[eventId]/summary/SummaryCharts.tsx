@@ -172,7 +172,10 @@ export default function SummaryCharts({
                           border: '1px solid var(--accent)',
                           borderRadius: 12,
                         }}
-                        formatter={(value: number | string) => [`${Number(value).toFixed(1)} min`, 'Duration']}
+                        formatter={(value) => {
+                          const normalized = Array.isArray(value) ? value[0] : value;
+                          return [`${Number(normalized ?? 0).toFixed(1)} min`, 'Duration'];
+                        }}
                       />
                       <Line type="monotone" dataKey="duration" stroke="var(--accent)" strokeWidth={2} isAnimationActive={false} />
                     </LineChart>

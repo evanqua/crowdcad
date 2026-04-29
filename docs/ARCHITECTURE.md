@@ -16,7 +16,7 @@ Repository layout (important folders)
 
 - `src/components/` — UI components grouped by role:
   - `src/components/modals/` — modal components (modal files follow `*modal.tsx` naming)
-  - `src/components/dispatch/` — dispatch-specific UI (cards, tracking widgets)
+  - `src/components/dispatch/` — dispatch-specific UI (cards, tracking widgets, shared tracking table primitives)
   - `src/components/event-create/` — event creation sections split by responsibility (metadata, staffing, schedule, posts/equipment)
   - `src/components/venue-management/` — venue management sections split by responsibility (layers, marker placement, uploads, equipment)
   - `src/components/layout/` — layout-level components (navbar, etc.)
@@ -33,6 +33,8 @@ Key architectural decisions
 - Firebase-first: The app uses Firebase for auth, realtime persistence, storage and hosting. `src/app/firebase.ts` centralizes initialization and should not be edited lightly.
 - Component-first UI: UI is organized around modular components and small primitives in `src/components/ui` so features compose cleanly.
 - Feature decomposition: page-level screens should be split into focused section components when a page starts to accumulate unrelated responsibilities.
+- Shared dispatch primitives: call and clinic tracking should compose from shared dispatch building blocks (`trackingtablebase.tsx`, `trackingtextentry.tsx`, `motioncell.tsx`) to keep behavior and styling consistent.
+- Centralized status theming: dispatch and team views derive status colors from `src/lib/statusColors.ts` rather than page-local class maps.
 - Tailwind + HeroUI: Tailwind utility classes are used for styling; HeroUI provides higher-level components.
 
 Data model and types
@@ -60,7 +62,8 @@ Where to look for examples
 
 - Client-side modal example: `src/components/modals/event/quickcallmodal.tsx`
 - UI primitives: `src/components/ui/button.tsx`, `src/components/ui/input.tsx`
-- Dispatch widgets: `src/components/dispatch/teamcard.tsx` and `calltrackingcard.tsx`
+- Dispatch widgets: `src/components/dispatch/teamcard.tsx`, `src/components/dispatch/calltrackingcard.tsx`, `src/components/dispatch/clinictrackingcard.tsx`
+- Dispatch shared primitives: `src/components/dispatch/trackingtablebase.tsx`, `src/components/dispatch/trackingtextentry.tsx`
 
 Maintainers & contact
 

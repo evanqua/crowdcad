@@ -509,7 +509,7 @@ export default function VenueManagementPageClient() {
             {isHover && !isPending && post.name && (
               <div
                 style={{ left: `calc(${post.x}% - 50px)`, top: `calc(${post.y}% - 40px)` }}
-                className="pointer-events-none absolute z-20 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg border border-default whitespace-nowrap"
+                className="pointer-events-none absolute z-20 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
               >
                 {post.name}
               </div>
@@ -649,7 +649,7 @@ export default function VenueManagementPageClient() {
   };
 
   return (
-    <main className="relative bg-surface-deepest text-white h-[calc(10-0vh-3rem)]">
+    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)]">
       <DiagonalStreaksFixed />
       
       <div className="relative z-10 pt-4 max-w-[1200px] mx-auto">
@@ -686,9 +686,9 @@ export default function VenueManagementPageClient() {
                       labelPlacement={"outside"}
                       variant="flat"
                       classNames={{
-                        label: 'text-white font-medium',
+                        label: 'text-surface-light font-medium',
                         inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
-                        input: 'text-white outline-none focus:outline-none data-[focus=true]:outline-none',
+                        input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
                       }}
                     />
                   </div>
@@ -696,7 +696,7 @@ export default function VenueManagementPageClient() {
                   {/* Locations & Equipment Section with Tabs */}
                   <Tabs className="flex-1 w-full" fullWidth radius="lg" selectedKey={selectedLeftTab} onSelectionChange={(key) => setSelectedLeftTab(key as string)}>
                     <Tab key="locations" title="Locations">
-                      <label className="mb-2 block text-sm font-medium text-white">
+                      <label className="mb-2 block text-sm font-medium text-surface-light">
                         Locations
                       </label>
                       <div className="flex gap-2">
@@ -712,14 +712,14 @@ export default function VenueManagementPageClient() {
                           }}
                           variant="flat"
                           classNames={{
-                            input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+                            input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
                             inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
                           }}
                         />
                         <Button
                           isIconOnly
                           onPress={addTextLocation}
-                          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-white"
+                          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-surface-light"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -745,7 +745,7 @@ export default function VenueManagementPageClient() {
                                     ) : (
                                       <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />
                                     )}
-                                    <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-white'}`}>
+                                    <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-surface-light'}`}>
                                       {label}
                                     </span>
                                     {item.layerName && (
@@ -815,7 +815,7 @@ export default function VenueManagementPageClient() {
                     onPress={() => handleSubmit()}
                     isLoading={isUploading}
                     isDisabled={!venueData.name.trim()}
-                    className="flex-1 bg-accent hover:bg-accent/90 text-white px-10"
+                    className="flex-1 bg-accent hover:bg-accent/90 text-surface-light px-10"
                   >
                     {isUploading ? (venueId ? 'Updating...' : 'Creating...') : (venueId ? 'Update Venue' : 'Create Venue')}
                   </Button>
@@ -832,7 +832,7 @@ export default function VenueManagementPageClient() {
             <div className="flex flex-col h-full relative px-6 pt-6 pb-[72px] overflow-hidden">
               <div className="mb-3 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-white">
+                  <label className="text-sm font-medium text-surface-light">
                     Venue Map <span className="text-surface-light text-xs">(Optional)</span>
                   </label>
                   <Input
@@ -841,7 +841,7 @@ export default function VenueManagementPageClient() {
                     variant="flat"
                     size="md"
                     classNames={{
-                      input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+                      input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
                       inputWrapper: 'rounded-2xl px-4 pr-6 hover:bg-surface-deep',
                     }}
                     placeholder="Layer name"

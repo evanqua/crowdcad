@@ -9,8 +9,26 @@ import AppShell from "../components/layout/appshell";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark text-foreground bg-background" suppressHydrationWarning>
+    <html lang="en" className="text-foreground bg-background" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                try {
+                  var stored = localStorage.getItem('ccad-theme');
+                  var useDark = stored ? stored === 'dark' : true;
+                  var root = document.documentElement;
+                  root.classList.toggle('dark', useDark);
+                  root.setAttribute('data-theme', useDark ? 'dark' : 'light');
+                } catch (e) {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.setAttribute('data-theme', 'dark');
+                }
+              })();
+            `,
+          }}
+        />
         {/* Inline early-unregister to avoid stale service worker serving old _next chunks in dev */}
         {process.env.NODE_ENV === 'development' && (
           <script

@@ -79,7 +79,7 @@ export default function EditProfilePage() {
                   <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full px-4 py-2 bg-surface-deepest text-white border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
+                    className="w-full px-4 py-2 bg-surface-deepest text-surface-light border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
                     placeholder="Your full name"
                   />
                 </div>
@@ -89,7 +89,7 @@ export default function EditProfilePage() {
                   <input
                     value={photoURL}
                     onChange={(e) => setPhotoURL(e.target.value)}
-                    className="w-full px-4 py-2 bg-surface-deepest text-white border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
+                    className="w-full px-4 py-2 bg-surface-deepest text-surface-light border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
                     placeholder="https://..."
                   />
                 </div>
@@ -99,7 +99,7 @@ export default function EditProfilePage() {
                   <input
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-4 py-2 bg-surface-deepest text-white border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
+                    className="w-full px-4 py-2 bg-surface-deepest text-surface-light border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
                     placeholder="+1 555 555 5555"
                   />
                   <p className="text-xs text-surface-faint mt-1">Phone numbers are saved to your profile document.</p>

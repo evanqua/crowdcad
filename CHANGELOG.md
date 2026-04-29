@@ -16,6 +16,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- Dispatch tracking composition utilities added under `src/components/dispatch/`:
+  - `trackingtablebase.tsx` — shared table shell and row rendering structure used by call and clinic tracking.
+  - `trackingtextentry.tsx` — shared inline text entry control used across team, call, and clinic flows.
+  - `motioncell.tsx` — shared animation-aware table cell wrapper for smoother row transitions.
+- Shared animation utilities now drive add/remove and collapse/expand transitions in dispatch cards and tracking rows with reduced-motion support.
+
 - Foundation refactor: extracted core utilities to `src/lib/` for reuse across features:
   - `uploadUtils.ts` — file upload with exponential backoff retry logic (transient error detection, original error preservation).
   - `zoomPanUtils.ts` — viewport math utilities (`clampScale`, `clampPanPosition`) for consistent zoom/pan behavior.
@@ -43,6 +49,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Changed
 
+- Dispatch right panel now uses browser-style secondary tabs with active counts and a compact header action bar (`Add Call` with keyboard shortcut hint).
+- Call and clinic tracking now share aligned table and card visual language, including unified shells, spacing, and row structure.
+- Team cards received a UI refresh: transparent shell, square corners, divider structure, chevron expand indicator, refined map pin sizing, and clearer member/cert formatting.
+- Team card expand/collapse now uses smooth row height and opacity animation with reduced-motion fallbacks.
+- Status color logic is centralized in `src/lib/statusColors.ts` and reused across team chips and dispatch status rendering.
+- Tracking text fields for chief complaint and location were resized and standardized through shared `TrackingTextEntry` usage.
+- Status box text area was expanded for better readability of longer status updates.
+
 - Event creation page (`src/app/(main)/events/[eventId]/create/page.tsx`) now uses decomposed section components instead of a monolithic page layout, improving maintainability and testability.
 - Venue management page (`src/app/(main)/venues/management/page.client.tsx`) now uses decomposed section components and shared map controls instead of page-local implementations.
 - Dispatch call tracking page now threads styling through `rowClassName` prop to restore per-status visual differentiation.
@@ -55,6 +69,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Updated `public/logo.svg` artwork/viewBox for refined logo rendering.
 
 ### Fixed
+
+- Resolved-row action menus now close correctly when rows are resolved and hidden, preventing orphaned dropdown menus.
+- Removed ghost/shadow rendering artifact in tracking text entry fields while scrolling.
 
 - Upload retry logic now only retries on transient Firebase Storage errors (`storage/retry-limit-exceeded`, `storage/unknown`) to avoid masking real failures, and preserves original error for diagnostics.
 - Removed initial navbar mount flicker/layout shift on page reload by rendering the main app navbar in the initial render path instead of client-only lazy loading.

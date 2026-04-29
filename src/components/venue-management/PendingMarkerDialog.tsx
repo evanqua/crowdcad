@@ -25,7 +25,7 @@ export default function PendingMarkerDialog({
         transform: 'translate(-50%, -50%)',
       }}
     >
-      <p className="mb-2 text-xs font-medium text-white">Name this location:</p>
+      <p className="mb-2 text-xs font-medium text-surface-light">Name this location:</p>
       <Input
         ref={markerInputRef}
         value={markerNameInput}
@@ -43,7 +43,7 @@ export default function PendingMarkerDialog({
         size="sm"
         variant="bordered"
         classNames={{
-          input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+          input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
           inputWrapper: 'px-4 hover:bg-surface-deep mb-2',
         }}
       />
@@ -54,7 +54,7 @@ export default function PendingMarkerDialog({
         <Button
           size="sm"
           onPress={onConfirm}
-          className="flex-1 bg-accent hover:bg-accent/90 text-white"
+          className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
         >
           Confirm
         </Button>

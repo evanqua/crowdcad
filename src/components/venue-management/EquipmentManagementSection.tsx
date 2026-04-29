@@ -34,7 +34,7 @@ export default function EquipmentManagementSection({
 }: EquipmentManagementSectionProps) {
   return (
     <>
-      <label className="mb-2 block text-sm font-medium text-white">
+      <label className="mb-2 block text-sm font-medium text-surface-light">
         Equipment <span className="text-surface-light text-xs">(Optional)</span>
       </label>
       <div className="flex gap-2 mb-3">
@@ -50,14 +50,14 @@ export default function EquipmentManagementSection({
           }}
           variant="flat"
           classNames={{
-            input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+            input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
             inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
           }}
         />
         <Button
           isIconOnly
           onPress={addEquipment}
-          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-white"
+          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-surface-light"
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -89,7 +89,7 @@ export default function EquipmentManagementSection({
                       size="sm"
                       autoFocus
                       classNames={{
-                        input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+                        input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
                         inputWrapper: 'rounded-lg px-2 hover:bg-surface-deep',
                       }}
                     />
@@ -118,7 +118,7 @@ export default function EquipmentManagementSection({
                 ) : (
                   <>
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-sm text-white truncate">{item.name}</span>
+                      <span className="text-sm text-surface-light truncate">{item.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
