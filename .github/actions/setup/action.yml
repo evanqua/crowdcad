@@ -1,0 +1,27 @@
+name: "Setup Node & Dependencies"
+description: "Reusable composite action: installs Node.js and caches npm dependencies"
+ 
+inputs:
+  node-version:
+    description: "Node.js version to use"
+    required: false
+    default: "20"
+ 
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: "npm"
+ 
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - shell: bash
+      run: npm run lint
+
+    - shell: bash
+      run: npm run type-check

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { MouseClickLog, KeyStrokeLog, InteractionSession } from '@/app/types';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { dbService, arrayUnion } from '@/lib/services';
 
 interface UseDataCollectionProps {
   eventId: string;
@@ -53,8 +52,8 @@ export function useDataCollection({ eventId, enabled = true }: UseDataCollection
     try {
       sessionRef.current.endTime = Date.now();
       
-      await updateDoc(doc(db, 'events', eventId), {
-        interactionSessions: arrayUnion(sessionRef.current)
+      await dbService.updateDocument('events', eventId, {
+        interactionSessions: arrayUnion(sessionRef.current),
       });
       
     } catch (error) {

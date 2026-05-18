@@ -46,3 +46,23 @@ next-env.d.ts
 # OS
 .DS_Store
 Thumbs.db
+
+# Playwright
+/tests/e2e/.auth/
+/tests/e2e/.pb-data/
+/playwright-report/
+/playwright-report-pocketbase/
+/test-results/
+/.features-gen/
+/.features-gen-pocketbase/
+
+# PocketBase binary (root-level only, so src/lib/services/pocketbase/ is not affected)
+/pocketbase.exe
+/pocketbase
+.pb-data/
+
+# Claude Code
+.claude/
+
+*-debug.log
+typescript

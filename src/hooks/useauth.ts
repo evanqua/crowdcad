@@ -1,14 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '@/app/firebase';
+import { authService, type ServiceUser } from '@/lib/services';
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ServiceUser | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = authService.onAuthStateChanged((u) => {
       setUser(u);
       setReady(true);
     });

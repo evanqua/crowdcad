@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { db } from '@/app/firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { dbService, arrayUnion, arrayRemove } from '@/lib/services';
 import {
   Modal,
   ModalContent,
@@ -45,9 +44,8 @@ export default function ShareModal({
 
     setIsLoading(true);
     try {
-      const ref = doc(db, collectionName, resourceId);
-      await updateDoc(ref, {
-        sharedWith: arrayUnion(emailInput.trim().toLowerCase())
+      await dbService.updateDocument(collectionName, resourceId, {
+        sharedWith: arrayUnion(emailInput.trim().toLowerCase()),
       });
       setEmailInput('');
       onUpdate();
@@ -64,9 +62,8 @@ export default function ShareModal({
     
     setIsLoading(true);
     try {
-      const ref = doc(db, collectionName, resourceId);
-      await updateDoc(ref, {
-        sharedWith: arrayRemove(email)
+      await dbService.updateDocument(collectionName, resourceId, {
+        sharedWith: arrayRemove(email),
       });
       onUpdate();
     } catch (error) {

@@ -6,6 +6,7 @@ import {
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Button, Input, Select, SelectItem,
 } from "@heroui/react";
+import { Role } from "@/app/types";
 
 type Props = {
   isOpen: boolean;
@@ -27,7 +28,7 @@ type Props = {
   memberCert: string;
   setMemberCert: (v: string) => void;
 
-  LICENSES: string[];
+  roles: Role[];
 };
 
 export default function AddSupervisorModal({
@@ -43,7 +44,7 @@ export default function AddSupervisorModal({
   setMemberName,
   memberCert,
   setMemberCert,
-  LICENSES,
+  roles,
 }: Props) {
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -129,9 +130,9 @@ export default function AddSupervisorModal({
                 aria-label="Certification"
                 isRequired
               >
-                {LICENSES.map((cert) => (
-                  <SelectItem key={cert} aria-label={cert} textValue={cert}>
-                    {cert}
+                {roles.map((role) => (
+                  <SelectItem key={role.name} aria-label={role.fullName} textValue={role.fullName}>
+                    {role.name}
                   </SelectItem>
                 ))}
               </Select>

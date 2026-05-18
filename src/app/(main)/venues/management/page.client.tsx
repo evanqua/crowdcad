@@ -5,13 +5,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getAuth } from 'firebase/auth';
-import { db } from '@/app/firebase';
-import { addDoc, collection, doc, getDoc, updateDoc } from 'firebase/firestore';
-import {
-  getStorage,
-  ref,
-} from 'firebase/storage';
+import { useAuth } from '@/hooks/useauth';
+import { dbService, storageService } from '@/lib/services';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
@@ -41,6 +36,8 @@ import {
   Trash2, 
   Edit2,
   MapPinned,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -56,9 +53,9 @@ export default function VenueManagementPageClient() {
   const searchParams = useSearchParams();
   const venueId = searchParams.get('venueId');
   // Firebase
-  const auth = useMemo(() => getAuth(), []);
-  const storage = useMemo(() => getStorage(), []);
-  const userId = auth.currentUser?.uid;
+  const { user } = useAuth();
+  const userId = user?.uid;
+
 
   // Local state
   const [venueData, setVenueData] = useState<{
@@ -174,9 +171,9 @@ export default function VenueManagementPageClient() {
     if (venueId && userId) {
       const loadVenue = async () => {
         try {
-          const venueDoc = await getDoc(doc(db, 'venues', venueId));
-          if (venueDoc.exists()) {
-            const venue = venueDoc.data() as Venue & { layers?: Layer[] };
+          const venueDoc = await dbService.getDocument<Venue & { layers?: Layer[] }>('venues', venueId);
+          if (venueDoc.exists && venueDoc.data) {
+            const venue = venueDoc.data;
             let layers: Layer[];
             if (venue.layers && venue.layers.length > 0) {
               layers = venue.layers;
@@ -543,8 +540,7 @@ export default function VenueManagementPageClient() {
       let newMapUrl: string | undefined;
 
       if (mapFile && mapFile.size > 0) {
-        const storageRef = ref(storage, `venue_maps/${Date.now()}_${mapFile.name}`);
-        newMapUrl = await uploadWithRetry(storageRef, mapFile);
+        newMapUrl = await storageService.uploadFile(`venue_maps/${Date.now()}_${mapFile.name}`, mapFile);
       }
 
       const equipmentToSave = venueData.equipment.map(({ ...rest }) => rest);
@@ -576,13 +572,9 @@ export default function VenueManagementPageClient() {
       }
 
       if (venueId) {
-        // Update existing venue
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await updateDoc(doc(db, 'venues', venueId), dataToSave as any);
+        await dbService.updateDocument('venues', venueId, dataToSave);
       } else {
-        // Create new venue
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await addDoc(collection(db, 'venues'), dataToSave as any);
+        await dbService.addDocument('venues', dataToSave);
       }
       router.push('/venues/selection')
     } catch (error: unknown) {
@@ -610,8 +602,7 @@ export default function VenueManagementPageClient() {
   const handleAddLayer = async (name: string, file: File) => {
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `venue_maps/${Date.now()}_${file.name}`);
-      const mapUrl = await uploadWithRetry(storageRef, file);
+      const mapUrl = await storageService.uploadFile(`venue_maps/${Date.now()}_${file.name}`, file);
       const newLayer: Layer = {
         id: crypto.randomUUID(),
         name,
@@ -662,6 +653,7 @@ export default function VenueManagementPageClient() {
             type="file"
             accept="image/*"
             className="hidden"
+            data-testid="map-file-input"
             onChange={(e) => {
               setMapFile(e.target.files?.[0] ?? null);
               setPendingLayer(currentLayer);
@@ -939,17 +931,69 @@ export default function VenueManagementPageClient() {
                     </div>
 
                     {/* Bottom Info Bar - Now OUTSIDE and BELOW the image container */}
-                    <LayerControlBar
-                      mapFileName={mapFileName}
-                      onReplaceMap={() => fileInputRef.current?.click()}
-                      currentLayer={currentLayer}
-                      totalLayers={venueData.layers?.length ?? 0}
-                      currentLayerName={venueData.layers?.[currentLayer]?.name || 'Layer'}
-                      onPreviousLayer={() => setCurrentLayer(currentLayer - 1)}
-                      onNextLayer={() => setCurrentLayer(currentLayer + 1)}
-                      onDeleteLayer={deleteLayer}
-                      onAddLayer={() => setIsNewLayerModalOpen(true)}
-                    />
+                    <Card
+                      isBlurred
+                      className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <MapPinned className="h-4 w-4 text-accent" />
+                          <span className="text-xs text-surface-light truncate max-w-[120px]">{mapFileName}</span>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={() => fileInputRef.current?.click()}
+                            startContent={<Upload className="h-3 w-3" />}
+                            className="ml-2"
+                          >
+                            Replace
+                          </Button>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            isDisabled={currentLayer <= 0}
+                            onPress={() => setCurrentLayer(currentLayer - 1)}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <span
+                            className="text-xs text-surface-light min-w-[100px] text-center"
+                          >
+                            {venueData.layers?.[currentLayer]?.name || 'Layer'}
+                          </span>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            isDisabled={!venueData.layers || currentLayer >= venueData.layers.length - 1}
+                            onPress={() => setCurrentLayer(currentLayer + 1)}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            onPress={deleteLayer}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            data-testid="add-layer-button"
+                            onPress={() => setIsNewLayerModalOpen(true)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
                   </div>
                 ) : (
                   <Card

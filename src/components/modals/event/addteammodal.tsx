@@ -16,6 +16,7 @@ import {
   Checkbox,
   Chip,
 } from "@heroui/react";
+import { Role } from "@/app/types";
 
 type Member = { name: string; cert: string; lead: boolean };
 
@@ -46,7 +47,7 @@ type Props = {
   currentMembers: Member[];
   removeMember: (idx: number) => void;
 
-  LICENSES: string[]; // e.g., ["EMT", "AEMT", "Paramedic", ...]
+  roles: Role[]; // e.g., [{ name: "EMT", fullName: "Emergency Medical Technician" }, ...]
 };
 
 export default function AddTeamModal({
@@ -67,7 +68,7 @@ export default function AddTeamModal({
   addMember,
   currentMembers,
   removeMember,
-  LICENSES,
+  roles,
 }: Props) {
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -177,9 +178,9 @@ export default function AddTeamModal({
                   aria-label="Certification"
                   className="flex-1"
                 >
-                  {LICENSES.map((cert) => (
-                    <SelectItem key={cert} aria-label={cert} textValue={cert}>
-                      {cert}
+                  {roles.map((role) => (
+                    <SelectItem key={role.name} aria-label={role.fullName} textValue={role.fullName}>
+                      {role.name}
                     </SelectItem>
                   ))}
                 </Select>
@@ -206,9 +207,8 @@ export default function AddTeamModal({
                       radius="full"
                       variant="solid"
                       classNames={{
-                        base: `px-2 py-2 rounded-full text-surface-light ${
-                          m.lead ? "bg-status-blue" : "bg-status-orange"
-                        } outline-none focus:outline-none data-[focus=true]:outline-none`,
+                        base: `px-2 py-2 rounded-full text-surface-light ${m.lead ? "bg-status-blue" : "bg-status-orange"
+                          } outline-none focus:outline-none data-[focus=true]:outline-none`,
                         content: "text-surface-light text-md",
                         closeButton:
                           "text-surface-light hover:text-status-red focus:outline-none data-[focus-visible=true]:outline-none",

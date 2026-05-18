@@ -1,0 +1,28 @@
+name: "Resolve Environment"
+description: |
+  Resolves the GitHub environment name based on the current branch or tag.
+  Default is Development except for all tags and main/master branch
+
+outputs:
+  environment:
+    description: "The resolved environment name (Production or Development)"
+    value: ${{ steps.resolve.outputs.environment }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve environment name
+      id: resolve
+      shell: bash
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/main" || \
+              "${{ github.ref }}" == "refs/heads/master" || \
+              "${{ github.ref }}" == refs/tags/* ]]; then
+          echo "environment=Production" >> $GITHUB_OUTPUT
+        else
+          echo "environment=Development" >> $GITHUB_OUTPUT
+        fi
+
+    - shell: bash
+      run: |
+        echo "Environment set to : ${{ steps.resolve.outputs.environment }}"

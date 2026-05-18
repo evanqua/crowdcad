@@ -89,6 +89,7 @@ export default function EquipmentCard({
   return (
     <Card
       className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
+      data-testid={`equipment-card-${equipment.name}`}
     >
       <div
         onClick={() => setExpanded(v => !v)}

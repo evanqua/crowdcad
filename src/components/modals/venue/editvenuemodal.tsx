@@ -5,20 +5,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 
-import { getAuth } from 'firebase/auth';
-import { db } from '@/app/firebase';
-import {
-  doc,
-  getDoc,
-  updateDoc,
-} from 'firebase/firestore';
-import {
-  getStorage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  type StorageReference,
-} from 'firebase/storage';
+import { authService, dbService, storageService } from '@/lib/services';
 
 import type { Post, Venue, Equipment, EquipmentStatus } from '@/app/types';
 import LoadingScreen from '@/components/ui/loading-screen';
@@ -32,10 +19,7 @@ interface Props {
 type CoordinatePost = { name: string; x: number; y: number };
 
 export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
-  // Firebase
-  const auth = useMemo(() => getAuth(), []);
-  const storage = useMemo(() => getStorage(), []);
-  const userId = auth.currentUser?.uid;
+  const userId = authService.currentUser?.uid;
   const imgRef = useRef<HTMLImageElement | null>(null);
   const imgWrapperRef = useRef<HTMLDivElement | null>(null);
 
@@ -73,15 +57,14 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
     let isMounted = true;
     (async () => {
       try {
-        const refDoc = doc(db, 'venues', venueId);
-        const snap = await getDoc(refDoc);
-        if (!snap.exists()) {
+        const snap = await dbService.getDocument<Venue>('venues', venueId);
+        if (!snap.exists || !snap.data) {
           alert('Venue not found');
           onClose();
           return;
         }
         if (!isMounted) return;
-        const data = snap.data() as Venue;
+        const data = snap.data;
 
         setVenueData({
           name: data.name ?? '',
@@ -289,41 +272,6 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
       });
   };
 
-  // Robust upload with retry
-  const uploadWithRetry = async (
-    storageRef: StorageReference,
-    file: File,
-    maxRetries = 3,
-    baseDelay = 1200
-  ): Promise<string> => {
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
-      } catch (err: unknown) {
-        const code =
-          typeof err === 'object' && err !== null && 'code' in err
-            ? (err as { code?: unknown }).code
-            : undefined;
-
-        const isRetryable =
-          code === 'storage/retry-limit-exceeded' ||
-          code === 'storage/unknown' ||
-          code === 'storage/canceled' ||
-          code === 'storage/quota-exceeded' ||
-          code === 'storage/unauthenticated';
-
-        if (attempt < maxRetries - 1 && isRetryable) {
-          const wait = baseDelay * Math.pow(2, attempt);
-          await new Promise((res) => setTimeout(res, wait));
-          continue;
-        }
-        throw new Error('Upload failed');
-      }
-    }
-    throw new Error('Max retries exceeded');
-  };
-
   // Save (update existing venue)
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
@@ -342,8 +290,10 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
       let mapUrl = venueData.mapUrl ?? null;
 
       if (mapFile && mapFile.size > 0) {
-        const storageRef = ref(storage, `venue_maps/${Date.now()}_${mapFile.name}`);
-        mapUrl = await uploadWithRetry(storageRef, mapFile);
+        mapUrl = await storageService.uploadFile(
+          `venue_maps/${Date.now()}_${mapFile.name}`,
+          mapFile,
+        );
       }
 
       const updates: Partial<Venue> = {
@@ -354,7 +304,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
         ...(userId ? { userId } : {}),
       };
 
-      await updateDoc(doc(db, 'venues', venueId), updates);
+      await dbService.updateDocument('venues', venueId, updates as Record<string, unknown>);
 
       onSaved?.();
       onClose();

@@ -388,7 +388,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   className={`text-surface-light h-9 shrink-0 ${teamStatusColor.chipClass}`}
                                   onClose={() => handleRemoveTeamFromCall(call.id, team)}
                                 >
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2" data-testid={`team-chip-${team}`}>
                                     <span>{team}</span>
                                     <Dropdown
                                       motionProps={dropdownMotionProps}

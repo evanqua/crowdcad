@@ -11,6 +11,26 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    // Discourage direct Firebase imports outside the service adapters.
+    // Use '@/lib/services' instead so the backend stays swappable.
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          patterns: [
+            {
+              group: ["firebase/firestore", "firebase/auth", "firebase/storage"],
+              message:
+                "Import from '@/lib/services' instead of Firebase directly. " +
+                "Exception: files inside src/lib/services/firebase/ may import Firebase.",
+            },
+          ],
+        },
+      ],
+    },
+    ignores: ["src/lib/services/firebase/**"],
+  },
 ];
 
 export default eslintConfig;
