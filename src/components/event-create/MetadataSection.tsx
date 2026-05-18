@@ -28,7 +28,7 @@ export default function MetadataSection({
         <Input
           label="Event Name"
           labelPlacement="outside"
-          placeholder="Event Name"
+          placeholder="Enter event name"
           value={eventData.name || ''}
           onValueChange={(value) => setEventData((prev) => ({ ...prev, name: value }))}
           classNames={inputClassNames}

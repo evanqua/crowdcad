@@ -65,10 +65,11 @@ export default defineConfig({
     {
       command: 'next build && next start',
       env: {
+        NEXT_PUBLIC_BACKEND: 'firebase',
         NEXT_PUBLIC_USE_FIREBASE_EMULATOR: 'true',
         NEXT_PUBLIC_USE_FIRESTORE_EMULATOR: 'true',
         NEXT_PUBLIC_FIREBASE_API_KEY: 'fake-api-key',
-        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'localhost',
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: '127.0.0.1',
         NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'demo-crowdcad',
         NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'demo-crowdcad.appspot.com',
         NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000',

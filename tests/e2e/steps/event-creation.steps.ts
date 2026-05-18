@@ -19,7 +19,6 @@ Given('I have started a new draft event from that venue', async ({ page, scenari
   await venueLink.click();
   await page.getByRole('button', { name: 'Start New Event' }).click();
   await page.waitForURL(/\/events\/.*\/create/, { timeout: 10_000 });
-  // Wait for React to hydrate before interacting with the form
   await page.getByPlaceholder('Enter event name').waitFor({ state: 'visible', timeout: 10_000 });
 });
 

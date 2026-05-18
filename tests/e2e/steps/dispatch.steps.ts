@@ -133,16 +133,20 @@ Then('the end event modal should be closed', async ({ page }) => {
 
 When('I switch to the {string} section', async ({ page }, section: string) => {
   // "Clinic", "Calls", and "Staff" are bottom-bar tabs in the mobile layout (lg:hidden).
-  // On desktop viewports the mobile tab bar is hidden and these sections are always visible,
-  // so clicking a non-existent tab would time out. Only click the tab when it is visible.
+  // On desktop viewports the mobile tab bar is hidden and these sections are selected via the right-side tab buttons.
   // "Teams", "Supervisors", "Equipment" live in the left-panel Select dropdown on desktop.
   const bottomTabs = ['Staff', 'Calls', 'Clinic'];
   if (bottomTabs.includes(section)) {
     const tab = page.getByRole('tab', { name: section });
     if (await tab.isVisible()) {
       await tab.click();
+    } else {
+      // Desktop view: Calls/Clinic are tab buttons in the right-side pane
+      const button = page.getByRole('button', { name: new RegExp(`^${section}`) });
+      if (await button.isVisible()) {
+        await button.click();
+      }
     }
-    // else: desktop layout — section is always visible without a tab to click
   } else {
     await page.locator('[aria-label="Select section"]').click();
     await page.getByRole('option', { name: section }).click();

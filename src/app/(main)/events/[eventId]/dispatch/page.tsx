@@ -3270,6 +3270,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 size="sm"
                                 variant="flat"
                                 className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                               data-testid="add-call-button"
                                 onPress={() => setShowQuickCallForm(true)}
                               >
                                 Add Call
@@ -3318,6 +3319,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 size="sm"
                                 variant="flat"
                                 className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                aria-label="Add Clinic Call"
                                 onPress={() => setShowQuickClinicCallForm(true)}
                               >
                                 Add Patient

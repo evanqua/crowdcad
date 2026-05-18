@@ -13,6 +13,10 @@ const authFile = path.join(__dirname, '.auth/user.json');
  * so Firebase auth state is already restored — no login needed per test.
  */
 setup('authenticate and save storage state', async ({ page }) => {
+  page.on('console', msg => console.log('BROWSER CONSOLE:', msg.type(), msg.text()));
+  page.on('pageerror', err => console.log('BROWSER UNCAUGHT EXCEPTION:', err.stack || err.message));
+  page.on('requestfailed', req => console.log('REQUEST FAILED:', req.url(), req.failure()?.errorText));
+
   const email = process.env.E2E_TEST_EMAIL;
   const password = process.env.E2E_TEST_PASSWORD;
 
