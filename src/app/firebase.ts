@@ -91,9 +91,9 @@ export const auth = typeof globalThis.window === 'undefined'
 const g = globalThis as unknown as { __FIREBASE_EMULATORS_CONNECTED?: boolean };
 if (typeof globalThis.window !== 'undefined' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && !g.__FIREBASE_EMULATORS_CONNECTED) {
   g.__FIREBASE_EMULATORS_CONNECTED = true;
-  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   if (process.env.NEXT_PUBLIC_USE_FIRESTORE_EMULATOR === 'true') {
-    connectFirestoreEmulator(db, 'localhost', 8080);
-    connectStorageEmulator(getStorage(app), 'localhost', 9199);
+    connectFirestoreEmulator(db, '127.0.0.1', 8080);
+    connectStorageEmulator(getStorage(app), '127.0.0.1', 9199);
   }
 }

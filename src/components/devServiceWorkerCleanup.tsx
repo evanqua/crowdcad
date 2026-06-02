@@ -11,7 +11,7 @@ export default function DevServiceWorkerCleanup() {
       regs.forEach((r) => {
         try {
           r.unregister();
-        } catch (e) {
+        } catch {
           // ignore
         }
       });

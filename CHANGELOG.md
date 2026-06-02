@@ -14,7 +14,90 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-<!-- Add upcoming changes here before they are tagged as a release. -->
+### Added
+
+- Dispatch tracking composition utilities added under `src/components/dispatch/`:
+  - `trackingtablebase.tsx` — shared table shell and row rendering structure used by call and clinic tracking.
+  - `trackingtextentry.tsx` — shared inline text entry control used across team, call, and clinic flows.
+  - `motioncell.tsx` — shared animation-aware table cell wrapper for smoother row transitions.
+- Shared animation utilities now drive add/remove and collapse/expand transitions in dispatch cards and tracking rows with reduced-motion support.
+
+- Foundation refactor: extracted core utilities to `src/lib/` for reuse across features:
+  - `uploadUtils.ts` — file upload with exponential backoff retry logic (transient error detection, original error preservation).
+  - `zoomPanUtils.ts` — viewport math utilities (`clampScale`, `clampPanPosition`) for consistent zoom/pan behavior.
+  - `markerUtils.ts` — marker detection and placement helpers.
+- Shared React hooks extracted to `src/hooks/` for reuse:
+  - `useZoomPan` — manages zoom/pan state and mouse/wheel event handlers for map-based interfaces.
+  - `useScheduleGeneration` — generates shift schedules from event duration and team coverage.
+  - `useTeamForm` — team/supervisor form submission and validation.
+- Shared UI primitives added to `src/components/ui/`:
+  - `map-zoom-controls.tsx` — zoom in/out/reset button cluster with accessibility labels (reused across event create and venue management).
+  - `map-pan-surface.tsx` — reusable pan/wheel interaction surface for canvas-based viewers.
+- Event creation flow decomposed into focused section components under `src/components/event-create/`:
+  - `MetadataSection.tsx` — event name, date, and venue selection.
+  - `TeamStaffingSection.tsx` — team roster assignment.
+  - `SupervisorStaffingSection.tsx` — supervisor roster assignment.
+  - `PostingScheduleSection.tsx` — shift schedule generation and management.
+  - `PostsEquipmentSection.tsx` — posts and equipment selection with multi-select state.
+- Venue management flow decomposed into focused section components under `src/components/venue-management/`:
+  - `EquipmentManagementSection.tsx` — add/edit/delete equipment with stable React keys.
+  - `LayerControlBar.tsx` — layer navigation (previous/next/add/delete) with accessibility labels.
+  - `MarkerModeToggleButton.tsx` — toggle marker placement mode.
+  - `PendingMarkerDialog.tsx` — marker naming dialog.
+  - `MarkerPlacementInstruction.tsx` — on-screen guidance during marker placement.
+- Lite event drafts now persist a `postingScheduleEnabled` flag to keep posting schedule behavior consistent between setup and dispatch.
+
+### Changed
+
+- Dispatch right panel now uses browser-style secondary tabs with active counts and a compact header action bar (`Add Call` with keyboard shortcut hint).
+- Call and clinic tracking now share aligned table and card visual language, including unified shells, spacing, and row structure.
+- Team cards received a UI refresh: transparent shell, square corners, divider structure, chevron expand indicator, refined map pin sizing, and clearer member/cert formatting.
+- Team card expand/collapse now uses smooth row height and opacity animation with reduced-motion fallbacks.
+- Status color logic is centralized in `src/lib/statusColors.ts` and reused across team chips and dispatch status rendering.
+- Tracking text fields for chief complaint and location were resized and standardized through shared `TrackingTextEntry` usage.
+- Status box text area was expanded for better readability of longer status updates.
+
+- Event creation page (`src/app/(main)/events/[eventId]/create/page.tsx`) now uses decomposed section components instead of a monolithic page layout, improving maintainability and testability.
+- Venue management page (`src/app/(main)/venues/management/page.client.tsx`) now uses decomposed section components and shared map controls instead of page-local implementations.
+- Dispatch call tracking page now threads styling through `rowClassName` prop to restore per-status visual differentiation.
+- Pan math in `zoomPanUtils.clampPanPosition` corrected to properly clamp against scaled image overflow (fixes off-by-factor error at different zoom levels).
+- Lite setup Locations/Equipment add row now uses an attached input + action button style with aligned corner radii and consistent spacing.
+- Teams and Supervisors panel actions in Lite setup now use explicit `Add Team` and `Add Supervisor` buttons.
+- Lite dispatch navbar now hides `Posting Schedule` when posting schedule is disabled in event setup.
+- Lite navbar primary links were simplified to focus on Lite routes (`Lite Home`, `Create`).
+- Landing page copy and CTA text were refined (`CrowdCAD Lite` footer label and Lite subtitle wording), and Lite CTA iconography was simplified.
+- Updated `public/logo.svg` artwork/viewBox for refined logo rendering.
+
+### Fixed
+
+- Resolved-row action menus now close correctly when rows are resolved and hidden, preventing orphaned dropdown menus.
+- Removed ghost/shadow rendering artifact in tracking text entry fields while scrolling.
+
+- Upload retry logic now only retries on transient Firebase Storage errors (`storage/retry-limit-exceeded`, `storage/unknown`) to avoid masking real failures, and preserves original error for diagnostics.
+- Removed initial navbar mount flicker/layout shift on page reload by rendering the main app navbar in the initial render path instead of client-only lazy loading.
+- Equipment list now uses stable React keys (`item.id`) instead of array indices to prevent component state loss on edit/delete operations.
+
+---
+
+## [1.1.0] - 2026-03-19
+
+### Added
+
+- Lite mode local-only workflow for event setup and dispatch, including browser-local persistence without Firebase sync.
+- Lite dispatch navbar controls for Posting Schedule, Clear Event, and Export Summary actions.
+
+### Changed
+
+- Unified Lite and Cloud dispatch onto a shared dispatch UI flow to reduce duplication and keep feature parity.
+- Lite dispatch navbar behavior now mirrors main app navbar behavior (clock placement, auth controls, desktop/mobile parity).
+- Lite dispatch route now uses a lightweight wrapper that delegates to the shared dispatch page.
+
+### Fixed
+
+- Resolved Next.js route export/type issues on dispatch pages that could fail production builds.
+- Cleared lint/type build blockers across dispatch, venue management, profile, and modal components.
+- Updated venue map icon rendering to satisfy Next.js image lint requirements.
+- Suppressed non-actionable React hydration mismatch warnings in development when browser extensions inject attributes on root HTML/body before client hydration.
 
 ---
 
@@ -83,4 +166,8 @@ Initial public release of **CrowdCAD** — an open-source, browser-based Compute
 ---
 
 *For upgrade notes and migration steps, see the relevant release on GitHub. For security vulnerabilities, follow the process in [SECURITY.md](SECURITY.md).*
+
+[Unreleased]: https://github.com/evanqua/crowdcad/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/evanqua/crowdcad/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/evanqua/crowdcad/releases/tag/v1.0.0
 

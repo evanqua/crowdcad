@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/evanqua/crowdcad/workflows/CI/badge.svg)](https://github.com/evanqua/crowdcad/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE.md)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](CHANGELOG.md)
 [![DOI](https://zenodo.org/badge/1169795235.svg)](https://doi.org/10.5281/zenodo.18864888)
 
 

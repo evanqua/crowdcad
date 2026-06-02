@@ -9,14 +9,21 @@ import { useAuth } from '@/hooks/useauth';
 import { dbService, storageService } from '@/lib/services';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
+import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
+import { uploadWithRetry } from '@/lib/uploadUtils';
+import { useZoomPan } from '@/hooks/useZoomPan';
 import NewLayerModal from '@/components/modals/venue/newlayer';
 import LocationEditModal from '@/components/modals/venue/locationedit';
+import EquipmentManagementSection from '@/components/venue-management/EquipmentManagementSection';
+import LayerControlBar from '@/components/venue-management/LayerControlBar';
+import MarkerModeToggleButton from '@/components/venue-management/MarkerModeToggleButton';
+import PendingMarkerDialog from '@/components/venue-management/PendingMarkerDialog';
+import MarkerPlacementInstruction from '@/components/venue-management/MarkerPlacementInstruction';
+import MapZoomControls from '@/components/ui/map-zoom-controls';
+import MapPanSurface from '@/components/ui/map-pan-surface';
 import {
   Button,
   Input,
-  Select,
-  SelectItem,
-  ButtonGroup,
   Card,
   Tabs,
   Tab,
@@ -29,11 +36,8 @@ import {
   Trash2, 
   Edit2,
   MapPinned,
-  MousePointer2,
-  ZoomIn,
-  ZoomOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -98,11 +102,24 @@ export default function VenueManagementPageClient() {
   // Hidden file input for map upload/replace
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Zoom and pan state
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const {
+    scale,
+    position,
+    isPanning,
+    setScale,
+    setPosition,
+    handleWheel,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+  } = useZoomPan(imgRef, imgContainerRef, {
+    minScale: 1,
+    maxScale: 5,
+    disablePan: () => isAddMarkerMode || draggingIdx !== null,
+  });
 
   // Drag/hover
   const [pendingLayer, setPendingLayer] = useState<number | null>(null);
@@ -112,7 +129,7 @@ export default function VenueManagementPageClient() {
   const [hoverId, setHoverId] = useState<number | null>(null);
 
   // Image aspect ratio
-  const [aspectRatio, setAspectRatio] = useState(1);
+  const [, setAspectRatio] = useState(1);
 
   // New layer modal
   const [isNewLayerModalOpen, setIsNewLayerModalOpen] = useState(false);
@@ -140,7 +157,7 @@ export default function VenueManagementPageClient() {
     } else {
       setPreviewUrl(venueData.layers[currentLayer]?.mapUrl || null);
     }
-  }, [mapFile, pendingLayer, currentLayer, venueData.layers]);
+  }, [mapFile, pendingLayer, currentLayer, venueData.layers, setPosition, setScale]);
 
   // Auto-focus marker name input when pending marker is set
   useEffect(() => {
@@ -243,14 +260,6 @@ export default function VenueManagementPageClient() {
     }));
   };
 
-  const updateEquipmentLocation = (index: number, locationId: string) => {
-    setVenueData((prev) => {
-      const updated = [...prev.equipment];
-      updated[index] = { ...updated[index], locationId: locationId || undefined };
-      return { ...prev, equipment: updated };
-    });
-  };
-
   const startEditEquipment = (index: number) => {
     setEditingEquipmentIndex(index);
     setEquipmentEditInput(venueData.equipment[index].name);
@@ -294,60 +303,6 @@ export default function VenueManagementPageClient() {
     setLocationInput('');
   };
 
-  // Handle zoom
-    // Handle zoom (disabled for wheel/trackpad - use buttons only)
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    // Prevent default scroll behavior but don't zoom
-    e.preventDefault();
-  };
-
-
-  // Handle pan start
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isAddMarkerMode || draggingIdx !== null) return;
-
-    setIsPanning(true);
-    setPanStart({ x: e.clientX - position.x, y: e.clientY - position.y });
-  };
-
-  // Handle pan move
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isPanning) return;
-
-    const img = imgRef.current;
-    const container = imgContainerRef.current;
-    if (!img || !container) {
-      setPosition({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const imgWidth = img.offsetWidth * scale;
-    const imgHeight = img.offsetHeight * scale;
-
-    // Calculate new position
-    const newX = e.clientX - panStart.x;
-    const newY = e.clientY - panStart.y;
-
-    // Clamp position to keep image within view
-    const maxX = Math.max(0, (imgWidth - containerRect.width) / scale);
-    const maxY = Math.max(0, (imgHeight - containerRect.height) / scale);
-
-    setPosition({
-      x: Math.min(0, Math.max(-maxX, newX)),
-      y: Math.min(0, Math.max(-maxY, newY)),
-    });
-  };
-
-
-  // Handle pan end
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
-
   // Handle map click for marker placement
   const handleImageClick = (evt: React.MouseEvent<HTMLDivElement>) => {
     if (!isAddMarkerMode || isPanning) return;
@@ -357,21 +312,11 @@ export default function VenueManagementPageClient() {
 
     const rect = img.getBoundingClientRect();
 
-    // Check if click is within image bounds
-    if (
-      evt.clientX < rect.left ||
-      evt.clientX > rect.right ||
-      evt.clientY < rect.top ||
-      evt.clientY > rect.bottom
-    ) {
+    if (!isPointWithinRect(evt.clientX, evt.clientY, rect)) {
       return;
     }
 
-    const xPercent = ((evt.clientX - rect.left) / rect.width) * 100;
-    const yPercent = ((evt.clientY - rect.top) / rect.height) * 100;
-
-    const x = Math.max(0, Math.min(100, xPercent));
-    const y = Math.max(0, Math.min(100, yPercent));
+    const { x, y } = pixelToPercent(evt.clientX, evt.clientY, rect);
 
     // Create temporary marker
     const newPost: Post = {
@@ -489,10 +434,7 @@ export default function VenueManagementPageClient() {
       const rect = img.getBoundingClientRect();
 
       const onMove = (e: MouseEvent) => {
-        const nx = ((e.clientX - rect.left) / rect.width) * 100;
-        const ny = ((e.clientY - rect.top) / rect.height) * 100;
-        const x = Math.max(0, Math.min(100, nx));
-        const y = Math.max(0, Math.min(100, ny));
+        const { x, y } = pixelToPercent(e.clientX, e.clientY, rect);
 
         setVenueData((prev) => {
           const newLayers = [...prev.layers];
@@ -564,7 +506,7 @@ export default function VenueManagementPageClient() {
             {isHover && !isPending && post.name && (
               <div
                 style={{ left: `calc(${post.x}% - 50px)`, top: `calc(${post.y}% - 40px)` }}
-                className="pointer-events-none absolute z-20 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg border border-default whitespace-nowrap"
+                className="pointer-events-none absolute z-20 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
               >
                 {post.name}
               </div>
@@ -698,7 +640,7 @@ export default function VenueManagementPageClient() {
   };
 
   return (
-    <main className="relative bg-surface-deepest text-white h-[calc(10-0vh-3rem)]">
+    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)]">
       <DiagonalStreaksFixed />
       
       <div className="relative z-10 pt-4 max-w-[1200px] mx-auto">
@@ -736,9 +678,9 @@ export default function VenueManagementPageClient() {
                       labelPlacement={"outside"}
                       variant="flat"
                       classNames={{
-                        label: 'text-white font-medium',
+                        label: 'text-surface-light font-medium',
                         inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
-                        input: 'text-white outline-none focus:outline-none data-[focus=true]:outline-none',
+                        input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
                       }}
                     />
                   </div>
@@ -746,7 +688,7 @@ export default function VenueManagementPageClient() {
                   {/* Locations & Equipment Section with Tabs */}
                   <Tabs className="flex-1 w-full" fullWidth radius="lg" selectedKey={selectedLeftTab} onSelectionChange={(key) => setSelectedLeftTab(key as string)}>
                     <Tab key="locations" title="Locations">
-                      <label className="mb-2 block text-sm font-medium text-white">
+                      <label className="mb-2 block text-sm font-medium text-surface-light">
                         Locations
                       </label>
                       <div className="flex gap-2">
@@ -762,14 +704,14 @@ export default function VenueManagementPageClient() {
                           }}
                           variant="flat"
                           classNames={{
-                            input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+                            input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
                             inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
                           }}
                         />
                         <Button
                           isIconOnly
                           onPress={addTextLocation}
-                          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-white"
+                          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-surface-light"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -795,7 +737,7 @@ export default function VenueManagementPageClient() {
                                     ) : (
                                       <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />
                                     )}
-                                    <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-white'}`}>
+                                    <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-surface-light'}`}>
                                       {label}
                                     </span>
                                     {item.layerName && (
@@ -833,122 +775,19 @@ export default function VenueManagementPageClient() {
                       )}
                     </Tab>
                     <Tab key="equipment" title="Equipment">
-                      <label className="mb-2 block text-sm font-medium text-white">
-                        Equipment <span className="text-surface-light text-xs">(Optional)</span>
-                      </label>
-                      <div className="flex gap-2 mb-3">
-                        <Input
-                          placeholder="e.g., Gurney 1"
-                          value={equipmentInput}
-                          onValueChange={setEquipmentInput}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addEquipment();
-                            }
-                          }}
-                          variant="flat"
-                          classNames={{
-                            input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                            inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
-                          }}
-                        />
-                        <Button
-                          isIconOnly
-                          onPress={addEquipment}
-                          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-white"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {venueData.equipment.length > 0 && (
-                        <ScrollShadow className="space-y-2 pr-2 max-h-[calc(100vh-430px)] scrollbar-hide">
-                          {venueData.equipment.map((item, idx) => (
-                            <Card
-                              key={idx}
-                              isBlurred
-                              className="border-2 rounded-2xl border-default-200 bg-transparent"
-                            >
-                              <div className="flex items-center justify-between px-3 py-2">
-                                {editingEquipmentIndex === idx ? (
-                                  <>
-                                    <Input
-                                      value={equipmentEditInput}
-                                      onValueChange={setEquipmentEditInput}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          saveEquipmentEdit();
-                                        } else if (e.key === 'Escape') {
-                                          e.preventDefault();
-                                          cancelEquipmentEdit();
-                                        }
-                                      }}
-                                      variant="flat"
-                                      size="sm"
-                                      autoFocus
-                                      classNames={{
-                                        input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                                        inputWrapper: 'rounded-lg px-2 hover:bg-surface-deep',
-                                      }}
-                                    />
-                                    <div className="flex items-center gap-1 ml-2">
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        variant="light"
-                                        color="success"
-                                        onPress={saveEquipmentEdit}
-                                        className="min-w-6 w-6 h-6 flex-shrink-0"
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        variant="light"
-                                        onPress={cancelEquipmentEdit}
-                                        className="min-w-6 w-6 h-6 flex-shrink-0"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                      <span className="text-sm text-white truncate">
-                                        {item.name}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        variant="light"
-                                        onPress={() => startEditEquipment(idx)}
-                                        className="min-w-6 w-6 h-6 flex-shrink-0"
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        variant="light"
-                                        color="danger"
-                                        onPress={() => removeEquipment(idx)}
-                                        className="min-w-6 w-6 h-6 flex-shrink-0"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </Card>
-                          ))}
-                        </ScrollShadow>
-                      )}
+                      <EquipmentManagementSection
+                        equipmentInput={equipmentInput}
+                        setEquipmentInput={setEquipmentInput}
+                        addEquipment={addEquipment}
+                        equipment={venueData.equipment}
+                        editingEquipmentIndex={editingEquipmentIndex}
+                        equipmentEditInput={equipmentEditInput}
+                        setEquipmentEditInput={setEquipmentEditInput}
+                        saveEquipmentEdit={saveEquipmentEdit}
+                        cancelEquipmentEdit={cancelEquipmentEdit}
+                        startEditEquipment={startEditEquipment}
+                        removeEquipment={removeEquipment}
+                      />
                     </Tab>
                   </Tabs>
                 </div>
@@ -968,7 +807,7 @@ export default function VenueManagementPageClient() {
                     onPress={() => handleSubmit()}
                     isLoading={isUploading}
                     isDisabled={!venueData.name.trim()}
-                    className="flex-1 bg-accent hover:bg-accent/90 text-white px-10"
+                    className="flex-1 bg-accent hover:bg-accent/90 text-surface-light px-10"
                   >
                     {isUploading ? (venueId ? 'Updating...' : 'Creating...') : (venueId ? 'Update Venue' : 'Create Venue')}
                   </Button>
@@ -985,7 +824,7 @@ export default function VenueManagementPageClient() {
             <div className="flex flex-col h-full relative px-6 pt-6 pb-[72px] overflow-hidden">
               <div className="mb-3 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-white">
+                  <label className="text-sm font-medium text-surface-light">
                     Venue Map <span className="text-surface-light text-xs">(Optional)</span>
                   </label>
                   <Input
@@ -994,7 +833,7 @@ export default function VenueManagementPageClient() {
                     variant="flat"
                     size="md"
                     classNames={{
-                      input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+                      input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
                       inputWrapper: 'rounded-2xl px-4 pr-6 hover:bg-surface-deep',
                     }}
                     placeholder="Layer name"
@@ -1002,16 +841,10 @@ export default function VenueManagementPageClient() {
                 </div>
                 {previewUrl && (
                   <div className="flex gap-2">
-                    <Button
-                      size="md"
-                      variant={isAddMarkerMode ? 'solid' : 'bordered'}
-                      color={isAddMarkerMode ? 'primary' : 'default'}
-                      onPress={() => setIsAddMarkerMode(!isAddMarkerMode)}
-                      startContent={isAddMarkerMode ? <MousePointer2 className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
-                      className={isAddMarkerMode ? 'bg-accent hover:bg-accent/90' : ''}
-                    >
-                      {isAddMarkerMode ? 'Click to Place' : 'Add Markers'}
-                    </Button>
+                    <MarkerModeToggleButton
+                      isAddMarkerMode={isAddMarkerMode}
+                      onToggle={() => setIsAddMarkerMode(!isAddMarkerMode)}
+                    />
                   </div>
                 )}
               </div>
@@ -1022,10 +855,12 @@ export default function VenueManagementPageClient() {
                 {previewUrl ? (
                   <div className="w-full flex flex-col gap-3 max-h-full">
                     <div className="relative w-full overflow-hidden rounded-2xl">
-                      <div 
-                        ref={imgContainerRef}
-                        className="relative overflow-auto scrollbar-hide"
+                      <MapPanSurface
+                        containerRef={imgContainerRef}
                         onWheel={handleWheel}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
                         style={{ 
                           cursor: isAddMarkerMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
                           maxHeight: 'calc(100vh - 200px)',
@@ -1033,10 +868,6 @@ export default function VenueManagementPageClient() {
                       >
                         <div
                           className="relative inline-block"
-                          onMouseDown={handleMouseDown}
-                          onMouseMove={handleMouseMove}
-                          onMouseUp={handleMouseUp}
-                          onMouseLeave={handleMouseUp}
                           onClick={handleImageClick}
                           style={{
                             transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
@@ -1074,102 +905,29 @@ export default function VenueManagementPageClient() {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </MapPanSurface>
 
                       {pendingMarker && (
-                        <div
-                          className="fixed z-30 w-52 rounded-lg border border-status-blue bg-surface-deepest p-3 shadow-xl"
-                          style={{
-                            left: '50%',
-                            top: '50%',
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                        >
-                          <p className="mb-2 text-xs font-medium text-white">Name this location:</p>
-                          <Input
-                            ref={markerInputRef}
-                            value={markerNameInput}
-                            onValueChange={setMarkerNameInput}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                confirmMarkerName();
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                cancelMarkerName();
-                              }
-                            }}
-                            placeholder="Location name"
-                            size="sm"
-                            variant="bordered"
-                            classNames={{
-                              input: 'text-white text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                              inputWrapper: 'px-4 hover:bg-surface-deep mb-2',
-                            }}
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              onPress={cancelMarkerName}
-                              className="flex-1"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              onPress={confirmMarkerName}
-                              className="flex-1 bg-accent hover:bg-accent/90 text-white"
-                            >
-                              Confirm
-                            </Button>
-                          </div>
-                        </div>
+                        <PendingMarkerDialog
+                          markerNameInput={markerNameInput}
+                          markerInputRef={markerInputRef}
+                          setMarkerNameInput={setMarkerNameInput}
+                          onConfirm={confirmMarkerName}
+                          onCancel={cancelMarkerName}
+                        />
                       )}
 
                       {/* Zoom Controls - Top Right */}
-                      <div className="absolute top-3 right-3 flex flex-row gap-1 z-20">
-                        <ButtonGroup>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            onPress={() => setScale(prev => Math.min(prev + 0.5, 5))}
-                            className="bg-surface-deepest/95"
-                          >
-                            <ZoomIn className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            onPress={() => setScale(prev => Math.max(prev - 0.5, 1))}
-                            className="bg-surface-deepest/95"
-                          >
-                            <ZoomOut className="h-4 w-4" />
-                          </Button>
-                        </ButtonGroup>
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          onPress={() => {
-                            setScale(1);
-                            setPosition({ x: 0, y: 0 });
-                          }}
-                          className="bg-surface-deepest/95 text-xs px-2"
-                        >
-                          Reset
-                        </Button>
-                      </div>
+                      <MapZoomControls
+                        onZoomIn={() => zoomIn(0.5)}
+                        onZoomOut={() => zoomOut(0.5)}
+                        onReset={resetZoom}
+                        buttonClassName="bg-surface-deepest/95"
+                        resetButtonClassName="bg-surface-deepest/95 text-xs px-2"
+                      />
 
                       {/* Instructions overlay - Top Left */}
-                      {isAddMarkerMode && !pendingMarker && (
-                        <div className="absolute left-3 top-3 rounded-lg border border-status-blue/50 bg-surface-deepest/95 px-3 py-2 z-20 pointer-events-none">
-                          <p className="text-xs text-status-blue">
-                            Click on the map to place a location marker
-                          </p>
-                        </div>
-                      )}
+                      {isAddMarkerMode && !pendingMarker && <MarkerPlacementInstruction />}
                     </div>
 
                     {/* Bottom Info Bar - Now OUTSIDE and BELOW the image container */}

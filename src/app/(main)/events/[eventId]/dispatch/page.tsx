@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState, useRef, useCallback, ReactNode, RefObject, use} from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, use } from 'react';
 import PostingScheduleModal from '@/components/modals/event/postingschedulemodal';
 import VenueMapModal from '@/components/modals/event/venuemapmodal';
 import EndEventModal from '@/components/modals/event/endeventmodal';
@@ -14,9 +14,10 @@ import { toast, Slide } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
 import { useAuth } from '@/hooks/useauth';
+import { useLiteMode } from '@/lib/LiteContext';
+import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
 import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4} from "lucide-react";
-import TeamCard from '@/components/dispatch/teamcard';
-import TeamCardCondensed from '@/components/dispatch/teamcard-condensed';
+import TeamWidget from '@/components/dispatch/teamwidget';
 import { CallTrackingTable } from '@/components/dispatch/calltracking';
 import ClinicTrackingTable from '@/components/dispatch/clinictracking';
 import CallTrackingCard from '@/components/dispatch/calltrackingcard';
@@ -27,66 +28,11 @@ import { ShieldAlert } from 'lucide-react';
 import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip } from "@heroui/react"
 import EquipmentCard from '@/components/dispatch/equipmentcard';
 import LoadingScreen from '@/components/ui/loading-screen';
+import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
+import { getRowStatusClass } from '@/lib/statusColors';
 
-interface DispatchPageProps {
-  params: Promise<{ eventId: string }>
-}
-
-import ReactDOM from 'react-dom';
-
-interface PortalDropdownProps {
-  anchorRef: RefObject<HTMLElement>;
-  isOpen: boolean;
-  children: ReactNode;
-  widthClass?: string;
-  onClose?: () => void;
-}
-
-function PortalDropdown({
-  anchorRef,
-  isOpen,
-  children,
-  widthClass = 'w-auto',
-  onClose,
-}: PortalDropdownProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleDown(e: MouseEvent) {
-      const t = e.target as Node;
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(t) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(t)
-      ) {
-        onClose?.();
-      }
-    }
-    document.addEventListener('mousedown', handleDown);
-    return () => document.removeEventListener('mousedown', handleDown);
-  }, [onClose, anchorRef]);
-
-  if (!isOpen || !anchorRef.current) return null;
-
-  const rect = anchorRef.current.getBoundingClientRect();
-  const dropdownStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: rect.bottom + 4,
-    left: rect.left,
-    zIndex: 9999,
-  };
-
-  return ReactDOM.createPortal(
-    <div
-      ref={menuRef}
-      style={dropdownStyle}
-      className={`inline-block bg-surface-deepest border border-surface-liner rounded shadow-lg ${widthClass} max-h-[60vh] overflow-auto whitespace-nowrap`}
-    >
-      {children}
-    </div>,
-    document.body
-  );
+interface DispatchRoutePageProps {
+  params: Promise<{ eventId: string }>;
 }
 
 // function StatusTimer({ since }: { since: number })  {
@@ -109,62 +55,20 @@ function PortalDropdown({
 //   );
 // }
 
-interface TeamWidgetProps {
-  staff: Staff;
-  event: Event;
-  callDisplayNumberMap: Map<string, number>;
-  teamTimers: { [team: string]: number };
-  onStatusChange: (staff: Staff, newStatus: string) => void;
-  onLocationChange: (staff: Staff, newLocation: string) => void;
-  onEditTeam?: (staff: Staff) => void;
-  onDeleteTeam?: (team: string) => void;
-  onRefreshTeamPost?: (team: string) => void;
-  updateEvent: (updates: Partial<Event>) => Promise<void>;
-  cardViewMode?: 'normal' | 'condensed';
-}
-
-
-const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
-  const {
-    staff,
-    event,
-    teamTimers,
-    onStatusChange,
-    onLocationChange,
-    onEditTeam,
-    onDeleteTeam,
-    onRefreshTeamPost,
-    updateEvent,
-    cardViewMode = 'normal',
-  } = props;
-
-  const CardComponent = cardViewMode === 'condensed' ? TeamCardCondensed : TeamCard;
-
-  return (
-    <CardComponent
-      staff={staff}
-      event={event}
-      sinceMs={teamTimers?.[staff.team]}
-      onStatusChange={onStatusChange}
-      onLocationChange={onLocationChange}
-      onEdit={onEditTeam}
-      onDelete={onDeleteTeam}
-      onRefreshPost={onRefreshTeamPost}
-      updateEvent={updateEvent}
-    />
-  );
-});
-
 const AUTO_POST_SYNC = false;
 
-export default function DispatchPage({ params }: DispatchPageProps) {
+export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [event, setEvent] = useState<Event | undefined>(undefined);
   const [postAssignments, setPostAssignments] = useState<PostAssignment>({});
   // const handleBulkPostAssignment = (newAssignments: PostAssignment) => {
   //   setPostAssignments(newAssignments);
   // };
   const { eventId } = use(params);
-  const { user, ready } = useAuth();
+  const { isLiteMode: layoutLiteMode } = useLiteMode();
+  const isLiteMode = layoutLiteMode;
+  const { user: authUser, ready: authReady } = useAuth();
+  const user = isLiteMode ? null : authUser;
+  const ready = isLiteMode ? true : authReady;
   const router = useRouter();
   const [openCallId, setOpenCallId] = useState<string | null>(null);
   const [openClinicCallId, setOpenClinicCallId] = useState<string | null>(null);
@@ -233,6 +137,35 @@ export default function DispatchPage({ params }: DispatchPageProps) {
     updateInput: Partial<Event> | ((current: Event) => Partial<Event>)
   ) => {
     if (!eventId) return;
+
+    if (isLiteMode) {
+      try {
+        const currentDraft = await getLiteEvent(eventId);
+        if (!currentDraft) {
+          throw new Error('Lite event not found');
+        }
+
+        const currentEvent = normalizeLiteDraftToEvent(currentDraft);
+        const updates =
+          typeof updateInput === 'function' ? updateInput(currentEvent) : updateInput;
+
+        const nextEvent = {
+          ...currentEvent,
+          ...removeUndefinedDeep(updates),
+        } as Event;
+
+        const nextDraft = toLiteDraftFromEvent(nextEvent, currentDraft);
+        await saveLiteEvent(nextDraft);
+
+        setEvent(nextEvent);
+        setPostAssignments(nextEvent.postAssignments || {});
+      } catch (error) {
+        console.error('Local update failed:', error);
+        toast.error('Failed to save local changes. Please try again.');
+      }
+      return;
+    }
+
     try {
       await dbService.runTransaction(async (tx) => {
         const snap = await tx.get<Event>('events', eventId);
@@ -271,7 +204,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
       console.error("Update failed:", error);
       toast.error("Failed to save changes. Please try again.");
     }
-  }, [eventId]);
+  }, [eventId, isLiteMode]);
 
   const handlePostAssignment = useCallback(async (time: string, post: string, team: string) => {
     await updateEvent((currentEvent) => {
@@ -820,112 +753,16 @@ export default function DispatchPage({ params }: DispatchPageProps) {
   const [teamStatusMap, setTeamStatusMap] = useState<{ [callId: string]: { [team: string]: string } }>({});
 
   const getCallRowClass = (call: Call) => {
-    if (!Array.isArray(call.assignedTeam)) return 'bg-surface-deep';
+    if (!Array.isArray(call.assignedTeam)) return '';
 
-    if (!event) return 'bg-surface-deep';
+    if (!event) return '';
 
     const statuses = call.assignedTeam
       .map(t => event?.staff.find(s => s.team === t)?.status)
       .filter((status): status is string => status !== undefined);
 
-    if (statuses.some(status => ['En Route', 'On Scene', 'Transporting'].includes(status))) {
-      return 'bg-status-red/10';
-    }
-
-    return 'bg-surface-deep';
+    return getRowStatusClass(statuses);
   };
-
-
-  const ACTIVE_CALL_SET = new Set(['Assigned','En Route','On Scene','Transporting','Pending']);
-
-  const commitEquipmentLocation = async (resourceName: string, newLocationRaw: string) => {
-    if (!event) return;
-    const newLocation = newLocationRaw; // allow empty
-
-    let touched = false;
-    const updatedEquipment = (event.eventEquipment || []).map(eq => {
-      if (eq.name === resourceName) {
-        touched = true;
-        const inUse = !!eq.assignedTeam;
-        return {
-          ...eq,
-          location: newLocation,
-          status: inUse ? eq.status : ('Available' as EquipmentStatus),
-        };
-      }
-      return eq;
-    });
-
-    if (!touched) {
-      updatedEquipment.push({
-        id: `eq_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-        name: resourceName,
-        status: ('Available' as EquipmentStatus),
-        location: newLocation,
-        assignedTeam: null,
-      });
-    }
-
-    await updateEvent({ eventEquipment: updatedEquipment });
-  };
-
-
-
-  const [equipmentDraft, setEquipmentDraft] = useState<Record<string, string>>({});
-
-  type EquipRow = {
-    name: string;
-    inUse: boolean;
-    rightText: string;   // shown in the UI
-    location: string;    // raw location value (can be '')
-  };
-
-
-  function getEquipmentRows(): EquipRow[] {
-    const venueEquipment = (event?.venue as { equipment?: (string | { name: string })[] })?.equipment ?? [];
-    const tracked = event?.eventEquipment ?? [];
-
-    const byName: Record<string, { name: string; assignedTeam?: string | null; location?: string | null; }> = {};
-
-    for (const v of venueEquipment) {
-      const name = typeof v === 'string' ? v : v?.name;
-      if (name) byName[name] = { name, assignedTeam: null, location: null };
-    }
-    for (const t of tracked) {
-      byName[t.name] = { name: t.name, assignedTeam: t.assignedTeam ?? null, location: t.location ?? null };
-    }
-
-    const rows = Object.values(byName).map(r => {
-      const inUse = !!(r.assignedTeam && r.assignedTeam.trim());
-      const location = r.location ?? ''; // raw value for editing (may be empty)
-      let rightText: string;
-
-      if (inUse) {
-        // compute "CallNum - Team(s)" (leave as you already had)
-        const call = (event?.calls ?? []).find(c =>
-          c.assignedTeam?.includes(r.assignedTeam!) && ACTIVE_CALL_SET.has(c.status)
-        );
-        if (call) {
-          const callNo = callDisplayNumberMap.get(call.id);
-          const teams = (call.assignedTeam ?? []).join(', ');
-          rightText = `${callNo} - ${teams}`;
-        } else {
-          rightText = `— - ${r.assignedTeam ?? ''}`;
-        }
-      } else {
-        rightText = location || 'Clinic';
-      }
-
-      return { name: r.name, inUse, location, rightText };
-    });
-
-    rows.sort((a, b) => {
-      if (a.inUse !== b.inUse) return a.inUse ? 1 : -1;
-      return a.name.localeCompare(b.name, undefined, { numeric: true });
-    });
-
-    return rows;
-  }
 
 
   async function handleAgeSexBlur(callId: string) {
@@ -1569,6 +1406,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
   const [cardViewMode, setCardViewMode] = useState<'normal' | 'condensed'>('normal');
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
+  const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
 
 
   
@@ -1591,14 +1429,55 @@ export default function DispatchPage({ params }: DispatchPageProps) {
 
    useEffect(() => {
     if (!eventId) {
-      console.error('eventId is undefined or null, skipping Firestore subscription');
+      console.error('eventId is undefined or null, skipping event subscription');
       return;
     }
-    
+
+    if (isLiteMode) {
+      let cancelled = false;
+
+      const loadLiteEvent = async () => {
+        try {
+          const draft = await getLiteEvent(eventId);
+          if (cancelled) return;
+
+          if (!draft) {
+            setEvent(undefined);
+            router.push('/lite/create');
+            return;
+          }
+
+          const activeDraft =
+            draft.status === 'draft' ? { ...draft, status: 'active' as const } : draft;
+
+          if (activeDraft !== draft) {
+            await saveLiteEvent(activeDraft);
+          }
+
+          const normalizedEvent = normalizeLiteDraftToEvent(activeDraft);
+          setEvent((prev) => {
+            if (!isEqual(prev, normalizedEvent)) {
+              return normalizedEvent;
+            }
+            return prev;
+          });
+          setPostAssignments(normalizedEvent.postAssignments || {});
+        } catch (error) {
+          console.error('Error loading local event:', error);
+          setEvent(undefined);
+          router.push('/lite/create');
+        }
+      };
+
+      void loadLiteEvent();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (!user) {
       return;
     }
-    
     const unsubscribe = dbService.subscribeToDocument<Event>(
       'events',
       eventId,
@@ -1650,9 +1529,8 @@ export default function DispatchPage({ params }: DispatchPageProps) {
         }
       },
     );
-    
     return () => unsubscribe();
-  }, [eventId, user, router, isAdmin]);
+  }, [eventId, user, router, isAdmin, isLiteMode]);
   
   const handleRemoveTeamFromCall = async (callId: string, teamToRemove: string) => {
     if (!event) return;
@@ -2635,26 +2513,6 @@ export default function DispatchPage({ params }: DispatchPageProps) {
     setEditingCell(null);
   }
 
-  const computeCallStatus = (call: Call): string => {
-    if (!Array.isArray(call.assignedTeam)) return call.status || 'Pending';
-
-    if (!event) return call.status || 'Pending';
-    
-    if (!call.assignedTeam || call.assignedTeam.length === 0) {
-      return call.status || 'Pending';
-    }
-  
-    const teamStatuses = call.assignedTeam
-      .map(teamName => event.staff.find(t => t.team === teamName)?.status)
-      .filter(Boolean) as string[];
-  
-    if (teamStatuses.includes('Transporting')) return 'Transporting';
-    if (teamStatuses.includes('On Scene')) return 'On Scene';
-    if (teamStatuses.includes('En Route')) return 'En Route';
-    
-    return call.status || 'Assigned';
-  };  
-  
   function notifyPostAssignmentChange(reason: string, details: Record<string, unknown>) {
     console.log("Post Assignment Change Notification Triggered", new Date().toLocaleTimeString(), "Reason:", reason, details);
     // Play sound
@@ -2670,7 +2528,73 @@ export default function DispatchPage({ params }: DispatchPageProps) {
       draggable: true,
       transition: Slide,
     });
-  }  
+  }
+
+  const formatSummaryTimestamp = useCallback((timestamp: number): string => {
+    return Number.isFinite(timestamp) ? timestamp.toFixed(2) : '';
+  }, []);
+
+  const generateSummaryCSVData = useCallback((): string => {
+    if (!event) return '';
+
+    const csvRows: string[] = [];
+    csvRows.push('Log Type,Team/Call ID,Timestamp,Message');
+
+    event.staff.forEach((team) => {
+      (team.log || []).forEach((entry: TeamLogEntry) => {
+        const message = (entry.message || '').replace(/"/g, '""');
+        csvRows.push(`Staff,${team.team},${formatSummaryTimestamp(entry.timestamp)},"${message}"`);
+      });
+    });
+
+    event.calls.forEach((call) => {
+      (call.log || []).forEach((entry: CallLogEntry) => {
+        const message = (entry.message || '').replace(/"/g, '""');
+        csvRows.push(`Call,${call.id},${formatSummaryTimestamp(entry.timestamp)},"${message}"`);
+      });
+    });
+
+    return csvRows.join('\n');
+  }, [event, formatSummaryTimestamp]);
+
+  const handleExportSummaryCsv = useCallback(() => {
+    const csvContent = generateSummaryCSVData();
+    if (!csvContent) {
+      toast.info('No summary logs to export yet.');
+      return;
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.setAttribute('download', `${event?.name || eventId || 'LiteEvent'}_Summary.csv`);
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }, [event?.name, eventId, generateSummaryCSVData]);
+
+  const handleClearLiteEvent = useCallback(async () => {
+    if (!isLiteMode || !eventId) return;
+
+    const confirmed = window.confirm(
+      'This will permanently clear this local event and all logs. This action is irreversible. Are you sure you want to continue?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteLiteEvent(eventId);
+      toast.success('Local event cleared.');
+      router.push('/lite');
+    } catch (error) {
+      console.error('Failed to clear local event:', error);
+      toast.error('Failed to clear local event. Please try again.');
+    }
+  }, [isLiteMode, eventId, router]);
+
   const [showVenueMap, setShowVenueMap] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
   const [showEndEvent, setShowEndEvent] = useState(false);
@@ -2679,17 +2603,33 @@ export default function DispatchPage({ params }: DispatchPageProps) {
     const openVenue = () => setShowVenueMap(true);
     const openPosting = () => setShowPostingSchedule(true);
     const openEnd = () => setShowEndEvent(true);
+    const openLiteClear = () => {
+      void handleClearLiteEvent();
+    };
+    const openLiteExport = () => {
+      handleExportSummaryCsv();
+    };
 
-    window.addEventListener('open-venue-map', openVenue);
     window.addEventListener('open-posting-schedule', openPosting);
-    window.addEventListener('open-end-event', openEnd);
+    window.addEventListener('open-lite-clear-event', openLiteClear);
+    window.addEventListener('open-lite-export-summary', openLiteExport);
+
+    if (!isLiteMode) {
+      window.addEventListener('open-venue-map', openVenue);
+      window.addEventListener('open-end-event', openEnd);
+    }
 
     return () => {
-      window.removeEventListener('open-venue-map', openVenue);
       window.removeEventListener('open-posting-schedule', openPosting);
-      window.removeEventListener('open-end-event', openEnd);
+      window.removeEventListener('open-lite-clear-event', openLiteClear);
+      window.removeEventListener('open-lite-export-summary', openLiteExport);
+
+      if (!isLiteMode) {
+        window.removeEventListener('open-venue-map', openVenue);
+        window.removeEventListener('open-end-event', openEnd);
+      }
     };
-  }, []);
+  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv]);
 
   // Tab cycling for left sidebar tabs
   useEffect(() => {
@@ -2714,19 +2654,21 @@ export default function DispatchPage({ params }: DispatchPageProps) {
   }, [selectedLeftTab]);
 
   useEffect(() => {
+    if (isLiteMode) return;
+
     if (ready && !user) {
       // Store the current path for redirect after login
       sessionStorage.setItem('redirectPath', `/events/${eventId}/dispatch`);
       router.push('/?login=true&error=auth');
     }
-  }, [user, ready, router, eventId]);
+  }, [user, ready, router, eventId, isLiteMode]);
 
   // Return early if auth is not ready or user is not authenticated
-  if (!ready) {
+  if (!isLiteMode && !ready) {
     return <LoadingScreen label="Loading…" />;
   }
 
-  if (!user) {
+  if (!isLiteMode && !user) {
     return (
       <div className="w-full bg-surface-deepest min-h-[calc(100vh-72px)] flex items-center justify-center">
         <div className="text-surface-light">Redirecting...</div>
@@ -2736,7 +2678,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
 
   const handleRowClick = (e: React.MouseEvent, id: string) => {
     const target = e.target as HTMLElement;
-    if (target.closest('input, textarea, select, Button, a, [contenteditable="true"]')) return;
+    if (target.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;
     setOpenCallId(openCallId === id ? null : id);
   };
 
@@ -2807,12 +2749,30 @@ export default function DispatchPage({ params }: DispatchPageProps) {
 
   if (!event) return <LoadingScreen label="Loading event…" />;
 
+  const resolvedCallStatuses = [
+    'Delivered',
+    'Refusal',
+    'NMM',
+    'Rolled',
+    'Resolved',
+    'Unable to Locate',
+  ];
+
+  const activeCallsCount = (event.calls || []).filter(
+    call => !resolvedCallStatuses.includes(call.status)
+  ).length;
+  const activeClinicCount = (event.calls || []).filter(
+    call => call.status === 'Delivered' && !call.outcome
+  ).length;
+  const totalCallsCount = event.calls?.length || 0;
+  const totalPatientsCount = (event.calls || []).filter(call => call.status === 'Delivered').length;
+
   const COLW = {
-    CALLNO: '5rem',   // Call #
-    CC:     '10rem',  // Chief Complaint
+    CALLNO: '4rem',   // Call #
+    CC:     '11rem',  // Chief Complaint
     AS:     '4rem',   // A/S
-    STATUS: '9rem',   // Status
-    LOC:    '10rem',  // Location
+    LOC:    '11rem',  // Location
+    ACTION: '3rem',   // Row actions
   };
 
   function TableColGroup() {
@@ -2821,9 +2781,9 @@ export default function DispatchPage({ params }: DispatchPageProps) {
         <col style={{ width: COLW.CALLNO }} />
         <col style={{ width: COLW.CC }} />
         <col style={{ width: COLW.AS }} />
-        <col style={{ width: COLW.STATUS }} />
         <col style={{ width: COLW.LOC }} />
         <col />
+        <col style={{ width: COLW.ACTION }} />
       </colgroup>
     );
   }
@@ -2837,6 +2797,167 @@ export default function DispatchPage({ params }: DispatchPageProps) {
     await updateEvent({ calls: updatedCalls });
     setContextMenu(null);
   };
+
+  const TeamActionButtonGroup = ({
+    selectedTab,
+  }: {
+    selectedTab: 'teams' | 'supervisors' | 'equipment';
+  }) => (
+    <div className="flex items-center gap-1 p-1 rounded-full bg-surface-deep border border-surface-liner">
+      <Tooltip
+        content={
+          selectedTab === 'teams'
+            ? 'Add Team'
+            : selectedTab === 'supervisors'
+              ? 'Add Supervisor'
+              : 'Add Equipment'
+        }
+        placement="top"
+      >
+        <div>
+          <Dropdown>
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                className="rounded-full bg-transparent hover:bg-surface-liner"
+                aria-label="Add Team or Supervisor"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="Team Actions"
+              onAction={(key) => {
+                if (key === 'team') {
+                  handleAddNewTeam();
+                } else if (key === 'supervisor') {
+                  handleAddNewSupervisor();
+                }
+              }}
+            >
+              <DropdownItem key="team">Add Team</DropdownItem>
+              <DropdownItem key="supervisor">Add Supervisor</DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      </Tooltip>
+
+      <Tooltip
+        content={selectedTab === 'teams' ? 'Refresh all team posts from schedule' : 'Update all locations'}
+        placement="top"
+      >
+        <div>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="flat"
+            className="rounded-full bg-transparent hover:bg-surface-liner"
+            onPress={refreshAllPostsFromSchedule}
+            aria-label="Update all posts"
+            isDisabled={selectedTab === 'supervisors' || selectedTab === 'equipment'}
+          >
+            <RotateCw className="h-5 w-5" />
+          </Button>
+        </div>
+      </Tooltip>
+
+      <Tooltip content="Sort and view options" placement="top">
+        <div>
+          <Dropdown
+            classNames={{
+              content: 'min-w-[140px] w-[140px] max-w-[140px]',
+            }}
+          >
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                className="rounded-full bg-transparent hover:bg-surface-liner"
+                aria-label="Sort teams"
+              >
+                <ArrowDownWideNarrow className="h-5 w-5" />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="Sort and view options"
+            >
+              <DropdownItem
+                key="view-toggle"
+                isReadOnly
+                className="cursor-default hover:bg-transparent px-0 py-0"
+                textValue="View toggle"
+              >
+                <Tabs
+                  selectedKey={cardViewMode}
+                  onSelectionChange={(key) => setCardViewMode(key as 'normal' | 'condensed')}
+                  size="sm"
+                  fullWidth
+                  classNames={{
+                    tabList: 'gap-0 w-full bg-surface-deep p-0.5 rounded-lg',
+                    tab: 'h-7 data-[selected=true]:text-surface-light data-[hover=true]:opacity-100 transition-colors',
+                    cursor: 'bg-surface-liner',
+                  }}
+                >
+                  <Tab
+                    key="normal"
+                    title={
+                      <Tooltip content="Standard card view with full details" placement="top">
+                        <div className="flex items-center gap-1 pointer-events-none">
+                          <Rows2 className="h-4 w-4" />
+                        </div>
+                      </Tooltip>
+                    }
+                  />
+                  <Tab
+                    key="condensed"
+                    title={
+                      <Tooltip content="Compact card view for more teams on screen" placement="top">
+                        <div className="flex items-center gap-1 pointer-events-none">
+                          <Rows4 className="h-4 w-4" />
+                        </div>
+                      </Tooltip>
+                    }
+                  />
+                </Tabs>
+              </DropdownItem>
+              <DropdownItem
+                key="divider"
+                isReadOnly
+                className="p-0 m-0 h-px bg-surface-liner cursor-default"
+                textValue="divider"
+              >
+                <div className="h-px" />
+              </DropdownItem>
+              <DropdownItem
+                key="availability"
+                onClick={() => setTeamSortMode('availability')}
+                className={teamSortMode === 'availability' ? 'bg-surface-liner' : ''}
+              >
+                Availability
+              </DropdownItem>
+              <DropdownItem
+                key="asc"
+                onClick={() => setTeamSortMode('asc')}
+                className={teamSortMode === 'asc' ? 'bg-surface-liner' : ''}
+              >
+                Ascending
+              </DropdownItem>
+              <DropdownItem
+                key="desc"
+                onClick={() => setTeamSortMode('desc')}
+                className={teamSortMode === 'desc' ? 'bg-surface-liner' : ''}
+              >
+                Descending
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      </Tooltip>
+    </div>
+  );
 
   return (
     <>
@@ -2934,11 +3055,13 @@ export default function DispatchPage({ params }: DispatchPageProps) {
       />
       {/* Main Layout */}
       <div className="w-full bg-surface-deepest h-[calc(100vh-72px)]">
-        <div className="max-w-[1750px] mx-auto px-3 sm:px-4 h-full">
+        <div className="max-w-[1750px] mx-auto px-2 sm:px-4 h-full">
+
+
           {isAdmin && (
             <button 
               onClick={() => setShowDebugModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/50 rounded hover:bg-red-500 hover:text-white transition-all text-sm font-bold"
+              className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/50 rounded hover:bg-red-500 hover:text-surface-light transition-all text-sm font-bold"
             >
               <ShieldAlert className="w-4 h-4" />
               Debug View
@@ -2953,7 +3076,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
               <ResizablePanel defaultSize={25} minSize={20} maxSize={37}>
                 <div className="h-full rounded-xl pb-16">
                   {/* Header with Select and Action Buttons */}
-                  <div className="flex justify-between items-center px-4 pt-2 pb-2 border-b border-surface-liner">
+                  <div className="flex w-full justify-between items-center pt-2 pb-2 border-b border-surface-liner">
                     <Select
                       selectedKeys={[selectedLeftTab]}
                       onSelectionChange={(keys) => {
@@ -2961,10 +3084,10 @@ export default function DispatchPage({ params }: DispatchPageProps) {
                         setSelectedLeftTab(selected);
                       }}
                       aria-label="Select section"
-                      className="max-w-[140px]"
+                      className="w-auto min-w-[180px]"
                       classNames={{
-                        trigger: "bg-surface-deep hover:bg-surface-liner h-10 min-h-10",
-                        value: "text-surface-lightest",
+                        trigger: "bg-surface-deep border border-surface-liner rounded-full hover:bg-surface-liner h-10 min-h-10",
+                        value: "text-surface-light",
                         popoverContent: "bg-surface-deep border-surface-liner",
                       }}
                     >
@@ -2973,168 +3096,16 @@ export default function DispatchPage({ params }: DispatchPageProps) {
                       <SelectItem key="equipment">Equipment</SelectItem>
                     </Select>
 
-
-                    <div className="flex items-center gap-2">
-                      <Tooltip 
-                        content={
-                          selectedLeftTab === 'teams' 
-                            ? 'Add Team' 
-                            : selectedLeftTab === 'supervisors' 
-                            ? 'Add Supervisor' 
-                            : 'Add Equipment'
-                        } 
-                        placement="top"
-                      >
-                        <div>
-                          <Dropdown>
-                            <DropdownTrigger>
-                              <Button
-                                isIconOnly
-                                size="md"
-                                variant="flat"
-                                className="bg-surface-deep hover:bg-surface-liner"
-                                aria-label="Add Team or Supervisor"
-                              >
-                                <Plus className="h-5 w-5" />
-                              </Button>
-                            </DropdownTrigger>
-                            <DropdownMenu
-                              aria-label="Team Actions"
-                              onAction={(key) => {
-                                if (key === "team") {
-                                  handleAddNewTeam();
-                                } else if (key === "supervisor") {
-                                  handleAddNewSupervisor();
-                                }
-                              }}
-                            >
-                              <DropdownItem key="team">Add Team</DropdownItem>
-                              <DropdownItem key="supervisor">Add Supervisor</DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      </Tooltip>
-                      <Tooltip 
-                        content={selectedLeftTab === 'teams' ? 'Refresh all team posts from schedule' : 'Update all locations'} 
-                        placement="top"
-                      >
-                        <div>
-                          <Button
-                            isIconOnly
-                            size="md"
-                            variant="flat"
-                            className="bg-surface-deep hover:bg-surface-liner"
-                            onPress={refreshAllPostsFromSchedule}
-                            aria-label="Update all posts"
-                            isDisabled={selectedLeftTab === 'supervisors' || selectedLeftTab === 'equipment'}
-                          >
-                            <RotateCw className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </Tooltip>
-                      <Tooltip content="Sort and view options" placement="top">
-                        <div>
-                          <Dropdown
-                            classNames={{
-                              content: "min-w-[140px] w-[140px] max-w-[140px]", // Adjust dropdown width here
-                            }}
-                          >
-                            <DropdownTrigger>
-                              <Button
-                                isIconOnly
-                                size="md"
-                                variant="flat"
-                                className="bg-surface-deep hover:bg-surface-liner"
-                                aria-label="Sort teams"
-                              >
-                                <ArrowDownWideNarrow className="h-5 w-5" />
-                              </Button>
-                            </DropdownTrigger>
-                            <DropdownMenu
-                              aria-label="Sort and view options"
-                            >
-                              <DropdownItem
-                                key="view-toggle"
-                                isReadOnly
-                                className="cursor-default hover:bg-transparent px-0 py-0"
-                                textValue="View toggle"
-                              >
-                                <Tabs
-                                  selectedKey={cardViewMode}
-                                  onSelectionChange={(key) => setCardViewMode(key as 'normal' | 'condensed')}
-                                  size="sm"
-                                  fullWidth
-                                  classNames={{
-                                    tabList: "gap-0 w-full bg-surface-deep p-0.5 rounded-lg",
-                                    tab: "h-7 data-[selected=true]:text-surface-light data-[hover=true]:opacity-100 transition-colors",
-                                    cursor: "bg-surface-liner",
-                                  }}
-                                >
-                                  <Tab
-                                    key="normal"
-                                    title={
-                                      <Tooltip content="Standard card view with full details" placement="top">
-                                        <div className="flex items-center gap-1 pointer-events-none">
-                                          <Rows2 className="h-4 w-4" />
-                                        </div>
-                                      </Tooltip>
-                                    }
-                                  />
-                                  <Tab
-                                    key="condensed"
-                                    title={
-                                      <Tooltip content="Compact card view for more teams on screen" placement="top">
-                                        <div className="flex items-center gap-1 pointer-events-none">
-                                          <Rows4 className="h-4 w-4" />
-                                        </div>
-                                      </Tooltip>
-                                    }
-                                  />
-                                </Tabs>
-                              </DropdownItem>
-                              <DropdownItem
-                                key="divider"
-                                isReadOnly
-                                className="p-0 m-0 h-px bg-surface-liner cursor-default"
-                                textValue="divider"
-                              >
-                                <div className="h-px" />
-                              </DropdownItem>
-                              <DropdownItem
-                                key="availability"
-                                onClick={() => setTeamSortMode('availability')}
-                                className={teamSortMode === 'availability' ? 'bg-surface-liner' : ''}
-                              >
-                                Availability
-                              </DropdownItem>
-                              <DropdownItem
-                                key="asc"
-                                onClick={() => setTeamSortMode('asc')}
-                                className={teamSortMode === 'asc' ? 'bg-surface-liner' : ''}
-                              >
-                                Ascending
-                              </DropdownItem>
-                              <DropdownItem
-                                key="desc"
-                                onClick={() => setTeamSortMode('desc')}
-                                className={teamSortMode === 'desc' ? 'bg-surface-liner' : ''}
-                              >
-                                Descending
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      </Tooltip>
-                    </div>
+                    <TeamActionButtonGroup selectedTab={selectedLeftTab as 'teams' | 'supervisors' | 'equipment'} />
                   </div>
 
                   {/* Content with ScrollShadow */}
                   <div className="h-full overflow-auto scrollbar-hide">
-                    <div className="p-4">
+                    <div className="p-0">
                       
                       {/* TEAMS CONTENT */}
                       {selectedLeftTab === 'teams' && (
-                        <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
+                        <div className="dispatch-shell-list">
                           {[...(event?.staff || [])]
                             .sort((a, b) => {
                               const statusRank = (status: string) => {
@@ -3181,7 +3152,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
 
                       {/* SUPERVISORS CONTENT */}
                       {selectedLeftTab === 'supervisors' && (
-                        <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
+                        <div className="dispatch-shell-list">
                           {event?.supervisor && event.supervisor.length > 0 ? (
                             event.supervisor
                               .sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
@@ -3227,7 +3198,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
 
                       {/* EQUIPMENT CONTENT */}
                       {selectedLeftTab === 'equipment' && (
-                        <div className="space-y-2">
+                        <div className="dispatch-shell-list">
                           {(event?.venue?.equipment?.length || event?.eventEquipment?.length) ? (
                             <>
                               {/* Sort equipment: active calls at bottom */}
@@ -3265,66 +3236,118 @@ export default function DispatchPage({ params }: DispatchPageProps) {
 
               <ResizableHandle withHandle />
 
-              {/* RIGHT SIDE - Calls and Clinic Stacked */}
+              {/* RIGHT SIDE - Calls and Clinic Tabs */}
               <ResizablePanel defaultSize={75} minSize={50}>
                 <div className="h-full overflow-auto scrollbar-hide pt-2 pb-2">
-                  <div className="">
-                    {/* Call Tracking */}
-                    <div className="rounded-xl overflow-hidden">
-                      <CallTrackingTable
-                        event={event}
-                        callDisplayNumberMap={callDisplayNumberMap}
-                        showResolvedCalls={showResolvedCalls}
-                        setShowResolvedCalls={setShowResolvedCalls}
-                        setShowQuickCallForm={setShowQuickCallForm}
-                        openCallId={openCallId}
-                        setOpenCallId={setOpenCallId}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                        editValue={editValue}
-                        setEditValue={setEditValue}
-                        teamStatusMap={teamStatusMap}
-                        updateEvent={updateEvent}
-                        handleCellClick={handleCellClick}
-                        handleCellBlur={handleCellBlur}
-                        handleAgeSexBlur={handleAgeSexBlur}
-                        handleRowClick={handleRowClick}
-                        handleMarkDuplicate={handleMarkDuplicate}
-                        handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
-                        handleDeleteCall={handleDeleteCall}
-                        handleTeamStatusChange={handleTeamStatusChange}
-                        handleRemoveTeamFromCall={handleRemoveTeamFromCall}
-                        handleAddTeamToCall={handleAddTeamToCall}
-                        getCallRowClass={getCallRowClass}
-                        computeCallStatus={computeCallStatus}
-                        formatAgeSex={formatAgeSex}
-                        TableColGroup={TableColGroup}
-                        PortalDropdown={PortalDropdown as unknown as React.ComponentType<unknown>}
-                      />
+                  <div className="w-full">
+                    <div className="relative z-30 mx-1.5 pb-0 flex items-end gap-1 h-10">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRightTab('calls')}
+                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                        aria-pressed={selectedRightTab === 'calls'}
+                      >
+                        Calls ({activeCallsCount})
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRightTab('clinic')}
+                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'clinic' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                        aria-pressed={selectedRightTab === 'clinic'}
+                      >
+                        Clinic ({activeClinicCount})
+                      </button>
                     </div>
 
-                    {/* Clinic Tracking */}
-                    <div className="rounded-xl overflow-hidden">
-                      <ClinicTrackingTable
-                        event={event}
-                        callDisplayNumberMap={callDisplayNumberMap}
-                        showResolvedClinicCalls={showResolvedClinicCalls}
-                        setShowResolvedClinicCalls={setShowResolvedClinicCalls}
-                        setShowQuickClinicCallForm={setShowQuickClinicCallForm}
-                        openClinicCallId={openClinicCallId}
-                        setOpenClinicCallId={setOpenClinicCallId}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                        editValue={editValue}
-                        setEditValue={setEditValue}
-                        updateEvent={updateEvent}
-                        handleCellClick={handleCellClick}
-                        handleCellBlur={handleCellBlur}
-                        handleAgeSexBlur={handleAgeSexBlur}
-                        getCallRowClass={getCallRowClass}
-                        formatAgeSex={formatAgeSex}
-                      />
-                    </div>
+                    {selectedRightTab === 'calls' && (
+                      <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
+                        <div className="flex items-center justify-between py-1">
+                          <h3 className="text-md font-semibold text-surface-light">Total Calls: {totalCallsCount}</h3>
+                          <Tooltip content="Add Call (Ctrl+Enter)" placement="top">
+                            <div>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                               data-testid="add-call-button"
+                                onPress={() => setShowQuickCallForm(true)}
+                              >
+                                Add Call
+                              </Button>
+                            </div>
+                          </Tooltip>
+                        </div>
+
+                        <CallTrackingTable
+                          event={event}
+                          callDisplayNumberMap={callDisplayNumberMap}
+                          showResolvedCalls={showResolvedCalls}
+                          setShowResolvedCalls={setShowResolvedCalls}
+                          openCallId={openCallId}
+                          setOpenCallId={setOpenCallId}
+                          editingCell={editingCell}
+                          setEditingCell={setEditingCell}
+                          editValue={editValue}
+                          setEditValue={setEditValue}
+                          teamStatusMap={teamStatusMap}
+                          updateEvent={updateEvent}
+                          handleCellClick={handleCellClick}
+                          handleCellBlur={handleCellBlur}
+                          handleAgeSexBlur={handleAgeSexBlur}
+                          handleRowClick={handleRowClick}
+                          handleMarkDuplicate={handleMarkDuplicate}
+                          handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
+                          handleDeleteCall={handleDeleteCall}
+                          handleTeamStatusChange={handleTeamStatusChange}
+                          handleRemoveTeamFromCall={handleRemoveTeamFromCall}
+                          handleAddTeamToCall={handleAddTeamToCall}
+                          getCallRowClass={getCallRowClass}
+                          formatAgeSex={formatAgeSex}
+                          TableColGroup={TableColGroup}
+                        />
+                      </div>
+                    )}
+
+                    {selectedRightTab === 'clinic' && (
+                      <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
+                        <div className="flex items-center justify-between py-1">
+                          <h3 className="text-md font-semibold text-surface-light">Total Patients: {totalPatientsCount}</h3>
+                          <Tooltip content="Add Patient" placement="top">
+                            <div>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                aria-label="Add Clinic Call"
+                                onPress={() => setShowQuickClinicCallForm(true)}
+                              >
+                                Add Patient
+                              </Button>
+                            </div>
+                          </Tooltip>
+                        </div>
+
+                        <ClinicTrackingTable
+                          event={event}
+                          callDisplayNumberMap={callDisplayNumberMap}
+                          showResolvedClinicCalls={showResolvedClinicCalls}
+                          setShowResolvedClinicCalls={setShowResolvedClinicCalls}
+                          openClinicCallId={openClinicCallId}
+                          setOpenClinicCallId={setOpenClinicCallId}
+                          editingCell={editingCell}
+                          setEditingCell={setEditingCell}
+                          editValue={editValue}
+                          setEditValue={setEditValue}
+                          updateEvent={updateEvent}
+                          handleCellClick={handleCellClick}
+                          handleCellBlur={handleCellBlur}
+                          handleAgeSexBlur={handleAgeSexBlur}
+                          getCallRowClass={getCallRowClass}
+                          formatAgeSex={formatAgeSex}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </ResizablePanel>
@@ -3344,7 +3367,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
                 tabList: "fixed bottom-0 left-0 right-0 w-full bg-surface-deep border-t border-surface-light/10 z-50",
                 cursor: "bg-blue-600",
                 tab: "h-10",
-                tabContent: "text-lg text-surface-light group-data-[selected=true]:text-surface-lightest"
+                tabContent: "text-lg text-surface-light group-data-[selected=true]:text-surface-light"
               }}
             >
               {/* TEAMS TAB */}
@@ -3353,127 +3376,10 @@ export default function DispatchPage({ params }: DispatchPageProps) {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <h2 className="text-xl font-bold text-surface-light">Teams</h2>
-                      <div className="flex items-center gap-2">
-                        <Tooltip content="Add Team or Supervisor" placement="top">
-                          <div>
-                            <Dropdown>
-                              <DropdownTrigger>
-                                <Button isIconOnly size="md" variant="flat" aria-label="Add Team or Supervisor">
-                                  <Plus className="h-5 w-5" />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu
-                                aria-label="Team Actions"
-                                onAction={(key) => {
-                                  if (key === "team") handleAddNewTeam();
-                                  else if (key === "supervisor") handleAddNewSupervisor();
-                                }}
-                              >
-                                <DropdownItem key="team">Add Team</DropdownItem>
-                                <DropdownItem key="supervisor">Add Supervisor</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </Tooltip>
-                        <Tooltip content="Refresh all team posts from schedule" placement="top">
-                          <div>
-                            <Button isIconOnly size="md" variant="flat" onPress={refreshAllPostsFromSchedule}>
-                              <RotateCw className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </Tooltip>
-                        <Tooltip content="Sort and view options" placement="top">
-                          <div>
-                            <Dropdown
-                              classNames={{
-                                content: "min-w-[140px] w-[140px] max-w-[140px]", // Adjust dropdown width here
-                              }}
-                            >
-                              <DropdownTrigger>
-                                <Button isIconOnly size="md" variant="flat" aria-label="Sort teams">
-                                  <ArrowDownWideNarrow className="h-5 w-5" />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu
-                                aria-label="Sort and view options"
-                              >
-                                <DropdownItem
-                                  key="view-toggle"
-                                  isReadOnly
-                                  className="cursor-default hover:bg-transparent px-2 py-1"
-                                  textValue="View toggle"
-                                >
-                                  <Tabs
-                                    selectedKey={cardViewMode}
-                                    onSelectionChange={(key) => setCardViewMode(key as 'normal' | 'condensed')}
-                                    size="sm"
-                                    fullWidth
-                                    disableAnimation
-                                    classNames={{
-                                      tabList: "gap-0 w-full bg-surface-deep p-0.5 rounded-lg",
-                                      tab: "h-7 px-2 data-[selected=true]:bg-surface-liner data-[selected=true]:text-surface-light data-[hover=true]:opacity-100 transition-colors",
-                                      cursor: "bg-surface-liner",
-                                    }}
-                                  >
-                                    <Tab
-                                      key="normal"
-                                      title={
-                                        <Tooltip content="Standard card view with full details" placement="top">
-                                          <div className="flex items-center gap-1 pointer-events-none">
-                                            <Rows2 className="h-4 w-4" />
-                                          </div>
-                                        </Tooltip>
-                                      }
-                                    />
-                                    <Tab
-                                      key="condensed"
-                                      title={
-                                        <Tooltip content="Compact card view for more teams on screen" placement="top">
-                                          <div className="flex items-center gap-1 pointer-events-none">
-                                            <Rows4 className="h-4 w-4" />
-                                          </div>
-                                        </Tooltip>
-                                      }
-                                    />
-                                  </Tabs>
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="divider"
-                                  isReadOnly
-                                  className="p-0 m-0 h-px bg-surface-liner cursor-default"
-                                  textValue="divider"
-                                >
-                                  <div className="h-px" />
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="availability"
-                                  onClick={() => setTeamSortMode('availability')}
-                                  className={teamSortMode === 'availability' ? 'bg-surface-liner' : ''}
-                                >
-                                  Availability
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="asc"
-                                  onClick={() => setTeamSortMode('asc')}
-                                  className={teamSortMode === 'asc' ? 'bg-surface-liner' : ''}
-                                >
-                                  Ascending
-                                </DropdownItem>
-                                <DropdownItem
-                                  key="desc"
-                                  onClick={() => setTeamSortMode('desc')}
-                                  className={teamSortMode === 'desc' ? 'bg-surface-liner' : ''}
-                                >
-                                  Descending
-                                </DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </Tooltip>
-                      </div>
+                      <TeamActionButtonGroup selectedTab="teams" />
                     </div>
                     <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
-                      <div className="grid grid-cols-1 gap-3">
+                      <div className="dispatch-shell-list">
                         {[...(event?.staff || [])]
                           .sort((a, b) => {
                             const statusRank = (status: string) => {
@@ -3515,7 +3421,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
                       <div className="flex justify-between items-center mb-2">
                         <h2 className="text-xl font-bold text-surface-light">Supervisors</h2>
                       </div>
-                      <div className="grid grid-cols-1 gap-3">
+                      <div className="dispatch-shell-list">
                         {event.supervisor
                           ?.sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
                           .map(supervisor => {
@@ -3559,79 +3465,11 @@ export default function DispatchPage({ params }: DispatchPageProps) {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <h2 className="text-xl font-bold text-surface-light">Equipment</h2>
-                      <div className="flex items-center gap-2">
-                        <Tooltip content="Add Equipment from venue" placement="top">
-                          <div>
-                            <Dropdown>
-                              <DropdownTrigger>
-                                <Button 
-                                  isIconOnly 
-                                  size="md" 
-                                  variant="flat" 
-                                  aria-label="Add Equipment"
-                                >
-                                  <Plus className="h-5 w-5" />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu
-                                aria-label="Add Equipment"
-                                onAction={(key) => handleAddVenueEquipment(key as string)}
-                              >
-                                {getAvailableVenueEquipment().length > 0 ? (
-                                  getAvailableVenueEquipment().map(equipName => (
-                                    <DropdownItem key={equipName}>{equipName}</DropdownItem>
-                                  ))
-                                ) : (
-                                  <DropdownItem key="none" textValue="No equipment available" isReadOnly>
-                                    No equipment left to add
-                                  </DropdownItem>
-                                )}
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </Tooltip>
-                        <Tooltip content="Reset all equipment locations to defaults" placement="top">
-                          <div>
-                            <Button 
-                              isIconOnly 
-                              size="md" 
-                              variant="flat" 
-                              onPress={handleResetEquipmentLocations}
-                              aria-label="Reset equipment locations"
-                            >
-                              <RotateCw className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </Tooltip>
-                        <Tooltip content="Sort equipment" placement="top">
-                          <div>
-                            <Dropdown>
-                              <DropdownTrigger>
-                                <Button isIconOnly size="md" variant="flat" aria-label="Sort equipment">
-                                  <ArrowDownWideNarrow className="h-5 w-5" />
-                                </Button>
-                              </DropdownTrigger>
-                              <DropdownMenu
-                                aria-label="Sort options"
-                                selectedKeys={[teamSortMode]}
-                                selectionMode="single"
-                                onSelectionChange={(keys) => {
-                                  const selected = Array.from(keys)[0] as 'availability' | 'asc' | 'desc';
-                                  setTeamSortMode(selected);
-                                }}
-                              >
-                                <DropdownItem key="availability">Availability</DropdownItem>
-                                <DropdownItem key="asc">Ascending</DropdownItem>
-                                <DropdownItem key="desc">Descending</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </Tooltip>
-                      </div>
+                      <TeamActionButtonGroup selectedTab="equipment" />
                     </div>
                     <div className="space-y-3">
                       {(event?.venue?.equipment?.length || event?.eventEquipment?.length) ? (
-                        <div className="grid grid-cols-1 gap-3">
+                        <div className="dispatch-shell-list">
                           {getEquipmentItems()
                             .sort((a, b) => {
                               const aOnCall = a.status !== 'Available' ? 1 : 0;
@@ -3780,26 +3618,6 @@ export default function DispatchPage({ params }: DispatchPageProps) {
               <Tab key="clinic" title="Clinic">
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">
-                        Clinic ({(event.calls || []).filter(c => c.status === 'Delivered' && !c.outcome).length})
-                      </h2>
-                      <div className="flex items-center gap-2">
-                        <Tooltip content="Add clinic walk-up" placement="top">
-                          <div>
-                            <Button 
-                              isIconOnly 
-                              size="md" 
-                              variant="flat" 
-                              aria-label="Add Clinic Call"
-                              onPress={() => setShowQuickClinicCallForm(true)}
-                            >
-                              <Plus className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </Tooltip>
-                      </div>
-                    </div>
                     <div className="space-y-3">
                       {[
                         // Unresolved clinic (Delivered with no outcome)
@@ -3908,32 +3726,6 @@ export default function DispatchPage({ params }: DispatchPageProps) {
         </div>
       </div>
 
-      {/* All your existing modals - unchanged */}
-      {event?.venue && (
-        <VenueMapModal
-          isOpen={showVenueMap}
-          onClose={() => setShowVenueMap(false)}
-          layers={
-            event.venue.layers && event.venue.layers.length
-              ? event.venue.layers
-              : [
-                  {
-                    id:
-                      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                        ? (crypto as unknown as { randomUUID?: () => string }).randomUUID?.() ?? `layer-${Date.now()}`
-                        : `layer-${Date.now()}`,
-                    name: event.venue.name || 'Main Floor',
-                    posts: event.eventPosts || [],
-                    mapUrl: event.venue.mapUrl,
-                  },
-                ]
-          }
-          staff={event.staff || []}
-          equipment={event.eventEquipment || []}
-          teamTimers={teamTimers}
-        />
-      )}
-
       <PostingScheduleModal
         isOpen={showPostingSchedule}
         onClose={() => setShowPostingSchedule(false)}
@@ -3948,12 +3740,42 @@ export default function DispatchPage({ params }: DispatchPageProps) {
         notifyPostAssignmentChange={notifyPostAssignmentChange}
       />
 
-      <EndEventModal
-        open={showEndEvent}
-        onClose={() => setShowEndEvent(false)}
-        onEndNoSummary={async () => { router.push('/venues/selection'); }}
-        onQuickSummary={async () => router.push(`/events/${event.id}/summary`)}
-      />
+      {!isLiteMode && (
+        <>
+          {/* Cloud-only modals */}
+          {event?.venue && (
+            <VenueMapModal
+              isOpen={showVenueMap}
+              onClose={() => setShowVenueMap(false)}
+              layers={
+                event.venue.layers && event.venue.layers.length
+                  ? event.venue.layers
+                  : [
+                      {
+                        id:
+                          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                            ? (crypto as unknown as { randomUUID?: () => string }).randomUUID?.() ?? `layer-${Date.now()}`
+                            : `layer-${Date.now()}`,
+                        name: event.venue.name || 'Main Floor',
+                        posts: event.eventPosts || [],
+                        mapUrl: event.venue.mapUrl,
+                      },
+                    ]
+              }
+              staff={event.staff || []}
+              equipment={event.eventEquipment || []}
+              teamTimers={teamTimers}
+            />
+          )}
+
+          <EndEventModal
+            open={showEndEvent}
+            onClose={() => setShowEndEvent(false)}
+            onEndNoSummary={async () => { router.push('/venues/selection'); }}
+            onQuickSummary={async () => router.push(`/events/${event.id}/summary`)}
+          />
+        </>
+      )}
 
       {showDuplicateModal && selectedDuplicateCallId && (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-center justify-center" onClick={() => setShowDuplicateModal(false)}>
@@ -3991,7 +3813,7 @@ export default function DispatchPage({ params }: DispatchPageProps) {
                         <td className="px-3 py-2">
                           <Button
                             onClick={() => handleResolveDuplicate(selectedDuplicateCallId, call.id)}
-                            className="px-3 py-1 bg-status-red hover:bg-status-red/80 text-white rounded text-sm"
+                            className="px-3 py-1 bg-status-red hover:bg-status-red/80 text-surface-light rounded text-sm"
                           >
                             Select
                           </Button>

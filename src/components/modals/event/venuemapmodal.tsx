@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { Modal, ModalContent, ModalBody, Button, Card, Tooltip } from '@heroui/react';
-import { ZoomIn, ZoomOut, RotateCcw, MapPin, Cross, ShieldPlus, Briefcase, HousePlus } from 'lucide-react';
+import { Modal, ModalContent, ModalBody, Button, Card } from '@heroui/react';
+import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus } from 'lucide-react';
 import { Post, Staff, Equipment, Layer } from '@/app/types';
 
 function StatusTimer({ since }: { since: number }) {
@@ -102,7 +102,7 @@ function PostMarker({ post, rect }: PostMarkerProps) {
             pointerEvents: 'none',
           }}
         >
-          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
+          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
             {post.name}
           </div>
         </div>,
@@ -110,28 +110,6 @@ function PostMarker({ post, rect }: PostMarkerProps) {
       )}
     </div>
   );
-}
-
-function getEquipmentMarkerColors(equipment: Equipment) {
-  let color = '#8B5CF6'; // Purple for default
-  const outline = '2px solid white';
-
-  switch (equipment.status) {
-    case 'Available':
-      color = '#10B981'; // Green
-      break;
-    case 'En Route to Call':
-      color = '#F59E0B'; // Amber
-      break;
-    case 'Transporting Patient':
-      color = '#EF4444'; // Red
-      break;
-    case 'Out of Service':
-      color = '#6B7280'; // Gray
-      break;
-  }
-
-  return { color, outline };
 }
 
 function getEquipmentIcon(equipment: Equipment) {
@@ -155,22 +133,24 @@ function getEquipmentIcon(equipment: Equipment) {
 function EquipmentIcon({ type, className }: { type: string; className?: string }) {
   if (type === 'wheelchair') {
     return (
-      <img 
-        src="/map/wheelchair.svg" 
-        alt="Wheelchair" 
+      <Image
+        src="/map/wheelchair.svg"
+        alt="Wheelchair"
+        width={24}
+        height={24}
         className={className}
-        style={{ width: '100%', height: '100%' }}
         draggable={false}
       />
     );
   }
   if (type === 'stretcher') {
     return (
-      <img 
-        src="/map/gurney.svg" 
-        alt="Gurney" 
+      <Image
+        src="/map/gurney.svg"
+        alt="Gurney"
+        width={24}
+        height={24}
         className={className}
-        style={{ width: '100%', height: '100%' }}
         draggable={false}
       />
     );
@@ -277,7 +257,7 @@ function EquipmentMarker({
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
         }}
       >
-        <EquipmentIcon type={iconType} className="h-4 w-4 text-white" />
+        <EquipmentIcon type={iconType} className="h-4 w-4 text-surface-light" />
       </div>
       {/* Hover tooltip with fixed positioning using portal */}
       {hovered && typeof window !== 'undefined' && createPortal(
@@ -290,7 +270,7 @@ function EquipmentMarker({
             pointerEvents: 'none',
           }}
         >
-          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
+          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
             <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}>
               {equipment.name}
             </div>
@@ -404,7 +384,7 @@ function TeamMarker({
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
         }}
       >
-        <ShieldPlus className="h-6 w-6 text-white" strokeWidth={2.5} />
+        <ShieldPlus className="h-6 w-6 text-surface-light" strokeWidth={2.5} />
       </div>
       {/* Hover card with fixed positioning using portal */}
       {hovered && typeof window !== 'undefined' && createPortal(
@@ -417,7 +397,7 @@ function TeamMarker({
             pointerEvents: 'none',
           }}
         >
-          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-white shadow-lg whitespace-nowrap">
+          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
             <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}>
               {team.team}
             </div>
@@ -892,7 +872,7 @@ export default function VenueMapModal({
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-white font-medium">
+                  <span className="text-sm text-surface-light font-medium">
                     {mapFileName || 'No map'}
                   </span>
                 </div>
@@ -903,11 +883,11 @@ export default function VenueMapModal({
                       variant="flat"
                       onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
                       isDisabled={currentLayer === 0}
-                      className="text-white"
+                      className="text-surface-light"
                     >
                       Previous
                     </Button>
-                    <span className="text-sm text-white">
+                    <span className="text-sm text-surface-light">
                       {layers[currentLayer]?.name || `Layer ${currentLayer + 1}`}
                     </span>
                     <Button
@@ -915,7 +895,7 @@ export default function VenueMapModal({
                       variant="flat"
                       onPress={() => setCurrentLayer(prev => Math.min(layers.length - 1, prev + 1))}
                       isDisabled={currentLayer === layers.length - 1}
-                      className="text-white"
+                      className="text-surface-light"
                     >
                       Next
                     </Button>

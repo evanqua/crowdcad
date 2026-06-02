@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { authService } from "@/lib/services";
 import { useAuth } from "@/hooks/useauth";
@@ -21,18 +21,11 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
-  Avatar,
 } from "@heroui/react";
 
-import { Menu, UserRound, Cog, LogOut } from "lucide-react";
+import { Menu, Moon, UserRound, LogOut, Sun } from "lucide-react";
 
 const LoginModalLazy = dynamic(() => import("@/components/modals/auth/loginmodal"), { ssr: false });
-
-function initialsFromUser(u?: { displayName?: string | null; email?: string | null }) {
-  const fromName = u?.displayName?.trim().split(/\s+/).map((s) => s[0]?.toUpperCase()).join("") ?? "";
-  if (fromName) return fromName.slice(0, 2);
-  return (u?.email?.[0] ?? "U").toUpperCase();
-}
 
 function LiveClock() {
   const [now, setNow] = useState<Date>(() => new Date());
@@ -41,7 +34,7 @@ function LiveClock() {
     return () => clearInterval(id);
   }, []);
   return (
-    <span suppressHydrationWarning={true} className="tabular-nums text-surface-light text-lg font-semibold font-arial">
+    <span suppressHydrationWarning={true} className="tabular-nums text-surface-light text-sm font-semibold font-arial">
       {now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
     </span>
   );
@@ -55,6 +48,29 @@ export default function AppNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginMode, setLoginMode] = useState<"login" | "signup">("login");
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const hasDarkClass = root.classList.contains("dark");
+    setIsDarkTheme(hasDarkClass);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    const nextIsDark = !isDarkTheme;
+    const root = document.documentElement;
+
+    root.classList.toggle("dark", nextIsDark);
+    root.setAttribute("data-theme", nextIsDark ? "dark" : "light");
+
+    try {
+      localStorage.setItem("ccad-theme", nextIsDark ? "dark" : "light");
+    } catch {
+      // Ignore localStorage failures (private mode / restricted storage).
+    }
+
+    setIsDarkTheme(nextIsDark);
+  }, [isDarkTheme]);
 
   const isDispatch = !!(pathname && /^\/events\/[^/]+\/dispatch(?:$|\/|\?)/.test(pathname));
 
@@ -84,7 +100,10 @@ export default function AppNavbar() {
   ];
 
   const isActive = (href: string) => pathname === href;
-  const initials = initialsFromUser(user ?? undefined);
+  const wrapperHeightClass = 'h-14 md:h-14';
+  const containerWidthClass = isDispatch ? 'max-w-none' : 'max-w-[1280px]';
+  const logoWidthClass = 'w-20';
+  const desktopNavGapClass = 'gap-1 pl-2';
 
   // Optional: You can add logic here to check if the user is actually an admin
   // const isAdmin = user?.email === "admin@yourdomain.com"; 
@@ -106,47 +125,45 @@ export default function AppNavbar() {
         onMenuOpenChange={setIsMenuOpen}
         classNames={{
           base:
-            "sticky top-0 z-[300] bg-surface-deepest/70 backdrop-blur-md",
+            `sticky top-0 z-[300] ${isDispatch ? 'bg-surface-deep' : 'bg-surface-deepest/70'} backdrop-blur-md`,
           wrapper:
-            "h-16 md:h-16 px-4 sm:px-6 md:px-6 lg:px-6 xl:px-6 2xl:px-6 flex items-center",
-          item: "text-[18px] leading-6",
+            `${wrapperHeightClass} px-4 sm:px-6 md:px-6 lg:px-6 xl:px-6 2xl:px-6 flex items-center`,
+          item: "text-[16px] leading-6",
           content: "items-center",
           toggle: "lg:hidden",
           menu:
-            "fixed inset-x-0 top-16 z-[350] bg-surface-deep/95 backdrop-blur supports-[backdrop-filter]:bg-opacity-90 " +
-            "h-[calc(100dvh-4rem)] overflow-y-auto pt-2 pb-6 border-t border-base-200",
+            `fixed inset-x-0 top-14 h-[calc(100dvh-3.5rem)] z-[350] bg-surface-deep/95 backdrop-blur supports-[backdrop-filter]:bg-opacity-90 ` +
+            'overflow-y-auto pt-2 pb-6 border-t border-base-200',
           menuItem: "justify-center text-surface-light",
         }}
       >
-        <div className={`flex items-center justify-between w-full ${!isDispatch ? 'max-w-[1200px] mx-auto' : ''}`}>
-          {/* LEFT: brand */}
-          <NavbarContent justify="start" className="min-w-0">
+        <div className={`flex w-full items-center justify-between ${containerWidthClass} mx-auto`}>
+          <div className="relative z-[30] min-w-0 flex items-center gap-2 sm:gap-4 md:gap-6">
             <NavbarBrand>
               <button onClick={() => router.push("/")} className="flex items-center">
                 <Image
-                  src="/logo.svg"
+                  src={isDarkTheme ? "/logo.svg" : "/logo-dark.svg"}
                   alt="Logo"
-                  width={140}
+                  width={118}
                   height={30}
                   priority
                   sizes="(max-width: 600px) 7rem, (max-width: 800px) 8rem, 110px"
-                  className="cursor-pointer w-24 h-auto"
+                  className={`cursor-pointer h-auto shrink-0 ${logoWidthClass}`}
                 />
               </button>
               {/* LiveClock next to logo when on dispatch page */}
               {isDispatch && (
-                <div className="ml-4 sm:ml-6 md:ml-8">
+                <div className="ml-3 sm:ml-4 md:ml-6">
                   <LiveClock />
                 </div>
               )}
             </NavbarBrand>
             {/* Organization selector removed — use Profile > Affiliations instead */}
-          </NavbarContent>
 
-          {/* CENTER: desktop nav links */}
+            {/* Desktop nav links */}
           <NavbarContent 
-            className={`hidden lg:flex gap-8 ${!isDispatch ? 'max-w-[500px]' : ''}`} 
-            justify="center"
+            className={`hidden lg:flex flex-none ${desktopNavGapClass}`}
+            justify="start"
           >
             {isDispatch ? (
               // Dispatch page navigation
@@ -154,7 +171,7 @@ export default function AppNavbar() {
                 <NavbarItem key={label}>
                   <button
                     onClick={onClick}
-                    className={`text-lg font-medium transition ${
+                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition ${
                       itemActive ? "text-surface-light" : "text-surface-light hover:text-accent"
                     }`}
                   >
@@ -163,79 +180,46 @@ export default function AppNavbar() {
                 </NavbarItem>
               ))
             ) : (
-              // Regular navigation (About has submenu)
-              navItems.map(({ label, href }) => {
-                if (label === "About") {
-                  const aboutActive = pathname?.startsWith("/about");
-                  return (
-                    <Dropdown key={href}>
-                        <NavbarItem isActive={aboutActive}>
-                        <DropdownTrigger>
-                          <button
-                            type="button"
-                            aria-haspopup="menu"
-                            className={`p-0 bg-transparent data-[hover=true]:bg-transparent text-lg font-medium ${aboutActive ? 'text-surface-light' : 'text-surface-faint hover:text-accent'}`}
-                          >
-                            About
-                          </button>
-                        </DropdownTrigger>
-                      </NavbarItem>
-                      <DropdownMenu
-                        aria-label="About menu"
-                        itemClasses={{
-                          base: "gap-2",
-                        }}
-                      >
-                        <DropdownItem
-                          key="overview"
-                          onPress={() => router.push('/about')}
-                        >
-                          Overview
-                        </DropdownItem>
-                        <DropdownItem
-                          key="hosting"
-                          onPress={() => router.push('/about/hosting')}
-                        >
-                          Hosting & HIPAA
-                        </DropdownItem>
-                        <DropdownItem
-                          key="firebase"
-                          onPress={() => router.push('/about/firebase')}
-                        >
-                          Firebase Setup
-                        </DropdownItem>
-                      </DropdownMenu>
-                    </Dropdown>
-                  );
-                }
-                return (
-                  <NavbarItem key={href} isActive={isActive(href)}>
-                    <Link
-                      href={href}
-                      className={`text-lg font-medium transition ${
-                        isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
-                      }`}
-                    >
-                      {label}
-                    </Link>
-                  </NavbarItem>
-                );
-              })
+              navItems.map(({ label, href }) => (
+                <NavbarItem key={href} isActive={isActive(href)}>
+                  <Link
+                    href={href}
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition ${
+                      isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                </NavbarItem>
+              ))
             )}
           </NavbarContent>
+          </div>
 
           {/* RIGHT: auth + mobile toggle */}
-          <NavbarContent justify="end" className="gap-2 sm:gap-3 md:gap-4">
+          <NavbarContent justify="end" className="gap-1 sm:gap-2 md:gap-2">
             {/* Mobile toggle */}
             <div className="lg:hidden">
               <NavbarMenuToggle
                 aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-                className="text-white"
+                className="text-surface-light"
                 icon={(open) => (
-                  <Menu className={`size-6 transition ${open ? "rotate-90" : ""}`} color="white" />
+                  <Menu className={`size-6 transition ${open ? "rotate-90" : ""} text-surface-light`} />
                 )}
               />
             </div>
+
+            <NavbarItem>
+              <Button
+                isIconOnly
+                variant="flat"
+                aria-label={isDarkTheme ? "Switch to light mode" : "Switch to dark mode"}
+                className="h-8 w-8 min-w-8 rounded-full bg-surface-deeper/70 text-surface-light hover:bg-surface-deeper"
+                onPress={toggleTheme}
+              >
+                {isDarkTheme ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              </Button>
+            </NavbarItem>
 
             {/* Show nothing while loading */}
             {!ready ? (
@@ -245,35 +229,31 @@ export default function AppNavbar() {
             ) : !user ? (
               <NavbarItem>
                 <Button
-                  onClick={() => {
+                  variant="bordered"
+                  aria-label="Log in"
+                  className="h-8 min-w-8 rounded-full border-surface-liner px-3 text-surface-light hover:bg-surface-deeper"
+                  onPress={() => {
                     setIsMenuOpen(false);
+                    setLoginMode("login");
                     setLoginOpen(true);
                   }}
                 >
-                  Log in
+                  Log In
                 </Button>
               </NavbarItem>
               
             ) : (
-              <NavbarItem  className="hidden lg:flex">
-                {/* Profile dropdown */}
+              <NavbarItem className="hidden lg:flex">
                 <Dropdown placement="bottom-end">
                   <DropdownTrigger>
-                    <button 
-                      aria-label="Open profile menu" 
-                      className="relative p-0.5 rounded-full bg-gradient-to-br from-accent/70 to-[rgba(240,28,28,0.4)] cursor-pointer"
-                    >
-                      <Avatar
-                        isBordered
-                        showFallback
-                        name={initials}
-                        classNames={{
-                          base: "bg-surface-base",
-                          name: "text-surface-light text-xs"
-                        }}
-                        className="w-8 h-8"
-                      />
-                    </button>
+                    <button
+                        aria-label="Open profile menu"
+                        className="relative rounded-full p-0.5 bg-gradient-to-br from-accent/70 to-[rgba(240,28,28,0.4)] cursor-pointer"
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-surface-liner bg-surface-base text-surface-light">
+                          <UserRound className="size-4" />
+                        </span>
+                      </button>
                   </DropdownTrigger>
 
 
@@ -322,65 +302,40 @@ export default function AppNavbar() {
               </NavbarMenuItem>
             ))
           ) : (
-            navItems.map(({ label, href }) => {
-              if (label === "About") {
-                return (
-                  <div key={href}>
-                    <NavbarMenuItem>
-                      <Link
-                        href={href}
-                        onClick={() => setIsMenuOpen(false)}
-                        className={`w-full text-lg font-medium transition ${
-                          isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
-                        }`}
-                      >
-                        {label}
-                      </Link>
-                    </NavbarMenuItem>
-                    <NavbarMenuItem>
-                      <Link
-                        href="/about/hosting"
-                        onClick={() => setIsMenuOpen(false)}
-                        className="w-full text-lg font-medium transition text-surface-faint hover:text-accent pl-4"
-                      >
-                        Hosting & HIPAA
-                      </Link>
-                    </NavbarMenuItem>
-                      <NavbarMenuItem>
-                        <Link
-                          href="/about/firebase"
-                          onClick={() => setIsMenuOpen(false)}
-                          className="w-full text-lg font-medium transition text-surface-faint hover:text-accent pl-4"
-                        >
-                          Firebase Setup
-                        </Link>
-                      </NavbarMenuItem>
-                  </div>
-                );
-              }
-              return (
-                <NavbarMenuItem key={href}>
-                  <Link
-                    href={href}
-                    onClick={() => setIsMenuOpen(false)}
-                    className={`w-full text-lg font-medium transition ${
-                      isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
-                    }`}
-                  >
-                    {label}
-                  </Link>
-                </NavbarMenuItem>
-              );
-            })
+            navItems.map(({ label, href }) => (
+              <NavbarMenuItem key={href}>
+                <Link
+                  href={href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition ${
+                    isActive(href) ? "text-surface-light" : "text-surface-faint hover:text-accent"
+                  }`}
+                >
+                  {label}
+                </Link>
+              </NavbarMenuItem>
+            ))
           )}
 
           <div className="my-2 border-t border-surface-liner" />
+
+          <NavbarMenuItem className="mt-1">
+            <button
+              className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-surface-light hover:text-accent"
+              onClick={() => {
+                toggleTheme();
+                setIsMenuOpen(false);
+              }}
+            >
+              {isDarkTheme ? "Switch to light mode" : "Switch to dark mode"}
+            </button>
+          </NavbarMenuItem>
 
           {!user ? (
             <>
               <NavbarMenuItem className="mt-1">
                 <button
-                  className="block w-full text-left text-[18px] px-2 py-2 rounded-md"
+                  className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-surface-light hover:text-accent"
                   onClick={() => {
                     setIsMenuOpen(false);
                     setLoginMode("login");
@@ -392,7 +347,7 @@ export default function AppNavbar() {
               </NavbarMenuItem>
               <NavbarMenuItem className="mt-1">
                 <button
-                  className="block w-full text-left text-[18px] px-2 py-2 rounded-md"
+                  className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-surface-light hover:text-accent"
                   onClick={() => {
                     setIsMenuOpen(false);
                     setLoginMode("signup");
@@ -408,7 +363,7 @@ export default function AppNavbar() {
               <NavbarMenuItem>
                 <Link
                   href="/profile"
-                  className="w-full text-lg font-medium transition text-surface-faint hover:text-accent"
+                  className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-surface-light hover:text-accent"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Profile
@@ -416,7 +371,7 @@ export default function AppNavbar() {
               </NavbarMenuItem>
               <NavbarMenuItem>
                 <button
-                  className="w-full text-left text-lg font-medium transition text-status-red hover:opacity-80"
+                  className="block w-full rounded-md px-2 py-2 text-left text-sm font-medium transition text-status-red hover:text-status-red/80"
                   onClick={() => {
                     setIsMenuOpen(false);
                     onLogout();

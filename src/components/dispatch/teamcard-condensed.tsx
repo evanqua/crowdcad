@@ -4,10 +4,13 @@
 import React, {useEffect, useMemo, useState, useRef} from 'react';
 import {
   Card, CardHeader, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Select, SelectItem, Autocomplete, AutocompleteItem, Textarea
+  Select, SelectItem, Autocomplete, AutocompleteItem
 } from '@heroui/react';
-import {MoreVertical} from 'lucide-react';
+import {ChevronDown, ChevronUp, MapPin, MoreVertical} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
+import DispatchMotionCell from './motioncell';
 
 type TeamCardCondensedProps = {
   staff: Staff;
@@ -33,45 +36,6 @@ function useMMSS(since?: number) {
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
   const ss = String(elapsed % 60).padStart(2, '0');
   return `${mm}:${ss}`;
-}
-
-function getLeadNameCert(staff: Staff) {
-  const isSupervisor =
-    Array.isArray(staff.members) &&
-    staff.members.length === 1 &&
-    typeof staff.members[0] === 'string' &&
-    !staff.members[0].includes('(Lead)');
-
-  if (isSupervisor) {
-    const m = staff.members?.[0] ?? '';
-    const rx = m.match(/^(.+?)\s\[(.+?)\]/);
-    return { name: rx?.[1] ?? m, cert: rx?.[2] ?? '' };
-  }
-  const lead = (staff.members || []).find(m => typeof m === 'string' && m.includes('(Lead)')) || '';
-  const rx = lead.match(/^(.+?)\s\[(.+?)\]/);
-  return { name: rx?.[1] ?? 'No Lead', cert: rx?.[2] ?? '' };
-}
-
-function teamBg(status: string, event: Event, team: string) {
-  // Check if team is assisting with equipment (orange)
-  const onEqRun =
-    !!event.calls?.some(c =>
-      c.equipmentTeams?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
-    ) || ['En Route Eq', 'Assisting'].includes(status);
-  
-  if (onEqRun) return 'bg-status-orange/15';
-  
-  // Check if team is on active patient care call (red)
-  const activeCare =
-    !!event.calls?.some(c =>
-      c.assignedTeam?.includes(team) && !['Resolved','Delivered','Delivered Eq','Refusal','NMM'].includes(c.status)
-    );
-  
-  if (activeCare) return 'bg-[#2d2123]';
-  
-  if (['On Break','In Clinic'].includes(status)) return 'bg-status-blue/20';
-  
-  return 'bg-surface-deep';
 }
 
 export default function TeamCardCondensed({
@@ -110,8 +74,7 @@ export default function TeamCardCondensed({
   useEffect(() => {
     setLocationInput(staff.location || '');
   }, [staff.location]);
-  
-  const {name, cert} = useMemo(() => getLeadNameCert(staff), [staff]);
+
   const timer = useMMSS(sinceMs);
 
   // Status options
@@ -135,7 +98,7 @@ export default function TeamCardCondensed({
     return Array.from(new Set([...base, ...posts]));
   }, [event.venue?.posts]);
 
-  const bg = teamBg(staff.status, event, staff.team);
+  const statusTone = getStatusColor(deriveTeamVisualStatus(staff.status, event, staff.team));
 
   // Get all members for display
   const allMembers = useMemo(() => {
@@ -153,7 +116,10 @@ export default function TeamCardCondensed({
   }, [staff.members]);
 
   return (
-    <Card className={`rounded-xl shadow-sm border-0 ${bg}`} data-testid={`team-card-condensed-${staff.team}`}>
+    <Card
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
+      data-testid={`team-card-condensed-${staff.team}`}
+    >
       {/* COLLAPSED HEADER - Single compact line */}
       <CardHeader
         onClick={() => setExpanded(v => !v)}
@@ -164,10 +130,16 @@ export default function TeamCardCondensed({
           <span className="text-sm font-semibold text-surface-light truncate">
             {staff.team}
           </span>
-          {/* Location as plain text */}
+          <span className={`text-sm font-bold truncate ${statusTone.textClass}`}>
+            {staff.status}
+          </span>
           <span className="text-sm text-surface-faint truncate">
             {staff.location || 'No location'}
           </span>
+        </div>
+
+        <div className="text-surface-light/70">
+          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </div>
 
         {/* Three dots menu */}
@@ -203,16 +175,17 @@ export default function TeamCardCondensed({
       </CardHeader>
 
       {/* EXPANDED BODY */}
-      {expanded && (
-        <CardBody className="px-3 pb-3 pt-0 space-y-3">
+      <DispatchMotionCell isOpen={expanded} animate={true} className="px-3 pb-3 pt-0 space-y-3">
+          <CardBody
+            className="px-0 py-0"
+            aria-hidden={!expanded}
+          >
           {/* Status and Location controls */}
-          <div className="grid grid-cols-5 gap-2">
+          <div className="flex items-center gap-3">
             {/* Status */}
-            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="col-span-2">
+            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1]">
               <Select
                 aria-label="Status"
-                label="Status"
-                labelPlacement="inside"
                 selectedKeys={new Set([staff.status ?? ''])}
                 onSelectionChange={(keys) => {
                   const val = Array.from(keys as Set<string>)[0] || '';
@@ -234,7 +207,7 @@ export default function TeamCardCondensed({
                 }}
                 classNames={{
                   base: 'min-w-0',
-                  trigger: 'bg-surface-deep text-surface-light border border-surface-liner'
+                  trigger: `${statusTone.fillClass} text-surface-light border ${statusTone.borderClass} rounded-full transition-colors`
                 }}
               >
                 {statusOptions.map((s) => (
@@ -244,11 +217,14 @@ export default function TeamCardCondensed({
             </div>
             
             {/* Location */}
-            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="col-span-3">
+            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1.5]">
               <Autocomplete
                 aria-label="Location"
-                label="Location"
-                labelPlacement="inside"
+                startContent={(
+                  <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                    <MapPin className="h-[18px] w-[18px] shrink-0 text-surface-faint" />
+                  </span>
+                )}
                 inputValue={locationInput}
                 onInputChange={(val) => {
                   setLocationInput(val);
@@ -281,8 +257,8 @@ export default function TeamCardCondensed({
                 }}
                 inputProps={{
                   classNames: {
-                    inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
-                    input: 'bg-surface-deep data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
+                    inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner rounded-full pl-3 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
+                    input: 'bg-surface-deep pl-1 data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
                   }
                 }}
               >
@@ -312,7 +288,6 @@ export default function TeamCardCondensed({
             
             {/* Timer on right */}
             <div className="flex-shrink-0">
-              <div className="text-xs font-semibold text-surface-light mb-1">Timer</div>
               <div className="text-base font-semibold text-surface-light tabular-nums">
                 {timer}
               </div>
@@ -322,7 +297,8 @@ export default function TeamCardCondensed({
           {/* Activity log */}
           <div onClick={e => e.stopPropagation()}>
             <div className="text-xs font-semibold text-surface-light mb-1">Activity Log</div>
-            <Textarea
+            <TrackingTextEntry
+              mode="log"
               value={logText}
               onChange={(e) => {
                 setLogText(e.target.value);
@@ -353,17 +329,17 @@ export default function TeamCardCondensed({
                 }
               }}
               minRows={3}
+              maxRows={4}
               variant="flat"
               placeholder="No log entries"
               className="min-w-0"
               classNames={{
-                input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-xs",
-                inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
+                input: 'text-xs'
               }}
             />
           </div>
-        </CardBody>
-      )}
+          </CardBody>
+      </DispatchMotionCell>
     </Card>
   );
 }

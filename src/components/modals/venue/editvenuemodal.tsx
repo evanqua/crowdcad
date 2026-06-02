@@ -263,7 +263,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
               }}
             />
             {isHover && (
-              <div className="pointer-events-none absolute left-3 top-3 rounded bg-black/80 px-2 py-1 text-xs text-white shadow">
+              <div className="pointer-events-none absolute left-3 top-3 rounded bg-black/80 px-2 py-1 text-xs text-surface-light shadow">
                 {post.name}
               </div>
             )}
@@ -347,7 +347,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
       tabIndex={-1}
     >
       <div
-        className="mx-4 w-full max-w-6xl rounded-2xl bg-surface-deepest text-white shadow-2xl"
+        className="mx-4 w-full max-w-6xl rounded-2xl bg-surface-deepest text-surface-light shadow-2xl"
         style={{ maxHeight: '85vh', overflowY: 'auto' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -365,7 +365,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
           <h2 className="text-lg font-semibold">Edit Venue</h2>
           <button
             onClick={onClose}
-            className="rounded py-1 text-white hover:text-status-blue"
+            className="rounded py-1 text-surface-light hover:text-status-blue"
             aria-label="Close"
           >
             ✕
@@ -383,7 +383,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
                 name="name"
                 value={venueData.name}
                 onChange={handleChange}
-                className="mt-1 w-full rounded-md border border-surface-faint bg-surface-deepest px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-status-blue"
+                className="mt-1 w-full rounded-md border border-surface-faint bg-surface-deepest px-4 py-2 text-surface-light focus:outline-none focus:ring-2 focus:ring-status-blue"
                 placeholder="Main Stage"
               />
             </label>
@@ -396,13 +396,13 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
                   type="text"
                   value={equipmentInput}
                   onChange={(e) => setEquipmentInput(e.target.value)}
-                  className="flex-1 text-sm rounded-md border border-surface-faint bg-surface-deepest px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-status-blue"
+                  className="flex-1 text-sm rounded-md border border-surface-faint bg-surface-deepest px-4 py-2 text-surface-light focus:outline-none focus:ring-2 focus:ring-status-blue"
                   placeholder="Gurney 1"
                 />
                 <button
                   type="button"
                   onClick={addEquipment}
-                  className="rounded bg-status-blue px-3 py-2 text-white font-bold hover:bg-status-blue/90"
+                  className="rounded bg-status-blue px-3 py-2 text-surface-light font-bold hover:bg-status-blue/90"
                 >
                   ╋
                 </button>
@@ -444,13 +444,13 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
                     type="text"
                     value={postsInput}
                     onChange={(e) => setPostsInput(e.target.value)}
-                    className="flex-1 text-sm border border-surface-faint rounded-md bg-surface-deepest px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-status-blue"
+                    className="flex-1 text-sm border border-surface-faint rounded-md bg-surface-deepest px-4 py-2 text-surface-light focus:outline-none focus:ring-2 focus:ring-status-blue"
                     placeholder="Stage Right Pit"
                   />
                   <button
                     type="button"
                     onClick={addTextPost}
-                    className="rounded bg-status-blue px-3 py-2 font-bold text-white hover:bg-status-blue/90"
+                    className="rounded bg-status-blue px-3 py-2 font-bold text-surface-light hover:bg-status-blue/90"
                   >
                     ╋
                   </button>
@@ -517,7 +517,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="rounded bg-status-blue px-4 py-2 text-white hover:bg-status-blue/90 disabled:opacity-60"
+                className="rounded bg-status-blue px-4 py-2 text-surface-light hover:bg-status-blue/90 disabled:opacity-60"
               >
                 {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
@@ -528,7 +528,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
           <div className="md:col-span-3">
             {previewUrl ? (
               <div>
-                <p className="mb-2 text-sm text-white/80">
+                <p className="mb-2 text-sm text-surface-light/80">
                   Click on the image to add a post at that location.
                 </p>
 

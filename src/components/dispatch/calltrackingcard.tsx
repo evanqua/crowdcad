@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Card, CardHeader, CardBody, Input, Chip, Button,
-  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Textarea
+  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem
 } from '@heroui/react';
 import { Plus, MoreVertical } from 'lucide-react';
 import {
@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Event, Call } from '@/app/types';
+import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 
 type CallTrackingCardProps = {
   call: Call;
@@ -59,11 +60,18 @@ function callBg(call: Call, event: Event) {
     .filter((status): status is string => status !== undefined);
 
   if (statuses.some(status => ['En Route', 'On Scene', 'Transporting'].includes(status))) {
-    return 'bg-[#2d2123]';
+    return 'bg-status-card-red';
   }
 
   return 'bg-surface-deep';
 }
+
+const dropdownMotionProps = {
+  initial: { opacity: 0, y: -8, scale: 0.98 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: -8, scale: 0.98 },
+  transition: { duration: 0.16, ease: 'easeOut' },
+} as const;
 
 export default function CallTrackingCard({
   call,
@@ -135,7 +143,7 @@ export default function CallTrackingCard({
   }, [call.log]);
 
   const timer = useMMSS(callTimestamp);
-  const bg = callBg(call, event);
+  const bg = getCallRowClass(call) || callBg(call, event);
 
   // Get available teams for dropdown (including On Break and In Clinic)
   const availableStaff = useMemo(() => {
@@ -184,7 +192,7 @@ export default function CallTrackingCard({
 
           {/* 3-dot menu */}
           <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-            <Dropdown placement="bottom-end" offset={6}>
+            <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={6}>
               <DropdownTrigger>
                 <button
                   className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
@@ -331,7 +339,7 @@ export default function CallTrackingCard({
               >
                 <div className="flex items-center gap-2" data-testid={`team-chip-${team}`}>
                   <span className="font-medium">{team}</span>
-                  <Dropdown placement="bottom-end" offset={2}>
+                  <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={2}>
                     <DropdownTrigger>
                       <button
                         onClick={(e) => {
@@ -402,7 +410,7 @@ export default function CallTrackingCard({
                           key={s.team}
                           onClick={() => onAddTeamToCall(call.id, s.team)}
                           className={`hover:bg-surface-liner focus:bg-surface-liner cursor-pointer ${
-                            isBreakOrClinic ? 'bg-status-blue/20 text-surface-light' : 'text-surface-light'
+                            isBreakOrClinic ? 'bg-status-card-blue text-surface-light' : 'text-surface-light'
                           }`}
                         >
                           {s.team} {isBreakOrClinic && `(${s.status})`}
@@ -431,7 +439,7 @@ export default function CallTrackingCard({
                           key={s.team}
                           onClick={() => onAddTeamToCall(call.id, s.team)}
                           className={`hover:bg-surface-liner focus:bg-surface-liner cursor-pointer ${
-                            isBreakOrClinic ? 'bg-status-blue/20 text-surface-light' : 'text-surface-light'
+                            isBreakOrClinic ? 'bg-status-card-blue text-surface-light' : 'text-surface-light'
                           }`}
                         >
                           {s.team} {isBreakOrClinic && `(${s.status})`}
@@ -529,7 +537,7 @@ export default function CallTrackingCard({
                                     });
                                   }}
                                   className={`hover:bg-surface-liner focus:bg-surface-liner cursor-pointer ${
-                                    isBreakOrClinic ? 'bg-status-blue/20 text-surface-light' : 'text-surface-light'
+                                    isBreakOrClinic ? 'bg-status-card-blue text-surface-light' : 'text-surface-light'
                                   }`}
                                 >
                                   {t.team} {isBreakOrClinic && `(${t.status})`}
@@ -567,7 +575,8 @@ export default function CallTrackingCard({
             {/* Notes - NO LOG ENTRY */}
             <div className="text-sm text-surface-light">
               <div className="font-semibold mb-1">Notes</div>
-              <Textarea
+              <TrackingTextEntry
+                mode="note"
                 value={notesText}
                 onChange={(e) => {
                   setNotesText(e.target.value);
@@ -587,20 +596,18 @@ export default function CallTrackingCard({
                   notesFocusedRef.current = true;
                 }}
                 minRows={2}
+                maxRows={3}
                 variant="flat"
                 placeholder="Add notes"
                 className="min-w-0"
-                classNames={{
-                  input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0",
-                  inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                }}
               />
             </div>
 
             {/* Log - Editable Textarea */}
             <div className="text-sm text-surface-light">
               <div className="font-semibold mb-1">Log for Call #{callDisplayNumber}:</div>
-              <Textarea
+              <TrackingTextEntry
+                mode="log"
                 value={logText}
                 onChange={(e) => {
                   setLogText(e.target.value);
@@ -634,13 +641,10 @@ export default function CallTrackingCard({
                   }
                 }}
                 minRows={4}
+                maxRows={5}
                 variant="flat"
                 placeholder="No log entries"
                 className="min-w-0"
-                classNames={{
-                  input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0 text-sm",
-                  inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep group-data-[focus-visible=true]:bg-surface-deep group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0"
-                }}
               />
             </div>
           </div>

@@ -1,10 +1,17 @@
 /** @type {import('tailwindcss').Config} */
 const { heroui } = require("@heroui/react");
 
+const CARD_BACKGROUND_OPACITY = {
+  red: "0.20",
+  blue: "0.20",
+  yellow: "0.15",
+};
+
 module.exports = {
   darkMode: ["class"],
   content: [
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    "./core/src/**/*.{js,ts,jsx,tsx,mdx}",
     "./node_modules/@heroui/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
@@ -14,14 +21,15 @@ module.exports = {
 
         // Surface palette — dark-mode background & text hierarchy
         surface: {
-          DEFAULT:  '#dbd8e3',   // default text on dark backgrounds
-          light:    '#faf9f5',   // primary / high-contrast text
-          faint:    '#c2c0b6',   // muted / secondary text
-          liner:    '#252528',   // borders, dividers, table headers
-          deep:     '#18181b',   // card & panel backgrounds
-          deeper:   '#1c1c1d',   // slightly elevated panels
-          deeperer: '#151516',   // intermediate depth
-          deepest:  '#0d0d0e',   // page background
+          DEFAULT:  'hsl(var(--surface-text) / <alpha-value>)',
+          light:    'hsl(var(--surface-text-strong) / <alpha-value>)',
+          faint:    'hsl(var(--surface-text-muted) / <alpha-value>)',
+          liner:    'hsl(var(--surface-border) / <alpha-value>)',
+          deep:     'hsl(var(--surface-bg-1) / <alpha-value>)',
+          deeper:   'hsl(var(--surface-bg-2) / <alpha-value>)',
+          deeperer: 'hsl(var(--surface-bg-3) / <alpha-value>)',
+          deepest:  'hsl(var(--surface-bg-0) / <alpha-value>)',
+          base:     'hsl(var(--surface-bg-2) / <alpha-value>)',
         },
 
         // Accent — primary action & brand highlight colour
@@ -36,6 +44,9 @@ module.exports = {
           green:  '#98c379',  // success, active indicators
           blue:   '#5eaae8',  // informational, selected states
           orange: '#e2c93d',  // non-lead members, equipment runs (gold/amber)
+          'card-red': `rgb(229 106 106 / ${CARD_BACKGROUND_OPACITY.red})`,
+          'card-blue': `rgb(94 170 232 / ${CARD_BACKGROUND_OPACITY.blue})`,
+          'card-yellow': `rgb(226 201 61 / ${CARD_BACKGROUND_OPACITY.yellow})`,
         },
 
         /* ── Radix / shadcn-ui primitives (CSS-variable based) ── */
@@ -71,12 +82,12 @@ module.exports = {
 
       /* ── Animations ──────────────────────────────────────── */
       animation: {
-        aurora: 'aurora 90s linear infinite',
+        aurora: 'aurora 92s linear infinite',
       },
       keyframes: {
         aurora: {
-          from: { backgroundPosition: '50% 50%, 50% 50%' },
-          to:   { backgroundPosition: '350% 50%, 350% 50%' },
+          from: { transform: 'translate3d(0, 0, 0) scale(1.06)' },
+          to:   { transform: 'translate3d(-14%, 0, 0) scale(1.06)' },
         },
       },
     },
@@ -84,9 +95,18 @@ module.exports = {
   plugins: [
     heroui({
       themes: {
+        light: {
+          colors: {
+            primary: { DEFAULT: "#2f8fd6", foreground: "#ffffff" },
+            background: "#f4f7fb",
+            foreground: "#111827",
+          },
+        },
         dark: {
           colors: {
             primary: { DEFAULT: "#5eaae8", foreground: "#0d0d0e" },
+            background: "#0d0d0e",
+            foreground: "#faf9f5",
           },
         },
       },

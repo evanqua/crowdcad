@@ -27,7 +27,7 @@ export default function DebugModal({ isOpen, onClose, onPopulate, onReset, onCle
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-surface-light hover:text-white hover:bg-surface-liner rounded transition-colors"
+            className="p-2 text-surface-light hover:text-surface-light hover:bg-surface-liner rounded transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -41,7 +41,7 @@ export default function DebugModal({ isOpen, onClose, onPopulate, onReset, onCle
             onClick={onPopulate}
             className="flex items-center gap-3 w-full p-4 rounded-lg bg-surface-liner hover:bg-[#2a2a2a] text-left transition-colors group"
           >
-            <div className="p-2 rounded bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20">
+            <div className="p-2 rounded bg-blue-500/20 text-blue-400 group-hover:bg-blue-500/20">
               <Users className="w-5 h-5" />
             </div>
             <div>
@@ -54,7 +54,7 @@ export default function DebugModal({ isOpen, onClose, onPopulate, onReset, onCle
             onClick={onReset}
             className="flex items-center gap-3 w-full p-4 rounded-lg bg-surface-liner hover:bg-[#2a2a2a] text-left transition-colors group"
           >
-             <div className="p-2 rounded bg-yellow-500/10 text-yellow-400 group-hover:bg-yellow-500/20">
+             <div className="p-2 rounded bg-yellow-500/20 text-yellow-400 group-hover:bg-yellow-500/20">
               <RotateCcw className="w-5 h-5" />
             </div>
             <div>
@@ -67,7 +67,7 @@ export default function DebugModal({ isOpen, onClose, onPopulate, onReset, onCle
           
           <button
             onClick={onClear}
-            className="flex items-center gap-3 w-full p-4 rounded-lg bg-status-red/10 hover:bg-status-red/20 border border-status-red/20 text-left transition-colors group"
+            className="flex items-center gap-3 w-full p-4 rounded-lg bg-status-red/20 hover:bg-status-red/20 border border-status-red/20 text-left transition-colors group"
           >
              <div className="p-2 rounded bg-status-red/20 text-status-red group-hover:bg-status-red/30">
               <Trash2 className="w-5 h-5" />
