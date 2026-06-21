@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/app/firebase';
+import { dbService } from '@/lib/services';
 import { Event, Call, TeamLogEntry, CallLogEntry, InteractionSession } from '@/app/types';
 import dynamic from 'next/dynamic';
 import { Button, Card, CardBody } from '@heroui/react';
@@ -141,8 +140,8 @@ export default function SummaryPage() {
   useEffect(() => {
     const fetchData = async () => {
       if (!eventId) return;
-      const eventDoc = await getDoc(doc(db, 'events', eventId));
-      setEvent(eventDoc.exists() ? (eventDoc.data() as Event) : null);
+      const eventDoc = await dbService.getDocument<Event>('events', eventId);
+      setEvent(eventDoc.exists ? eventDoc.data : null);
     };
     fetchData();
   }, [eventId]);

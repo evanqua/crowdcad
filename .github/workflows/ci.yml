@@ -1,41 +1,207 @@
-name: CI
+name: Run and Test Next Project
 
 on:
-  pull_request:
-    branches: [main, master]
   push:
-    branches: [main, master]
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  set-env:
+    name: Resolve environment
     runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      base-url: ${{ steps.set-prefix.outputs.base-url }}
+      report-prefix: ${{ steps.set-prefix.outputs.report-prefix }}
     
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - id: set-env
+        uses: ./.github/actions/set-environment
+
+      - id: set-prefix
+        run: |
+          # For PRs use the incoming (head) branch, not the merge ref (e.g. 9/merge)
+          if [[ -n "${{ github.head_ref }}" ]]; then
+            BRANCH="${{ github.head_ref }}"
+          else
+            BRANCH="${GITHUB_REF_NAME}"
+          fi
+          BRANCH=$(echo "${BRANCH}" | sed 's/\//-/g')
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          echo "report-prefix=${BRANCH}/${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "base-url=https://${{ github.repository_owner }}.github.io/${REPO_NAME}" >> $GITHUB_OUTPUT
+ 
     
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    needs: set-env
+    environment: ${{ needs.set-env.outputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup project
+        uses: ./.github/actions/setup
+        with:
+          node-version: ${{ vars.NODE_VERSION }}
+      
+      - name: Check if playwright installed
+        run: |
+          if [[ -z $(ls -la node_modules/.bin/playwright 2>/dev/null) ]]; then
+            echo -e "\033[0;31mPlaywright tests NOT configured. Please install playwright module.\033[0m"
+            exit 1
+          fi;
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps
+ 
+      - name: Install Playwright system deps (cached hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps
+
+      - name: "Firebase Tools: Setup Java 21"
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          CI: true
+          E2E_TEST_EMAIL: ${{ vars.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: playwright-report/
+          retention-days: 30
+
+  e2e-pocketbase:
+    runs-on: ubuntu-latest
+
+    env:
+      POCKETBASE_VERSION: '0.36.7'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Setup Node.js ${{ matrix.node-version }}
+
+      - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 20.x
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Run linter
-        run: npm run lint
-      
-      - name: Build project
-        run: npm run build
+
+      - name: Download PocketBase binary
+        run: |
+          curl -fsSL \
+            "https://github.com/pocketbase/pocketbase/releases/download/v${POCKETBASE_VERSION}/pocketbase_${POCKETBASE_VERSION}_linux_amd64.zip" \
+            -o pocketbase.zip
+          unzip pocketbase.zip pocketbase
+          chmod +x pocketbase
+          rm pocketbase.zip
+
+      - name: Install Playwright Chromium browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E tests (PocketBase)
+        run: npm run test:e2e:pocketbase
         env:
-          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY || 'placeholder' }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: placeholder.firebaseapp.com
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: placeholder-project
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: placeholder.appspot.com
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '123456789'
-          NEXT_PUBLIC_FIREBASE_APP_ID: '1:123456789:web:placeholder'
+          CI: true
+          E2E_TEST_EMAIL: test@crowdcad.local
+          E2E_TEST_PASSWORD: TestPassword123!
+
+      - name: Upload Playwright report (PocketBase)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-pocketbase
+          path: playwright-report-pocketbase/
+          retention-days: 30
+
+  publish-report:
+    name: Publish failed report to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [set-env, test]
+    if: always() && needs.test.result == 'failure'
+ 
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: playwright-report/
+ 
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+        continue-on-error: true  # Branch may not exist on first run
+ 
+      - name: Init gh-pages branch if missing
+        run: |
+          if [ ! -d "gh-pages" ] || [ -z "$(ls -A gh-pages)" ]; then
+            mkdir -p gh-pages
+            git -C gh-pages init
+            git -C gh-pages checkout --orphan gh-pages
+          fi
+ 
+      - name: Add report to gh-pages
+        run: |
+          PREFIX="${{ needs.set-env.outputs.report-prefix }}"
+          mkdir -p "./gh-pages/${PREFIX}"
+          cp -r playwright-report/. "./gh-pages/${PREFIX}/"
+
+      - name: Generate index files
+        shell: bash
+        run: |
+            find gh-pages -name "index.html" -type f -maxdepth 2 -exec rm -f {} \;
+            node ./.github/scripts/generate-index.js gh-pages ${{ needs.set-env.outputs.base-url }};
+          
+      - name: Commit and push to gh-pages
+        run: |
+          PREFIX="${{ needs.set-env.outputs.report-prefix }}"
+          cd gh-pages
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${PREFIX}/" $(find . -name "index.html" -type f)
+          git commit -m "report: ${PREFIX} [${GITHUB_SHA::7}]"
+          git push origin HEAD:gh-pages
+ 
+      - name: Print report URL
+        run: |
+          BASE="${{ needs.set-env.outputs.base-url }}"
+          PREFIX="${{ needs.set-env.outputs.report-prefix }}"
+          echo "📋 Index  → ${BASE}/"
+          echo "📊 Report → ${BASE}/${PREFIX}/"

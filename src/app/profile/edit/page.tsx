@@ -3,9 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
-import { auth, db } from '@/app/firebase';
-import { updateProfile } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { authService, dbService } from '@/lib/services';
 import { Card, CardBody, Button, Avatar } from '@heroui/react';
 import LoadingScreen from '@/components/ui/loading-screen';
 
@@ -35,15 +33,15 @@ export default function EditProfilePage() {
     setSaving(true);
     setMessage(null);
     try {
-      if (auth.currentUser) {
-        await updateProfile(auth.currentUser, {
+      const currentUser = authService.currentUser;
+      if (currentUser) {
+        await authService.updateProfile({
           displayName: displayName || null,
-          photoURL: photoURL || null,
+          ...(photoURL ? { photoURL } : {}),
         });
 
-        // Save phone (and other profile metadata) to Firestore users collection
-        const userRef = doc(db, 'users', auth.currentUser.uid);
-        await setDoc(userRef, { phoneNumber: phone || null }, { merge: true });
+        // Save phone (and other profile metadata) to users collection
+        await dbService.setDocument('users', currentUser.uid, { phoneNumber: phone || null }, { merge: true });
 
         setMessage('Profile saved.');
         router.push('/profile');

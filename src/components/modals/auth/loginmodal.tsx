@@ -2,11 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/app/firebase';
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-} from 'firebase/auth';
+import { authService } from '@/lib/services';
 import {
   Modal,
   ModalContent,
@@ -71,9 +67,9 @@ export default function LoginModal({
       setSubmitting(true);
 
       if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, email, password);
+        await authService.signIn(email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        await authService.signUp(email, password);
       }
 
       document.cookie = 'ccad_auth=1; Max-Age=604800; Path=/; SameSite=Lax';

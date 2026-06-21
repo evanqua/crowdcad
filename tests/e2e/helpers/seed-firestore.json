@@ -1,0 +1,12 @@
+{
+    "roles": [
+        {
+            "name": "FR",
+            "fullName": "First Responder"
+        },
+        {
+            "name": "FA",
+            "fullName": "First Aid"
+        }
+    ]
+}

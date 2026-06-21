@@ -1,0 +1,84 @@
+name: Deploy on Realease
+
+on:
+  release:
+    types: [published]
+
+# Prevent concurrent deploys — queue them instead
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate semver tag
+        run: |
+          if [[ "${{ github.event.release.tag_name }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)? ]]; then
+          echo "Valid semver tag: ${{ github.event.release.tag_name }}"
+          else
+          echo "❌ '${{ github.event.release.tag_name }}' is not a valid semver tag"
+          exit 1
+          fi
+  set-environment:
+    name: Resolve environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - id: set-env
+        uses: ./.github/actions/set-environment
+
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    needs: [check, set-environment]
+    timeout-minutes: 20
+    environment:
+      name: ${{ needs.set-environment.outputs.environment }}
+      url: ${{ steps.deploy.outputs.deploy-url || 'no-deploy' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup project
+        uses: ./.github/actions/setup
+        with:
+          node-version: ${{ vars.NODE_VERSION }}
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts','**/*.tsx','**/*.js','**/*.jsx') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          DISABLE_TELEMETRY: true
+          NODE_ENV: production
+
+      # - name: Deploy to Netlify
+      #   id: deploy
+      #   uses: netlify/actions/cli@master
+      #   with:
+      #     args: deploy --dir=out --prod --message "Deploy from GitHub Actions — ${{ github.sha }}"
+      #   env:
+      #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }sss}
+      #     NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: Report deploy URL
+        run: echo "✅ Deployed to ${{ steps.deploy.outputs.deploy-url || 'no-deploy' }}"

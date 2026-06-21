@@ -87,6 +87,7 @@ export default function NewLayerModal({ isOpen, onClose, onSubmit }: Props) {
                 type="file"
                 accept="image/*"
                 className="hidden"
+                data-testid="layer-file-input"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
 

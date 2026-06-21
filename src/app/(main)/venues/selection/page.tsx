@@ -2,8 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState, useMemo } from 'react';
-import { db } from '@/app/firebase';
-import { collection, getDocs, query, where, deleteDoc, doc, addDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { dbService, type Unsubscribe } from '@/lib/services';
 import type { Venue, Event } from '@/app/types';
 import { useAuth } from '@/hooks/useauth';
 import LoadingScreen from '@/components/ui/loading-screen';
@@ -81,7 +80,7 @@ export default function VenueSelection() {
     const confirm = window.confirm('Are you sure you want to delete this event?');
     if (!confirm) return;
     try {
-      await deleteDoc(doc(db, 'events', eventId));
+      await dbService.deleteDocument('events', eventId);
       setRecentEvents(prev => prev.filter(e => e.id !== eventId));
     } catch (error) {
       console.error('Error deleting event:', error);
@@ -93,7 +92,7 @@ export default function VenueSelection() {
     const confirm = window.confirm('Are you sure you want to delete this venue?');
     if (!confirm) return;
     try {
-      await deleteDoc(doc(db, 'venues', venueId));
+      await dbService.deleteDocument('venues', venueId);
       setVenues(prev => prev.filter(v => v.id !== venueId));
       if (selectedVenueId === venueId) {
         setSelectedVenueId(null);
@@ -127,8 +126,8 @@ export default function VenueSelection() {
         createdAt: new Date().toISOString(),
       };
 
-      const eventRef = await addDoc(collection(db, 'events'), stripUndefined(newEvent));
-      router.push(`/events/${eventRef.id}/create`);
+      const newEventId = await dbService.addDocument('events', stripUndefined(newEvent));
+      router.push(`/events/${newEventId}/create`);
     } catch (error) {
       console.error('Error creating event:', error);
       alert('Failed to create event.');
@@ -147,33 +146,37 @@ export default function VenueSelection() {
     setLoading(true);
 
     // 1. Owned Venues Listener
-    const ownedVenuesQuery = query(collection(db, 'venues'), where('userId', '==', user.uid));
-    listeners.push(onSnapshot(ownedVenuesQuery, (snapshot) => {
-      setOwnedVenuesList(snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Venue)));
-    }));
+    listeners.push(dbService.subscribeToQuery<Venue>(
+      'venues',
+      [{ field: 'userId', op: '==', value: user.uid }],
+      (snaps) => setOwnedVenuesList(snaps.map(s => ({ ...s.data, id: s.id } as Venue))),
+    ));
 
     // 2. Shared Venues Listener
     if (user.email) {
-      const sharedVenuesQuery = query(collection(db, 'venues'), where('sharedWith', 'array-contains', user.email));
-      listeners.push(onSnapshot(sharedVenuesQuery, (snapshot) => {
-        setSharedVenuesList(snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Venue)));
-      }));
+      listeners.push(dbService.subscribeToQuery<Venue>(
+        'venues',
+        [{ field: 'sharedWith', op: 'array-contains', value: user.email }],
+        (snaps) => setSharedVenuesList(snaps.map(s => ({ ...s.data, id: s.id } as Venue))),
+      ));
     } else {
       setSharedVenuesList([]);
     }
 
     // 3. Owned Events Listener
-    const ownedEventsQuery = query(collection(db, 'events'), where('userId', '==', user.uid));
-    listeners.push(onSnapshot(ownedEventsQuery, (snapshot) => {
-      setOwnedEventsList(snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Event)));
-    }));
+    listeners.push(dbService.subscribeToQuery<Event>(
+      'events',
+      [{ field: 'userId', op: '==', value: user.uid }],
+      (snaps) => setOwnedEventsList(snaps.map(s => ({ ...s.data, id: s.id } as Event))),
+    ));
 
     // 4. Shared Events Listener
     if (user.email) {
-      const sharedEventsQuery = query(collection(db, 'events'), where('sharedWith', 'array-contains', user.email));
-      listeners.push(onSnapshot(sharedEventsQuery, (snapshot) => {
-        setSharedEventsList(snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Event)));
-      }));
+      listeners.push(dbService.subscribeToQuery<Event>(
+        'events',
+        [{ field: 'sharedWith', op: 'array-contains', value: user.email }],
+        (snaps) => setSharedEventsList(snaps.map(s => ({ ...s.data, id: s.id } as Event))),
+      ));
     } else {
       setSharedEventsList([]);
     }
@@ -181,19 +184,16 @@ export default function VenueSelection() {
     // Cleanup incomplete drafts (One-time check on mount/user load)
     const cleanupIncompleteEvents = async () => {
       try {
-        const draftsQuery = query(
-          collection(db, 'events'), 
-          where('userId', '==', user.uid),
-          where('status', '==', 'draft')
-        );
-        const draftsSnapshot = await getDocs(draftsQuery);
-        const deletePromises = draftsSnapshot.docs
-          .filter(doc => {
-            const data = doc.data() as Partial<Event>;
-            // Reuse your existing isEventIncomplete function
-            if (!data.name || data.name.trim() === '') {
-              if (data.createdAt) {
-                const createdTime = new Date(data.createdAt).getTime();
+        const drafts = await dbService.queryCollection<Partial<Event>>('events', [
+          { field: 'userId', op: '==', value: user.uid },
+          { field: 'status', op: '==', value: 'draft' },
+        ]);
+        const deletePromises = drafts
+          .filter(snap => {
+            const data = snap.data;
+            if (!data?.name || data.name.trim() === '') {
+              if (data?.createdAt) {
+                const createdTime = new Date(data.createdAt as string).getTime();
                 const now = Date.now();
                 return (now - createdTime) > 5 * 60 * 1000;
               }
@@ -201,7 +201,7 @@ export default function VenueSelection() {
             }
             return false;
           })
-          .map(doc => deleteDoc(doc.ref));
+          .map(snap => dbService.deleteDocument('events', snap.id));
         await Promise.all(deletePromises);
       } catch (error) {
         console.error('Error cleaning up incomplete events:', error);
@@ -285,8 +285,8 @@ export default function VenueSelection() {
 
   const filteredVenues = useMemo(() => {
     if (!searchQuery) return venueStats.sorted;
-    return venueStats.sorted.filter(v => 
-      v.name.toLowerCase().includes(searchQuery.toLowerCase())
+    return venueStats.sorted.filter(v =>
+      (v.name || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [venueStats.sorted, searchQuery]);
 
@@ -365,9 +365,9 @@ export default function VenueSelection() {
 
               <ScrollShadow className="space-y-3 hideScrollBar">
                 {filteredVenues.map((venue) => {
-                  const stats = venueStats.byVenue[venue.id];
+                  const stats = venueStats.byVenue[venue.id] ?? { count: 0, lastUsed: null };
                   return (
-                    <Card 
+                    <Card
                       key={venue.id}
                       isPressable
                       onPress={() => setSelectedVenueId(venue.id)}
@@ -643,7 +643,7 @@ export default function VenueSelection() {
 
               <ScrollShadow className="flex-1 space-y-2 scrollbar-hide">
                 {filteredVenues.map((venue) => {
-                  const stats = venueStats.byVenue[venue.id];
+                  const stats = venueStats.byVenue[venue.id] ?? { count: 0, lastUsed: null };
                   const isSelected = selectedVenueId === venue.id;
                   
                   return (

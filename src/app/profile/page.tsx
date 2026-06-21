@@ -1,12 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { FirebaseError } from 'firebase/app';
 import { useAuth } from '@/hooks/useauth';
-import { Avatar, Button, Card, CardBody, Input, Tabs, Tab } from '@heroui/react';
-import { auth, db } from '@/app/firebase';
-import { updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut, deleteUser } from 'firebase/auth';
-import { doc, setDoc, collection, query, where, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
+import { Avatar, Button, Card, CardBody, Input, Select, SelectItem, Tabs, Tab } from '@heroui/react';
+import { authService, dbService, ServiceError } from '@/lib/services';
 import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { User, Shield, Database, Settings, LogOut, Trash2, Download, Eye, EyeOff } from 'lucide-react';
@@ -43,11 +40,19 @@ export default function ProfilePage() {
     // Load user data
     const loadUserData = async () => {
       try {
-        const userRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userRef);
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setLastPasswordChange(data.lastPasswordChange?.toDate() || null);
+        const userDoc = await dbService.getDocument<Record<string, unknown>>('users', user.uid);
+        if (userDoc.exists && userDoc.data) {
+          const raw = userDoc.data.lastPasswordChange;
+          // Handle Firestore Timestamp (.toDate()), Date, or ISO string
+          const date =
+            raw && typeof (raw as { toDate?: () => Date }).toDate === 'function'
+              ? (raw as { toDate: () => Date }).toDate()
+              : raw instanceof Date
+              ? raw
+              : raw
+              ? new Date(raw as string)
+              : null;
+          setLastPasswordChange(date);
         }
       } catch (err) {
         console.error('Error loading user data:', err);
@@ -57,9 +62,10 @@ export default function ProfilePage() {
     // Load dispatch logs
     const loadDispatchLogs = async () => {
       try {
-        const logsQuery = query(collection(db, 'dispatchLogs'), where('userId', '==', user.uid));
-        const logsSnap = await getDocs(logsQuery);
-        setDispatchLogs(logsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const logs = await dbService.queryCollection('dispatchLogs', [
+          { field: 'userId', op: '==', value: user.uid },
+        ]);
+        setDispatchLogs(logs.map((snap) => ({ id: snap.id, ...(snap.data ?? {}) })));
       } catch (err) {
         console.error('Error loading dispatch logs:', err);
       }
@@ -73,7 +79,7 @@ export default function ProfilePage() {
   if (!user) return <div className="p-8">You are not signed in.</div>;
 
   const handleChangePassword = async () => {
-    if (!auth.currentUser) return setMessage('Not signed in');
+    if (!authService.currentUser) return setMessage('Not signed in');
     setPasswordError(null);
     if (!currentPassword) {
       setPasswordError('Enter your current password');
@@ -91,22 +97,20 @@ export default function ProfilePage() {
     setPasswordSaving(true);
     setMessage(null);
     try {
-      const cred = EmailAuthProvider.credential(auth.currentUser.email || '', currentPassword);
-      await reauthenticateWithCredential(auth.currentUser, cred);
-      await updatePassword(auth.currentUser, newPassword);
-      
+      await authService.updatePassword(currentPassword, newPassword);
+
       // Update last password change
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      await setDoc(userRef, { lastPasswordChange: new Date() }, { merge: true });
+      const uid = authService.currentUser!.uid;
+      await dbService.setDocument('users', uid, { lastPasswordChange: new Date() }, { merge: true });
       setLastPasswordChange(new Date());
-      
+
       setMessage('Password updated successfully.');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setPasswordError(null);
     } catch (err) {
-      if (err instanceof FirebaseError) {
+      if (err instanceof ServiceError) {
         const code = err.code;
         const message = err.message;
         if (code === 'auth/wrong-password' || /wrong-password|invalid-credential/i.test(message)) {
@@ -114,7 +118,7 @@ export default function ProfilePage() {
           setMessage(null);
         } else {
           setPasswordError(null);
-          setMessage(err.message || 'Failed to update password');
+          setMessage(message || 'Failed to update password');
         }
       } else {
         setPasswordError(null);
@@ -127,14 +131,14 @@ export default function ProfilePage() {
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await authService.signOut();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Failed to sign out');
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (!auth.currentUser || !deletePassword) {
+    if (!authService.currentUser || !deletePassword) {
       setMessage('Enter your password to confirm deletion');
       return;
     }
@@ -142,23 +146,17 @@ export default function ProfilePage() {
     setDeleting(true);
     setMessage(null);
     try {
-      const cred = EmailAuthProvider.credential(auth.currentUser.email || '', deletePassword);
-      await reauthenticateWithCredential(auth.currentUser, cred);
-      
-      // Delete user data
-      const userRef = doc(db, 'users', auth.currentUser.uid);
-      await deleteDoc(userRef);
-      
-      // Delete account
-      await deleteUser(auth.currentUser);
+      // Delete user document first, then delete the auth account
+      await dbService.deleteDocument('users', authService.currentUser.uid);
+      await authService.deleteCurrentUser(deletePassword);
     } catch (err) {
-      if (err instanceof FirebaseError) {
+      if (err instanceof ServiceError) {
         const code = err.code;
         const message = err.message;
         if (code === 'auth/wrong-password' || /wrong-password|invalid-credential/i.test(message)) {
           setMessage('Incorrect password');
         } else {
-          setMessage(err.message || 'Failed to delete account');
+          setMessage(message || 'Failed to delete account');
         }
       } else {
         setMessage(err instanceof Error ? err.message : 'Failed to delete account');

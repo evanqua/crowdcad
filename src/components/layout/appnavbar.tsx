@@ -5,8 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { signOut } from "firebase/auth";
-import { auth } from "@/app/firebase";
+import { authService } from "@/lib/services";
 import { useAuth } from "@/hooks/useauth";
 
 import {
@@ -109,7 +108,7 @@ export default function AppNavbar() {
   // const isAdmin = user?.email === "admin@yourdomain.com"; 
 
   const onLogout = async () => {
-    await signOut(auth);
+    await authService.signOut();
     document.cookie = "ccad_auth=0; Max-Age=0; Path=/; SameSite=Lax";
     router.refresh();
     router.push("/");

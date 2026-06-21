@@ -140,7 +140,7 @@ Initial public release of **CrowdCAD** — an open-source, browser-based Compute
 
 ### Team & Supervisor Management
 
-- Add, edit, and delete field teams with named members and certification levels (CPR, EMT-B, EMT-A, EMT-P, RN, MD/DO); lead designation per member.
+- Add, edit, and delete field teams with named members and certification levels (FR, FA); lead designation per member.
 - Add, edit, and delete supervisors with call sign and certification.
 - Team status and location controls; per-team status timer derived from activity log.
 - Sort teams by availability, name (A→Z / Z→A).

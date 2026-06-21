@@ -1,10 +1,10 @@
-export type Post = 
-  | string 
-  | { 
-      name: string; 
-      x: number | null; // percentage of width
-      y: number | null; // percentage of height
-    };
+export type Post =
+  | string
+  | {
+    name: string;
+    x: number | null; // percentage of width
+    y: number | null; // percentage of height
+  };
 
 export interface Layer {
   id: string;
@@ -23,7 +23,7 @@ export interface Venue {
   userId: string;
   sharedWith?: string[]; // Array of emails
 }
-  
+
 export interface Event {
   id: string;
   name: string;
@@ -36,13 +36,13 @@ export interface Event {
   userId: string;
   calls: Call[];
   status?: 'draft' | 'active';
-  createdAt?: string | number; 
+  createdAt?: string | number;
   pendingAssignments?: {
     [team: string]: { post: string; time: string };
   };
   eventPosts: Post[];
   eventEquipment: EventEquipment[];
-  ended?: boolean; 
+  ended?: boolean;
   postAssignments?: PostAssignment;
 
   postingStart?: string | number;
@@ -79,7 +79,7 @@ export interface Supervisor {
   log?: TeamLogEntry[];
   originalPost?: string;
 }
-  
+
 export type PostAssignment = {
   [time: string]: {
     [post: string]: string;
@@ -181,3 +181,8 @@ export type EquipmentItem = {
   needsRefresh?: boolean; // Whether equipment needs to be marked ready after clinic delivery
   notes?: string; // Additional details/notes about the equipment
 };
+
+export type Role = {
+  name: string;
+  fullName: string;
+}

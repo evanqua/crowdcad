@@ -5,13 +5,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getAuth } from 'firebase/auth';
-import { db } from '@/app/firebase';
-import { addDoc, collection, doc, getDoc, updateDoc } from 'firebase/firestore';
-import {
-  getStorage,
-  ref,
-} from 'firebase/storage';
+import { useAuth } from '@/hooks/useauth';
+import { dbService, storageService } from '@/lib/services';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
@@ -56,9 +51,9 @@ export default function VenueManagementPageClient() {
   const searchParams = useSearchParams();
   const venueId = searchParams.get('venueId');
   // Firebase
-  const auth = useMemo(() => getAuth(), []);
-  const storage = useMemo(() => getStorage(), []);
-  const userId = auth.currentUser?.uid;
+  const { user } = useAuth();
+  const userId = user?.uid;
+
 
   // Local state
   const [venueData, setVenueData] = useState<{
@@ -174,9 +169,9 @@ export default function VenueManagementPageClient() {
     if (venueId && userId) {
       const loadVenue = async () => {
         try {
-          const venueDoc = await getDoc(doc(db, 'venues', venueId));
-          if (venueDoc.exists()) {
-            const venue = venueDoc.data() as Venue & { layers?: Layer[] };
+          const venueDoc = await dbService.getDocument<Venue & { layers?: Layer[] }>('venues', venueId);
+          if (venueDoc.exists && venueDoc.data) {
+            const venue = venueDoc.data;
             let layers: Layer[];
             if (venue.layers && venue.layers.length > 0) {
               layers = venue.layers;
@@ -543,8 +538,7 @@ export default function VenueManagementPageClient() {
       let newMapUrl: string | undefined;
 
       if (mapFile && mapFile.size > 0) {
-        const storageRef = ref(storage, `venue_maps/${Date.now()}_${mapFile.name}`);
-        newMapUrl = await uploadWithRetry(storageRef, mapFile);
+        newMapUrl = await storageService.uploadFile(`venue_maps/${Date.now()}_${mapFile.name}`, mapFile);
       }
 
       const equipmentToSave = venueData.equipment.map(({ ...rest }) => rest);
@@ -576,13 +570,9 @@ export default function VenueManagementPageClient() {
       }
 
       if (venueId) {
-        // Update existing venue
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await updateDoc(doc(db, 'venues', venueId), dataToSave as any);
+        await dbService.updateDocument('venues', venueId, dataToSave);
       } else {
-        // Create new venue
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await addDoc(collection(db, 'venues'), dataToSave as any);
+        await dbService.addDocument('venues', dataToSave);
       }
       router.push('/venues/selection')
     } catch (error: unknown) {
@@ -610,8 +600,7 @@ export default function VenueManagementPageClient() {
   const handleAddLayer = async (name: string, file: File) => {
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `venue_maps/${Date.now()}_${file.name}`);
-      const mapUrl = await uploadWithRetry(storageRef, file);
+      const mapUrl = await storageService.uploadFile(`venue_maps/${Date.now()}_${file.name}`, file);
       const newLayer: Layer = {
         id: crypto.randomUUID(),
         name,
@@ -662,6 +651,7 @@ export default function VenueManagementPageClient() {
             type="file"
             accept="image/*"
             className="hidden"
+            data-testid="map-file-input"
             onChange={(e) => {
               setMapFile(e.target.files?.[0] ?? null);
               setPendingLayer(currentLayer);

@@ -116,6 +116,7 @@ export default function TeamCard({
     <Card
       // Closed cards are transparent/sharp; open cards retain active dark shell.
       className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
+      data-testid={`team-card-${staff.team}`}
     >
       {/* HEADER (click to toggle). Not a <button>, so no nested <button> issues */}
       <CardHeader
