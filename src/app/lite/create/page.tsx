@@ -1387,7 +1387,7 @@ function LiteCreateContent() {
         addMember={addMember}
         currentMembers={currentMembers}
         removeMember={removeMember}
-        LICENSES={LICENSES}
+        roles={LICENSES.map(name => ({ name, fullName: name }))}
       />
 
       <AddSupervisorModal
@@ -1403,7 +1403,7 @@ function LiteCreateContent() {
         setMemberName={setSamMemberName}
         memberCert={samCert}
         setMemberCert={setSamCert}
-        LICENSES={LICENSES}
+        roles={LICENSES.map(name => ({ name, fullName: name }))}
       />
     </main>
   );

@@ -3290,6 +3290,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           callDisplayNumberMap={callDisplayNumberMap}
                           showResolvedCalls={showResolvedCalls}
                           setShowResolvedCalls={setShowResolvedCalls}
+                          setShowQuickCallForm={setShowQuickCallForm}
                           openCallId={openCallId}
                           setOpenCallId={setOpenCallId}
                           editingCell={editingCell}

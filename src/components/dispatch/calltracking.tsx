@@ -36,6 +36,7 @@ interface CallTrackingTableProps {
   callDisplayNumberMap: Map<string, number>;
   showResolvedCalls: boolean;
   setShowResolvedCalls: (value: boolean | ((prev: boolean) => boolean)) => void;
+  setShowQuickCallForm: (value: boolean) => void;
   openCallId: string | null;
   setOpenCallId: (value: string | null) => void;
   editingCell: { callId: string; field: EditableCallField } | null;
@@ -83,6 +84,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   callDisplayNumberMap,
   showResolvedCalls,
   setShowResolvedCalls,
+  setShowQuickCallForm,
   openCallId,
   setOpenCallId,
   editingCell,
@@ -1455,6 +1457,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
             {showResolvedCalls ? 'Hide Resolved Calls' : 'Show Resolved Calls'}
           </button>
         </div>
+      </div>
     </div>
   );
 };
