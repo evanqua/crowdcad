@@ -37,7 +37,7 @@ export class PocketbaseDbService implements IDbService {
   async getCollection<T>(col: string): Promise<DocSnapshot<T>[]> {
     try {
       const records = await pb.collection(col).getFullList();
-      return records.map((r) => toSnapshot<T>(r as unknown as Record<string, unknown>));
+      return records.map((r: unknown) => toSnapshot<T>(r as unknown as Record<string, unknown>));
     } catch (err) {
       throw toPbServiceError(err);
     }
@@ -47,7 +47,7 @@ export class PocketbaseDbService implements IDbService {
     try {
       const filter = buildFilter(constraints);
       const records = await pb.collection(col).getFullList({ filter: filter || undefined });
-      return records.map((r) => toSnapshot<T>(r as unknown as Record<string, unknown>));
+      return records.map((r: unknown) => toSnapshot<T>(r as unknown as Record<string, unknown>));
     } catch (err) {
       throw toPbServiceError(err);
     }
@@ -186,7 +186,7 @@ export class PocketbaseDbService implements IDbService {
 
     // Subscribe to SSE immediately so we don't miss any events that arrive
     // while the initial poll is in-flight.
-    pb.collection(col).subscribe(id, (event) => {
+    pb.collection(col).subscribe(id, (event: { action: string; record: unknown }) => {
       if (cancelled) return;
       // SSE beat the poll — mark initial load done so the poll callback is skipped.
       initialLoadDone = true;
@@ -195,7 +195,7 @@ export class PocketbaseDbService implements IDbService {
       } else {
         callback(toSnapshot<T>(event.record as unknown as Record<string, unknown>));
       }
-    }).catch((err) => onError?.(toPbServiceError(err)));
+    }).catch((err: unknown) => onError?.(toPbServiceError(err)));
 
     // Poll until the document appears (handles the case where the record was
     // just created and PocketBase's SSE has not emitted the create event yet).
@@ -258,18 +258,18 @@ export class PocketbaseDbService implements IDbService {
     const refetch = () =>
       pb.collection(col)
         .getFullList({ filter: filter || undefined })
-        .then((records) => {
+        .then((records: unknown[]) => {
           if (!cancelled)
-            callback(records.map((r) => toSnapshot<T>(r as unknown as Record<string, unknown>)));
+            callback(records.map((r: unknown) => toSnapshot<T>(r as unknown as Record<string, unknown>)));
         })
-        .catch((err) => { if (!cancelled) onError?.(toPbServiceError(err)); });
+        .catch((err: unknown) => { if (!cancelled) onError?.(toPbServiceError(err)); });
 
     // Initial load
     refetch();
 
     // Re-fetch on any change in the collection
     pb.collection(col).subscribe('*', () => { if (!cancelled) refetch(); })
-      .catch((err) => onError?.(toPbServiceError(err)));
+      .catch((err: unknown) => onError?.(toPbServiceError(err)));
 
     return () => {
       cancelled = true;

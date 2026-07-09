@@ -2746,7 +2746,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const activeClinicCount = (event.calls || []).filter(
     call => call.status === 'Delivered' && !call.outcome
   ).length;
-  const totalCallsCount = event.calls?.length || 0;
   const totalPatientsCount = (event.calls || []).filter(call => call.status === 'Delivered').length;
 
   const COLW = {
@@ -3244,28 +3243,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
                     {selectedRightTab === 'calls' && (
                       <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
-                        <div className="flex items-center justify-between py-1">
-                          <h3 className="text-md font-semibold text-surface-light">Total Calls: {totalCallsCount}</h3>
-                          <Tooltip content="Add Call (Ctrl+Enter)" placement="top">
-                            <div>
-                              <Button
-                                size="sm"
-                                variant="flat"
-                                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                               data-testid="add-call-button"
-                                onPress={() => setShowQuickCallForm(true)}
-                              >
-                                Add Call
-                              </Button>
-                            </div>
-                          </Tooltip>
-                        </div>
-
                         <CallTrackingTable
                           event={event}
                           callDisplayNumberMap={callDisplayNumberMap}
                           showResolvedCalls={showResolvedCalls}
                           setShowResolvedCalls={setShowResolvedCalls}
+                          setShowQuickCallForm={setShowQuickCallForm}
                           openCallId={openCallId}
                           setOpenCallId={setOpenCallId}
                           editingCell={editingCell}
