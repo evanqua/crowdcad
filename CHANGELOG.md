@@ -14,8 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+---
+
+## [1.3.0] - 2026-07-09
+
 ### Added
 
+- **PocketBase self-hosted backend support** — opt-in via `NEXT_PUBLIC_BACKEND=pocketbase`, giving LAN/local deployments a no-cloud-account option alongside Firebase. Implemented as a backend-agnostic service layer (`src/lib/services` — `IAuthService`/`IDbService`/`IStorageService` interfaces with `firebase/` and `pocketbase/` adapters selected by `factory.ts`), plus `docker-compose.yml`, `Dockerfile.pocketbase`, and `scripts/setup-pocketbase.js` for collection setup.
+- Docker production and development environment (`Dockerfile`, `Dockerfile.pocketbase`, `docker-compose.yml`).
+- GitHub Actions CI/CD pipeline (build, lint, type-check, E2E against both backends) and automated release drafting (`.github/workflows/`).
+- BDD end-to-end test suite bootstrap (Playwright + `playwright-bdd`, Firebase emulators) covering dispatch, event creation, venue management, auth, and profile flows, with a parallel PocketBase E2E configuration.
+- Roles are now fetched from the persisted store instead of hardcoded values.
 - Dispatch tracking composition utilities added under `src/components/dispatch/`:
   - `trackingtablebase.tsx` — shared table shell and row rendering structure used by call and clinic tracking.
   - `trackingtextentry.tsx` — shared inline text entry control used across team, call, and clinic flows.
@@ -49,6 +58,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Changed
 
+- Navbar refresh: increased contrast in light mode, resized/recolored for greater contrast and more compact viewing, and realigned mobile navbar buttons for consistency.
+- Color and opacity constants centralized in config instead of scattered literals.
 - Dispatch right panel now uses browser-style secondary tabs with active counts and a compact header action bar (`Add Call` with keyboard shortcut hint).
 - Call and clinic tracking now share aligned table and card visual language, including unified shells, spacing, and row structure.
 - Team cards received a UI refresh: transparent shell, square corners, divider structure, chevron expand indicator, refined map pin sizing, and clearer member/cert formatting.
@@ -70,6 +81,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 
+- Calls tab now visually matches the Clinic tab: shares the `TrackingTableBase` scaffold and header/button chrome, and `Add Call` (a pill button matching Clinic's `Add Patient`) replaces the old icon-only `+`. This also fixed a header/body column-count mismatch that had misaligned every column from Status onward.
+- Resolved calls (Delivered, NMM, Unable to Locate, Refusal, etc.) no longer show a stale "Pending" team marker just because their team was detached.
+- The call actions (3-dot) menu no longer force-closes on resolved calls when "Show Resolved Calls" is enabled.
+- Team-status dropdown no longer closes spuriously from a stray upstream self-close race in the popover library.
+- Fixed a dispatch dual-mount bug and E2E test-data collisions in seed data, and corrected a nested-dialog Playwright locator.
+- Backend-agnostic bypass logic (`src/app/firebase.ts`) now checks `NEXT_PUBLIC_BACKEND === 'pocketbase'` explicitly rather than inferring it from other env vars, so the app never silently falls back to the wrong backend.
+- Profile edit no longer passes `photoURL` to `updateProfile()` in PocketBase mode, where the adapter doesn't support it.
+- E2E seed-db `bulkCreate()` document IDs no longer collide across chunks (ID now incorporates chunk index and item index).
+- CI workflow `contents: write` permission scoped to the publish-report job instead of top-level.
+- Repaired a broken PocketBase client initialization path and hardcoded CI E2E test credentials.
 - Resolved-row action menus now close correctly when rows are resolved and hidden, preventing orphaned dropdown menus.
 - Removed ghost/shadow rendering artifact in tracking text entry fields while scrolling.
 
@@ -167,7 +188,8 @@ Initial public release of **CrowdCAD** — an open-source, browser-based Compute
 
 *For upgrade notes and migration steps, see the relevant release on GitHub. For security vulnerabilities, follow the process in [SECURITY.md](SECURITY.md).*
 
-[Unreleased]: https://github.com/evanqua/crowdcad/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/evanqua/crowdcad/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/evanqua/crowdcad/compare/v1.2.0...v1.3.0
 [1.1.0]: https://github.com/evanqua/crowdcad/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/evanqua/crowdcad/releases/tag/v1.0.0
 
