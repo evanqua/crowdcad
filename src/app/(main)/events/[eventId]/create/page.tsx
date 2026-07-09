@@ -154,6 +154,7 @@ export default function EventCreation() {
     const timeout = setTimeout(async () => {
       try {
         await dbService.updateDocument('events', eventId, stripUndefined({ postingTimes: times }) as Record<string, unknown>);
+        // eslint-disable-next-line no-console
         console.log('Autosaved postingTimes to draft:', { eventId, postingTimes: times });
       } catch (err) {
         console.error('Failed to autosave postingTimes:', err);
@@ -354,6 +355,7 @@ export default function EventCreation() {
               updatedAt: new Date().toISOString(),
               status: 'active',
             }) as Record<string, unknown>);
+            // eslint-disable-next-line no-console
             console.log('Event updated:', { eventId: eventDocId, postingTimes: eventData.postingTimes || [] });
           } else {
             eventDocId = await dbService.addDocument('events', stripUndefined({
@@ -364,6 +366,7 @@ export default function EventCreation() {
               createdAt: new Date().toISOString(),
               status: 'active',
             }));
+            // eslint-disable-next-line no-console
             console.log('Event created (branch new):', { eventId: eventDocId, postingTimes: eventData.postingTimes || [] });
           }
         } catch (error) {
@@ -375,6 +378,7 @@ export default function EventCreation() {
             createdAt: new Date().toISOString(),
             status: 'active',
           }));
+          // eslint-disable-next-line no-console
           console.log('Event created (catch):', { eventId: eventDocId, postingTimes: eventData.postingTimes || [] });
         }
       } else {
@@ -385,6 +389,7 @@ export default function EventCreation() {
           createdAt: new Date().toISOString(),
           status: 'active',
         }));
+        // eslint-disable-next-line no-console
         console.log('Event created (no eventId):', { eventId: eventDocId, postingTimes: eventData.postingTimes || [] });
       }
       router.push(`/events/${eventDocId}/dispatch`);
@@ -564,6 +569,9 @@ export default function EventCreation() {
                           onDeleteTeam={handleDeleteTeam}
                           onAddTeam={() => setIsTeamModalOpen(true)}
                         />
+                      </Tab>
+
+                      <Tab key="supervisors" title="Supervisors" className="flex flex-col h-full">
                         <SupervisorStaffingSection
                           supervisors={eventData.supervisor || []}
                           openSupervisors={openSupervisors}

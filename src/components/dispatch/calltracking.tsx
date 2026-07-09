@@ -401,6 +401,16 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                         >
                           <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                             <div className="relative z-0 flex flex-nowrap items-center gap-2 min-w-max w-max">
+                            {(call.assignedTeam || []).length === 0 && (
+                              <Chip
+                                size="lg"
+                                variant="flat"
+                                color="default"
+                                className="text-surface-light h-9 shrink-0 border border-surface-liner bg-surface-liner/30"
+                              >
+                                Pending
+                              </Chip>
+                            )}
                             {/* Active assigned teams - Larger chips with centered dropdown */}
                             {(Array.isArray(call.assignedTeam) ? call.assignedTeam : []).map((team: string) => {
                               const isEquipmentOnlyTeam = call.equipmentTeams?.includes(team);

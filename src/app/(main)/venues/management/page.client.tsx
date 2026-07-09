@@ -36,6 +36,8 @@ import {
   Trash2, 
   Edit2,
   MapPinned,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -929,17 +931,69 @@ export default function VenueManagementPageClient() {
                     </div>
 
                     {/* Bottom Info Bar - Now OUTSIDE and BELOW the image container */}
-                    <LayerControlBar
-                      mapFileName={mapFileName}
-                      onReplaceMap={() => fileInputRef.current?.click()}
-                      currentLayer={currentLayer}
-                      totalLayers={venueData.layers?.length ?? 0}
-                      currentLayerName={venueData.layers?.[currentLayer]?.name || 'Layer'}
-                      onPreviousLayer={() => setCurrentLayer(currentLayer - 1)}
-                      onNextLayer={() => setCurrentLayer(currentLayer + 1)}
-                      onDeleteLayer={deleteLayer}
-                      onAddLayer={() => setIsNewLayerModalOpen(true)}
-                    />
+                    <Card
+                      isBlurred
+                      className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <MapPinned className="h-4 w-4 text-accent" />
+                          <span className="text-xs text-surface-light truncate max-w-[120px]">{mapFileName}</span>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={() => fileInputRef.current?.click()}
+                            startContent={<Upload className="h-3 w-3" />}
+                            className="ml-2"
+                          >
+                            Replace
+                          </Button>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            isDisabled={currentLayer <= 0}
+                            onPress={() => setCurrentLayer(currentLayer - 1)}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <span
+                            className="text-xs text-surface-light min-w-[100px] text-center"
+                          >
+                            {venueData.layers?.[currentLayer]?.name || 'Layer'}
+                          </span>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            isDisabled={!venueData.layers || currentLayer >= venueData.layers.length - 1}
+                            onPress={() => setCurrentLayer(currentLayer + 1)}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            onPress={deleteLayer}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            data-testid="add-layer-button"
+                            onPress={() => setIsNewLayerModalOpen(true)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
                   </div>
                 ) : (
                   <Card

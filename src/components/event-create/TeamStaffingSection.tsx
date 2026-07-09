@@ -28,6 +28,7 @@ export default function TeamStaffingSection({
           onPress={onAddTeam}
           className="min-w-8 w-8 h-8"
           style={{ backgroundColor: '#27272a' }}
+          data-testid="add-team-button"
         >
           <Plus className="h-4 w-4 text-surface-light" />
         </Button>

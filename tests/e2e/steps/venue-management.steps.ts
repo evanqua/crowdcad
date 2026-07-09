@@ -2,6 +2,7 @@ import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
 import { test } from '../fixtures';
 import { NAV_TIMEOUT } from '../timeouts';
+import { uniqueSuffix } from '../helpers/unique';
 
 const { When, Then } = createBdd(test);
 
@@ -36,7 +37,7 @@ When('I clear the venue name', async ({ page }) => {
 // ── Venue creation with unique name ───────────────────────────────────────────
 
 When('I create a venue with a unique name', async ({ page, scenarioState }) => {
-  scenarioState.createdVenueName = `Playwright-Venue-${Date.now()}`;
+  scenarioState.createdVenueName = `Playwright-Venue-${uniqueSuffix()}`;
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(scenarioState.createdVenueName);
   // Ensure Firebase auth emulator has validated the token before submitting.
   // networkidle settles quickly for /venues/management (no persistent connections).
@@ -52,7 +53,7 @@ Then('the newly created venue should be visible', async ({ page, scenarioState }
 // ── Two-venue search filter scenario ──────────────────────────────────────────
 
 When('I create two venues with unique names', async ({ page, scenarioState }) => {
-  const suffix = Date.now();
+  const suffix = uniqueSuffix();
   scenarioState.createdVenueNameA = `Alpha-${suffix}`;
   scenarioState.createdVenueNameB = `Beta-${suffix}`;
 

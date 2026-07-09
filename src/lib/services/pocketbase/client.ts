@@ -1,17 +1,6 @@
-type PocketBaseClient = {
-  baseURL: string;
-  autoCancellation: (enabled: boolean) => void;
-  filter: (expression: string, params?: Record<string, unknown>) => string;
-  authStore: {
-    isValid: boolean;
-    model: unknown | null;
-    clear: () => void;
-    onChange: (callback: () => void) => () => void;
-  };
-  collection: (name: string) => any;
-};
+import PocketBase from 'pocketbase';
 
-function createPocketBaseClient(): PocketBaseClient {
+function createPocketBaseClient(): PocketBase {
   const backend = process.env.NEXT_PUBLIC_BACKEND ?? 'firebase';
   const url = process.env.NEXT_PUBLIC_POCKETBASE_URL;
 
@@ -26,13 +15,6 @@ function createPocketBaseClient(): PocketBaseClient {
     );
   }
 
-  // Avoid a static import so Firebase-only builds do not need the package installed.
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  const requireFn = typeof window !== 'undefined'
-    ? (0, eval)('require') as ((id: string) => unknown)
-    : (0, eval)('require') as ((id: string) => unknown);
-
-  const PocketBase = requireFn('pocketbase') as new (baseUrl: string) => PocketBaseClient;
   const client = new PocketBase(url ?? 'http://127.0.0.1:8090');
   client.autoCancellation(false);
   return client;
@@ -45,7 +27,7 @@ export const pb = (() => {
   } catch {
     // Firebase is the default backend. Keep PocketBase optional by returning
     // a lazy-throwing proxy that only fails if a PocketBase path is used.
-    return new Proxy({} as PocketBaseClient, {
+    return new Proxy({} as PocketBase, {
       get() {
         throw new Error('PocketBase backend is not enabled. Set NEXT_PUBLIC_BACKEND=pocketbase to use it.');
       },

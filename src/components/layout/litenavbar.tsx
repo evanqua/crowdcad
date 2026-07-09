@@ -5,8 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/app/firebase';
+import { authService } from '@/lib/services';
 import { useAuth } from '@/hooks/useauth';
 import { getLiteEvent } from '@/lib/liteEventStore';
 import {
@@ -138,7 +137,7 @@ export default function LiteNavbar() {
   };
 
   const onLogout = async () => {
-    await signOut(auth);
+    await authService.signOut();
     document.cookie = 'ccad_auth=0; Max-Age=0; Path=/; SameSite=Lax';
     router.refresh();
     router.push('/');

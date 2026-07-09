@@ -2,6 +2,7 @@ import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
 import { test } from '../fixtures';
 import { NAV_TIMEOUT } from '../timeouts';
+import { uniqueSuffix } from '../helpers/unique';
 
 const { Given, When, Then } = createBdd(test);
 
@@ -10,7 +11,7 @@ const { Given, When, Then } = createBdd(test);
  * Stores the venue name in scenarioState for later assertions.
  */
 Given('I have a venue on the selection page', async ({ page, scenarioState }) => {
-  scenarioState.deletionVenueName = `Del-Venue-${Date.now()}`;
+  scenarioState.deletionVenueName = `Del-Venue-${uniqueSuffix()}`;
   await page.goto('/venues/management', { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(scenarioState.deletionVenueName);
   await page.getByRole('button', { name: 'Create Venue' }).click();

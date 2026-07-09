@@ -75,6 +75,7 @@ export default function AppNavbar() {
   const isDispatch = !!(pathname && /^\/events\/[^/]+\/dispatch(?:$|\/|\?)/.test(pathname));
 
   const navItems = [
+    { label: "Home", href: "/" },
     { label: "Venues", href: "/venues/selection" },
   ];
 

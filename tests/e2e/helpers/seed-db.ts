@@ -44,19 +44,13 @@ async function bulkCreate(collectionName: string, dataArray: Array<Record<string
         chunks.push(dataArray.slice(i, i + BATCH_LIMIT));
     }
 
-    for (const [_, chunk] of chunks.entries()) {
+    for (const [chunkIndex, chunk] of chunks.entries()) {
         try {
             const batch = db.batch();
 
-            // chunk.forEach((data) => {
-            //     const docRef = doc(collection(db, collectionName));
-            //     batch.set(docRef, {
-            //         ...data
-            //     });
-            // });
-
             chunk.forEach((data, index) => {
-                const docRef = db.collection(collectionName).doc(`${collectionName}-${index}`)
+                const globalIndex = chunkIndex * BATCH_LIMIT + index;
+                const docRef = db.collection(collectionName).doc(`${collectionName}-${globalIndex}`)
                 batch.set(docRef, { ...data })
             })
 

@@ -32,7 +32,7 @@ if (missing.length) {
 let app: FirebaseApp;
 if (!getApps().length) {
   // If we are using pocketbase, we mock initialization to prevent crashes from stray imports
-  if (missing.length && process.env.NEXT_PUBLIC_BACKEND === 'pocketbase') {
+  if (process.env.NEXT_PUBLIC_BACKEND === 'pocketbase') {
     app = {} as FirebaseApp;
   } else {
     app = initializeApp(firebaseConfig);
@@ -41,7 +41,7 @@ if (!getApps().length) {
   app = getApp();
 }
 
-export const db = (missing.length && process.env.NEXT_PUBLIC_BACKEND === 'pocketbase')
+export const db = process.env.NEXT_PUBLIC_BACKEND === 'pocketbase'
   ? new Proxy({} as ReturnType<typeof getFirestore>, {
       get(_, prop) {
         if (prop === 'type') return 'firestore';
@@ -55,7 +55,7 @@ export const db = (missing.length && process.env.NEXT_PUBLIC_BACKEND === 'pocket
 // defaults to IndexedDB (firebaseLocalStorageDb), which storageState does NOT
 // capture. The try/catch handles hot-reload re-evaluation without throwing.
 function createAuth() {
-  if (missing.length && process.env.NEXT_PUBLIC_BACKEND === 'pocketbase') {
+  if (process.env.NEXT_PUBLIC_BACKEND === 'pocketbase') {
     return new Proxy({} as ReturnType<typeof getAuth>, {
       get() { return () => { throw new Error('Firebase Auth bypassed'); }; }
     });
@@ -91,9 +91,9 @@ export const auth = typeof globalThis.window === 'undefined'
 const g = globalThis as unknown as { __FIREBASE_EMULATORS_CONNECTED?: boolean };
 if (typeof globalThis.window !== 'undefined' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && !g.__FIREBASE_EMULATORS_CONNECTED) {
   g.__FIREBASE_EMULATORS_CONNECTED = true;
-  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   if (process.env.NEXT_PUBLIC_USE_FIRESTORE_EMULATOR === 'true') {
-    connectFirestoreEmulator(db, 'localhost', 8080);
-    connectStorageEmulator(getStorage(app), 'localhost', 9199);
+    connectFirestoreEmulator(db, '127.0.0.1', 8080);
+    connectStorageEmulator(getStorage(app), '127.0.0.1', 9199);
   }
 }

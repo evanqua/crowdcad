@@ -2,6 +2,7 @@ import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
 import { test } from '../fixtures';
 import { NAV_TIMEOUT } from '../timeouts';
+import { uniqueSuffix } from '../helpers/unique';
 
 const { Given, When, Then } = createBdd(test);
 
@@ -12,7 +13,7 @@ const { Given, When, Then } = createBdd(test);
  */
 Given('I have ended an event and am on the summary page', async ({ page }) => {
   // 1. Create a venue
-  const venueName = `Summary-Venue-${Date.now()}`;
+  const venueName = `Summary-Venue-${uniqueSuffix()}`;
   await page.goto('/venues/management', { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(venueName);
   await page.getByRole('button', { name: 'Create Venue' }).click();
@@ -24,7 +25,7 @@ Given('I have ended an event and am on the summary page', async ({ page }) => {
   await page.waitForURL(/\/events\/.*\/create/, { timeout: 10_000 });
 
   // 3. Name and launch the event
-  await page.getByPlaceholder('Enter event name').fill(`Summary Event ${Date.now()}`);
+  await page.getByPlaceholder('Enter event name').fill(`Summary Event ${uniqueSuffix()}`);
   await page.getByRole('button', { name: 'Create Event' }).click();
   await page.waitForURL(/\/events\/.*\/dispatch/, { timeout: NAV_TIMEOUT });
   await page.locator('[aria-label="Select section"]').waitFor({ state: 'visible', timeout: 10_000 });

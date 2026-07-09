@@ -116,7 +116,10 @@ export default function TeamCardCondensed({
   }, [staff.members]);
 
   return (
-    <Card className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`} data-testid={`team-card-condensed-${staff.team}`}>
+    <Card
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-2xl bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
+      data-testid={`team-card-condensed-${staff.team}`}
+    >
       {/* COLLAPSED HEADER - Single compact line */}
       <CardHeader
         onClick={() => setExpanded(v => !v)}

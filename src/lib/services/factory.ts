@@ -12,6 +12,8 @@ import { PocketbaseStorageService } from './pocketbase/PocketbaseStorageService'
 // bundler to tree-shake the unused backend in production builds.
 const backend = process.env.NEXT_PUBLIC_BACKEND ?? 'firebase';
 
+export const isPocketbaseBackend = backend === 'pocketbase';
+
 export const authService: IAuthService =
   backend === 'pocketbase' ? new PocketbaseAuthService() : new FirebaseAuthService();
 

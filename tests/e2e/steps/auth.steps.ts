@@ -1,6 +1,7 @@
 import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
 import { test } from '../fixtures';
+import { uniqueSuffix } from '../helpers/unique';
 
 const { When, Then } = createBdd(test);
 
@@ -104,6 +105,6 @@ When('I fill the {string} field with the test user password', async ({ page }, l
 });
 
 When('I fill the {string} field with a unique signup email', async ({ page }, label: string) => {
-  const uniqueEmail = `e2e-signup-${Date.now()}@crowdcad.test`;
+  const uniqueEmail = `e2e-signup-${uniqueSuffix()}@crowdcad.test`;
   await page.getByRole('dialog').getByLabel(label, { exact: true }).fill(uniqueEmail);
 });
