@@ -180,25 +180,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           updates = updateInput;
         }
 
-        const removeUndefined = <T,>(obj: T): T => {
-          if (obj === null || typeof obj !== 'object') return obj;
-
-          if (Array.isArray(obj)) {
-            return obj.map((item) => removeUndefined(item)) as unknown as T;
-          }
-
-          const cleaned = {} as Record<string, unknown>;
-          const record = obj as Record<string, unknown>;
-
-          Object.keys(record).forEach((key) => {
-            const val = removeUndefined(record[key]);
-            if (val !== undefined) cleaned[key] = val;
-          });
-
-          return cleaned as unknown as T;
-        };
-
-        tx.update('events', eventId, removeUndefined(updates));
+        tx.update('events', eventId, removeUndefinedDeep(updates));
       });
     } catch (error) {
       console.error("Update failed:", error);

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
-import { authService, dbService } from '@/lib/services';
+import { authService, dbService, isPocketbaseBackend } from '@/lib/services';
 import { Card, CardBody, Button, Avatar } from '@heroui/react';
 import LoadingScreen from '@/components/ui/loading-screen';
 
@@ -37,7 +37,7 @@ export default function EditProfilePage() {
       if (currentUser) {
         await authService.updateProfile({
           displayName: displayName || null,
-          ...(photoURL ? { photoURL } : {}),
+          ...(photoURL && !isPocketbaseBackend ? { photoURL } : {}),
         });
 
         // Save phone (and other profile metadata) to users collection

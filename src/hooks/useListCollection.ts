@@ -1,8 +1,7 @@
-import { db } from "@/app/firebase";
-import { collection, DocumentData, getDocs } from "firebase/firestore";
+import { dbService } from "@/lib/services";
 import { useState, useEffect } from "react";
 
-export default <T extends DocumentData>(collectionName: string): { data: T[]; loading: boolean; error: Error | null } => {
+export default function useListCollection<T>(collectionName: string): { data: T[]; loading: boolean; error: Error | null } {
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
@@ -10,15 +9,9 @@ export default <T extends DocumentData>(collectionName: string): { data: T[]; lo
     useEffect(() => {
         const listData = async (collectionName: string): Promise<void> => {
             try {
-                const data: T[] = [];
+                const snapshots = await dbService.getCollection<T>(collectionName);
 
-                const querySnapshot = await getDocs(collection(db, collectionName));
-
-                querySnapshot.forEach((doc) => {
-                    data.push(doc.data() as T);
-                });
-
-                setData(data);
+                setData(snapshots.filter((snap) => snap.data !== null).map((snap) => snap.data as T));
             } catch (err) {
                 setError(err as Error);
             } finally {

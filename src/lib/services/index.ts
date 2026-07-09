@@ -1,7 +1,7 @@
 // The single import point for all backend service access.
 // Usage: import { authService, dbService, storageService, arrayUnion, arrayRemove } from '@/lib/services';
 
-export { authService, dbService, storageService } from './factory';
+export { authService, dbService, storageService, isPocketbaseBackend } from './factory';
 
 export {
   arrayUnion,

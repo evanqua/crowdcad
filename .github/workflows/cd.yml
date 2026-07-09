@@ -1,4 +1,4 @@
-name: Deploy on Realease
+name: Deploy on Release
 
 on:
   release:
@@ -77,7 +77,7 @@ jobs:
       #   with:
       #     args: deploy --dir=out --prod --message "Deploy from GitHub Actions — ${{ github.sha }}"
       #   env:
-      #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }sss}
+      #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       #     NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
       - name: Report deploy URL
