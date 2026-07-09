@@ -111,6 +111,14 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   const [closingCallId, setClosingCallId] = React.useState<string | null>(null);
   const [openMenuToken, setOpenMenuToken] = React.useState<string | null>(null);
   const previousOpenCallIdRef = React.useRef<string | null>(null);
+  // HeroUI/react-aria's Popover can spuriously fire onOpenChange(false) a few
+  // milliseconds after opening, with no user interaction (a known upstream
+  // focus/blur-tracking race — see adobe/react-spectrum#4533). Real users
+  // never dismiss a menu that fast, so ignore closes inside this window
+  // unless they came from an actual selection (onAction).
+  const TEAM_STATUS_MENU_CLOSE_GUARD_MS = 150;
+  const teamStatusMenuOpenedAtRef = React.useRef<number>(0);
+  const teamStatusMenuSelectedRef = React.useRef<boolean>(false);
   const {
     notesTexts,
     setNotesTexts,
@@ -437,7 +445,13 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                       onOpenChange={(isOpen) => {
                                         if (isOpen) {
                                           if (isResolvedCall && !showResolvedCalls) return;
+                                          teamStatusMenuOpenedAtRef.current = Date.now();
                                           setOpenMenuToken(`team-status:${call.id}:${team}`);
+                                          return;
+                                        }
+                                        const selected = teamStatusMenuSelectedRef.current;
+                                        teamStatusMenuSelectedRef.current = false;
+                                        if (!selected && Date.now() - teamStatusMenuOpenedAtRef.current < TEAM_STATUS_MENU_CLOSE_GUARD_MS) {
                                           return;
                                         }
                                         setOpenMenuToken((current) =>
@@ -456,7 +470,10 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                       </DropdownTrigger>
                                       <DropdownMenu
                                         aria-label="Team status"
-                                        onAction={(key) => handleTeamStatusChange(call.id, team, key as string)}
+                                        onAction={(key) => {
+                                          teamStatusMenuSelectedRef.current = true;
+                                          handleTeamStatusChange(call.id, team, key as string);
+                                        }}
                                       >
                                         {statusOptions.map((status: string) => (
                                           <DropdownItem key={status}>{status}</DropdownItem>
