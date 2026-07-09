@@ -2,11 +2,12 @@ import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
 import { test } from '../fixtures';
 import { NAV_TIMEOUT } from '../timeouts';
+import { uniqueSuffix } from '../helpers/unique';
 
 const { Given, When } = createBdd(test);
 
 Given('I have a venue ready for event creation', async ({ page, scenarioState }) => {
-  scenarioState.eventVenueName = `EC-Venue-${Date.now()}`;
+  scenarioState.eventVenueName = `EC-Venue-${uniqueSuffix()}`;
   await page.goto('/venues/management', { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(scenarioState.eventVenueName);
   await page.getByRole('button', { name: 'Create Venue' }).click();

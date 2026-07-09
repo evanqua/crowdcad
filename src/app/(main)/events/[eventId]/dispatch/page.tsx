@@ -18,6 +18,7 @@ import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
 import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4} from "lucide-react";
 import TeamWidget from '@/components/dispatch/teamwidget';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { CallTrackingTable } from '@/components/dispatch/calltracking';
 import ClinicTrackingTable from '@/components/dispatch/clinictracking';
 import CallTrackingCard from '@/components/dispatch/calltrackingcard';
@@ -1389,6 +1390,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
   const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
+
+  // Matches the lg breakpoint used by the desktop/mobile CSS split below —
+  // keeps CallTrackingTable/Card and ClinicTrackingTable/Card from both being
+  // mounted at once (they'd otherwise share data-testids and thrash React
+  // state on every call/team update while off-screen).
+  const isMobile = useIsMobile(1024);
 
 
   
@@ -3241,7 +3248,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       </button>
                     </div>
 
-                    {selectedRightTab === 'calls' && (
+                    {selectedRightTab === 'calls' && !isMobile && (
                       <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
                         <CallTrackingTable
                           event={event}
@@ -3274,7 +3281,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       </div>
                     )}
 
-                    {selectedRightTab === 'clinic' && (
+                    {selectedRightTab === 'clinic' && !isMobile && (
                       <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
                           <h3 className="text-md font-semibold text-surface-light">Total Patients: {totalPatientsCount}</h3>
@@ -3486,7 +3493,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       </div>
                     </div>
                     <div className="space-y-3">
-                      {[
+                      {isMobile && [
                         // Active calls first
                         ...event.calls
                           .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status))
@@ -3584,7 +3591,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="space-y-3">
-                      {[
+                      {isMobile && [
                         // Unresolved clinic (Delivered with no outcome)
                         ...(event.calls || [])
                           .filter(c => c.status === 'Delivered' && !c.outcome)

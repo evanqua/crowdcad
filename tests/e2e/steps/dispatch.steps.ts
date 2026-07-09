@@ -2,13 +2,14 @@ import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
 import { test } from '../fixtures';
 import { NAV_TIMEOUT } from '../timeouts';
+import { uniqueSuffix } from '../helpers/unique';
 
 const { Given, When, Then } = createBdd(test);
 
 Given('I have created an event and am on the dispatch page', async ({ page }) => {
   // networkidle ensures the Firebase Auth emulator token-validation (and any
   // initial Firestore calls) complete before we interact with the form.
-  const venueName = `Dispatch-Venue-${Date.now()}`;
+  const venueName = `Dispatch-Venue-${uniqueSuffix()}`;
   await page.goto('/venues/management', { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(venueName);
   await page.getByRole('button', { name: 'Create Venue' }).click();
@@ -22,7 +23,7 @@ Given('I have created an event and am on the dispatch page', async ({ page }) =>
   await page.waitForURL(/\/events\/.*\/create/, { timeout: 10_000 });
 
   // Name and launch the event (auth.currentUser stays set across SPA navigation)
-  const eventName = `Test Event ${Date.now()}`;
+  const eventName = `Test Event ${uniqueSuffix()}`;
   await page.getByPlaceholder('Enter event name').fill(eventName);
   await page.getByRole('button', { name: 'Create Event' }).click();
   await page.waitForURL(/\/events\/.*\/dispatch/, { timeout: NAV_TIMEOUT });
@@ -71,7 +72,10 @@ When('I create a team named {string} with a member {string} certified as {string
   await page.locator('[role="listbox"]').getByText(cert, { exact: true }).click();
   await dialog.getByRole('button', { name: 'Add member' }).click();
   await dialog.getByRole('button', { name: 'Create Team' }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible();
+  // Named locator avoids a strict-mode clash with the Certification Select's
+  // own popover, which also carries role="dialog" and can briefly linger in
+  // the DOM mid-unmount after the parent modal closes.
+  await expect(page.getByRole('dialog', { name: 'Add New Team' })).not.toBeVisible();
 });
 
 Then('the team {string} should appear in the teams list', async ({ page }, teamName: string) => {
@@ -167,7 +171,10 @@ When('I create a supervisor with call sign {string} and certification {string}',
   await dialog.locator('[aria-label="Certification"]').click();
   await page.locator('[role="listbox"]').getByText(cert, { exact: true }).click();
   await dialog.getByRole('button', { name: 'Create Supervisor' }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible();
+  // Named locator avoids a strict-mode clash with the Certification Select's
+  // own popover, which also carries role="dialog" and can briefly linger in
+  // the DOM mid-unmount after the parent modal closes.
+  await expect(page.getByRole('dialog', { name: 'Add New Supervisor' })).not.toBeVisible();
 });
 
 Then('the supervisor {string} should appear in the supervisors list', async ({ page }, callSign: string) => {
