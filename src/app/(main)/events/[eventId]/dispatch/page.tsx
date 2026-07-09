@@ -3250,12 +3250,29 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
                     {selectedRightTab === 'calls' && !isMobile && (
                       <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
+                        <div className="flex items-center justify-between py-1">
+                          <h3 className="text-md font-semibold text-surface-light">Total Calls: {event.calls?.length || 0}</h3>
+                          <Tooltip content="Add Call" placement="top">
+                            <div>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                aria-label="Add Call"
+                                data-testid="add-call-button"
+                                onPress={() => setShowQuickCallForm(true)}
+                              >
+                                Add Call
+                              </Button>
+                            </div>
+                          </Tooltip>
+                        </div>
+
                         <CallTrackingTable
                           event={event}
                           callDisplayNumberMap={callDisplayNumberMap}
                           showResolvedCalls={showResolvedCalls}
                           setShowResolvedCalls={setShowResolvedCalls}
-                          setShowQuickCallForm={setShowQuickCallForm}
                           openCallId={openCallId}
                           setOpenCallId={setOpenCallId}
                           editingCell={editingCell}

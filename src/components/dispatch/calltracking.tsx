@@ -36,7 +36,6 @@ interface CallTrackingTableProps {
   callDisplayNumberMap: Map<string, number>;
   showResolvedCalls: boolean;
   setShowResolvedCalls: (value: boolean | ((prev: boolean) => boolean)) => void;
-  setShowQuickCallForm: (value: boolean) => void;
   openCallId: string | null;
   setOpenCallId: (value: string | null) => void;
   editingCell: { callId: string; field: EditableCallField } | null;
@@ -84,7 +83,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   callDisplayNumberMap,
   showResolvedCalls,
   setShowResolvedCalls,
-  setShowQuickCallForm,
   openCallId,
   setOpenCallId,
   editingCell,
@@ -154,7 +152,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
     }
 
     const tokenCallIsResolved = resolvedCallStatuses.includes(tokenCall.status);
-    if (tokenCallIsResolved) {
+    if (tokenCallIsResolved && !showResolvedCalls) {
       setOpenMenuToken(null);
     }
   }, [openMenuToken, event.calls, showResolvedCalls]);
@@ -208,40 +206,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
   return (
     <div className="col-span-2 text-black w-full">
-      <div className="p-4 bg-surface-deep rounded-xl overflow-hidden">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-lg font-semibold text-surface-light">
-            Total Calls: {event.calls?.length || 0}
-          </h3>
-          <div className="flex gap-2">
-            <Button
-              isIconOnly
-              size="md"
-              variant="flat"
-              aria-label="Add Call"
-              data-testid="add-call-button"
-              onPress={() => setShowQuickCallForm(true)}
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-[870px] w-full text-[14px] sm:text-[15px] text-surface-light table-fixed border-separate border-spacing-0">
-            <TableColGroup />
-            <thead>
-              <tr className="border-b border-surface-liner">
-                <th className="px-3 py-2.5 text-left text-surface-faint w-16">Call #</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint w-40">Chief Complaint</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint w-16">A/S</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint w-40">Status</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint w-48">Location</th>
-                <th className="px-3 py-2.5 text-left text-surface-faint">Team</th>
-                <th className="px-3 py-2.5 text-right text-surface-faint w-12"></th>
-              </tr>
-            </thead>
-
-            <tbody className="[&>tr>td]:border-b [&>tr>td]:border-surface-liner">
+      <TrackingTableBase TableColGroup={TableColGroup} showStatusColumn={false} showTeamAssignmentChips={true}>
               {[
                 // Active calls first
                 ...activeCalls,
@@ -409,7 +374,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                         >
                           <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                             <div className="relative z-0 flex flex-nowrap items-center gap-2 min-w-max w-max">
-                            {(call.assignedTeam || []).length === 0 && (
+                            {(call.assignedTeam || []).length === 0 && !isResolvedCall && (
                               <Chip
                                 size="lg"
                                 variant="flat"
@@ -1471,19 +1436,16 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                 </React.Fragment>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-        
-        <div className="flex justify-center pt-3">
-          <button
-            onClick={() => setShowResolvedCalls(prev => !prev)}
-            className="text-surface-faint text-base hover:text-surface-light"
-            aria-label="Toggle resolved calls"
-          >
-            {showResolvedCalls ? 'Hide Resolved Calls' : 'Show Resolved Calls'}
-          </button>
-        </div>
+      </TrackingTableBase>
+
+      <div className="flex justify-center pt-3">
+        <button
+          onClick={() => setShowResolvedCalls(prev => !prev)}
+          className="text-surface-faint text-base hover:text-surface-light"
+          aria-label="Toggle resolved calls"
+        >
+          {showResolvedCalls ? 'Hide Resolved Calls' : 'Show Resolved Calls'}
+        </button>
       </div>
     </div>
   );
