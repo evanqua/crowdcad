@@ -81,15 +81,16 @@ Small PRs are easier to review. If work is exploratory, prefer opening a draft P
 
 ## Testing & quality
 
-- Run linters and tests before opening a PR (if applicable):
+- Run linters, type-checking, and the E2E suite before opening a PR:
 
 ```bash
 npm run lint
-# run tests if the project has a test script
-npm test
+npm run type-check
+npm run test:e2e            # Firebase-backed E2E (Playwright BDD)
+npm run test:e2e:pocketbase # PocketBase-backed E2E
 ```
 
-- Add unit or integration tests for new features when possible.
+- Add or update `.feature`/step-definition coverage under `tests/e2e/` for new features when possible.
 
 ## Documentation contributions
 
