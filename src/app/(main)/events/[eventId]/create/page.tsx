@@ -560,7 +560,7 @@ export default function EventCreation() {
                     <Card
                       isBlurred
                       className="flex-1 flex flex-col mt-4 overflow-hidden"
-                      style={{ backgroundColor: 'rgba(39, 39, 42, 0.5)' }}
+                      style={{ backgroundColor: 'hsl(var(--surface-bg-2) / 0.5)' }}
                     >
                     <Tabs
                       selectedKey={selectedTab}
@@ -782,7 +782,7 @@ export default function EventCreation() {
                     </Card>
                   </div>
                 ) : (
-                  <div className="bg-surface-deep rounded-2xl p-8 text-center text-gray-400">
+                  <div className="bg-surface-deep rounded-2xl p-8 text-center text-surface-faint">
                     No map available
                   </div>
                 )}

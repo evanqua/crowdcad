@@ -70,7 +70,7 @@ export default function LiteLandingPage() {
               CrowdCAD Lite
             </h1>
           </div>
-          <p className="text-lg sm:text-xl text-gray-300 text-center">
+          <p className="text-lg sm:text-xl text-surface-light/80 text-center">
             Fast, lightweight dispatch for events — no internet required
           </p>
         </div>
@@ -78,7 +78,7 @@ export default function LiteLandingPage() {
         {/* Event setup form */}
         <div className="w-full max-w-md flex flex-col gap-6">
           <div className="flex flex-col gap-2">
-            <label htmlFor="event-name" className="text-sm font-semibold text-gray-200">
+            <label htmlFor="event-name" className="text-sm font-semibold text-surface-light">
               Event Name
             </label>
             <Input
@@ -104,9 +104,9 @@ export default function LiteLandingPage() {
             Start Lite Mode
           </Button>
 
-          <p className="text-xs text-gray-400 text-center">
+          <p className="text-xs text-surface-faint text-center">
             You can also switch to the{' '}
-            <Link href="/" className="text-blue-400 hover:text-blue-300 underline">
+            <Link href="/" className="text-accent hover:text-accent/80 underline">
               cloud version
             </Link>
             {' '}if you&apos;d like full features

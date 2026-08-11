@@ -376,7 +376,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
           {/* Left column: Controls (2/5) */}
           <form onSubmit={handleSubmit} className="md:col-span-2 flex flex-col gap-4">
             {/* Venue name */}
-            <label className="text-sm text-gray-300">
+            <label className="text-sm text-surface-light/80">
               Venue Name
               <input
                 type="text"
@@ -390,7 +390,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
 
             {/* Equipment */}
             <div>
-              <div className="mb-2 text-sm text-gray-300">Add Equipment</div>
+              <div className="mb-2 text-sm text-surface-light/80">Add Equipment</div>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -410,7 +410,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
 
               {venueData.equipment.length > 0 && (
                 <div className="mt-3">
-                  <div className="mb-2 text-sm text-gray-300">Current Equipment</div>
+                  <div className="mb-2 text-sm text-surface-light/80">Current Equipment</div>
                   <div className="flex flex-wrap gap-2">
                     {venueData.equipment.map((item, idx) => (
                       <span
@@ -438,7 +438,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
             {/* Text-only posts if no map */}
             {!previewUrl && (
               <div>
-                <div className="mb-2 text-sm text-gray-300">Add Post Locations</div>
+                <div className="mb-2 text-sm text-surface-light/80">Add Post Locations</div>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -461,7 +461,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
             {/* Current Posts (pill tags) */}
             {venueData.posts.length > 0 && (
               <div>
-                <div className="mb-2 text-sm text-gray-300">Current Posts</div>
+                <div className="mb-2 text-sm text-surface-light/80">Current Posts</div>
                 <div className="flex flex-wrap gap-2">
                   {venueData.posts.map((post, idx) => {
                     const label = typeof post === 'string' ? post : post.name;

@@ -28,7 +28,7 @@ export default function TeamStaffingSection({
           <Button
             size="sm"
             onPress={onAddTeam}
-            className="h-8 px-3 text-sm text-surface-light bg-zinc-700 hover:bg-zinc-600"
+            className="h-8 px-3 text-sm text-surface-light bg-surface-deeperer hover:bg-surface-deep"
             data-testid="add-team-button"
           >
             Add Team
@@ -38,7 +38,7 @@ export default function TeamStaffingSection({
               <Button
                 isIconOnly
                 size="sm"
-                className="h-8 min-w-8 w-8 text-surface-light bg-zinc-700 hover:bg-zinc-600"
+                className="h-8 min-w-8 w-8 text-surface-light bg-surface-deeperer hover:bg-surface-deep"
                 aria-label="More add-team options"
               >
                 <ChevronDown className="h-4 w-4 text-surface-light" />
@@ -80,7 +80,7 @@ export default function TeamStaffingSection({
                 </div>
               </div>
               {openTeams[idx] && (
-                <ul className="px-3 pb-2 list-disc list-inside text-sm text-gray-300">
+                <ul className="px-3 pb-2 list-disc list-inside text-sm text-surface-faint">
                   {team.members.map((member, mIdx) => (
                     <li key={mIdx}>{member}</li>
                   ))}

@@ -786,7 +786,7 @@ function LiteCreateContent() {
                   <Card
                     isBlurred
                     className="flex-1 overflow-hidden"
-                    style={{ backgroundColor: 'rgba(39, 39, 42, 0.5)' }}
+                    style={{ backgroundColor: 'hsl(var(--surface-bg-2) / 0.5)' }}
                   >
                     {selectedLeftTab === 'locations' ? (
                       <ScrollShadow
@@ -940,7 +940,7 @@ function LiteCreateContent() {
                   <Card
                     isBlurred
                     className="flex-1 flex flex-col overflow-hidden"
-                    style={{ backgroundColor: 'rgba(39, 39, 42, 0.5)' }}
+                    style={{ backgroundColor: 'hsl(var(--surface-bg-2) / 0.5)' }}
                   >
                     <div className="flex-1 flex flex-col h-full overflow-hidden">
                       <Tabs
@@ -976,7 +976,7 @@ function LiteCreateContent() {
                                 setCurrentMembers([]);
                                 setIsTeamModalOpen(true);
                               }}
-                              className="h-8 px-3 text-sm text-surface-light bg-zinc-700 hover:bg-zinc-600"
+                              className="h-8 px-3 text-sm text-surface-light bg-surface-deeperer hover:bg-surface-deep"
                             >
                               Add Team
                             </Button>
@@ -989,7 +989,7 @@ function LiteCreateContent() {
                             <Button
                               size="sm"
                               onPress={() => setIsSupervisorModalOpen(true)}
-                              className="h-8 px-3 text-sm text-surface-light bg-zinc-700 hover:bg-zinc-600"
+                              className="h-8 px-3 text-sm text-surface-light bg-surface-deeperer hover:bg-surface-deep"
                             >
                               Add Supervisor
                             </Button>
