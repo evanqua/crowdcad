@@ -16,6 +16,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [1.4.0] - 2026-08-11
+
+### Added
+
+- **Multiple named clinics (foundation)** — venues can now designate specific locations as clinics (`Post.isClinic`), and an event can define multiple clinics (`Event.clinics`). Dispatch renders one named tab per clinic instead of a single hardcoded "Clinic" tab, and calls carry a `clinicId` field. Picking which specific clinic a call routes to is intentionally deferred to a follow-up — this release lays the data-model and UI foundation only.
+- **CSV bulk upload for teams and supervisors** — download a template, fill it out, and import via a new split "Add Team"/"Add Supervisor" button (download template → upload → validated preview → import), instead of adding staff one at a time.
+- **Loading feedback on "Start New Event"** — the button now shows a spinner and disables itself while the draft event is being created, instead of giving no feedback during the write.
+- New Claude Code skill (`event-venue-creation-design`) documenting the design conventions for event- and venue-creation surfaces, scoped to keep them out of the dispatch page's own visual language.
+
+### Fixed
+
+- Teams/Supervisors/Posts/Equipment tabs on the event-create page no longer end their blurred panel at different heights — replaced a duplicated viewport-relative magic number with real flexbox fill, so every tab's content area shares an identical bottom edge.
+- Lite mode's staffing panel blur now matches cloud mode's (it previously read "washed out" from a Tailwind opacity class colliding with HeroUI's `isBlurred` styling at equal specificity).
+- Cloud mode's Add Team / Add Supervisor buttons now carry visible text labels instead of being icon-only.
+- Cloud event-create page no longer scrolls vertically — it now uses the same `100dvh - 3.5rem` height calculation as lite mode (accounting for the app navbar's actual rendered height), and its tabs span the full width of the panel like lite's do.
+- Unified list-item card, chip color, button color, and header spacing between lite and cloud event-create surfaces, and matched bottom panel padding so tab content no longer touches the edge of the screen.
+
+---
+
 ## [1.3.0] - 2026-07-09
 
 ### Added
@@ -188,7 +207,8 @@ Initial public release of **CrowdCAD** — an open-source, browser-based Compute
 
 *For upgrade notes and migration steps, see the relevant release on GitHub. For security vulnerabilities, follow the process in [SECURITY.md](SECURITY.md).*
 
-[Unreleased]: https://github.com/evanqua/crowdcad/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/evanqua/crowdcad/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/evanqua/crowdcad/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/evanqua/crowdcad/compare/v1.2.0...v1.3.0
 [1.1.0]: https://github.com/evanqua/crowdcad/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/evanqua/crowdcad/releases/tag/v1.0.0
