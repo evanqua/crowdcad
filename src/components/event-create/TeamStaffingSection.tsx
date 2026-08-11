@@ -19,7 +19,7 @@ export default function TeamStaffingSection({
   onAddTeam,
 }: Props) {
   return (
-    <>
+    <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
         <h3 className="text-surface-light font-semibold text-lg">Teams</h3>
         <Button
@@ -34,8 +34,8 @@ export default function TeamStaffingSection({
         </Button>
       </div>
 
-      <div className="px-4 py-3">
-        <ScrollShadow className="space-y-2 pr-2 scrollbar-hide" hideScrollBar style={{ minHeight: 'calc(100vh - 334px)', maxHeight: 'calc(100vh - 334px)', overflow: 'auto' }}>
+      <div className="px-4 py-3 flex-1 min-h-0 flex flex-col">
+        <ScrollShadow className="space-y-2 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
           {staff.map((team, idx) => (
             <div key={idx} className="rounded-2xl p-3" style={{ backgroundColor: '#27272a' }}>
               <div
@@ -68,6 +68,6 @@ export default function TeamStaffingSection({
           ))}
         </ScrollShadow>
       </div>
-    </>
+    </div>
   );
 }

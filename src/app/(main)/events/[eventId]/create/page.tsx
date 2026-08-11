@@ -582,8 +582,8 @@ export default function EventCreation() {
                       </Tab>
 
                       <Tab key="posts" title="Posts" className="flex flex-col h-full">
-                        <div className="px-4 py-3">
-                          <ScrollShadow className="space-y-4 pr-2 scrollbar-hide" hideScrollBar style={{ minHeight: 'calc(100vh - 334px)', maxHeight: 'calc(100vh - 334px)', overflow: 'auto' }}>
+                        <div className="px-4 py-3 flex-1 min-h-0 flex flex-col">
+                          <ScrollShadow className="space-y-4 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
                             <PostsSelectionSection
                               hasVenue={hasVenue}
                               postsEnabled={postsEnabled}

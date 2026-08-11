@@ -151,9 +151,9 @@ export function EquipmentSelectionSection({
   getPostName,
 }: Pick<Props, 'hasVenue' | 'eventData' | 'setEventData' | 'selectClassNames' | 'allPosts' | 'getPostName'>) {
   return (
-    <div className="flex-1 px-4 py-3">
+    <div className="flex-1 min-h-0 px-4 py-3 flex flex-col">
       {hasVenue && (
-        <ScrollShadow className="space-y-2 pr-2 scrollbar-hide" hideScrollBar style={{ minHeight: 'calc(100vh - 334px)', maxHeight: 'calc(100vh - 334px)', overflow: 'auto' }}>
+        <ScrollShadow className="space-y-2 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
           {eventData.venue?.equipment?.map((equip) => {
             const selectedEquip = eventData.eventEquipment.find((e) => e.id === equip.id);
             const isSelected = !!selectedEquip;
