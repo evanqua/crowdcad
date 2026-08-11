@@ -22,6 +22,7 @@ import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/e
 import { stripUndefined } from '@/lib/utils';
 import AddTeamModal from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
+import BulkImportModal from '@/components/modals/event/bulkimportmodal';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -56,6 +57,7 @@ export default function EventCreation() {
   const [currentLayer, setCurrentLayer] = useState(0);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
+  const [bulkImportMode, setBulkImportMode] = useState<'team' | 'supervisor' | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imgContainerRef = useRef<HTMLDivElement>(null);
@@ -324,6 +326,15 @@ export default function EventCreation() {
     setIsSupervisorModalOpen(false);
   };
 
+  const handleBulkImport = (staff: Staff[], supervisors: Supervisor[]) => {
+    setEventData(prev => ({
+      ...prev,
+      staff: staff.length > 0 ? [...(prev.staff || []), ...staff] : prev.staff,
+      supervisor: supervisors.length > 0 ? [...(prev.supervisor || []), ...supervisors] : prev.supervisor,
+    }));
+    setBulkImportMode(null);
+  };
+
   const handleSubmit = async () => {
     submittedRef.current = true;
     try {
@@ -568,6 +579,7 @@ export default function EventCreation() {
                           setOpenTeams={setOpenTeams}
                           onDeleteTeam={handleDeleteTeam}
                           onAddTeam={() => setIsTeamModalOpen(true)}
+                          onUploadCSV={() => setBulkImportMode('team')}
                         />
                       </Tab>
 
@@ -577,6 +589,7 @@ export default function EventCreation() {
                           openSupervisors={openSupervisors}
                           setOpenSupervisors={setOpenSupervisors}
                           onDeleteSupervisor={handleDeleteSupervisor}
+                          onUploadCSV={() => setBulkImportMode('supervisor')}
                           onAddSupervisor={() => setIsSupervisorModalOpen(true)}
                         />
                       </Tab>
@@ -816,6 +829,19 @@ export default function EventCreation() {
         memberCert={samCert}
         setMemberCert={setSamCert}
         roles={LICENSES.map(name => ({ name, fullName: name }))}
+      />
+
+      <BulkImportModal
+        isOpen={bulkImportMode !== null}
+        onClose={() => setBulkImportMode(null)}
+        mode={bulkImportMode || 'team'}
+        roles={LICENSES.map(name => ({ name, fullName: name }))}
+        existingTeamNames={
+          bulkImportMode === 'supervisor'
+            ? (eventData.supervisor || []).map(s => s.team)
+            : (eventData.staff || []).map(s => s.team)
+        }
+        onImport={handleBulkImport}
       />
     </main>
   );

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button, ScrollShadow } from '@heroui/react';
-import { Trash2, Plus } from 'lucide-react';
+import { Button, ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, ScrollShadow } from '@heroui/react';
+import { Trash2, Plus, ChevronDown } from 'lucide-react';
 import type { Staff } from '@/app/types';
 
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
   setOpenTeams: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
   onDeleteTeam: (idx: number) => void;
   onAddTeam: () => void;
+  onUploadCSV: () => void;
 };
 
 export default function TeamStaffingSection({
@@ -17,21 +18,45 @@ export default function TeamStaffingSection({
   setOpenTeams,
   onDeleteTeam,
   onAddTeam,
+  onUploadCSV,
 }: Props) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
         <h3 className="text-surface-light font-semibold text-lg">Teams</h3>
-        <Button
-          size="sm"
-          onPress={onAddTeam}
-          startContent={<Plus className="h-4 w-4 text-surface-light" />}
-          className="h-8 px-3 text-sm text-surface-light"
-          style={{ backgroundColor: '#27272a' }}
-          data-testid="add-team-button"
-        >
-          Add Team
-        </Button>
+        <ButtonGroup>
+          <Button
+            size="sm"
+            onPress={onAddTeam}
+            startContent={<Plus className="h-4 w-4 text-surface-light" />}
+            className="h-8 px-3 text-sm text-surface-light"
+            style={{ backgroundColor: '#27272a' }}
+            data-testid="add-team-button"
+          >
+            Add Team
+          </Button>
+          <Dropdown>
+            <DropdownTrigger>
+              <Button
+                isIconOnly
+                size="sm"
+                className="h-8 min-w-8 w-8 text-surface-light"
+                style={{ backgroundColor: '#27272a' }}
+                aria-label="More add-team options"
+              >
+                <ChevronDown className="h-4 w-4 text-surface-light" />
+              </Button>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="Team add options"
+              onAction={(key) => {
+                if (key === 'upload-csv') onUploadCSV();
+              }}
+            >
+              <DropdownItem key="upload-csv">Upload CSV</DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </ButtonGroup>
       </div>
 
       <div className="px-4 py-3 flex-1 min-h-0 flex flex-col">
