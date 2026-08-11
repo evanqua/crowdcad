@@ -31,6 +31,7 @@ type Props = {
 
   formatAgeSex: (age?: string, gender?: string) => string;
   parseAgeSex: (raw: string) => { age: string; gender: string };
+  clinicId?: string;
 };
 
 export default function ClinicWalkupModal({
@@ -42,6 +43,7 @@ export default function ClinicWalkupModal({
   setClinicCall,
   formatAgeSex,
   parseAgeSex,
+  clinicId,
 }: Props) {
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -74,6 +76,7 @@ export default function ClinicWalkupModal({
         ...(clinicCall.age?.trim() && { age: clinicCall.age.trim() }),
         ...(clinicCall.gender?.trim() && { gender: clinicCall.gender.trim() }),
         clinic: true,
+        ...(clinicId && { clinicId }),
         priority: false,
         log: [
           {

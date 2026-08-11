@@ -1,10 +1,12 @@
 import React from 'react';
-import { Button, Input } from '@heroui/react';
+import { Button, Checkbox, Input } from '@heroui/react';
 
 interface PendingMarkerDialogProps {
   markerNameInput: string;
   markerInputRef: React.RefObject<HTMLInputElement | null>;
   setMarkerNameInput: (value: string) => void;
+  markerIsClinicInput: boolean;
+  setMarkerIsClinicInput: (value: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -13,6 +15,8 @@ export default function PendingMarkerDialog({
   markerNameInput,
   markerInputRef,
   setMarkerNameInput,
+  markerIsClinicInput,
+  setMarkerIsClinicInput,
   onConfirm,
   onCancel,
 }: PendingMarkerDialogProps) {
@@ -47,7 +51,15 @@ export default function PendingMarkerDialog({
           inputWrapper: 'px-4 hover:bg-surface-deep mb-2',
         }}
       />
-      <div className="flex gap-2">
+      <Checkbox
+        isSelected={markerIsClinicInput}
+        onValueChange={setMarkerIsClinicInput}
+        size="sm"
+        classNames={{ label: 'text-surface-light text-xs' }}
+      >
+        Mark as Clinic
+      </Checkbox>
+      <div className="flex gap-2 mt-2">
         <Button size="sm" variant="flat" onPress={onCancel} className="flex-1">
           Cancel
         </Button>

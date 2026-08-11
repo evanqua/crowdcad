@@ -4,7 +4,13 @@ export type Post =
     name: string;
     x: number | null; // percentage of width
     y: number | null; // percentage of height
+    isClinic?: boolean;
   };
+
+export interface Clinic {
+  id: string;
+  name: string;
+}
 
 export interface Layer {
   id: string;
@@ -44,6 +50,7 @@ export interface Event {
   eventEquipment: EventEquipment[];
   ended?: boolean;
   postAssignments?: PostAssignment;
+  clinics?: Clinic[];
 
   postingStart?: string | number;
   postingEnd?: string | number;
@@ -117,6 +124,7 @@ export interface Call {
   equipmentTeams?: string[];
   equipment?: string[];
   clinic?: boolean;
+  clinicId?: string;
   outcome?: ClinicOutcome;
 }
 

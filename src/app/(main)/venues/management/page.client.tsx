@@ -83,6 +83,7 @@ export default function VenueManagementPageClient() {
     postIdx: number;
   } | null>(null);
   const [markerNameInput, setMarkerNameInput] = useState('');
+  const [markerIsClinicInput, setMarkerIsClinicInput] = useState(false);
 
   // Inputs
   const [equipmentInput, setEquipmentInput] = useState('');
@@ -335,6 +336,7 @@ export default function VenueManagementPageClient() {
     });
     setPendingMarker({ x, y, layerIdx: currentLayer, postIdx: venueData.layers[currentLayer].posts.length });
     setMarkerNameInput('');
+    setMarkerIsClinicInput(false);
   };
 
   // Confirm marker name
@@ -347,6 +349,7 @@ export default function VenueManagementPageClient() {
       removePost(pendingMarker.layerIdx, pendingMarker.postIdx);
       setPendingMarker(null);
       setMarkerNameInput('');
+      setMarkerIsClinicInput(false);
       return;
     }
 
@@ -355,7 +358,7 @@ export default function VenueManagementPageClient() {
       const copy = [...newLayers[pendingMarker.layerIdx].posts];
       const currentPost = copy[pendingMarker.postIdx];
       if (typeof currentPost !== 'string') {
-        copy[pendingMarker.postIdx] = { ...currentPost, name };
+        copy[pendingMarker.postIdx] = { ...currentPost, name, isClinic: markerIsClinicInput };
       }
       newLayers[pendingMarker.layerIdx] = { ...newLayers[pendingMarker.layerIdx], posts: copy };
       return { ...prev, layers: newLayers };
@@ -363,6 +366,7 @@ export default function VenueManagementPageClient() {
 
     setPendingMarker(null);
     setMarkerNameInput('');
+    setMarkerIsClinicInput(false);
   };
 
   // Cancel marker placement
@@ -372,6 +376,7 @@ export default function VenueManagementPageClient() {
     }
     setPendingMarker(null);
     setMarkerNameInput('');
+    setMarkerIsClinicInput(false);
   };
 
   const removePost = (layerIdx: number, postIdx: number) => {
@@ -390,7 +395,7 @@ export default function VenueManagementPageClient() {
     setIsLocationEditModalOpen(true);
   };
 
-  const handleEditLocation = (name: string, newLayerIdx: number) => {
+  const handleEditLocation = (name: string, newLayerIdx: number, isClinic: boolean) => {
     if (!editingLocation) return;
     const { layerIdx, postIdx } = editingLocation;
     setVenueData((prev) => {
@@ -399,12 +404,12 @@ export default function VenueManagementPageClient() {
       if (typeof post === 'string') return prev;
       if (newLayerIdx !== layerIdx) {
         // Move to new layer
-        const newPost = { ...post, name };
+        const newPost = { ...post, name, isClinic };
         newLayers[layerIdx].posts.splice(postIdx, 1);
         newLayers[newLayerIdx].posts.push(newPost);
       } else {
         // Same layer, just rename
-        newLayers[layerIdx].posts[postIdx] = { ...post, name };
+        newLayers[layerIdx].posts[postIdx] = { ...post, name, isClinic };
       }
       return { ...prev, layers: newLayers };
     });
@@ -912,6 +917,8 @@ export default function VenueManagementPageClient() {
                           markerNameInput={markerNameInput}
                           markerInputRef={markerInputRef}
                           setMarkerNameInput={setMarkerNameInput}
+                          markerIsClinicInput={markerIsClinicInput}
+                          setMarkerIsClinicInput={setMarkerIsClinicInput}
                           onConfirm={confirmMarkerName}
                           onCancel={cancelMarkerName}
                         />
@@ -1042,6 +1049,14 @@ export default function VenueManagementPageClient() {
             : ''
         }
         initialLayerIdx={editingLocation?.layerIdx || 0}
+        initialIsClinic={
+          editingLocation
+            ? (() => {
+                const p = venueData.layers[editingLocation.layerIdx].posts[editingLocation.postIdx];
+                return typeof p === 'string' ? false : !!p?.isClinic;
+              })()
+            : false
+        }
         layers={venueData.layers}
       />
     </main>
