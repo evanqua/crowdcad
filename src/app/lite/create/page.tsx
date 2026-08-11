@@ -930,7 +930,8 @@ function LiteCreateContent() {
                 <div className="flex flex-col h-full relative overflow-hidden px-6 pt-0 pb-4">
                   <Card
                     isBlurred
-                    className="flex-1 flex flex-col overflow-hidden bg-surface-deeper/90"
+                    className="flex-1 flex flex-col overflow-hidden"
+                    style={{ backgroundColor: 'rgba(39, 39, 42, 0.5)' }}
                   >
                     <div className="flex-1 flex flex-col h-full overflow-hidden">
                       <Tabs

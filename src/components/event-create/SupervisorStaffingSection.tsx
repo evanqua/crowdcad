@@ -23,14 +23,14 @@ export default function SupervisorStaffingSection({
       <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
         <h3 className="text-surface-light font-semibold text-lg">Supervisors</h3>
         <Button
-          isIconOnly
           size="sm"
           onPress={onAddSupervisor}
-          className="min-w-8 w-8 h-8"
+          startContent={<Plus className="h-4 w-4 text-surface-light" />}
+          className="h-8 px-3 text-sm text-surface-light"
           style={{ backgroundColor: '#27272a' }}
           aria-label="Add Supervisor"
         >
-          <Plus className="h-4 w-4 text-surface-light" />
+          Add
         </Button>
       </div>
 
