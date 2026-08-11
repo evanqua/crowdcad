@@ -42,7 +42,7 @@ export function PostsSelectionSection({
 
   return (
     <>
-      <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
+      <div className="flex-shrink-0 pb-3 pt-0.5 flex items-center justify-between">
         <h3 className="text-surface-light font-semibold text-lg">Posts</h3>
         <Checkbox isSelected={postsEnabled} onValueChange={setPostsEnabled} size="sm">
           <span className="text-sm text-surface-light">Enable Posts</span>
@@ -128,7 +128,7 @@ export function PostsSelectionSection({
                       }));
                     }}
                     variant="flat"
-                    style={{ backgroundColor: '#3eb1fd33', color: '#3eb1fd' }}
+                    className="bg-accent/20 text-accent"
                   >
                     {postName}
                   </Chip>
@@ -151,14 +151,14 @@ export function EquipmentSelectionSection({
   getPostName,
 }: Pick<Props, 'hasVenue' | 'eventData' | 'setEventData' | 'selectClassNames' | 'allPosts' | 'getPostName'>) {
   return (
-    <div className="flex-1 px-4 py-3">
+    <div className="flex-1 min-h-0 px-4 py-3 flex flex-col">
       {hasVenue && (
-        <ScrollShadow className="space-y-2 pr-2 scrollbar-hide" hideScrollBar style={{ minHeight: 'calc(100vh - 334px)', maxHeight: 'calc(100vh - 334px)', overflow: 'auto' }}>
+        <ScrollShadow className="space-y-1.5 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
           {eventData.venue?.equipment?.map((equip) => {
             const selectedEquip = eventData.eventEquipment.find((e) => e.id === equip.id);
             const isSelected = !!selectedEquip;
             return (
-              <div key={equip.id} className="rounded-2xl p-3" style={{ backgroundColor: '#27272a' }}>
+              <div key={equip.id} className="rounded-2xl p-3 bg-surface-deeper/90">
                 <div className="flex items-center gap-3">
                   <Checkbox
                     isSelected={isSelected}

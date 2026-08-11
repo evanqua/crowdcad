@@ -10,7 +10,7 @@ import {
   DropdownItem
 } from '@heroui/react';
 import { MoreVertical } from 'lucide-react';
-import type { Event, Call, CallLogEntry, ClinicOutcome } from '@/app/types';
+import type { Event, Call, CallLogEntry, ClinicOutcome, Clinic } from '@/app/types';
 import DispatchMotionCell from './motioncell';
 import TrackingTableBase from './trackingtablebase';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
@@ -20,6 +20,8 @@ type EditableCallField = keyof Call | 'ageSex';
 
 interface ClinicTrackingTableProps {
   event: Event;
+  clinicId?: string;
+  clinics?: Clinic[];
   callDisplayNumberMap: Map<string, number>;
   showResolvedClinicCalls: boolean;
   setShowResolvedClinicCalls: (value: boolean | ((prev: boolean) => boolean)) => void;
@@ -60,6 +62,8 @@ const TableColGroup = () => (
 
 export default function ClinicTrackingTable({
   event,
+  clinicId,
+  clinics,
   callDisplayNumberMap,
   showResolvedClinicCalls,
   setShowResolvedClinicCalls,
@@ -85,16 +89,24 @@ export default function ClinicTrackingTable({
   const [openMenuToken, setOpenMenuToken] = React.useState<string | null>(null);
   const previousOpenClinicCallIdRef = React.useRef<string | null>(null);
 
+  // When there's more than one venue-designated clinic, only show calls tagged for
+  // this one; legacy calls with no clinicId fall back to the first clinic so nothing
+  // is silently hidden or duplicated across tabs.
+  const belongsToThisClinic = React.useCallback(
+    (c: Call) => !clinicId || !clinics || clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinicId,
+    [clinicId, clinics]
+  );
+
   const resolvedClinicCalls = (event?.calls || [])
-    .filter(c => c.status === 'Delivered' && !!c.outcome)
+    .filter(c => c.status === 'Delivered' && !!c.outcome && belongsToThisClinic(c))
     .sort((a, b) => parseInt(a.id) - parseInt(b.id));
   const unresolvedClinicCalls = (event?.calls || [])
-    .filter(c => c.status === 'Delivered' && !c.outcome)
+    .filter(c => c.status === 'Delivered' && !c.outcome && belongsToThisClinic(c))
     .sort((a, b) => parseInt(a.id) - parseInt(b.id));
 
   const isClinicCallVisible = React.useCallback(
-    (call: Call) => !(call.status === 'Delivered' && !!call.outcome) || showResolvedClinicCalls,
-    [showResolvedClinicCalls]
+    (call: Call) => (!(call.status === 'Delivered' && !!call.outcome) || showResolvedClinicCalls) && belongsToThisClinic(call),
+    [showResolvedClinicCalls, belongsToThisClinic]
   );
 
   React.useEffect(() => {

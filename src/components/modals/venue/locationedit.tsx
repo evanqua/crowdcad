@@ -9,6 +9,7 @@ import {
   ModalBody,
   ModalFooter,
   Button,
+  Checkbox,
   Input,
   Select,
   SelectItem,
@@ -17,9 +18,10 @@ import {
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (name: string, layerIdx: number) => void;
+  onSubmit: (name: string, layerIdx: number, isClinic: boolean) => void;
   initialName: string;
   initialLayerIdx: number;
+  initialIsClinic?: boolean;
   layers: { name: string }[];
 };
 
@@ -29,15 +31,18 @@ export default function LocationEditModal({
   onSubmit,
   initialName,
   initialLayerIdx,
+  initialIsClinic = false,
   layers,
 }: Props) {
   const [name, setName] = React.useState(initialName);
   const [layerIdx, setLayerIdx] = React.useState(initialLayerIdx);
+  const [isClinic, setIsClinic] = React.useState(initialIsClinic);
 
   React.useEffect(() => {
     setName(initialName);
     setLayerIdx(initialLayerIdx);
-  }, [initialName, initialLayerIdx]);
+    setIsClinic(initialIsClinic);
+  }, [initialName, initialLayerIdx, initialIsClinic]);
 
   const inputClassNames = {
     label: "text-surface-light mb-1",
@@ -54,7 +59,7 @@ export default function LocationEditModal({
 
   const handleSubmit = () => {
     if (!name.trim()) return;
-    onSubmit(name.trim(), layerIdx);
+    onSubmit(name.trim(), layerIdx, isClinic);
     onClose();
   };
 
@@ -62,6 +67,7 @@ export default function LocationEditModal({
     onClose();
     setName(initialName);
     setLayerIdx(initialLayerIdx);
+    setIsClinic(initialIsClinic);
   };
 
   return (
@@ -120,6 +126,15 @@ export default function LocationEditModal({
                   </SelectItem>
                 ))}
               </Select>
+
+              <Checkbox
+                isSelected={isClinic}
+                onValueChange={setIsClinic}
+                size="sm"
+                classNames={{ label: "text-surface-light text-sm" }}
+              >
+                Mark as Clinic
+              </Checkbox>
             </ModalBody>
 
             <ModalFooter>

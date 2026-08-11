@@ -9,7 +9,7 @@ import AddTeamModal from "@/components/modals/event/addteammodal";
 import AddSupervisorModal from "@/components/modals/event/addsupervisormodal";
 import React from 'react';
 import { dbService, ServiceError } from '@/lib/services';
-import { PostAssignment, Event, Staff, Supervisor, Call, EquipmentStatus, CallLogEntry, TeamLogEntry, EquipmentItem, EventEquipment, ClinicOutcome } from '@/app/types';
+import { PostAssignment, Event, Staff, Supervisor, Call, EquipmentStatus, CallLogEntry, TeamLogEntry, EquipmentItem, EventEquipment, ClinicOutcome, Clinic } from '@/app/types';
 import { toast, Slide } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
@@ -31,6 +31,8 @@ import EquipmentCard from '@/components/dispatch/equipmentcard';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
+
+const DEFAULT_CLINICS: Clinic[] = [{ id: 'clinic', name: 'Clinic' }];
 
 interface DispatchRoutePageProps {
   params: Promise<{ eventId: string }>;
@@ -1209,6 +1211,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         ...c,
         status: displayStatus,
         clinic: clinicFlag,
+        clinicId: c.clinicId ?? (event?.clinics?.[0]?.id || 'clinic'),
         log: updatedLog,
         assignedTeam: updatedAssignedTeam,
         equipmentTeams: updatedEquipmentTeams,
@@ -2750,10 +2753,16 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const activeCallsCount = (event.calls || []).filter(
     call => !resolvedCallStatuses.includes(call.status)
   ).length;
-  const activeClinicCount = (event.calls || []).filter(
-    call => call.status === 'Delivered' && !call.outcome
-  ).length;
-  const totalPatientsCount = (event.calls || []).filter(call => call.status === 'Delivered').length;
+
+  // Venue-designated clinics, falling back to a single default "Clinic" for
+  // events created before multi-clinic support existed.
+  const clinics: Clinic[] = event.clinics && event.clinics.length > 0 ? event.clinics : DEFAULT_CLINICS;
+
+  // Calls delivered before per-clinic routing existed (or with no clinicId set) all
+  // land in the first/default clinic, so nothing gets silently hidden or duplicated.
+  const getClinicCalls = (clinicId: string) => (event.calls || []).filter(
+    call => call.status === 'Delivered' && (clinics.length <= 1 || (call.clinicId ?? clinics[0]?.id) === clinicId)
+  );
 
   const COLW = {
     CALLNO: '4rem',   // Call #
@@ -2970,6 +2979,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         setClinicCall={setClinicCall}
         formatAgeSex={formatAgeSex}
         parseAgeSex={parseAgeSex}
+        clinicId={clinics.find(c => c.id === selectedRightTab)?.id || clinics[0]?.id}
       />
       <AddTeamModal
         isOpen={showAddTeamModal}
@@ -3238,14 +3248,17 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         Calls ({activeCallsCount})
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRightTab('clinic')}
-                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'clinic' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
-                        aria-pressed={selectedRightTab === 'clinic'}
-                      >
-                        Clinic ({activeClinicCount})
-                      </button>
+                      {clinics.map((clinic) => (
+                        <button
+                          key={clinic.id}
+                          type="button"
+                          onClick={() => setSelectedRightTab(clinic.id)}
+                          className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === clinic.id ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                          aria-pressed={selectedRightTab === clinic.id}
+                        >
+                          {clinic.name} ({getClinicCalls(clinic.id).filter(c => !c.outcome).length})
+                        </button>
+                      ))}
                     </div>
 
                     {selectedRightTab === 'calls' && !isMobile && (
@@ -3298,10 +3311,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       </div>
                     )}
 
-                    {selectedRightTab === 'clinic' && !isMobile && (
-                      <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
+                    {clinics.map((clinic) => selectedRightTab === clinic.id && !isMobile && (
+                      <div key={clinic.id} className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
-                          <h3 className="text-md font-semibold text-surface-light">Total Patients: {totalPatientsCount}</h3>
+                          <h3 className="text-md font-semibold text-surface-light">Total Patients: {getClinicCalls(clinic.id).length}</h3>
                           <Tooltip content="Add Patient" placement="top">
                             <div>
                               <Button
@@ -3319,6 +3332,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
                         <ClinicTrackingTable
                           event={event}
+                          clinicId={clinic.id}
+                          clinics={clinics}
                           callDisplayNumberMap={callDisplayNumberMap}
                           showResolvedClinicCalls={showResolvedClinicCalls}
                           setShowResolvedClinicCalls={setShowResolvedClinicCalls}
@@ -3336,7 +3351,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           formatAgeSex={formatAgeSex}
                         />
                       </div>
-                    )}
+                    ))}
                   </div>
                 </div>
               </ResizablePanel>
@@ -3603,20 +3618,21 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 </div>
               </Tab>
 
-              {/* CLINIC TAB */}
-              <Tab key="clinic" title="Clinic">
+              {/* CLINIC TABS - one per venue-designated clinic */}
+              {clinics.map((clinic) => (
+              <Tab key={clinic.id} title={clinic.name}>
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="space-y-3">
                       {isMobile && [
                         // Unresolved clinic (Delivered with no outcome)
                         ...(event.calls || [])
-                          .filter(c => c.status === 'Delivered' && !c.outcome)
+                          .filter(c => c.status === 'Delivered' && !c.outcome && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
                           .sort((a, b) => parseInt(a.id) - parseInt(b.id)),
                         // Resolved clinic (Delivered with an outcome) when toggled on
                         ...(showResolvedClinicCalls
                           ? (event.calls || [])
-                              .filter(c => c.status === 'Delivered' && !!c.outcome)
+                              .filter(c => c.status === 'Delivered' && !!c.outcome && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
                               .sort((a, b) => parseInt(a.id) - parseInt(b.id))
                           : [])
                       ].map((call: Call) => (
@@ -3692,7 +3708,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           updateEvent={updateEvent}
                         />
                       ))}
-                      {(!event.calls || event.calls.filter(c => c.status === 'Delivered').length === 0) && (
+                      {getClinicCalls(clinic.id).length === 0 && (
                         <div className="text-center text-surface-light/50 py-8">
                           No clinic calls
                         </div>
@@ -3710,6 +3726,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                   </div>
                 </div>
               </Tab>
+              ))}
             </Tabs>
           </div>
         </div>

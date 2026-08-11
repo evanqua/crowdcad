@@ -48,6 +48,7 @@ export default function VenueSelection() {
   const [sharedVenuesList, setSharedVenuesList] = useState<Venue[]>([]);
   const [ownedEventsList, setOwnedEventsList] = useState<Event[]>([]);
   const [sharedEventsList, setSharedEventsList] = useState<Event[]>([]);
+  const [isStartingEvent, setIsStartingEvent] = useState(false);
   const { user, ready } = useAuth();
   const [shareModalData, setShareModalData] = useState<{
     id: string;
@@ -111,6 +112,7 @@ export default function VenueSelection() {
     }
 
     try {
+      setIsStartingEvent(true);
       const newEvent = {
         name: '',
         date: new Date(),
@@ -131,6 +133,7 @@ export default function VenueSelection() {
     } catch (error) {
       console.error('Error creating event:', error);
       alert('Failed to create event.');
+      setIsStartingEvent(false);
     }
   };
 
@@ -475,6 +478,8 @@ export default function VenueSelection() {
                   startContent={<Play className="w-5 h-5" />}
                   className="w-full bg-accent hover:bg-accent/90 text-surface-light"
                   onPress={() => handleStartNewEvent(selectedVenueId)}
+                  isLoading={isStartingEvent}
+                  isDisabled={isStartingEvent}
                 >
                   Start New Event
                 </Button>
@@ -756,6 +761,8 @@ export default function VenueSelection() {
                       startContent={<Play className="w-5 h-5" />}
                       className="bg-accent hover:bg-accent/90 text-surface-light"
                       onPress={() => handleStartNewEvent(selectedVenueId)}
+                      isLoading={isStartingEvent}
+                      isDisabled={isStartingEvent}
                     >
                       Start New Event
                     </Button>
