@@ -47,7 +47,7 @@ export default function PostingScheduleSection({
     <div className={`space-y-3 mt-6 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
       <h3 className="text-surface-light font-semibold text-lg">Schedule</h3>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 rounded-2xl pb-3">
         <TimeInput
           label="From"
           labelPlacement="inside"
@@ -94,12 +94,11 @@ export default function PostingScheduleSection({
                 setPostingTimes((prev) => prev.filter((time) => time !== timeToRemove));
               }}
               variant="flat"
-              style={{ backgroundColor: '#3eb1fd33', color: '#3eb1fd' }}
               onClick={() => {
                 setEditingChipId(chip.id);
                 setEditingChipValue(chip.time);
               }}
-              className="cursor-pointer"
+              className="cursor-pointer bg-accent/20 text-accent"
             >
               {editingChipId === chip.id ? (
                 <input

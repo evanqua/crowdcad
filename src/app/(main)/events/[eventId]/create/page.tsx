@@ -490,13 +490,13 @@ export default function EventCreation() {
   const inputClassNames = {
     label: 'text-surface-light font-medium',
     inputWrapper: 'rounded-2xl px-4',
-    input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
+    input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   };
 
   const selectClassNames = {
     label: 'text-surface-light font-medium',
     input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-    inputWrapper: 'rounded-2xl px-4 pr-6',
+    inputWrapper: 'rounded-2xl px-4 pr-6 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
   };
 
   const handleDeleteTeam = (idx: number) => {
@@ -538,7 +538,7 @@ export default function EventCreation() {
   };
 
   return (
-    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)] overflow-hidden leading-none">
+    <main className="relative bg-surface-deepest text-surface-light h-[calc(100dvh-3.5rem)] overflow-hidden leading-none">
       <DiagonalStreaksFixed />
       <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden">
         <div className="h-full overflow-hidden">
@@ -547,7 +547,7 @@ export default function EventCreation() {
               <Panel defaultSize={40} minSize={30} maxSize={60}>
                 <div className="flex flex-col h-full relative overflow-hidden">
                   <div className="flex-1 flex flex-col overflow-hidden">
-                    <div className="px-6 pt-4 pb-0">
+                    <div className="px-6 pt-4 pb-4 flex-1 flex flex-col min-h-0">
                     {/* Event Name and Date (side-by-side) */}
                     <MetadataSection
                       eventData={eventData}
@@ -565,14 +565,22 @@ export default function EventCreation() {
                     <Tabs
                       selectedKey={selectedTab}
                       onSelectionChange={(key) => setSelectedTab(key as typeof selectedTab)}
-                      className="flex-1 flex flex-col h-full"
+                      fullWidth
+                      className="w-full flex-shrink-0"
                       classNames={{
-                        tabList: 'p-1 flex-shrink-0',
+                        tabList: 'p-1 w-full flex-shrink-0',
                         tab: 'text-surface-light data-[selected=true]:text-surface-light',
-                        panel: 'pt-0 flex-1 flex flex-col overflow-hidden',
+                        panel: 'hidden',
                       }}
                     >
-                      <Tab key="teams" title="Teams" className="flex flex-col h-full">
+                      <Tab key="teams" title="Teams" />
+                      <Tab key="supervisors" title="Supervisors" />
+                      <Tab key="posts" title="Posts" />
+                      <Tab key="equipment" title="Equipment" />
+                    </Tabs>
+
+                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                      {selectedTab === 'teams' && (
                         <TeamStaffingSection
                           staff={eventData.staff || []}
                           openTeams={openTeams}
@@ -581,9 +589,9 @@ export default function EventCreation() {
                           onAddTeam={() => setIsTeamModalOpen(true)}
                           onUploadCSV={() => setBulkImportMode('team')}
                         />
-                      </Tab>
+                      )}
 
-                      <Tab key="supervisors" title="Supervisors" className="flex flex-col h-full">
+                      {selectedTab === 'supervisors' && (
                         <SupervisorStaffingSection
                           supervisors={eventData.supervisor || []}
                           openSupervisors={openSupervisors}
@@ -592,9 +600,9 @@ export default function EventCreation() {
                           onUploadCSV={() => setBulkImportMode('supervisor')}
                           onAddSupervisor={() => setIsSupervisorModalOpen(true)}
                         />
-                      </Tab>
+                      )}
 
-                      <Tab key="posts" title="Posts" className="flex flex-col h-full">
+                      {selectedTab === 'posts' && (
                         <div className="px-4 py-3 flex-1 min-h-0 flex flex-col">
                           <ScrollShadow className="space-y-4 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
                             <PostsSelectionSection
@@ -634,24 +642,25 @@ export default function EventCreation() {
                             />
                           </ScrollShadow>
                         </div>
-                      </Tab>
+                      )}
 
-
-                      <Tab key="equipment" title="Equipment" className="flex flex-col h-full">
-                        <div className="flex-shrink-0 px-3 py-3 flex items-center justify-between">
-                          <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
-                          <div />
+                      {selectedTab === 'equipment' && (
+                        <div className="flex flex-col h-full overflow-hidden">
+                          <div className="flex-shrink-0 px-4 pt-3 flex items-center justify-between">
+                            <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
+                            <div className="w-8 h-8" />
+                          </div>
+                          <EquipmentSelectionSection
+                            hasVenue={hasVenue}
+                            eventData={eventData as Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] }}
+                            setEventData={setEventData as React.Dispatch<React.SetStateAction<Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] }>>}
+                            selectClassNames={selectClassNames}
+                            allPosts={allPosts}
+                            getPostName={getPostName}
+                          />
                         </div>
-                        <EquipmentSelectionSection
-                          hasVenue={hasVenue}
-                          eventData={eventData as Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] }}
-                          setEventData={setEventData as React.Dispatch<React.SetStateAction<Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] }>>}
-                          selectClassNames={selectClassNames}
-                          allPosts={allPosts}
-                          getPostName={getPostName}
-                        />
-                      </Tab>
-                    </Tabs>
+                      )}
+                    </div>
                     </Card>
 
                     {/* Submit Button removed from left column (moved to right header) */}
@@ -663,7 +672,7 @@ export default function EventCreation() {
                     <div className="w-0.5 h-8 bg-surface-light/30 rounded-full transition-colors" />
                   </PanelResizeHandle>
                   <Panel defaultSize={60} minSize={40}>
-                    <div className="flex flex-col h-full relative px-6 pt-2 pb-0 overflow-hidden">
+                    <div className="flex flex-col h-full relative px-6 pt-2 pb-4 overflow-hidden">
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between flex-shrink-0">
                           <div>

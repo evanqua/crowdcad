@@ -123,16 +123,24 @@ function LiteCreateContent() {
 
   const inputClassNames = {
     label: 'text-surface-light font-medium',
-    inputWrapper:
-      'rounded-2xl px-4 bg-surface-deeper/90 hover:bg-surface-deeper shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
     input:
       'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
+  } as const;
+
+  const timeInputClassNames = {
+    label: inputClassNames.label,
+    input: inputClassNames.input,
+  } as const;
+
+  const byInputClassNames = {
+    label: inputClassNames.label,
+    input: inputClassNames.input,
   } as const;
 
   const attachedInputClassNames = {
     label: inputClassNames.label,
     inputWrapper:
-      'rounded-l-2xl rounded-r-none px-4 bg-surface-deeper/90 hover:bg-surface-deeper shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+      'rounded-l-2xl rounded-r-none px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
     input:
       'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   } as const;
@@ -141,7 +149,7 @@ function LiteCreateContent() {
     label: 'text-surface-light font-medium',
     input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
     inputWrapper:
-      'rounded-2xl px-4 pr-6 bg-surface-deeper/90 hover:bg-surface-deeper shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+      'rounded-2xl px-4 pr-6 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
   } as const;
 
   useEffect(() => {
@@ -768,7 +776,7 @@ function LiteCreateContent() {
                       />
                       <Button
                         onPress={selectedLeftTab === 'locations' ? addLocation : addEquipment}
-                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-2xl text-surface-light bg-surface-deeper/90 hover:bg-surface-deeper"
+                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-2xl"
                       >
                         Add
                       </Button>
@@ -777,7 +785,8 @@ function LiteCreateContent() {
 
                   <Card
                     isBlurred
-                    className="flex-1 overflow-hidden bg-surface-deeper/90"
+                    className="flex-1 overflow-hidden"
+                    style={{ backgroundColor: 'rgba(39, 39, 42, 0.5)' }}
                   >
                     {selectedLeftTab === 'locations' ? (
                       <ScrollShadow
@@ -967,7 +976,7 @@ function LiteCreateContent() {
                                 setCurrentMembers([]);
                                 setIsTeamModalOpen(true);
                               }}
-                              className="h-8 px-3 text-sm text-surface-light bg-surface-deeper/90 hover:bg-surface-deeper"
+                              className="h-8 px-3 text-sm text-surface-light bg-zinc-700 hover:bg-zinc-600"
                             >
                               Add Team
                             </Button>
@@ -980,7 +989,7 @@ function LiteCreateContent() {
                             <Button
                               size="sm"
                               onPress={() => setIsSupervisorModalOpen(true)}
-                              className="h-8 px-3 text-sm text-surface-light bg-surface-deeper/90 hover:bg-surface-deeper"
+                              className="h-8 px-3 text-sm text-surface-light bg-zinc-700 hover:bg-zinc-600"
                             >
                               Add Supervisor
                             </Button>
@@ -1191,10 +1200,10 @@ function LiteCreateContent() {
                               )}
                             </div>
 
-                            <div className={`space-y-3 mt-6 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
-                              <h3 className="text-surface-light font-semibold text-lg">Schedule</h3>
+                            <div className={`space-y-1 mt-2 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
+                              <h3 className="text-surface-light font-medium text-md">Schedule</h3>
 
-                              <div className="grid grid-cols-3 gap-3">
+                              <div className="grid grid-cols-3 gap-3 rounded-2xl pt-2 pb-3">
                                 <TimeInput
                                   label="From"
                                   labelPlacement="inside"
@@ -1202,7 +1211,7 @@ function LiteCreateContent() {
                                   onChange={(value) => value && setScheduleFrom(value)}
                                   hourCycle={24}
                                   isDisabled={!postsEnabled}
-                                  classNames={inputClassNames}
+                                  classNames={timeInputClassNames}
                                   size="md"
                                 />
                                 <TimeInput
@@ -1212,7 +1221,7 @@ function LiteCreateContent() {
                                   onChange={(value) => value && setScheduleTo(value)}
                                   hourCycle={24}
                                   isDisabled={!postsEnabled}
-                                  classNames={inputClassNames}
+                                  classNames={timeInputClassNames}
                                   size="md"
                                 />
                                 <Input
@@ -1225,7 +1234,7 @@ function LiteCreateContent() {
                                   min="1"
                                   endContent="min"
                                   isDisabled={!postsEnabled}
-                                  classNames={inputClassNames}
+                                  classNames={byInputClassNames}
                                   size="md"
                                 />
                               </div>
