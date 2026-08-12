@@ -37,3 +37,12 @@ export function addLocalCustomPreset(preset: DispatchVocabularyPreset) {
     // localStorage unavailable — preset only lives in memory this session
   }
 }
+
+export function deleteLocalCustomPreset(id: string) {
+  try {
+    const existing = getLocalCustomPresets();
+    localStorage.setItem(LOCAL_PRESETS_KEY, JSON.stringify(existing.filter((p) => p.id !== id)));
+  } catch {
+    // localStorage unavailable — nothing to clean up
+  }
+}

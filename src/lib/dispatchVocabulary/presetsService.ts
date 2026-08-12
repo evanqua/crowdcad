@@ -31,3 +31,7 @@ export async function createCustomPreset(input: {
     createdAt: Date.now(),
   });
 }
+
+export async function deleteCustomPreset(id: string): Promise<void> {
+  await dbService.deleteDocument(COLLECTION, id);
+}

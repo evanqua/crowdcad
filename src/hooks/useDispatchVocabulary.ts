@@ -11,9 +11,14 @@ import {
   type DispatchVocabularyPresetSummary,
 } from '@/lib/dispatchVocabulary/presets';
 import type { DispatchVocabularyPreset } from '@/lib/dispatchVocabulary/types';
-import { createCustomPreset, listCustomPresets } from '@/lib/dispatchVocabulary/presetsService';
+import {
+  createCustomPreset,
+  deleteCustomPreset,
+  listCustomPresets,
+} from '@/lib/dispatchVocabulary/presetsService';
 import {
   addLocalCustomPreset,
+  deleteLocalCustomPreset,
   getLocalCustomPresets,
   getLocalPresetId,
   setLocalPresetId,
@@ -129,6 +134,28 @@ export function useDispatchVocabulary() {
     [user, setActivePresetId],
   );
 
+  /** Deletes a custom preset the current user created. Built-ins and other users' presets are refused. */
+  const deletePreset = useCallback(
+    async (id: string) => {
+      if (isBuiltinPresetId(id)) return;
+      const preset = customPresets.find((p) => p.id === id);
+      if (!preset) return;
+      const owner = user ? user.uid : 'local';
+      if (preset.createdBy !== owner) return;
+
+      if (user) {
+        await deleteCustomPreset(id);
+      } else {
+        deleteLocalCustomPreset(id);
+      }
+      setCustomPresets((prev) => prev.filter((p) => p.id !== id));
+      if (presetId === id) {
+        await setActivePresetId(DEFAULT_PRESET_ID);
+      }
+    },
+    [user, customPresets, presetId, setActivePresetId],
+  );
+
   const availablePresets: DispatchVocabularyPresetSummary[] = useMemo(
     () => [BUILTIN_PRESETS[DEFAULT_PRESET_ID], BUILTIN_PRESETS[FRENCH_PRESET_ID], ...customPresets],
     [customPresets],
@@ -141,5 +168,14 @@ export function useDispatchVocabulary() {
     );
   }, [presetId, customPresets]);
 
-  return { presetId, activePreset, availablePresets, customPresets, setActivePresetId, forkPreset, loading };
+  return {
+    presetId,
+    activePreset,
+    availablePresets,
+    customPresets,
+    setActivePresetId,
+    forkPreset,
+    deletePreset,
+    loading,
+  };
 }
