@@ -3,9 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
-import { authService, dbService, isPocketbaseBackend } from '@/lib/services';
-import { Card, CardBody, Button, Avatar } from '@heroui/react';
+import { authService, dbService } from '@/lib/services';
+import { Card, CardBody, Button, Avatar, Input } from '@heroui/react';
+import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
 import LoadingScreen from '@/components/ui/loading-screen';
+
+const inputClassNames = {
+  label: 'text-surface-light font-medium',
+  input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
+  inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+} as const;
 
 export default function EditProfilePage() {
   const { user, ready } = useAuth();
@@ -13,7 +20,6 @@ export default function EditProfilePage() {
 
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
-  const [photoURL, setPhotoURL] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -21,7 +27,6 @@ export default function EditProfilePage() {
     if (!ready) return;
     if (!user) return;
     setDisplayName(user.displayName ?? '');
-    setPhotoURL(user.photoURL ?? '');
     setPhone(user.phoneNumber ?? '');
   }, [user, ready]);
 
@@ -35,10 +40,7 @@ export default function EditProfilePage() {
     try {
       const currentUser = authService.currentUser;
       if (currentUser) {
-        await authService.updateProfile({
-          displayName: displayName || null,
-          ...(photoURL && !isPocketbaseBackend ? { photoURL } : {}),
-        });
+        await authService.updateProfile({ displayName: displayName || null });
 
         // Save phone (and other profile metadata) to users collection
         await dbService.setDocument('users', currentUser.uid, { phoneNumber: phone || null }, { merge: true });
@@ -57,10 +59,15 @@ export default function EditProfilePage() {
   };
 
   return (
-    <main className="min-h-screen bg-surface-deeper text-surface-light" style={{ '--nav-h': '72px' } as React.CSSProperties}>
-      <section className="max-w-3xl mx-auto px-6 py-12">
+    <main className="relative min-h-[calc(100vh-3.5rem)] bg-surface-deepest text-surface-light overflow-hidden">
+      <DiagonalStreaksFixed />
+      <section className="relative z-10 max-w-3xl mx-auto px-6 py-12">
         <form onSubmit={handleSubmit}>
-          <Card className="bg-default/10 border border-surface-light/10">
+          <Card
+            isBlurred
+            className="border border-default-200"
+            style={{ backgroundColor: 'hsl(var(--surface-bg-2) / 0.5)' }}
+          >
             <CardBody className="p-6">
               <div className="flex items-center gap-6">
                 <Avatar name={displayName || (user.email ?? 'U')} isBordered showFallback className="w-20 h-20" />
@@ -72,41 +79,42 @@ export default function EditProfilePage() {
               </div>
 
               <div className="mt-6 grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block mb-1 text-sm text-surface-light/90">Full name</label>
-                  <input
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full px-4 py-2 bg-surface-deepest text-surface-light border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
-                    placeholder="Your full name"
-                  />
-                </div>
+                <Input
+                  label="Full name"
+                  labelPlacement="outside"
+                  size="lg"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Your full name"
+                  classNames={inputClassNames}
+                />
 
-                <div>
-                  <label className="block mb-1 text-sm text-surface-light/90">Photo URL</label>
-                  <input
-                    value={photoURL}
-                    onChange={(e) => setPhotoURL(e.target.value)}
-                    className="w-full px-4 py-2 bg-surface-deepest text-surface-light border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block mb-1 text-sm text-surface-light/90">Phone number</label>
-                  <input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-4 py-2 bg-surface-deepest text-surface-light border border-surface rounded-md focus:outline-none focus:ring-2 focus:ring-status-blue"
-                    placeholder="+1 555 555 5555"
-                  />
-                  <p className="text-xs text-surface-faint mt-1">Phone numbers are saved to your profile document.</p>
-                </div>
+                <Input
+                  label="Phone number"
+                  labelPlacement="outside"
+                  size="lg"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+1 555 555 5555"
+                  description="Phone numbers are saved to your profile document."
+                  classNames={inputClassNames}
+                />
               </div>
 
               <div className="mt-6 flex items-center gap-3">
-                <Button type="submit" className="bg-accent hover:bg-accent/90" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
-                <Button type="button" variant="bordered" onClick={() => router.push('/profile')}>Cancel</Button>
+                <Button
+                  type="submit"
+                  size="lg"
+                  radius="lg"
+                  className="bg-accent hover:bg-accent/90 text-surface-light"
+                  isLoading={saving}
+                  isDisabled={saving}
+                >
+                  Save Changes
+                </Button>
+                <Button type="button" variant="bordered" onPress={() => router.push('/profile')}>
+                  Cancel
+                </Button>
                 {message && <span className="ml-4 text-sm text-surface-light/80">{message}</span>}
               </div>
             </CardBody>

@@ -192,6 +192,13 @@
   }
 }
 
+.reduce-motion .dispatch-expand-grid,
+.reduce-motion .dispatch-expand-fade {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
 @keyframes cell-ripple {
   0% {
     opacity: calc(0.3 * (1 - var(--distance-ratio, 0)));
@@ -349,6 +356,27 @@ grammarly-card,
     animation: none !important;
     background-position: 50% 50%;
   }
+}
+
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+.reduce-motion .animate-aurora {
+  animation: none !important;
+  opacity: 0.18 !important;
+}
+
+.reduce-motion .hero-cta-gradient {
+  animation: none !important;
+  background-position: 50% 50%;
+}
+
+.reduce-motion .hero-cta-gradient::before {
+  animation: none !important;
+  background-position: 50% 50%;
 }
 
 /* ── NProgress loading bar styles ──────────────────────────── */

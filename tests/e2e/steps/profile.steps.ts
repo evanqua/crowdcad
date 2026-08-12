@@ -5,5 +5,5 @@ import { test } from '../fixtures';
 const { Given } = createBdd(test);
 
 Given('the profile page is loaded', async ({ page }) => {
-  await expect(page.getByRole('tab', { name: 'Account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Security' })).toBeVisible();
 });

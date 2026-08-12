@@ -57,6 +57,13 @@ export default defineConfig({
   webServer: [
     {
       command: 'npx firebase emulators:start --only auth,firestore,storage --project demo-crowdcad',
+      // The emulator hub's port — lets Playwright detect an already-running
+      // instance and skip re-spawning it. Without this, Playwright always
+      // launches a fresh `firebase emulators:start`, which either races the
+      // `next build` step below (proceeding before the emulator is actually
+      // ready) or, if one is already running, fails to bind its ports and
+      // can take the healthy instance down with it.
+      port: 4400,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       stdout: 'pipe',

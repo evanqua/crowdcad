@@ -8,6 +8,8 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   deleteUser,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
+  confirmPasswordReset as firebaseConfirmPasswordReset,
   type User,
 } from 'firebase/auth';
 import { auth } from '@/app/firebase';
@@ -98,6 +100,26 @@ export class FirebaseAuthService implements IAuthService {
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
       await deleteUser(user);
+    } catch (err) {
+      throw toServiceError(err);
+    }
+  }
+
+  async sendPasswordResetEmail(email: string, actionUrl?: string): Promise<void> {
+    try {
+      await firebaseSendPasswordResetEmail(
+        auth,
+        email,
+        actionUrl ? { url: actionUrl, handleCodeInApp: true } : undefined,
+      );
+    } catch (err) {
+      throw toServiceError(err);
+    }
+  }
+
+  async confirmPasswordReset(code: string, newPassword: string): Promise<void> {
+    try {
+      await firebaseConfirmPasswordReset(auth, code, newPassword);
     } catch (err) {
       throw toServiceError(err);
     }

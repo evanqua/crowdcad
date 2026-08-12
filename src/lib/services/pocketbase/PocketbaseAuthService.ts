@@ -117,4 +117,23 @@ export class PocketbaseAuthService implements IAuthService {
       throw toServiceError(err);
     }
   }
+
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    // actionUrl is ignored — PocketBase's reset-link destination is set via
+    // its own email template (Admin UI > Settings > Mail templates), not
+    // per-request.
+    try {
+      await pb.collection('users').requestPasswordReset(email);
+    } catch (err) {
+      throw toServiceError(err);
+    }
+  }
+
+  async confirmPasswordReset(code: string, newPassword: string): Promise<void> {
+    try {
+      await pb.collection('users').confirmPasswordReset(code, newPassword, newPassword);
+    } catch (err) {
+      throw toServiceError(err);
+    }
+  }
 }

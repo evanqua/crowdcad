@@ -34,6 +34,9 @@ export default function LoginModal({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -44,6 +47,8 @@ export default function LoginModal({
       setEmail('');
       setPassword('');
       setConfirmPassword('');
+      setShowForgotPassword(false);
+      setResetMessage(null);
     }
   }, [open, initialError]);
 
@@ -52,6 +57,8 @@ export default function LoginModal({
     setError(null);
     setPassword('');
     setConfirmPassword('');
+    setShowForgotPassword(false);
+    setResetMessage(null);
   }, [mode]);
 
   const handleSubmit = async () => {
@@ -92,6 +99,21 @@ export default function LoginModal({
     }
   };
 
+  const handleSendResetEmail = async () => {
+    if (!email || resetSubmitting) return;
+    setResetSubmitting(true);
+    setResetMessage(null);
+    try {
+      await authService.sendPasswordResetEmail(email, `${window.location.origin}/reset-password`);
+    } catch {
+      // Deliberately swallowed — always show the same generic message below
+      // so this form can't be used to enumerate which emails have accounts.
+    } finally {
+      setResetSubmitting(false);
+      setResetMessage('If an account exists for that email, a reset link has been sent.');
+    }
+  };
+
   const isSubmitDisabled =
     submitting ||
     !email ||
@@ -126,87 +148,137 @@ export default function LoginModal({
         {(close) => (
           <>
             <ModalHeader className="text-2xl font-bold text-surface">
-              {mode === 'login' ? 'Login' : 'Create an Account'}
+              {showForgotPassword ? 'Reset Password' : mode === 'login' ? 'Login' : 'Create an Account'}
             </ModalHeader>
 
-            <ModalBody>
-              <Input
-                label="Email Address"
-                labelPlacement="inside"
-                variant="bordered"
-                size="lg"
-                radius="lg"
-                type="email"
-                classNames={inputClassNames}
-                value={email}
-                onValueChange={setEmail}
-                aria-label="Email Address"
-              />
-
-              <Input
-                label="Password"
-                labelPlacement="inside"
-                variant="bordered"
-                size="lg"
-                radius="lg"
-                type="password"
-                classNames={inputClassNames}
-                value={password}
-                onValueChange={setPassword}
-                aria-label="Password"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && mode === 'login') handleSubmit();
-                }}
-              />
-
-              {mode === 'signup' && (
+            {showForgotPassword ? (
+              <ModalBody>
+                <p className="text-sm text-surface-light/80">
+                  Enter your account email and we&apos;ll send you a link to reset your password.
+                </p>
                 <Input
-                  label="Confirm Password"
+                  label="Email Address"
+                  labelPlacement="inside"
+                  variant="bordered"
+                  size="lg"
+                  radius="lg"
+                  type="email"
+                  classNames={inputClassNames}
+                  value={email}
+                  onValueChange={setEmail}
+                  aria-label="Email Address"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSendResetEmail();
+                  }}
+                />
+
+                {resetMessage && (
+                  <p className="text-sm text-surface-light">{resetMessage}</p>
+                )}
+
+                <p className="mt-1 text-sm text-surface-light">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setResetMessage(null);
+                    }}
+                    className="text-status-blue hover:underline"
+                  >
+                    Back to login
+                  </button>
+                </p>
+              </ModalBody>
+            ) : (
+              <ModalBody>
+                <Input
+                  label="Email Address"
+                  labelPlacement="inside"
+                  variant="bordered"
+                  size="lg"
+                  radius="lg"
+                  type="email"
+                  classNames={inputClassNames}
+                  value={email}
+                  onValueChange={setEmail}
+                  aria-label="Email Address"
+                />
+
+                <Input
+                  label="Password"
                   labelPlacement="inside"
                   variant="bordered"
                   size="lg"
                   radius="lg"
                   type="password"
                   classNames={inputClassNames}
-                  value={confirmPassword}
-                  onValueChange={setConfirmPassword}
-                  aria-label="Confirm Password"
+                  value={password}
+                  onValueChange={setPassword}
+                  aria-label="Password"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSubmit();
+                    if (e.key === 'Enter' && mode === 'login') handleSubmit();
                   }}
                 />
-              )}
 
-              {error && (
-                <p className="text-sm text-status-red">{error}</p>
-              )}
-
-              <p className="mt-1 text-sm text-surface-light">
-                {mode === 'login' ? (
-                  <>
-                    Don&apos;t have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setMode('signup')}
-                      className="text-status-blue hover:underline"
-                    >
-                      Sign Up
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Already have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setMode('login')}
-                      className="text-status-blue hover:underline"
-                    >
-                      Log in
-                    </button>
-                  </>
+                {mode === 'signup' && (
+                  <Input
+                    label="Confirm Password"
+                    labelPlacement="inside"
+                    variant="bordered"
+                    size="lg"
+                    radius="lg"
+                    type="password"
+                    classNames={inputClassNames}
+                    value={confirmPassword}
+                    onValueChange={setConfirmPassword}
+                    aria-label="Confirm Password"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSubmit();
+                    }}
+                  />
                 )}
-              </p>
-            </ModalBody>
+
+                {mode === 'login' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="self-start text-sm text-status-blue hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+
+                {error && (
+                  <p className="text-sm text-status-red">{error}</p>
+                )}
+
+                <p className="mt-1 text-sm text-surface-light">
+                  {mode === 'login' ? (
+                    <>
+                      Don&apos;t have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => setMode('signup')}
+                        className="text-status-blue hover:underline"
+                      >
+                        Sign Up
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Already have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => setMode('login')}
+                        className="text-status-blue hover:underline"
+                      >
+                        Log in
+                      </button>
+                    </>
+                  )}
+                </p>
+              </ModalBody>
+            )}
 
             <ModalFooter className="flex justify-end gap-2">
               <Button
@@ -220,6 +292,17 @@ export default function LoginModal({
               >
                 Cancel
               </Button>
+              {showForgotPassword ? (
+                <Button
+                  onPress={handleSendResetEmail}
+                  radius="lg"
+                  className="px-4 py-2 bg-accent hover:bg-accent/90 text-surface-light"
+                  isDisabled={!email || resetSubmitting}
+                  isLoading={resetSubmitting}
+                >
+                  Send Reset Link
+                </Button>
+              ) : (
               <Button
                 onPress={handleSubmit}
                 radius="lg"
@@ -229,6 +312,7 @@ export default function LoginModal({
               >
                 {mode === 'login' ? 'Login' : 'Sign Up'}
               </Button>
+              )}
             </ModalFooter>
           </>
         )}

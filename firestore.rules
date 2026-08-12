@@ -34,9 +34,26 @@ service cloud.firestore {
       allow update, delete: if isEventOwnerOrOrgMember(eventId);
     }
 
-    // Users: allow users to read/write their own profile
+    // Users: allow users to read/write their own profile; admins may also
+    // read/write any user's doc (needed to grant/revoke isAdmin from the
+    // Profile > Admin > Manage Admins panel).
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null &&
+        (request.auth.uid == userId || isRequestingUserAdmin());
+    }
+
+    // Settings: app-wide admin-managed config (e.g. the certification list
+    // offered when adding team members). Readable by any authenticated user
+    // since it's needed during event creation; writable only by admins.
+    match /settings/{settingId} {
+      allow read: if request.auth != null;
+      allow write: if isRequestingUserAdmin();
+    }
+
+    function isRequestingUserAdmin() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     // Fallback deny

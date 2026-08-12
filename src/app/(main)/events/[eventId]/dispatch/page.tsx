@@ -14,6 +14,7 @@ import { toast, Slide } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
 import { useAuth } from '@/hooks/useauth';
+import { useCertifications } from '@/hooks/useCertifications';
 import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
 import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4} from "lucide-react";
@@ -100,7 +101,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [isTeamLead, setIsTeamLead] = useState(false);
   const [currentMembers, setCurrentMembers] = useState<{ name: string, cert: string, lead: boolean }[]>([]);
   const [editTeamOriginalName, setEditTeamOriginalName] = useState<string | null>(null);
-  const LICENSES = ['FA', 'FR', 'CPR', 'EMT-B', 'EMT-A', 'EMT-P', 'RN', 'MD/DO'];
+  const { certifications: LICENSES } = useCertifications();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;

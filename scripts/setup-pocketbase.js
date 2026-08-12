@@ -62,13 +62,14 @@ async function getAdminToken() {
   return token;
 }
 
-async function ensureCollection(headers, name, fields) {
+async function ensureCollection(headers, name, fields, rules) {
   const check = await pbFetch(`/api/collections/${name}`, { headers });
   if (check.ok) {
     console.log(`  [skip]   ${name} — already exists`);
     return;
   }
 
+  const authRule = '@request.auth.id != ""';
   const res = await pbFetch('/api/collections', {
     method: 'POST',
     headers,
@@ -78,11 +79,11 @@ async function ensureCollection(headers, name, fields) {
       fields,
       // Restrict access to authenticated users by default.
       // Adjust these rules in the PocketBase admin UI to match your security policy.
-      listRule: '@request.auth.id != ""',
-      viewRule: '@request.auth.id != ""',
-      createRule: '@request.auth.id != ""',
-      updateRule: '@request.auth.id != ""',
-      deleteRule: '@request.auth.id != ""',
+      listRule: rules?.listRule ?? authRule,
+      viewRule: rules?.viewRule ?? authRule,
+      createRule: rules?.createRule ?? authRule,
+      updateRule: rules?.updateRule ?? authRule,
+      deleteRule: rules?.deleteRule ?? authRule,
     }),
   });
 
@@ -91,6 +92,31 @@ async function ensureCollection(headers, name, fields) {
     throw new Error(`Failed to create collection '${name}': ${res.status} — ${body}`);
   }
   console.log(`  [create] ${name}`);
+}
+
+async function ensureField(headers, collectionName, field) {
+  const res = await pbFetch(`/api/collections/${collectionName}`, { headers });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Failed to read collection '${collectionName}': ${res.status} — ${body}`);
+  }
+  const collection = await res.json();
+  const existing = collection.fields || [];
+  if (existing.some((f) => f.name === field.name)) {
+    console.log(`  [skip]   ${collectionName}.${field.name} — already exists`);
+    return;
+  }
+
+  const patchRes = await pbFetch(`/api/collections/${collectionName}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ fields: [...existing, field] }),
+  });
+  if (!patchRes.ok) {
+    const body = await patchRes.text();
+    throw new Error(`Failed to add field '${field.name}' to '${collectionName}': ${patchRes.status} — ${body}`);
+  }
+  console.log(`  [add]    ${collectionName}.${field.name}`);
 }
 
 async function main() {
@@ -150,9 +176,48 @@ async function main() {
     { name: 'file', type: 'file', options: { maxSelect: 1, maxSize: 52428800 } },
   ]);
 
+  await ensureCollection(
+    headers,
+    'settings',
+    [
+      { name: 'key', type: 'text', required: true },
+      { name: 'list', type: 'json' },
+    ],
+    {
+      // Readable by any authenticated user (needed at event-create time);
+      // writable only by admins.
+      listRule: '@request.auth.id != ""',
+      viewRule: '@request.auth.id != ""',
+      createRule: '@request.auth.isAdmin = true',
+      updateRule: '@request.auth.isAdmin = true',
+      deleteRule: '@request.auth.isAdmin = true',
+    },
+  );
+
+  // `isAdmin` on the built-in `users` auth collection — grants access to the
+  // Profile > Admin section. Grant it per-user via scripts/setAdminPocketbase.js
+  // (or the Manage Admins panel, once at least one admin exists).
+  await ensureField(headers, 'users', { name: 'isAdmin', type: 'bool' });
+
   console.log('\nDone. CrowdCAD collections are ready.');
   console.log(
     'Review access rules in the PocketBase admin UI at ' + PB_URL + '/_/ before going to production.',
+  );
+  console.log(
+    "\nSecurity: restrict the built-in 'users' collection's List/View/Update rules to\n" +
+      '  @request.auth.id = id || @request.auth.isAdmin = true\n' +
+      'in the admin UI (Collections > users > API Rules) — otherwise any authenticated\n' +
+      "user may be able to list other users or flip their own 'isAdmin' field. This\n" +
+      "isn't set automatically so it doesn't overwrite rules you've already customized.",
+  );
+  console.log(
+    "\nForgot-password emails: PocketBase's default reset-password email links to its\n" +
+      "own admin UI, not this app. In the admin UI go to Collections > users > Options >\n" +
+      'Email templates > Reset password, and change the action URL to:\n' +
+      '  {APP_URL}/reset-password?token={TOKEN}\n' +
+      "(replace {APP_URL} with your deployed app's URL). Also configure Settings > Mail\n" +
+      "settings with real SMTP credentials — without it, PocketBase can't send these\n" +
+      'emails at all. Neither of these is set automatically for the same reason as above.',
   );
 }
 

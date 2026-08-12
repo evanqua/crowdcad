@@ -43,6 +43,10 @@ Then('I should see a {string} button in the modal', async ({ page }, name: strin
   await expect(page.getByRole('dialog').getByRole('button', { name })).toBeVisible();
 });
 
+Then('the {string} button should not be visible in the modal', async ({ page }, name: string) => {
+  await expect(page.getByRole('dialog').getByRole('button', { name })).not.toBeVisible();
+});
+
 Then('I should see a {string} submit button in the modal', async ({ page }, name: string) => {
   await expect(
     page.getByRole('dialog').getByRole('button', { name, exact: true })
