@@ -174,7 +174,7 @@ export default function SecuritySection({ user }: { user: ServiceUser }) {
 
       <Card isBlurred className="w-full border border-default-200 bg-surface-deep/40">
         <CardBody className="p-6">
-          <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-xl font-semibold">Password</h3>
               {lastPasswordChange && (

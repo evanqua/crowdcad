@@ -21,17 +21,29 @@ service cloud.firestore {
     }
 
     // Venues: require org membership to read; writes only by org members.
+    // Admins may also update/delete any venue (needed to wipe a deleted
+    // user's data from Profile > Admin > Manage Administrator Access).
     match /venues/{venueId} {
       allow read: if isVenueVisibleToUser(venueId);
       allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
-      allow update, delete: if isVenueOwnerOrOrgMember(venueId);
+      allow update, delete: if isVenueOwnerOrOrgMember(venueId) || isRequestingUserAdmin();
     }
 
     // Events: require org membership to read; writes only by org members.
+    // Admins may also update/delete any event (see venues comment above).
     match /events/{eventId} {
       allow read: if isEventVisibleToUser(eventId);
       allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
-      allow update, delete: if isEventOwnerOrOrgMember(eventId);
+      allow update, delete: if isEventOwnerOrOrgMember(eventId) || isRequestingUserAdmin();
+    }
+
+    // Dispatch logs: owner-scoped, with an admin override for the same
+    // account-deletion flow. (No prior rule existed for this collection —
+    // added now since admin-initiated deletes need it to actually work.)
+    match /dispatchLogs/{logId} {
+      allow read, update, delete: if request.auth != null &&
+        (resource.data.userId == request.auth.uid || isRequestingUserAdmin());
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
 
     // Users: allow users to read/write their own profile; admins may also

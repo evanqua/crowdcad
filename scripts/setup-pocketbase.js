@@ -146,7 +146,12 @@ async function main() {
     { name: 'posts', type: 'json' },
     { name: 'mapUrl', type: 'text' },
     { name: 'sharedWith', type: 'json' },
+    { name: 'isOrgVenue', type: 'bool' },
   ]);
+
+  // `isOrgVenue` on `venues` — set for deployments where this collection
+  // already existed before the field was added above.
+  await ensureField(headers, 'venues', { name: 'isOrgVenue', type: 'bool' });
 
   await ensureCollection(headers, 'events', [
     { name: 'name', type: 'text' },
@@ -204,11 +209,14 @@ async function main() {
     'Review access rules in the PocketBase admin UI at ' + PB_URL + '/_/ before going to production.',
   );
   console.log(
-    "\nSecurity: restrict the built-in 'users' collection's List/View/Update rules to\n" +
+    "\nSecurity: restrict the built-in 'users' collection's List/View/Update/Delete rules to\n" +
       '  @request.auth.id = id || @request.auth.isAdmin = true\n' +
       'in the admin UI (Collections > users > API Rules) — otherwise any authenticated\n' +
-      "user may be able to list other users or flip their own 'isAdmin' field. This\n" +
-      "isn't set automatically so it doesn't overwrite rules you've already customized.",
+      "user may be able to list other users, flip their own 'isAdmin' field, or delete\n" +
+      "someone else's account. The same rule also keeps self-deletion (Profile > Security)\n" +
+      "and admin-initiated deletion (Profile > Admin > Manage Administrator Access) working\n" +
+      "as intended. This isn't set automatically so it doesn't overwrite rules you've\n" +
+      'already customized.',
   );
   console.log(
     "\nForgot-password emails: PocketBase's default reset-password email links to its\n" +

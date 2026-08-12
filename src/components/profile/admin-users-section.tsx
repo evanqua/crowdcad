@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, CardBody, Input, Spinner, Switch } from '@heroui/react';
-import { RefreshCw } from 'lucide-react';
-import { dbService } from '@/lib/services';
+import { RefreshCw, Trash2 } from 'lucide-react';
+import { dbService, isPocketbaseBackend } from '@/lib/services';
 import type { UserDoc } from '@/lib/userDoc';
 import type { ServiceUser } from '@/lib/services';
 
@@ -23,11 +23,35 @@ function toRow(id: string, data: UserDoc & Record<string, unknown>): UserRow {
   };
 }
 
+/** Deletes everything a user owns (venues, events, dispatch logs) plus their `users/{id}` doc.
+ *  On PocketBase, deleting the `users` record also deletes the underlying auth account.
+ *  On Firebase, the Auth account itself is untouched — it has no privileged server-side path
+ *  here — so it must be removed separately via the Firebase Console if a full account removal
+ *  is needed. */
+async function deleteUserAndData(userId: string): Promise<void> {
+  const [venues, events, logs] = await Promise.all([
+    dbService.queryCollection('venues', [{ field: 'userId', op: '==', value: userId }]),
+    dbService.queryCollection('events', [{ field: 'userId', op: '==', value: userId }]),
+    dbService.queryCollection('dispatchLogs', [{ field: 'userId', op: '==', value: userId }]),
+  ]);
+
+  await Promise.all([
+    ...venues.map((v) => dbService.deleteDocument('venues', v.id)),
+    ...events.map((e) => dbService.deleteDocument('events', e.id)),
+    ...logs.map((l) => dbService.deleteDocument('dispatchLogs', l.id)),
+  ]);
+
+  await dbService.deleteDocument('users', userId);
+}
+
 export default function AdminUsersSection({ currentUser }: { currentUser: ServiceUser }) {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -61,11 +85,26 @@ export default function AdminUsersSection({ currentUser }: { currentUser: Servic
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteUserAndData(deleteTarget.id);
+      setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete user.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Card isBlurred className="w-full border border-default-200 bg-surface-deep/40">
       <CardBody className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold">Manage Admins</h3>
+          <h3 className="text-xl font-semibold">Manage Administrator Access</h3>
           <Button
             isIconOnly
             size="sm"
@@ -103,7 +142,23 @@ export default function AdminUsersSection({ currentUser }: { currentUser: Servic
                   {row.displayName && <p className="text-xs text-surface-faint truncate">{row.email}</p>}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  {row.id === currentUser.uid && <span className="text-xs text-surface-light/50">(you)</span>}
+                  {row.id === currentUser.uid ? (
+                    <span className="text-xs text-surface-light/50">(you)</span>
+                  ) : (
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      color="danger"
+                      onPress={() => {
+                        setDeleteError(null);
+                        setDeleteTarget(row);
+                      }}
+                      aria-label={`Delete account for ${row.email}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Switch
                     isSelected={row.isAdmin}
                     onValueChange={() => toggleAdmin(row)}
@@ -117,6 +172,47 @@ export default function AdminUsersSection({ currentUser }: { currentUser: Servic
           </div>
         )}
       </CardBody>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full bg-surface-deepest border border-status-red/30">
+            <CardBody className="p-6">
+              <h3 className="text-xl font-semibold text-status-red mb-2">Delete Account</h3>
+              <p className={`text-surface-light/80 ${isPocketbaseBackend ? 'mb-4' : 'mb-2'}`}>
+                This permanently deletes <span className="font-medium">{deleteTarget.email}</span>&apos;s
+                venues, events, dispatch logs, and profile
+                {isPocketbaseBackend ? ', including their sign-in account.' : '.'} This cannot be undone.
+              </p>
+              {!isPocketbaseBackend && (
+                <p className="text-xs text-surface-faint mb-4">
+                  Their sign-in account itself is not removed by this action (Firebase Auth doesn&apos;t
+                  allow that from the app). You can remove it separately in the Firebase Console if needed.
+                </p>
+              )}
+              {deleteError && <p className="text-sm text-status-red mb-4">{deleteError}</p>}
+              <div className="flex gap-3">
+                <Button
+                  onPress={handleDeleteConfirm}
+                  color="danger"
+                  isDisabled={deleting}
+                  isLoading={deleting}
+                  className="flex-1"
+                >
+                  Delete Account &amp; Data
+                </Button>
+                <Button
+                  onPress={() => setDeleteTarget(null)}
+                  variant="bordered"
+                  isDisabled={deleting}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      )}
     </Card>
   );
 }
