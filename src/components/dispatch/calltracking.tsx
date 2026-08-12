@@ -381,7 +381,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 size="lg"
                                 variant="flat"
                                 color="default"
-                                className="text-surface-light h-9 shrink-0 border border-surface-liner bg-surface-liner/30"
+                                className="text-surface-light h-8 shrink-0 border border-surface-liner bg-surface-liner/30"
                               >
                                 {t('Pending')}
                               </Chip>
@@ -401,7 +401,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   size="lg"
                                   variant="flat"
                                   color="default"
-                                  className={`text-surface-light h-9 shrink-0 ${teamStatusColor.chipClass}`}
+                                  className={`text-surface-light h-8 shrink-0 ${teamStatusColor.chipClass}`}
                                   onClose={() => handleRemoveTeamFromCall(call.id, team)}
                                 >
                                   <div className="flex items-center gap-2" data-testid={`team-chip-${team}`}>
@@ -459,7 +459,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 size="lg"
                                 variant="flat"
                                 color={detachedTeam.reason === 'Delivered' ? 'success' : 'default'}
-                                className="border border-surface-liner h-9"
+                                className="border border-surface-liner h-8"
                               >
                                 <span className="text-surface-light font-medium mr-2">
                                   {detachedTeam.team}
@@ -1290,10 +1290,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                           </DispatchMotionCell>
                         </td>
                         {/* Options Ellipsis */}
-                        <td
-                          className="p-0 text-right w-12 min-w-12 max-w-12 whitespace-nowrap"
-                        >
-                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right w-12 min-w-12 max-w-12 whitespace-nowrap">
+                        <td className="p-0">
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
                             <Dropdown
                               motionProps={dropdownMotionProps}
                               placement="bottom-end"
@@ -1311,7 +1309,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                             >
                               <DropdownTrigger>
                                 <button
-                                  className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center ml-auto shrink-0 w-4 h-4"
+                                  className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
                                   aria-label="Call actions"
                                   type="button"
                                   onClick={(e) => e.stopPropagation()}
