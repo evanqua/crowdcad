@@ -14,6 +14,7 @@ import {
   SelectItem,
 } from "@heroui/react";
 import type { Event, Staff, Call, TeamLogEntry } from "@/app/types";
+import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
 
 type QuickCallState = {
   location: string;
@@ -50,6 +51,7 @@ export default function QuickCallModal({
   parseAgeSex,
   quickCallRef,
 }: Props) {
+  const { t } = useDispatchTerms();
   const [submitting, setSubmitting] = React.useState(false);
 
   // Replace the postedTeams useMemo
@@ -209,13 +211,13 @@ export default function QuickCallModal({
         {(close) => (
           <form ref={quickCallRef} onSubmit={handleSubmit}>
             <ModalHeader className="text-2xl font-bold text-surface">
-              Add Call
+              {t("Add Call")}
             </ModalHeader>
 
             <ModalBody className="">
               <Input
                 autoFocus
-                label="Location"
+                label={t("Location")}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -225,7 +227,7 @@ export default function QuickCallModal({
                 onValueChange={(v) => setQuickCall((p) => ({ ...p, location: v }))}
               />
               <Input
-                label="Source"
+                label={t("Source")}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -236,7 +238,7 @@ export default function QuickCallModal({
                 aria-label="Source"
               />
               <Input
-                label="Age/Sex"
+                label={t("Age/Sex")}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -251,7 +253,7 @@ export default function QuickCallModal({
               />
 
               <Input
-                label="Chief Complaint"
+                label={t("Chief Complaint")}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -262,8 +264,8 @@ export default function QuickCallModal({
                 aria-label="Chief Complaint"
               />
               <Select
-              label="Assign Team"
-              placeholder="Select a team"
+              label={t("Assign Team")}
+              placeholder={t("Select a team")}
               selectedKeys={quickCall.assignedTeam ? new Set([quickCall.assignedTeam]) : new Set()}
               onSelectionChange={(keys) => {
                 if (keys === "all") return;
@@ -276,22 +278,22 @@ export default function QuickCallModal({
             >
               {[
                 ...availableTeams.map((team) => (
-                  <SelectItem 
+                  <SelectItem
                     key={team.team}
-                    textValue={`${team.team} - ${team.location || 'Unknown'}`}
+                    textValue={`${team.team} - ${t(team.location || 'Unknown')}`}
                   >
-                    {team.team} - {team.location || 'Unknown'}
+                    {team.team} - {t(team.location || 'Unknown')}
                   </SelectItem>
                 )),
                 ...inactiveTeams.map((team) => (
-                  <SelectItem 
+                  <SelectItem
                     key={team.team}
-                    textValue={`${team.team} - ${team.location || 'Unknown'}`}
+                    textValue={`${team.team} - ${t(team.location || 'Unknown')}`}
                     classNames={{
                       base: "bg-status-blue/20"
                     }}
                   >
-                    {team.team} - {team.location || 'Unknown'}
+                    {team.team} - {t(team.location || 'Unknown')}
                   </SelectItem>
                 ))
               ]}
@@ -317,7 +319,7 @@ export default function QuickCallModal({
                 variant="bordered"
                 radius="lg"
               >
-                Cancel
+                {t("Cancel")}
               </Button>
 
               <Button
@@ -326,7 +328,7 @@ export default function QuickCallModal({
                 className="px-4 py-2 bg-accent hover:bg-accent/90 text-surface-light"
                 isDisabled={submitting}
               >
-                Submit
+                {t("Submit")}
               </Button>
             </ModalFooter>
           </form>

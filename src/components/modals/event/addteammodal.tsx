@@ -17,6 +17,7 @@ import {
   Chip,
 } from "@heroui/react";
 import { Role } from "@/app/types";
+import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
 
 type Member = { name: string; cert: string; lead: boolean };
 
@@ -70,6 +71,7 @@ export default function AddTeamModal({
   removeMember,
   roles,
 }: Props) {
+  const { t } = useDispatchTerms();
   const [submitting, setSubmitting] = React.useState(false);
 
   const inputClassNames = {
@@ -90,9 +92,9 @@ export default function AddTeamModal({
   } as const;
 
   const title =
-    titleOverride ?? (mode === "edit" ? "Edit Team" : "Add New Team");
+    titleOverride ?? (mode === "edit" ? t("Edit Team") : t("Add New Team"));
   const submitLabel =
-    submitLabelOverride ?? (mode === "edit" ? "Save Changes" : "Create Team");
+    submitLabelOverride ?? (mode === "edit" ? t("Save Changes") : t("Create Team"));
 
   return (
     <Modal
@@ -121,7 +123,7 @@ export default function AddTeamModal({
             <ModalBody>
               {/* Team name */}
               <Input
-                label="Team name"
+                label={t("Team Name")}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -135,7 +137,7 @@ export default function AddTeamModal({
               {/* Member add row */}
               <div className="flex gap-2 items-center">
                 <Input
-                  label="Member name"
+                  label={t("Member name")}
                   labelPlacement="inside"
                   variant="bordered"
                   size="lg"
@@ -157,14 +159,14 @@ export default function AddTeamModal({
                   }}
                   aria-label="Lead"
                 >
-                  Lead
+                  {t("Lead")}
                 </Checkbox>
               </div>
 
               {/* Cert dropdown (left) + Add button (right) */}
               <div className="flex gap-2 items-center">
                 <Select
-                  label="Certification"
+                  label={t("Certification")}
                   labelPlacement="inside"
                   variant="bordered"
                   size="lg"
@@ -214,7 +216,7 @@ export default function AddTeamModal({
                           "text-surface-light hover:text-status-red focus:outline-none data-[focus-visible=true]:outline-none",
                       }}
                     >
-                      {`${m.name} [${m.cert}]${m.lead ? " (Lead)" : ""}`}
+                      {`${m.name} [${m.cert}]${m.lead ? ` (${t("Lead")})` : ""}`}
                     </Chip>
                   ))}
                 </div>
@@ -231,7 +233,7 @@ export default function AddTeamModal({
                 variant="bordered"
                 radius="lg"
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 onPress={async () => {

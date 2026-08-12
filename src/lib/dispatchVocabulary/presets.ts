@@ -121,6 +121,9 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   'Edit Supervisor': 'Modifier le superviseur',
   Notes: 'Notes',
   'Add notes': 'Ajouter des notes',
+  'Add notes about this equipment': 'Ajouter des notes sur cet équipement',
+  'Not Set': 'Non défini',
+  'Call ID': "ID d'appel",
   'No log entries': "Aucune entrée dans le registre",
   'Log for Call': "Registre de l'appel",
   'PRIORITY CALL: Life threat to patient/provider': 'APPEL PRIORITAIRE : menace vitale pour le patient ou l’intervenant',
@@ -128,6 +131,17 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   Delete: 'Supprimer',
   'No members': 'Aucun membre',
   'Activity Log': 'Registre d’activité',
+  'Add Clinic Walkup': 'Ajouter une présentation spontanée',
+  Cancel: 'Annuler',
+  Submit: 'Envoyer',
+  'Member name': 'Nom du membre',
+  'Add member': 'Ajouter un membre',
+  'Save Changes': 'Enregistrer les modifications',
+  'Create Team': "Créer l'équipe",
+  'Create Supervisor': 'Créer le superviseur',
+  Source: 'Source',
+  'Assign Team': 'Assigner une équipe',
+  'Select a team': 'Sélectionner une équipe',
 };
 
 export const BUILTIN_PRESETS: Record<BuiltinPresetId, DispatchVocabularyPresetSummary> = {
