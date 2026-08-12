@@ -46,3 +46,15 @@ export function deleteLocalCustomPreset(id: string) {
     // localStorage unavailable — nothing to clean up
   }
 }
+
+export function updateLocalCustomPreset(id: string, terms: Record<string, string>) {
+  try {
+    const existing = getLocalCustomPresets();
+    localStorage.setItem(
+      LOCAL_PRESETS_KEY,
+      JSON.stringify(existing.map((p) => (p.id === id ? { ...p, terms } : p))),
+    );
+  } catch {
+    // localStorage unavailable — edit only lives in memory this session
+  }
+}

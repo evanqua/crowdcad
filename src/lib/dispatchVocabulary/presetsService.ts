@@ -22,16 +22,23 @@ export async function createCustomPreset(input: {
   createdByName?: string;
   basedOn?: string;
 }): Promise<string> {
-  return dbService.addDocument<Omit<DispatchVocabularyPreset, 'id'>>(COLLECTION, {
+  const payload: Omit<DispatchVocabularyPreset, 'id'> = {
     name: input.name,
     terms: input.terms,
     createdBy: input.createdBy,
-    createdByName: input.createdByName,
-    basedOn: input.basedOn,
     createdAt: Date.now(),
-  });
+  };
+  // Firestore rejects explicit `undefined` field values — only include optional fields when set.
+  if (input.createdByName) payload.createdByName = input.createdByName;
+  if (input.basedOn) payload.basedOn = input.basedOn;
+
+  return dbService.addDocument<Omit<DispatchVocabularyPreset, 'id'>>(COLLECTION, payload);
 }
 
 export async function deleteCustomPreset(id: string): Promise<void> {
   await dbService.deleteDocument(COLLECTION, id);
+}
+
+export async function updateCustomPreset(id: string, terms: Record<string, string>): Promise<void> {
+  await dbService.setDocument<DispatchVocabularyPreset>(COLLECTION, id, { terms }, { merge: true });
 }

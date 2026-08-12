@@ -15,6 +15,7 @@ import {
   createCustomPreset,
   deleteCustomPreset,
   listCustomPresets,
+  updateCustomPreset,
 } from '@/lib/dispatchVocabulary/presetsService';
 import {
   addLocalCustomPreset,
@@ -22,13 +23,16 @@ import {
   getLocalCustomPresets,
   getLocalPresetId,
   setLocalPresetId,
+  updateLocalCustomPreset,
 } from '@/lib/dispatchVocabulary/localStore';
+import { broadcastVocabularyChange, subscribeToVocabularyChanges } from '@/lib/dispatchVocabulary/changeBus';
 
 export function useDispatchVocabulary() {
   const { user } = useAuth();
   const [presetId, setPresetIdState] = useState<string>(DEFAULT_PRESET_ID);
   const [customPresets, setCustomPresets] = useState<DispatchVocabularyPreset[]>([]);
   const [loading, setLoading] = useState(true);
+  const ownerId = user ? user.uid : 'local';
 
   // Shared custom presets — visible to every signed-in user, same as org venues.
   useEffect(() => {
@@ -75,9 +79,36 @@ export function useDispatchVocabulary() {
     };
   }, [user]);
 
+  // Components like AppNavbar/LiteNavbar live in a persistent layout and never remount on
+  // client-side navigation, so their mount-time fetch above never re-runs after this user
+  // changes their preset elsewhere in the same session. This keeps every mounted instance
+  // in sync without a refetch, by listening for changes broadcast from any of them.
+  useEffect(() => {
+    return subscribeToVocabularyChanges((change) => {
+      switch (change.type) {
+        case 'selected':
+          setPresetIdState(change.presetId);
+          break;
+        case 'created':
+        case 'updated':
+          setCustomPresets((prev) => {
+            const exists = prev.some((p) => p.id === change.preset.id);
+            return exists
+              ? prev.map((p) => (p.id === change.preset.id ? change.preset : p))
+              : [...prev, change.preset];
+          });
+          break;
+        case 'deleted':
+          setCustomPresets((prev) => prev.filter((p) => p.id !== change.id));
+          break;
+      }
+    });
+  }, []);
+
   const setActivePresetId = useCallback(
     async (id: string) => {
       setPresetIdState(id);
+      broadcastVocabularyChange({ type: 'selected', presetId: id });
       if (user) {
         await dbService.setDocument<UserDoc>(
           'users',
@@ -113,6 +144,7 @@ export function useDispatchVocabulary() {
           createdAt: Date.now(),
         };
         setCustomPresets((prev) => [...prev, preset]);
+        broadcastVocabularyChange({ type: 'created', preset });
         await setActivePresetId(id);
         return id;
       }
@@ -128,10 +160,30 @@ export function useDispatchVocabulary() {
       };
       addLocalCustomPreset(preset);
       setCustomPresets((prev) => [...prev, preset]);
+      broadcastVocabularyChange({ type: 'created', preset });
       await setActivePresetId(preset.id);
       return preset.id;
     },
     [user, setActivePresetId],
+  );
+
+  /** Saves changes in place on a preset the current user created. Refused for built-ins and other users' presets. */
+  const updatePreset = useCallback(
+    async (id: string, terms: Record<string, string>) => {
+      if (isBuiltinPresetId(id)) return;
+      const preset = customPresets.find((p) => p.id === id);
+      if (!preset || preset.createdBy !== ownerId) return;
+
+      if (user) {
+        await updateCustomPreset(id, terms);
+      } else {
+        updateLocalCustomPreset(id, terms);
+      }
+      const updated: DispatchVocabularyPreset = { ...preset, terms };
+      setCustomPresets((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      broadcastVocabularyChange({ type: 'updated', preset: updated });
+    },
+    [user, customPresets, ownerId],
   );
 
   /** Deletes a custom preset the current user created. Built-ins and other users' presets are refused. */
@@ -139,9 +191,7 @@ export function useDispatchVocabulary() {
     async (id: string) => {
       if (isBuiltinPresetId(id)) return;
       const preset = customPresets.find((p) => p.id === id);
-      if (!preset) return;
-      const owner = user ? user.uid : 'local';
-      if (preset.createdBy !== owner) return;
+      if (!preset || preset.createdBy !== ownerId) return;
 
       if (user) {
         await deleteCustomPreset(id);
@@ -149,12 +199,18 @@ export function useDispatchVocabulary() {
         deleteLocalCustomPreset(id);
       }
       setCustomPresets((prev) => prev.filter((p) => p.id !== id));
+      broadcastVocabularyChange({ type: 'deleted', id });
       if (presetId === id) {
         await setActivePresetId(DEFAULT_PRESET_ID);
       }
     },
-    [user, customPresets, presetId, setActivePresetId],
+    [user, customPresets, ownerId, presetId, setActivePresetId],
   );
+
+  const isOwnPreset = useCallback((id: string) => {
+    const preset = customPresets.find((p) => p.id === id);
+    return !!preset && preset.createdBy === ownerId;
+  }, [customPresets, ownerId]);
 
   const availablePresets: DispatchVocabularyPresetSummary[] = useMemo(
     () => [BUILTIN_PRESETS[DEFAULT_PRESET_ID], BUILTIN_PRESETS[FRENCH_PRESET_ID], ...customPresets],
@@ -175,7 +231,9 @@ export function useDispatchVocabulary() {
     customPresets,
     setActivePresetId,
     forkPreset,
+    updatePreset,
     deletePreset,
+    isOwnPreset,
     loading,
   };
 }
