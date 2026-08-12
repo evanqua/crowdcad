@@ -9,6 +9,7 @@ import {
 import { MoreVertical } from 'lucide-react';
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 
 type ClinicTrackingCardProps = {
   call: Call;
@@ -62,6 +63,7 @@ export default function ClinicTrackingCard({
   getCallRowClass,
   updateEvent,
 }: ClinicTrackingCardProps) {
+  const { t } = useDispatchTerms();
   const [expanded, setExpanded] = useState(false);
   const [locationInput, setLocationInput] = useState(call.location || '');
   const [ageSexInput, setAgeSexInput] = useState(formatAgeSex(call.age, call.gender) || '');
@@ -136,7 +138,7 @@ export default function ClinicTrackingCard({
         className="relative flex items-center justify-between px-4 py-3 pb-0 cursor-pointer select-none"
       >
         <div className="text-[15px] sm:text-base font-semibold text-surface-light">
-          Call {callDisplayNumber}
+          {t('Call')} {callDisplayNumber}
         </div>
         
         {/* Right section: Timer and Menu aligned horizontally */}
@@ -163,9 +165,9 @@ export default function ClinicTrackingCard({
                   key="showLog"
                   onPress={() => setExpanded(v => !v)}
                 >
-                  {expanded ? 'Hide Log' : 'Show Log'}
+                  {expanded ? t('Hide Log') : t('Show Log')}
                 </DropdownItem>
-                <DropdownItem 
+                <DropdownItem
                   key="delete"
                   className="text-danger"
                   color="danger"
@@ -175,7 +177,7 @@ export default function ClinicTrackingCard({
                     }
                   }}
                 >
-                  Delete Call
+                  {t('Delete Call')}
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
@@ -188,7 +190,7 @@ export default function ClinicTrackingCard({
         {/* Row 1: Location */}
         <div className="flex gap-2">
           <Input
-            label="Location"
+            label={t('Location')}
             labelPlacement="inside"
             value={locationInput}
             onChange={(e) => setLocationInput(e.target.value)}
@@ -214,7 +216,7 @@ export default function ClinicTrackingCard({
         {/* Row 2: Age/Sex (1/4) + Chief Complaint (3/4) */}
         <div className="flex gap-2">
           <Input
-            label="Age/Sex"
+            label={t('Age/Sex')}
             labelPlacement="inside"
             value={ageSexInput}
             onChange={(e) => setAgeSexInput(e.target.value)}
@@ -236,7 +238,7 @@ export default function ClinicTrackingCard({
             className="w-1/4"
           />
           <Input
-            label="Chief Complaint"
+            label={t('Chief Complaint')}
             labelPlacement="inside"
             value={chiefComplaintInput}
             onChange={(e) => setChiefComplaintInput(e.target.value)}
@@ -271,8 +273,8 @@ export default function ClinicTrackingCard({
                   className="w-full h-full justify-start bg-surface-deep border border-surface-liner hover:bg-surface-muted text-surface-light px-2"
                 >
                   <div className="text-left flex-4 pl-0.5">
-                    <div className="text-xs text-[#d4d4d8] pb-0.5">Status</div>
-                    <div className="text-sm">{call.outcome || 'In Clinic'}</div>
+                    <div className="text-xs text-[#d4d4d8] pb-0.5">{t('Status')}</div>
+                    <div className="text-sm">{t(call.outcome || 'In Clinic')}</div>
                   </div>
                 </Button>
               </DropdownTrigger>
@@ -280,10 +282,10 @@ export default function ClinicTrackingCard({
                 aria-label="Clinic Status"
                 onAction={(key) => onOutcomeChange(call.id, key as string)}
               >
-                <DropdownItem key="In Clinic">In Clinic</DropdownItem>
-                <DropdownItem key="Transported">Transported</DropdownItem>
-                <DropdownItem key="AMA">AMA</DropdownItem>
-                <DropdownItem key="Discharged">Discharged</DropdownItem>
+                <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
+                <DropdownItem key="Transported">{t('Transported')}</DropdownItem>
+                <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
+                <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
               </DropdownMenu>
             </Dropdown>
           </div>
@@ -291,8 +293,8 @@ export default function ClinicTrackingCard({
           {/* Primary Team (read-only) */}
           <div className="flex-1">
             <div className="h-full px-2.5 py-2 bg-surface-deep border border-surface-liner rounded-xl flex flex-col justify-center">
-              <div className="text-xs text-[#d4d4d8] mb-0.5">Primary Team</div>
-              <div className="text-sm">{primaryTeam}</div>
+              <div className="text-xs text-[#d4d4d8] mb-0.5">{t('Primary Team')}</div>
+              <div className="text-sm">{t(primaryTeam)}</div>
             </div>
           </div>
         </div>
@@ -302,13 +304,13 @@ export default function ClinicTrackingCard({
           <div className="pt-3 border-t border-surface-liner space-y-3" onClick={e => e.stopPropagation()}>
             {call.priority && (
               <div className="bg-status-red text-surface-light p-2 rounded">
-                ⚠️ PRIORITY CALL: Life threat to patient/provider
+                ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
               </div>
             )}
 
             {/* Notes - NO LOG ENTRY */}
             <div className="text-sm text-surface-light">
-              <div className="font-semibold mb-1">Notes</div>
+              <div className="font-semibold mb-1">{t('Notes')}</div>
               <TrackingTextEntry
                 mode="note"
                 value={notesText}
@@ -332,14 +334,14 @@ export default function ClinicTrackingCard({
                 minRows={2}
                 maxRows={3}
                 variant="flat"
-                placeholder="Add notes"
+                placeholder={t('Add notes')}
                 className="min-w-0"
               />
             </div>
 
             {/* Log - Editable Textarea */}
             <div className="text-sm text-surface-light">
-              <div className="font-semibold mb-1">Log for Call #{callDisplayNumber}:</div>
+              <div className="font-semibold mb-1">{t('Log for Call')} #{callDisplayNumber}:</div>
               <TrackingTextEntry
                 mode="log"
                 value={logText}
@@ -377,7 +379,7 @@ export default function ClinicTrackingCard({
                 minRows={4}
                 maxRows={5}
                 variant="flat"
-                placeholder="No log entries"
+                placeholder={t('No log entries')}
                 className="min-w-0"
               />
             </div>

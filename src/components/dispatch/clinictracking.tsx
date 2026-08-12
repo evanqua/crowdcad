@@ -15,6 +15,7 @@ import DispatchMotionCell from './motioncell';
 import TrackingTableBase from './trackingtablebase';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 
 type EditableCallField = keyof Call | 'ageSex';
 
@@ -80,6 +81,7 @@ export default function ClinicTrackingTable({
   getCallRowClass,
   formatAgeSex,
 }: ClinicTrackingTableProps) {
+  const { t } = useDispatchTerms();
   // Persistent local state for notes/log text per call — never goes null to prevent flicker
   const [notesTexts, setNotesTexts] = React.useState<Record<string, string>>({});
   const notesFocusedRef = React.useRef<string | null>(null);
@@ -365,7 +367,7 @@ export default function ClinicTrackingTable({
                             variant="flat"
                             className="min-w-0 h-7 px-2 text-xs justify-start bg-surface-liner hover:bg-surface-muted"
                           >
-                            {call.outcome || 'In Clinic'}
+                            {t(call.outcome || 'In Clinic')}
                           </Button>
                         </DropdownTrigger>
                         <DropdownMenu
@@ -394,10 +396,10 @@ export default function ClinicTrackingTable({
                             await updateEvent({ calls: updatedCalls });
                           }}
                         >
-                          <DropdownItem key="In Clinic">In Clinic</DropdownItem>
-                          <DropdownItem key="Transported">Transported</DropdownItem>
-                          <DropdownItem key="AMA">AMA</DropdownItem>
-                          <DropdownItem key="Discharged">Discharged</DropdownItem>
+                          <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
+                          <DropdownItem key="Transported">{t('Transported')}</DropdownItem>
+                          <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
+                          <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
                         </DropdownMenu>
                       </Dropdown>
                     </DispatchMotionCell>
@@ -408,7 +410,7 @@ export default function ClinicTrackingTable({
                     <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                       {(call.assignedTeam && call.assignedTeam.length > 0)
                         ? (Array.isArray(call.assignedTeam) ? call.assignedTeam.join(', ') : call.assignedTeam)
-                        : (call.detachedTeams?.map(d => d.team).join(', ') || 'Walkup')}
+                        : (call.detachedTeams?.map(d => d.team).join(', ') || t('Walkup'))}
                     </DispatchMotionCell>
                   </td>
                   {/* Options Ellipsis */}
@@ -446,7 +448,7 @@ export default function ClinicTrackingTable({
                               setOpenClinicCallId(openClinicCallId === call.id ? null : call.id);
                             }}
                           >
-                            {openClinicCallId === call.id ? 'Hide Log' : 'Show Log'}
+                            {openClinicCallId === call.id ? t('Hide Log') : t('Show Log')}
                           </DropdownItem>
                           <DropdownItem 
                             key="delete"
@@ -460,7 +462,7 @@ export default function ClinicTrackingTable({
                               }
                             }}
                           >
-                            Delete Call
+                            {t('Delete Call')}
                           </DropdownItem>
                         </DropdownMenu>
                       </Dropdown>
@@ -488,16 +490,16 @@ export default function ClinicTrackingTable({
                         <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer">
                           {call.priority && (
                             <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
-                              ⚠️ PRIORITY CALL: Life threat to patient/provider
+                              ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
                             </div>
                           )}
-                          
+
                           {/* Notes - Using HeroUI Textarea - NO LOG ENTRY */}
                           <div
                             className="mt-0 mb-1.5 text-sm text-surface-light"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <div className="font-semibold mb-1">Notes</div>
+                            <div className="font-semibold mb-1">{t('Notes')}</div>
                             <TrackingTextEntry
                               mode="note"
                               value={notesTexts[call.id] ?? (call.notes || '')}
@@ -524,15 +526,15 @@ export default function ClinicTrackingTable({
                               minRows={2}
                               maxRows={3}
                               variant="flat"
-                              placeholder="Add notes"
+                              placeholder={t('Add notes')}
                               className="min-w-0"
                             />
                           </div>
 
-                          
+
                           {/* Log - Using HeroUI ScrollShadow */}
                           <div onClick={(e) => e.stopPropagation()}>
-                            <strong>Log for Call #{callDisplayNumberMap.get(call.id)}:</strong>
+                            <strong>{t('Log for Call')} #{callDisplayNumberMap.get(call.id)}:</strong>
                               <TrackingTextEntry
                                 mode="log"
                                 value={logTexts[call.id] ?? (() => {
@@ -577,7 +579,7 @@ export default function ClinicTrackingTable({
                                 minRows={4}
                                 maxRows={5}
                                 variant="flat"
-                                placeholder="No log entries"
+                                placeholder={t('No log entries')}
                                 className="min-w-0"
                               />
                           </div>
@@ -596,7 +598,7 @@ export default function ClinicTrackingTable({
           className="text-surface-faint text-base hover:text-surface-light"
           aria-label="Toggle resolved clinic calls"
         >
-          {showResolvedClinicCalls ? 'Hide Resolved Clinic Calls' : 'Show Resolved Clinic Calls'}
+          {showResolvedClinicCalls ? t('Hide Resolved Clinic Calls') : t('Show Resolved Clinic Calls')}
         </button>
       </div>
     </div>

@@ -108,6 +108,24 @@ async function ensureTestUser(
   }
 }
 
+async function ensureField(
+  headers: AdminHeaders,
+  collectionName: string,
+  field: FieldDef,
+): Promise<void> {
+  const res = await pbFetch(`/api/collections/${collectionName}`, { headers });
+  if (!res.ok) return;
+  const collection = (await res.json()) as { fields?: Array<{ name: string }> };
+  const existing = collection.fields || [];
+  if (existing.some((f) => f.name === field.name)) return;
+
+  await pbFetch(`/api/collections/${collectionName}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ fields: [...existing, field] }),
+  });
+}
+
 async function globalSetup(): Promise<void> {
   const email = process.env.E2E_TEST_EMAIL;
   const password = process.env.E2E_TEST_PASSWORD;
@@ -131,6 +149,7 @@ async function globalSetup(): Promise<void> {
       { name: 'posts', type: 'json' },
       { name: 'mapUrl', type: 'text' },
       { name: 'sharedWith', type: 'json' },
+      { name: 'isOrgVenue', type: 'bool' },
     ]),
     ensureBaseCollection(headers, 'events', [
       { name: 'name', type: 'text' },
@@ -158,6 +177,10 @@ async function globalSetup(): Promise<void> {
       { name: 'data', type: 'json' },
     ]),
   ]);
+
+  // Covers .pb-data directories persisted from before this field existed —
+  // ensureBaseCollection only sets fields at creation time, not on existing collections.
+  await ensureField(headers, 'venues', { name: 'isOrgVenue', type: 'bool' });
 
   // Wipe all data collections to ensure a clean state for every test run
   await Promise.all([

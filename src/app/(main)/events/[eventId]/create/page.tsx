@@ -14,6 +14,7 @@ import MapPanSurface from '@/components/ui/map-pan-surface';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { useTeamForm } from '@/hooks/useTeamForm';
 import { useZoomPan } from '@/hooks/useZoomPan';
+import { useCertifications } from '@/hooks/useCertifications';
 import MetadataSection from '@/components/event-create/MetadataSection';
 import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
 import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
@@ -26,8 +27,6 @@ import BulkImportModal from '@/components/modals/event/bulkimportmodal';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
-const LICENSES = ['FA', 'FR', 'CPR', 'EMT-B', 'EMT-A', 'EMT-P', 'RN', 'MD/DO'];
-
 // Helper to get post name regardless of type
 const getPostName = (post: Post): string => {
   return typeof post === 'string' ? post : post.name;
@@ -38,6 +37,8 @@ export default function EventCreation() {
   const router = useRouter();
   const params = useParams();
   const eventId = params?.eventId as string | undefined;
+
+  const { certifications } = useCertifications();
 
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState<Partial<Event> & { eventEquipment: EventEquipment[] }>({
@@ -821,7 +822,7 @@ export default function EventCreation() {
         addMember={addMember}
         currentMembers={currentMembers}
         removeMember={removeMember}
-        roles={LICENSES.map(name => ({ name, fullName: name }))}
+        roles={certifications.map(name => ({ name, fullName: name }))}
       />
 
       <AddSupervisorModal
@@ -837,14 +838,14 @@ export default function EventCreation() {
         setMemberName={setSamMemberName}
         memberCert={samCert}
         setMemberCert={setSamCert}
-        roles={LICENSES.map(name => ({ name, fullName: name }))}
+        roles={certifications.map(name => ({ name, fullName: name }))}
       />
 
       <BulkImportModal
         isOpen={bulkImportMode !== null}
         onClose={() => setBulkImportMode(null)}
         mode={bulkImportMode || 'team'}
-        roles={LICENSES.map(name => ({ name, fullName: name }))}
+        roles={certifications.map(name => ({ name, fullName: name }))}
         existingTeamNames={
           bulkImportMode === 'supervisor'
             ? (eventData.supervisor || []).map(s => s.team)

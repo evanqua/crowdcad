@@ -13,6 +13,7 @@ import {
 } from "@heroui/react";
 
 import { Event, Call } from "@/app/types";
+import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
 
 type ClinicCallState = {
   age: string;
@@ -45,6 +46,7 @@ export default function ClinicWalkupModal({
   parseAgeSex,
   clinicId,
 }: Props) {
+  const { t } = useDispatchTerms();
   const [submitting, setSubmitting] = React.useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -128,13 +130,13 @@ export default function ClinicWalkupModal({
         {(close) => (
           <form onSubmit={handleSubmit}>
             <ModalHeader className="text-2xl font-bold text-surface">
-              Add Clinic Walkup
+              {t('Add Clinic Walkup')}
             </ModalHeader>
 
             <ModalBody>
               <Input
                 autoFocus
-                label="Age/Sex"
+                label={t('Age/Sex')}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -149,7 +151,7 @@ export default function ClinicWalkupModal({
               />
 
               <Input
-                label="Chief Complaint"
+                label={t('Chief Complaint')}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -173,7 +175,7 @@ export default function ClinicWalkupModal({
                 variant="bordered"
                 radius="lg"
               >
-                Cancel
+                {t('Cancel')}
               </Button>
               <Button
                 type="submit"
@@ -181,7 +183,7 @@ export default function ClinicWalkupModal({
                 className="px-4 py-2 bg-accent hover:bg-accent/90 text-surface-light"
                 isDisabled={submitting}
               >
-                Submit
+                {t('Submit')}
               </Button>
             </ModalFooter>
           </form>

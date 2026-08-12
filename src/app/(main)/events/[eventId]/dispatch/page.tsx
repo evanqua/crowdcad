@@ -14,6 +14,7 @@ import { toast, Slide } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
 import { useAuth } from '@/hooks/useauth';
+import { useCertifications } from '@/hooks/useCertifications';
 import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
 import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4} from "lucide-react";
@@ -31,6 +32,8 @@ import EquipmentCard from '@/components/dispatch/equipmentcard';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
+import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
+import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
 
 const DEFAULT_CLINICS: Clinic[] = [{ id: 'clinic', name: 'Clinic' }];
 
@@ -72,6 +75,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const { user: authUser, ready: authReady } = useAuth();
   const user = isLiteMode ? null : authUser;
   const ready = isLiteMode ? true : authReady;
+  const { activePreset: dispatchVocabularyPreset } = useDispatchVocabulary();
+  const vocabularyTerms = dispatchVocabularyPreset.terms;
+  const t = useCallback((key: string) => vocabularyTerms[key] ?? key, [vocabularyTerms]);
   const router = useRouter();
   const [openCallId, setOpenCallId] = useState<string | null>(null);
   const [openClinicCallId, setOpenClinicCallId] = useState<string | null>(null);
@@ -100,7 +106,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [isTeamLead, setIsTeamLead] = useState(false);
   const [currentMembers, setCurrentMembers] = useState<{ name: string, cert: string, lead: boolean }[]>([]);
   const [editTeamOriginalName, setEditTeamOriginalName] = useState<string | null>(null);
-  const LICENSES = ['FA', 'FR', 'CPR', 'EMT-B', 'EMT-A', 'EMT-P', 'RN', 'MD/DO'];
+  const { certifications: LICENSES } = useCertifications();
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -2804,10 +2810,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       <Tooltip
         content={
           selectedTab === 'teams'
-            ? 'Add Team'
+            ? t('Add Team')
             : selectedTab === 'supervisors'
-              ? 'Add Supervisor'
-              : 'Add Equipment'
+              ? t('Add Supervisor')
+              : t('Add Equipment')
         }
         placement="top"
       >
@@ -2834,8 +2840,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 }
               }}
             >
-              <DropdownItem key="team">Add Team</DropdownItem>
-              <DropdownItem key="supervisor">Add Supervisor</DropdownItem>
+              <DropdownItem key="team">{t('Add Team')}</DropdownItem>
+              <DropdownItem key="supervisor">{t('Add Supervisor')}</DropdownItem>
             </DropdownMenu>
           </Dropdown>
         </div>
@@ -2957,7 +2963,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   );
 
   return (
-    <>
+    <DispatchVocabularyProvider terms={vocabularyTerms}>
       {/* All your modals first - unchanged */}
       <QuickCallModal
         isOpen={showQuickCallForm}
@@ -3089,9 +3095,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         popoverContent: "bg-surface-deep border-surface-liner",
                       }}
                     >
-                      <SelectItem key="teams">Teams</SelectItem>
-                      <SelectItem key="supervisors">Supervisors</SelectItem>
-                      <SelectItem key="equipment">Equipment</SelectItem>
+                      <SelectItem key="teams">{t('Teams')}</SelectItem>
+                      <SelectItem key="supervisors">{t('Supervisors')}</SelectItem>
+                      <SelectItem key="equipment">{t('Equipment')}</SelectItem>
                     </Select>
 
                     <TeamActionButtonGroup selectedTab={selectedLeftTab as 'teams' | 'supervisors' | 'equipment'} />
@@ -3142,7 +3148,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             ))}
                           {(!event?.staff || event.staff.length === 0) && (
                             <div className="text-center text-surface-light/50 py-8">
-                              No teams available
+                              {t('No teams available')}
                             </div>
                           )}
                         </div>
@@ -3221,7 +3227,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             </>
                           ) : (
                             <div className="text-center text-surface-light/50 py-8">
-                              No equipment configured
+                              {t('No equipment configured')}
                             </div>
                           )}
                         </div>
@@ -3245,7 +3251,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
                         aria-pressed={selectedRightTab === 'calls'}
                       >
-                        Calls ({activeCallsCount})
+                        {t('Calls')} ({activeCallsCount})
                       </button>
 
                       {clinics.map((clinic) => (
@@ -3264,18 +3270,18 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     {selectedRightTab === 'calls' && !isMobile && (
                       <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
-                          <h3 className="text-md font-semibold text-surface-light">Total Calls: {event.calls?.length || 0}</h3>
-                          <Tooltip content="Add Call" placement="top">
+                          <h3 className="text-md font-semibold text-surface-light">{t('Total Calls')}: {event.calls?.length || 0}</h3>
+                          <Tooltip content={t('Add Call')} placement="top">
                             <div>
                               <Button
                                 size="sm"
                                 variant="flat"
                                 className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                                aria-label="Add Call"
+                                aria-label={t('Add Call')}
                                 data-testid="add-call-button"
                                 onPress={() => setShowQuickCallForm(true)}
                               >
-                                Add Call
+                                {t('Add Call')}
                               </Button>
                             </div>
                           </Tooltip>
@@ -3314,17 +3320,17 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     {clinics.map((clinic) => selectedRightTab === clinic.id && !isMobile && (
                       <div key={clinic.id} className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
-                          <h3 className="text-md font-semibold text-surface-light">Total Patients: {getClinicCalls(clinic.id).length}</h3>
-                          <Tooltip content="Add Patient" placement="top">
+                          <h3 className="text-md font-semibold text-surface-light">{t('Total Patients')}: {getClinicCalls(clinic.id).length}</h3>
+                          <Tooltip content={t('Add Patient')} placement="top">
                             <div>
                               <Button
                                 size="sm"
                                 variant="flat"
                                 className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                                aria-label="Add Clinic Call"
+                                aria-label={t('Add Patient')}
                                 onPress={() => setShowQuickClinicCallForm(true)}
                               >
-                                Add Patient
+                                {t('Add Patient')}
                               </Button>
                             </div>
                           </Tooltip>
@@ -3375,11 +3381,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               }}
             >
               {/* TEAMS TAB */}
-              <Tab key="teams" title="Staff">
+              <Tab key="teams" title={t('Teams')}>
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">Teams</h2>
+                      <h2 className="text-xl font-bold text-surface-light">{t('Teams')}</h2>
                       <TeamActionButtonGroup selectedTab="teams" />
                     </div>
                     <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
@@ -3423,7 +3429,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                   {event?.supervisor && event.supervisor.length > 0 && (
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-xl font-bold text-surface-light">Supervisors</h2>
+                        <h2 className="text-xl font-bold text-surface-light">{t('Supervisors')}</h2>
                       </div>
                       <div className="dispatch-shell-list">
                         {event.supervisor
@@ -3464,11 +3470,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               </Tab>
 
               {/* EQUIPMENT TAB */}
-              <Tab key="equipment" title="Equipment">
+              <Tab key="equipment" title={t('Equipment')}>
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">Equipment</h2>
+                      <h2 className="text-xl font-bold text-surface-light">{t('Equipment')}</h2>
                       <TeamActionButtonGroup selectedTab="equipment" />
                     </div>
                     <div className="space-y-3">
@@ -3495,7 +3501,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         </div>
                       ) : (
                         <div className="text-center text-surface-light/50 py-8">
-                          No equipment configured
+                          {t('No equipment configured')}
                         </div>
                       )}
                     </div>
@@ -3503,19 +3509,19 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 </div>
               </Tab>
 
-              <Tab key="calls" title="Calls">
+              <Tab key="calls" title={t('Calls')}>
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">Calls</h2>
+                      <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
                       <div className="flex items-center gap-2">
-                        <Tooltip content="Add new call" placement="top">
+                        <Tooltip content={t('Add Call')} placement="top">
                           <div>
-                            <Button 
-                              isIconOnly 
-                              size="md" 
-                              variant="flat" 
-                              aria-label="Add Call"
+                            <Button
+                              isIconOnly
+                              size="md"
+                              variant="flat"
+                              aria-label={t('Add Call')}
                               onPress={() => setShowQuickCallForm(true)}
                             >
                               <Plus className="h-5 w-5" />
@@ -3602,7 +3608,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       ))}
                       {(!event.calls || event.calls.length === 0) && (
                         <div className="text-center text-surface-light/50 py-8">
-                          No calls
+                          {t('No calls')}
                         </div>
                       )}
                     </div>
@@ -3611,7 +3617,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         onClick={() => setShowResolvedCalls(prev => !prev)}
                         className="text-surface-faint text-base hover:text-surface-light"
                         aria-label="Toggle resolved calls"
-                      >                        {showResolvedCalls ? 'Hide Resolved Calls' : 'Show Resolved Calls'}
+                      >                        {showResolvedCalls ? t('Hide Resolved Calls') : t('Show Resolved Calls')}
                       </button>
                     </div>
                   </div>
@@ -3710,7 +3716,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       ))}
                       {getClinicCalls(clinic.id).length === 0 && (
                         <div className="text-center text-surface-light/50 py-8">
-                          No clinic calls
+                          {t('No clinic calls')}
                         </div>
                       )}
                     </div>
@@ -3720,7 +3726,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         className="text-surface-faint text-base hover:text-surface-light"
                         aria-label="Toggle resolved clinic calls"
                       >
-                        {showResolvedClinicCalls ? 'Hide Resolved Clinic Calls' : 'Show Resolved Clinic Calls'}
+                        {showResolvedClinicCalls ? t('Hide Resolved Clinic Calls') : t('Show Resolved Clinic Calls')}
                       </button>
                     </div>
                   </div>
@@ -3843,6 +3849,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           </div>
         </div>
       )}
-    </>
+    </DispatchVocabularyProvider>
   );
 }

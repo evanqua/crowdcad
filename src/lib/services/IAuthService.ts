@@ -22,6 +22,17 @@ export interface IAuthService {
   /** Re-authenticates with password before permanently deleting the account. */
   deleteCurrentUser(password: string): Promise<void>;
 
+  /**
+   * Sends a password-reset email for an account that's locked out (doesn't
+   * know its current password). `actionUrl` (Firebase only) is where the
+   * reset link in the email points back into this app; PocketBase's link
+   * destination is controlled by its own email template instead.
+   */
+  sendPasswordResetEmail(email: string, actionUrl?: string): Promise<void>;
+
+  /** Completes a password reset using the code/token pulled from the reset-link URL. */
+  confirmPasswordReset(code: string, newPassword: string): Promise<void>;
+
   /** Synchronous access to the current user (null if not signed in or not yet resolved). */
   readonly currentUser: ServiceUser | null;
 }

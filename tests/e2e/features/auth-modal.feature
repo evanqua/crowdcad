@@ -91,3 +91,30 @@ Feature: Login modal
     And I fill the "Confirm Password" field with "SecurePass123!"
     And I click the "Sign Up" submit button
     Then the login modal should not be visible
+
+  Scenario: Forgot password link is only shown in login mode
+    When I click the "Sign In" button
+    Then I should see a "Forgot password?" button in the modal
+    When I click the "Sign Up" button in the modal
+    Then the "Forgot password?" button should not be visible in the modal
+
+  Scenario: Forgot password link switches to the reset view
+    When I click the "Sign In" button
+    And I click the "Forgot password?" button in the modal
+    Then the login modal should have the title "Reset Password"
+    And the "Password" field should not be visible in the modal
+    And the "Email Address" field should be visible in the modal
+
+  Scenario: Requesting a reset link shows the same generic message for any email
+    When I click the "Sign In" button
+    And I click the "Forgot password?" button in the modal
+    And I fill the "Email Address" field with "no-such-account@crowdcad.test"
+    And I click the "Send Reset Link" button in the modal
+    Then I should see the modal text "If an account exists for that email, a reset link has been sent."
+
+  Scenario: Back to login returns from the reset view
+    When I click the "Sign In" button
+    And I click the "Forgot password?" button in the modal
+    And I click the "Back to login" button in the modal
+    Then the login modal should have the title "Login"
+    And the "Password" field should be visible in the modal

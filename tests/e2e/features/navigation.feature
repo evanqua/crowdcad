@@ -21,7 +21,7 @@ Feature: Main navigation
 
   Scenario: Profile page loads for authenticated user
     Given I navigate to "/profile"
-    Then I should see the "Account" tab
+    Then I should see the heading "Security"
 
   Scenario: Authenticated landing page shows Start a New Event
     Given I navigate to "/"

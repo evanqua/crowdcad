@@ -3,6 +3,7 @@
 import React from 'react';
 import DispatchMotionCell from './motioncell';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 
 type Props = {
   callDisplayNumber: number | undefined;
@@ -37,6 +38,7 @@ export default function CallTrackingDetails({
   priority,
   rowClassName,
 }: Props) {
+  const { t } = useDispatchTerms();
   return (
     <tr className={rowClassName}>
       <td
@@ -52,7 +54,7 @@ export default function CallTrackingDetails({
           <DispatchMotionCell isOpen={isOpen} animate={true} className="cursor-pointer">
             {priority && (
               <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
-                ⚠️ PRIORITY CALL: Life threat to patient/provider
+                ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
               </div>
             )}
 
@@ -60,7 +62,7 @@ export default function CallTrackingDetails({
               className="mt-0 mb-1.5 text-sm text-surface-light"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="font-semibold mb-1">Notes</div>
+              <div className="font-semibold mb-1">{t('Notes')}</div>
               <TrackingTextEntry
                 mode="note"
                 value={notesText}
@@ -70,13 +72,13 @@ export default function CallTrackingDetails({
                 minRows={2}
                 maxRows={3}
                 variant="flat"
-                placeholder="Add notes"
+                placeholder={t('Add notes')}
                 className="min-w-0"
               />
             </div>
 
             <div onClick={(e) => e.stopPropagation()}>
-              <strong>Log for Call #{callDisplayNumber}:</strong>
+              <strong>{t('Log for Call')} #{callDisplayNumber}:</strong>
               <TrackingTextEntry
                 mode="log"
                 value={logText}
@@ -92,7 +94,7 @@ export default function CallTrackingDetails({
                 minRows={4}
                 maxRows={5}
                 variant="flat"
-                placeholder="No log entries"
+                placeholder={t('No log entries')}
                 className="min-w-0"
               />
             </div>

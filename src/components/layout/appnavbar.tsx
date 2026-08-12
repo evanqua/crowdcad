@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { authService } from "@/lib/services";
 import { useAuth } from "@/hooks/useauth";
+import { useDispatchVocabulary } from "@/hooks/useDispatchVocabulary";
 
 import {
   Navbar,
@@ -44,6 +45,11 @@ export default function AppNavbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, ready } = useAuth();
+  const { activePreset: dispatchVocabularyPreset } = useDispatchVocabulary();
+  const t = useCallback(
+    (key: string) => dispatchVocabularyPreset.terms[key] ?? key,
+    [dispatchVocabularyPreset]
+  );
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -175,7 +181,7 @@ export default function AppNavbar() {
                       itemActive ? "text-surface-light" : "text-surface-light hover:text-accent"
                     }`}
                   >
-                    {label}
+                    {t(label)}
                   </button>
                 </NavbarItem>
               ))
@@ -297,7 +303,7 @@ export default function AppNavbar() {
                   }}
                   className="block w-full text-left text-[18px] px-2 py-2 hover:opacity-80"
                 >
-                  {label}
+                  {t(label)}
                 </button>
               </NavbarMenuItem>
             ))

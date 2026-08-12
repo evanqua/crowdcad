@@ -7,6 +7,7 @@ import {
   Button, Input, Select, SelectItem,
 } from "@heroui/react";
 import { Role } from "@/app/types";
+import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
 
 type Props = {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export default function AddSupervisorModal({
   setMemberCert,
   roles,
 }: Props) {
+  const { t } = useDispatchTerms();
   const [submitting, setSubmitting] = React.useState(false);
 
   const inputClassNames = {
@@ -62,8 +64,8 @@ export default function AddSupervisorModal({
     listbox: "p-1 [&_[data-hover=true]]:bg-surface-deep [&_[data-selected=true]]:bg-surface-deep",
   } as const;
 
-  const title = titleOverride ?? (mode === "edit" ? "Edit Supervisor" : "Add New Supervisor");
-  const submitLabel = submitLabelOverride ?? (mode === "edit" ? "Save Changes" : "Create Supervisor");
+  const title = titleOverride ?? (mode === "edit" ? t("Edit Supervisor") : t("Add New Supervisor"));
+  const submitLabel = submitLabelOverride ?? (mode === "edit" ? t("Save Changes") : t("Create Supervisor"));
 
   const canSubmit = teamName.trim().length > 0 && (memberCert?.trim().length ?? 0) > 0;
 
@@ -91,7 +93,7 @@ export default function AddSupervisorModal({
 
             <ModalBody className="space-y-3">
               <Input
-                label="Supervisor Call Sign"
+                label={t("Supervisor Call Sign")}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -104,7 +106,7 @@ export default function AddSupervisorModal({
               />
 
               <Input
-                label="Supervisor Name (optional)"
+                label={t("Supervisor Name (optional)")}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -116,7 +118,7 @@ export default function AddSupervisorModal({
               />
 
               <Select
-                label="Certification"
+                label={t("Certification")}
                 labelPlacement="inside"
                 variant="bordered"
                 size="lg"
@@ -145,7 +147,7 @@ export default function AddSupervisorModal({
                 variant="bordered"
                 radius="lg"
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 onPress={async () => {

@@ -58,6 +58,15 @@ node scripts/setup-pocketbase.js
 
 5. The app is available at `http://localhost:3000` and the PocketBase admin UI at `http://localhost:8090/_/`.
 
+6. Grant yourself admin access (first time only — needed for Profile > Admin, e.g. managing the certification list):
+```bash
+PB_URL=http://127.0.0.1:8090 PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASSWORD=YourPassword! \
+node scripts/setAdminPocketbase.js you@example.com
+```
+> This is only needed once — after signing in, that user can grant/revoke admin access for others from Profile > Admin > Manage Admins.
+
+7. (Optional) Enable "Forgot password" emails: in the PocketBase admin UI, configure **Settings > Mail settings** with real SMTP credentials, then update the **Collections > users > Options > Email templates > Reset password** action URL to `{APP_URL}/reset-password?token={TOKEN}` (replacing `{APP_URL}` with your app's URL) so the link opens this app instead of PocketBase's own admin UI. Without this, users can't self-serve a forgotten password. `scripts/setup-pocketbase.js` also prints this reminder.
+
 To stop the stack: `docker compose down`. Your data is preserved in `.pb-data/` and will be available on the next `docker compose up`.
 
 **With Docker + Firebase**
@@ -171,6 +180,21 @@ npm run build && npm start
 ```
 
 The app will be available at `http://localhost:3000` and will communicate with PocketBase via the URL you configured.
+
+**6. Grant yourself admin access**
+
+One-time bootstrap step for Profile > Admin (e.g. managing the certification list):
+
+```bash
+PB_URL=http://192.168.x.x:8090 PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASSWORD=YourPassword! \
+node scripts/setAdminPocketbase.js you@example.com
+```
+
+After signing in, that user can grant/revoke admin access for others from Profile > Admin > Manage Admins.
+
+**7. (Optional) Enable "Forgot password" emails**
+
+Configure **Settings > Mail settings** in the PocketBase admin UI with real SMTP credentials, then update the **Collections > users > Options > Email templates > Reset password** action URL to `{APP_URL}/reset-password?token={TOKEN}` so the link opens this app instead of PocketBase's own admin UI.
 
 #### Testing
 

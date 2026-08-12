@@ -17,6 +17,7 @@ import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
 import DispatchMotionCell from './motioncell';
 import TrackingTableBase from './trackingtablebase';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
+import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 
 import {
   Dropdownmenu,
@@ -114,6 +115,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   // focus/blur-tracking race — see adobe/react-spectrum#4533). Real users
   // never dismiss a menu that fast, so ignore closes inside this window
   // unless they came from an actual selection (onAction).
+  const { t } = useDispatchTerms();
   const TEAM_STATUS_MENU_CLOSE_GUARD_MS = 150;
   const teamStatusMenuOpenedAtRef = React.useRef<number>(0);
   const teamStatusMenuSelectedRef = React.useRef<boolean>(false);
@@ -379,9 +381,9 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 size="lg"
                                 variant="flat"
                                 color="default"
-                                className="text-surface-light h-9 shrink-0 border border-surface-liner bg-surface-liner/30"
+                                className="text-surface-light h-8 shrink-0 border border-surface-liner bg-surface-liner/30"
                               >
-                                Pending
+                                {t('Pending')}
                               </Chip>
                             )}
                             {/* Active assigned teams - Larger chips with centered dropdown */}
@@ -399,7 +401,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   size="lg"
                                   variant="flat"
                                   color="default"
-                                  className={`text-surface-light h-9 shrink-0 ${teamStatusColor.chipClass}`}
+                                  className={`text-surface-light h-8 shrink-0 ${teamStatusColor.chipClass}`}
                                   onClose={() => handleRemoveTeamFromCall(call.id, team)}
                                 >
                                   <div className="flex items-center gap-2" data-testid={`team-chip-${team}`}>
@@ -430,7 +432,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                           variant="light"
                                           className="min-w-0 h-6 px-2 text-xs shrink-0"
                                         >
-                                          {currentTeamStatus}
+                                          {t(currentTeamStatus)}
                                         </Button>
                                       </DropdownTrigger>
                                       <DropdownMenu
@@ -441,7 +443,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                         }}
                                       >
                                         {statusOptions.map((status: string) => (
-                                          <DropdownItem key={status}>{status}</DropdownItem>
+                                          <DropdownItem key={status}>{t(status)}</DropdownItem>
                                         ))}
                                       </DropdownMenu>
                                     </Dropdown>
@@ -457,13 +459,13 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 size="lg"
                                 variant="flat"
                                 color={detachedTeam.reason === 'Delivered' ? 'success' : 'default'}
-                                className="border border-surface-liner h-9"
+                                className="border border-surface-liner h-8"
                               >
                                 <span className="text-surface-light font-medium mr-2">
                                   {detachedTeam.team}
                                 </span>
                                 <span className="text-xs">
-                                  {detachedTeam.reason === 'Refusal' ? 'Refusal' : detachedTeam.reason}
+                                  {t(detachedTeam.reason)}
                                 </span>
                               </Chip>
                             ))}
@@ -486,7 +488,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 {/* Add Team Submenu */}
                                 <DropdownMenuSub>
                                   <DropdownMenuSubTrigger className="hover:bg-surface-liner focus:bg-surface-liner cursor-pointer">
-                                    Add Team
+                                    {t('Add Team')}
                                   </DropdownMenuSubTrigger>
                                   <DropdownMenuSubContent className="bg-surface-deep border-surface-liner">
                                     {(() => {
@@ -537,7 +539,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 {/* Add Supervisor Submenu */}
                                 <DropdownMenuSub>
                                   <DropdownMenuSubTrigger className="hover:bg-surface-liner focus:bg-surface-liner cursor-pointer">
-                                    Add Supervisor
+                                    {t('Add Supervisor')}
                                   </DropdownMenuSubTrigger>
                                   <DropdownMenuSubContent className="bg-surface-deep border-surface-liner">
                                     {event.supervisor
@@ -612,7 +614,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                       return notAssignedToThisCall && isAvailable;
                                     }).length === 0) && (
                                       <DropdownMenuItem disabled className="text-surface-light/50">
-                                        No supervisors available
+                                        {t('No supervisors available')}
                                       </DropdownMenuItem>
                                     )}
                                   </DropdownMenuSubContent>
@@ -621,7 +623,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 {/* Add Equipment Submenu */}
                                 <DropdownMenuSub>
                                   <DropdownMenuSubTrigger className="hover:bg-surface-liner focus:bg-surface-liner cursor-pointer">
-                                    Add Equipment
+                                    {t('Add Equipment')}
                                   </DropdownMenuSubTrigger>
                                   <DropdownMenuSubContent className="bg-surface-deep border-surface-liner">
                                     {(() => {
@@ -1277,7 +1279,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                     })()}
                                     {(!event.eventEquipment || (event.eventEquipment.filter((eq: Equipment) => eq.status === 'Available' || eq.status === 'In Clinic' || !eq.assignedTeam).length === 0)) && (
                                               <DropdownMenuItem disabled className="text-surface-light/50">
-                                                No equipment available
+                                                {t('No equipment available')}
                                               </DropdownMenuItem>
                                             )}
                                   </DropdownMenuSubContent>
@@ -1288,10 +1290,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                           </DispatchMotionCell>
                         </td>
                         {/* Options Ellipsis */}
-                        <td
-                          className="p-0 text-right w-12 min-w-12 max-w-12 whitespace-nowrap"
-                        >
-                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right w-12 min-w-12 max-w-12 whitespace-nowrap">
+                        <td className="p-0">
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
                             <Dropdown
                               motionProps={dropdownMotionProps}
                               placement="bottom-end"
@@ -1309,7 +1309,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                             >
                               <DropdownTrigger>
                                 <button
-                                  className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center ml-auto shrink-0 w-4 h-4"
+                                  className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
                                   aria-label="Call actions"
                                   type="button"
                                   onClick={(e) => e.stopPropagation()}
@@ -1325,27 +1325,27 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                     setOpenCallId(openCallId === call.id ? null : call.id);
                                   }}
                                 >
-                                  {openCallId === call.id ? 'Hide Log' : 'Show Log'}
+                                  {openCallId === call.id ? t('Hide Log') : t('Show Log')}
                                 </DropdownItem>
-                                <DropdownItem 
+                                <DropdownItem
                                   key="duplicate"
                                   onPress={() => {
                                     setOpenMenuToken(null);
                                     handleMarkDuplicate(call.id);
                                   }}
                                 >
-                                  Mark as Duplicate
+                                  {t('Mark as Duplicate')}
                                 </DropdownItem>
-                                <DropdownItem 
+                                <DropdownItem
                                   key="priority"
                                   onPress={() => {
                                     setOpenMenuToken(null);
                                     handleTogglePriorityFromMenu(call.id);
                                   }}
                                 >
-                                  {call.priority ? 'Remove Priority' : 'Mark as Priority'}
+                                  {call.priority ? t('Remove Priority') : t('Mark as Priority')}
                                 </DropdownItem>
-                                <DropdownItem 
+                                <DropdownItem
                                   key="delete"
                                   className="text-danger"
                                   color="danger"
@@ -1356,7 +1356,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                     }
                                   }}
                                 >
-                                  Delete Call
+                                  {t('Delete Call')}
                                 </DropdownItem>
                               </DropdownMenu>
                             </Dropdown>
@@ -1444,7 +1444,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
           className="text-surface-faint text-base hover:text-surface-light"
           aria-label="Toggle resolved calls"
         >
-          {showResolvedCalls ? 'Hide Resolved Calls' : 'Show Resolved Calls'}
+          {showResolvedCalls ? t('Hide Resolved Calls') : t('Show Resolved Calls')}
         </button>
       </div>
     </div>

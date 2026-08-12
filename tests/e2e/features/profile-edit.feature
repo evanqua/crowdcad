@@ -8,7 +8,7 @@ Feature: Profile edit page
   Scenario: Edit profile page renders form fields
     Then I should see the heading "Edit Profile"
     And I should see the "Your full name" placeholder
-    And I should see the "https://..." placeholder
+    And I should see the "+1 555 555 5555" placeholder
 
   Scenario: Save and Cancel buttons are visible
     Then I should see a "Save Changes" button

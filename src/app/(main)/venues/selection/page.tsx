@@ -46,6 +46,7 @@ export default function VenueSelection() {
   const [isMobile, setIsMobile] = useState(false);
   const [ownedVenuesList, setOwnedVenuesList] = useState<Venue[]>([]);
   const [sharedVenuesList, setSharedVenuesList] = useState<Venue[]>([]);
+  const [orgVenuesList, setOrgVenuesList] = useState<Venue[]>([]);
   const [ownedEventsList, setOwnedEventsList] = useState<Event[]>([]);
   const [sharedEventsList, setSharedEventsList] = useState<Event[]>([]);
   const [isStartingEvent, setIsStartingEvent] = useState(false);
@@ -166,6 +167,13 @@ export default function VenueSelection() {
       setSharedVenuesList([]);
     }
 
+    // 2b. Organization Venues Listener — admin-designated venues visible to everyone
+    listeners.push(dbService.subscribeToQuery<Venue>(
+      'venues',
+      [{ field: 'isOrgVenue', op: '==', value: true }],
+      (snaps) => setOrgVenuesList(snaps.map(s => ({ ...s.data, id: s.id } as Venue))),
+    ));
+
     // 3. Owned Events Listener
     listeners.push(dbService.subscribeToQuery<Event>(
       'events',
@@ -224,8 +232,8 @@ export default function VenueSelection() {
     // Combine Venues
     const venueMap = new Map<string, Venue>();
     
-    // Add owned and shared venues to map
-    [...ownedVenuesList, ...sharedVenuesList].forEach(v => {
+    // Add owned, shared, and organization venues to map
+    [...ownedVenuesList, ...sharedVenuesList, ...orgVenuesList].forEach(v => {
       venueMap.set(v.id, v);
     });
 
@@ -255,7 +263,7 @@ export default function VenueSelection() {
 
     setVenues(Array.from(venueMap.values()));
     setRecentEvents(uniqueEvents);
-  }, [ownedVenuesList, sharedVenuesList, ownedEventsList, sharedEventsList]);
+  }, [ownedVenuesList, sharedVenuesList, orgVenuesList, ownedEventsList, sharedEventsList]);
 
   const venueStats = useMemo(() => {
     const byVenue: Record<string, { count: number; lastUsed: number | null }> = {};
@@ -366,7 +374,7 @@ export default function VenueSelection() {
                 }}
               />
 
-              <ScrollShadow className="space-y-3 hideScrollBar">
+              <ScrollShadow className="minimal-scrollbar space-y-3 max-h-[32rem] pr-2">
                 {filteredVenues.map((venue) => {
                   const stats = venueStats.byVenue[venue.id] ?? { count: 0, lastUsed: null };
                   return (
@@ -383,7 +391,12 @@ export default function VenueSelection() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <MapPin className="w-4 h-4 text-status-blue flex-shrink-0" />
-                              <h3 className="font-semibold text-lg truncate">{venue.name}</h3>
+                              <h3 className="font-semibold text-lg truncate min-w-0">{venue.name}</h3>
+                              {venue.isOrgVenue && (
+                                <Chip size="sm" variant="flat" className="bg-accent/20 text-accent flex-shrink-0">
+                                  Org
+                                </Chip>
+                              )}
                             </div>
                             <div className="text-sm text-surface-light">
                               {stats.count} {stats.count === 1 ? 'event' : 'events'}
@@ -494,7 +507,7 @@ export default function VenueSelection() {
                   </CardBody>
                 </Card>
               ) : (
-                <div className="space-y-3">
+                <div className="minimal-scrollbar space-y-3 max-h-[32rem] overflow-y-auto pr-2">
                   {selectedVenueEvents.map((event) => (
                     <Card 
                       key={event.id}
@@ -646,7 +659,7 @@ export default function VenueSelection() {
                 }}
               />
 
-              <ScrollShadow className="flex-1 space-y-2 scrollbar-hide">
+              <ScrollShadow className="minimal-scrollbar flex-1 space-y-2 pr-2">
                 {filteredVenues.map((venue) => {
                   const stats = venueStats.byVenue[venue.id] ?? { count: 0, lastUsed: null };
                   const isSelected = selectedVenueId === venue.id;
@@ -669,7 +682,12 @@ export default function VenueSelection() {
                         <div className="pr-8">
                           <div className="flex items-center gap-2 mb-1">
                             <MapPin className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-status-blue' : 'text-surface-light'}`} />
-                            <h3 className="font-semibold text-sm">{venue.name}</h3>
+                            <h3 className="font-semibold text-sm truncate min-w-0">{venue.name}</h3>
+                            {venue.isOrgVenue && (
+                              <Chip size="sm" variant="flat" className="bg-accent/20 text-accent flex-shrink-0">
+                                Org
+                              </Chip>
+                            )}
                           </div>
                           <div className="text-xs text-surface-light">
                             {stats.count} {stats.count === 1 ? 'event' : 'events'}
@@ -779,7 +797,7 @@ export default function VenueSelection() {
                           </div>
                         </div>
                       ) : (
-                        <div className="overflow-auto h-full min-w-[500px]">
+                        <div className="minimal-scrollbar overflow-auto h-full min-w-[500px]">
                           <table className="w-full">
                             <thead className="sticky top-0 bg-default border-b border-default">
                               <tr>

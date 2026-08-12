@@ -28,6 +28,7 @@ export interface Venue {
   mapUrl?: string;
   userId: string;
   sharedWith?: string[]; // Array of emails
+  isOrgVenue?: boolean; // Visible to all users on this instance, set by an admin
 }
 
 export interface Event {

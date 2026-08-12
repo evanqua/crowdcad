@@ -63,6 +63,23 @@ Use the emulators when developing Firestore rules and client workflows.
 - For production consider enabling SSO providers (Google, OIDC) and enforce MFA for admin users.
 - Create service accounts for CI and server-side tasks with least privilege.
 
+## Granting admin access
+
+CrowdCAD's app-level admin role (Profile > Admin — manages the certification list and other admins) is separate from Firebase IAM/service accounts above. It's a boolean `isAdmin` field on the user's `users/{uid}` Firestore document.
+
+There's no signup-time or console way to set it, so the first admin on a deployment must be bootstrapped with a script:
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json \
+node scripts/setAdmin.js admin@example.com
+```
+
+This requires a service account JSON (Firebase Console > Project Settings > Service Accounts > Generate new private key). Once the first admin signs in, they can grant or revoke admin access for other users from the "Manage Admins" panel in Profile > Admin — the script is only needed once per deployment.
+
+## Forgot-password emails
+
+The "Forgot password?" link on the login screen uses Firebase Auth's built-in `sendPasswordResetEmail` — Firebase sends and delivers the email itself, no SMTP config needed. The only requirement is that your deployed domain (and `localhost` for local dev) is listed under **Authentication > Settings > Authorized domains** in the Firebase Console — this is usually already the case for any domain you're using to sign in, since Firebase Auth requires it for sign-in to work at all.
+
 ## CI & production deploys
 
 - Store `FIREBASE_PROJECT` and `FIREBASE_TOKEN` (or use Workload Identity Federation) in your CI secrets.

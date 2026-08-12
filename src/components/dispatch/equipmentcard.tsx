@@ -10,6 +10,7 @@ import {
 import { ChevronDown, ChevronUp, MapPin, MoreVertical } from 'lucide-react';
 import type { Event, EquipmentItem } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 
 type EquipmentCardProps = {
   equipment: EquipmentItem;
@@ -49,6 +50,7 @@ export default function EquipmentCard({
   onDelete,
   updateEvent
 }: EquipmentCardProps) {
+  const { t } = useDispatchTerms();
   const [expanded, setExpanded] = useState(false);
   const [locationInput, setLocationInput] = useState('');
   const [isMobile, setIsMobile] = useState(false);
@@ -127,9 +129,9 @@ export default function EquipmentCard({
                 }}
               >
                 {equipment.needsRefresh ? (
-                  <DropdownItem key="ready">Mark Ready</DropdownItem>
+                  <DropdownItem key="ready">{t('Mark Ready')}</DropdownItem>
                 ) : null}
-                <DropdownItem key="delete" className="text-status-red">Delete</DropdownItem>
+                <DropdownItem key="delete" className="text-status-red">{t('Delete')}</DropdownItem>
               </DropdownMenu>
             </Dropdown>
           </div>
@@ -156,7 +158,7 @@ export default function EquipmentCard({
                 }}
               >
                 {statusOptions.map((s) => (
-                  <SelectItem key={s}>{s}</SelectItem>
+                  <SelectItem key={s}>{t(s)}</SelectItem>
                 ))}
               </Select>
             </div>
@@ -211,7 +213,7 @@ export default function EquipmentCard({
                   const posts = (event.venue?.posts || []).map(p => (typeof p === 'string' ? p : p.name));
                   const teams = (event.staff || []).map(s => s.team);
                   const opts = Array.from(new Set(['Clinic', ...posts, ...teams, equipment.stagingLocation].filter(Boolean)));
-                  return opts.map(p => <AutocompleteItem key={p}>{p}</AutocompleteItem>);
+                  return opts.map(p => <AutocompleteItem key={p}>{t(p)}</AutocompleteItem>);
                 })()}
               </Autocomplete>
             </div>
@@ -225,13 +227,13 @@ export default function EquipmentCard({
                 onClick={e => e.stopPropagation()}
                 aria-hidden={!expanded}
               >
-              <div className="text-sm font-semibold text-surface-light mb-2">Equipment Details</div>
+              <div className="text-sm font-semibold text-surface-light mb-2">{t('Equipment Details')}</div>
               <div className="text-sm text-surface-light mb-2 space-y-1">
-                <div>Staging Location: {equipment.stagingLocation || 'Not Set'}</div>
-                {equipment.callId && <div>Call ID: {equipment.callId}</div>}
-                {equipment.deliveryTeam && <div>Delivery Team: {equipment.deliveryTeam}</div>}
+                <div>{t('Staging Location')}: {equipment.stagingLocation ? t(equipment.stagingLocation) : t('Not Set')}</div>
+                {equipment.callId && <div>{t('Call ID')}: {equipment.callId}</div>}
+                {equipment.deliveryTeam && <div>{t('Delivery Team')}: {t(equipment.deliveryTeam)}</div>}
               </div>
-              <div className="text-sm font-semibold text-surface-light mb-1">Notes</div>
+              <div className="text-sm font-semibold text-surface-light mb-1">{t('Notes')}</div>
               <TrackingTextEntry
                 mode="note"
                 value={notesText}
@@ -253,7 +255,7 @@ export default function EquipmentCard({
                 minRows={2}
                 maxRows={3}
                 variant="flat"
-                placeholder="Add notes about this equipment"
+                placeholder={t('Add notes about this equipment')}
                 className="min-w-0"
               />
               </div>

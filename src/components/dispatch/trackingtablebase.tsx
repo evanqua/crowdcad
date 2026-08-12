@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 
 interface TrackingTableBaseProps {
   TableColGroup: React.ComponentType;
@@ -19,6 +20,7 @@ export default function TrackingTableBase({
   footer,
   className,
 }: TrackingTableBaseProps) {
+  const { t } = useDispatchTerms();
   return (
     <div className={`w-full ${className || ''}`.trim()} data-team-chips={showTeamAssignmentChips ? 'on' : 'off'}>
       <div className="overflow-x-auto w-full">
@@ -26,12 +28,12 @@ export default function TrackingTableBase({
           <TableColGroup />
           <thead>
             <tr className="border-b border-surface-liner">
-              <th className="px-3 py-2.5 text-left text-surface-faint w-16">Call #</th>
-              <th className="px-3 py-2.5 text-left text-surface-faint w-40">Chief Complaint</th>
-              <th className="px-3 py-2.5 text-left text-surface-faint w-16">A/S</th>
-              <th className="px-3 py-2.5 text-left text-surface-faint w-48">Location</th>
-              {showStatusColumn && <th className="px-3 py-2.5 text-left text-surface-faint w-28">Status</th>}
-              <th className="px-3 py-2.5 text-left text-surface-faint">Team</th>
+              <th className="px-3 py-2.5 text-left text-surface-faint w-16">{t('Call #')}</th>
+              <th className="px-3 py-2.5 text-left text-surface-faint w-40">{t('Chief Complaint')}</th>
+              <th className="px-3 py-2.5 text-left text-surface-faint w-16">{t('A/S')}</th>
+              <th className="px-3 py-2.5 text-left text-surface-faint w-48">{t('Location')}</th>
+              {showStatusColumn && <th className="px-3 py-2.5 text-left text-surface-faint w-28">{t('Status')}</th>}
+              <th className="px-3 py-2.5 text-left text-surface-faint">{t('Team')}</th>
               <th className="px-3 py-2.5 text-right text-surface-faint w-12"></th>
             </tr>
           </thead>

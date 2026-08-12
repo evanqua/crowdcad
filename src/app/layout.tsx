@@ -25,6 +25,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   document.documentElement.classList.add('dark');
                   document.documentElement.setAttribute('data-theme', 'dark');
                 }
+                try {
+                  var reducedMotion = localStorage.getItem('ccad-reduced-motion') === '1';
+                  var root2 = document.documentElement;
+                  root2.classList.toggle('reduce-motion', reducedMotion);
+                  root2.setAttribute('data-reduced-motion', String(reducedMotion));
+                } catch (e) {
+                  // localStorage unavailable — falls back to OS prefers-reduced-motion via CSS
+                }
               })();
             `,
           }}
