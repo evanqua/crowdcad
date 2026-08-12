@@ -5,4 +5,6 @@ export interface UserDoc {
   phoneNumber?: string | null;
   lastPasswordChange?: unknown;
   isAdmin?: boolean;
+  /** Built-in preset id ('crowdcad-default' | 'crowdcad-french') or a dispatchVocabularyPresets doc id. */
+  dispatchVocabularyPresetId?: string;
 }
