@@ -3716,7 +3716,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       ))}
                       {getClinicCalls(clinic.id).length === 0 && (
                         <div className="text-center text-surface-light/50 py-8">
-                          No clinic calls
+                          {t('No clinic calls')}
                         </div>
                       )}
                     </div>
