@@ -321,6 +321,11 @@ export default function SecuritySection({ user }: { user: ServiceUser }) {
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
                 placeholder="Your password"
+                classNames={{
+                  inputWrapper:
+                    'group-data-[focus=true]:ring-0 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+                  input: 'outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
+                }}
               />
               <div className="flex gap-3 mt-4">
                 <Button

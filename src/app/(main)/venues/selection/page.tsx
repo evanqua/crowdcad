@@ -507,7 +507,7 @@ export default function VenueSelection() {
                   </CardBody>
                 </Card>
               ) : (
-                <div className="space-y-3">
+                <div className="minimal-scrollbar space-y-3 max-h-[32rem] overflow-y-auto pr-2">
                   {selectedVenueEvents.map((event) => (
                     <Card 
                       key={event.id}
@@ -797,7 +797,7 @@ export default function VenueSelection() {
                           </div>
                         </div>
                       ) : (
-                        <div className="overflow-auto h-full min-w-[500px]">
+                        <div className="minimal-scrollbar overflow-auto h-full min-w-[500px]">
                           <table className="w-full">
                             <thead className="sticky top-0 bg-default border-b border-default">
                               <tr>
