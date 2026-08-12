@@ -99,8 +99,11 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'Supervisors',
     'No calls',
     'No teams available',
+    'No available teams',
     'No supervisors available',
+    'No available supervisors',
     'No equipment available',
+    'No available equipment',
     'No equipment configured',
     'Show Resolved Calls',
     'Hide Resolved Calls',
@@ -128,6 +131,11 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'Edit Team',
     'Add New Supervisor',
     'Edit Supervisor',
+    'Notes',
+    'Add notes',
+    'No log entries',
+    'Log for Call',
+    'PRIORITY CALL: Life threat to patient/provider',
   ]),
 ];
 

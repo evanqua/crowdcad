@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 
 type CallTrackingCardProps = {
   call: Call;
@@ -90,6 +91,7 @@ export default function CallTrackingCard({
   getCallRowClass,
   updateEvent,
 }: CallTrackingCardProps) {
+  const { t } = useDispatchTerms();
   const [expanded, setExpanded] = useState(false);
   const [locationInput, setLocationInput] = useState(call.location || '');
   const [ageSexInput, setAgeSexInput] = useState(formatAgeSex(call.age, call.gender) || '');
@@ -207,21 +209,21 @@ export default function CallTrackingCard({
                   key="showLog"
                   onPress={() => setExpanded(v => !v)}
                 >
-                  {expanded ? 'Hide Log' : 'Show Log'}
+                  {expanded ? t('Hide Log') : t('Show Log')}
                 </DropdownItem>
-                <DropdownItem 
+                <DropdownItem
                   key="duplicate"
                   onPress={() => handleMarkDuplicate(call.id)}
                 >
-                  Mark as Duplicate
+                  {t('Mark as Duplicate')}
                 </DropdownItem>
-                <DropdownItem 
+                <DropdownItem
                   key="priority"
                   onPress={() => handleTogglePriority(call.id)}
                 >
-                  {call.priority ? 'Remove Priority' : 'Mark as Priority'}
+                  {call.priority ? t('Remove Priority') : t('Mark as Priority')}
                 </DropdownItem>
-                <DropdownItem 
+                <DropdownItem
                   key="delete"
                   className="text-danger"
                   color="danger"
@@ -231,7 +233,7 @@ export default function CallTrackingCard({
                     }
                   }}
                 >
-                  Delete Call
+                  {t('Delete Call')}
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
@@ -347,7 +349,7 @@ export default function CallTrackingCard({
                         }}
                         className="text-xs text-surface-faint hover:text-surface-light transition-colors"
                       >
-                        {currentStatus} ▼
+                        {t(currentStatus)} ▼
                       </button>
                     </DropdownTrigger>
                     <DropdownMenu
@@ -355,7 +357,7 @@ export default function CallTrackingCard({
                       onAction={(key) => handleTeamStatusChange(call.id, team, key as string)}
                     >
                       {statusOptions.map(status => (
-                        <DropdownItem key={status}>{status}</DropdownItem>
+                        <DropdownItem key={status}>{t(status)}</DropdownItem>
                       ))}
                     </DropdownMenu>
                   </Dropdown>
@@ -377,7 +379,7 @@ export default function CallTrackingCard({
                 {detachedTeam.team}
               </span>
               <span className="text-xs">
-                {detachedTeam.reason === 'Refusal' ? 'Refusal' : detachedTeam.reason}
+                {t(detachedTeam.reason)}
               </span>
             </Chip>
           ))}
@@ -399,7 +401,7 @@ export default function CallTrackingCard({
               {/* Add Team Submenu */}
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="hover:bg-surface-liner focus:bg-surface-liner cursor-pointer">
-                  Add Team
+                  {t('Add Team')}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="bg-surface-deep border-surface-liner">
                   {availableStaff.length > 0 ? (
@@ -413,13 +415,13 @@ export default function CallTrackingCard({
                             isBreakOrClinic ? 'bg-status-card-blue text-surface-light' : 'text-surface-light'
                           }`}
                         >
-                          {s.team} {isBreakOrClinic && `(${s.status})`}
+                          {s.team} {isBreakOrClinic && `(${t(s.status)})`}
                         </DropdownMenuItem>
                       );
                     })
                   ) : (
                     <DropdownMenuItem disabled className="text-surface-faint">
-                      No available teams
+                      {t('No available teams')}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuSubContent>
@@ -428,7 +430,7 @@ export default function CallTrackingCard({
               {/* Add Supervisor Submenu */}
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="hover:bg-surface-liner focus:bg-surface-liner cursor-pointer">
-                  Add Supervisor
+                  {t('Add Supervisor')}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="bg-surface-deep border-surface-liner">
                   {availableSupervisors.length > 0 ? (
@@ -442,13 +444,13 @@ export default function CallTrackingCard({
                             isBreakOrClinic ? 'bg-status-card-blue text-surface-light' : 'text-surface-light'
                           }`}
                         >
-                          {s.team} {isBreakOrClinic && `(${s.status})`}
+                          {s.team} {isBreakOrClinic && `(${t(s.status)})`}
                         </DropdownMenuItem>
                       );
                     })
                   ) : (
                     <DropdownMenuItem disabled className="text-surface-faint">
-                      No available supervisors
+                      {t('No available supervisors')}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuSubContent>
@@ -457,7 +459,7 @@ export default function CallTrackingCard({
               {/* Add Equipment Submenu - with team selection */}
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="hover:bg-surface-liner focus:bg-surface-liner cursor-pointer">
-                  Add Equipment
+                  {t('Add Equipment')}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="bg-surface-deep border-surface-liner">
                   {availableEquipment.length > 0 ? (
@@ -554,7 +556,7 @@ export default function CallTrackingCard({
                     ))
                   ) : (
                     <DropdownMenuItem disabled className="text-surface-faint">
-                      No available equipment
+                      {t('No available equipment')}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuSubContent>
