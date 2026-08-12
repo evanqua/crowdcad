@@ -95,6 +95,8 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   'No equipment configured': 'Aucun équipement configuré',
   'Show Resolved Calls': 'Afficher les appels résolus',
   'Hide Resolved Calls': 'Masquer les appels résolus',
+  'Show Resolved Clinic Calls': 'Afficher les appels résolus du poste de secours',
+  'Hide Resolved Clinic Calls': 'Masquer les appels résolus du poste de secours',
   'Total Patients': 'Total des patients',
   'Show Log': 'Afficher le registre',
   'Hide Log': 'Masquer le registre',
@@ -142,6 +144,12 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   Source: 'Source',
   'Assign Team': 'Assigner une équipe',
   'Select a team': 'Sélectionner une équipe',
+  'Venue Map': 'Plan du site',
+  'Posting Schedule': 'Horaire des postes',
+  'End Event': "Terminer l'événement",
+  Venues: 'Sites',
+  'Clear Event': "Réinitialiser l'événement",
+  'Export Summary': 'Exporter le résumé',
 };
 
 export const BUILTIN_PRESETS: Record<BuiltinPresetId, DispatchVocabularyPresetSummary> = {

@@ -598,7 +598,7 @@ export default function ClinicTrackingTable({
           className="text-surface-faint text-base hover:text-surface-light"
           aria-label="Toggle resolved clinic calls"
         >
-          {showResolvedClinicCalls ? 'Hide Resolved Clinic Calls' : 'Show Resolved Clinic Calls'}
+          {showResolvedClinicCalls ? t('Hide Resolved Clinic Calls') : t('Show Resolved Clinic Calls')}
         </button>
       </div>
     </div>

@@ -1446,7 +1446,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
           className="text-surface-faint text-base hover:text-surface-light"
           aria-label="Toggle resolved calls"
         >
-          {showResolvedCalls ? 'Hide Resolved Calls' : 'Show Resolved Calls'}
+          {showResolvedCalls ? t('Hide Resolved Calls') : t('Show Resolved Calls')}
         </button>
       </div>
     </div>

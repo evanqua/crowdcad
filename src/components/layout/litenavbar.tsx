@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { authService } from '@/lib/services';
 import { useAuth } from '@/hooks/useauth';
+import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { getLiteEvent } from '@/lib/liteEventStore';
 import {
   Avatar,
@@ -62,6 +63,11 @@ export default function LiteNavbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, ready } = useAuth();
+  const { activePreset: dispatchVocabularyPreset } = useDispatchVocabulary();
+  const t = useCallback(
+    (key: string) => dispatchVocabularyPreset.terms[key] ?? key,
+    [dispatchVocabularyPreset]
+  );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginMode, setLoginMode] = useState<'login' | 'signup'>('login');
@@ -199,7 +205,7 @@ export default function LiteNavbar() {
                       onClick={openPostingSchedule}
                       className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition text-surface-light hover:text-accent"
                     >
-                      Posting Schedule
+                      {t('Posting Schedule')}
                     </button>
                   </NavbarItem>
                 )}
@@ -211,7 +217,7 @@ export default function LiteNavbar() {
                         type="button"
                         className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium transition text-surface-light hover:text-accent"
                       >
-                        End Event
+                        {t('End Event')}
                       </button>
                     </DropdownTrigger>
                     <DropdownMenu aria-label="Lite end event actions">
@@ -220,10 +226,10 @@ export default function LiteNavbar() {
                         className="text-status-red"
                         onPress={triggerClearEvent}
                       >
-                        Clear Event
+                        {t('Clear Event')}
                       </DropdownItem>
                       <DropdownItem key="export-summary" onPress={triggerExportSummary}>
-                        Export Summary
+                        {t('Export Summary')}
                       </DropdownItem>
                     </DropdownMenu>
                   </Dropdown>
@@ -346,7 +352,7 @@ export default function LiteNavbar() {
                     }}
                     className="block w-full text-left text-[18px] px-2 py-2"
                   >
-                    Posting Schedule
+                    {t('Posting Schedule')}
                   </button>
                 </NavbarMenuItem>
               )}
@@ -358,7 +364,7 @@ export default function LiteNavbar() {
                   }}
                   className="block w-full text-left text-[18px] px-2 py-2 text-status-red"
                 >
-                  Clear Event
+                  {t('Clear Event')}
                 </button>
               </NavbarMenuItem>
               <NavbarMenuItem>
@@ -369,7 +375,7 @@ export default function LiteNavbar() {
                   }}
                   className="block w-full text-left text-[18px] px-2 py-2"
                 >
-                  Export Summary
+                  {t('Export Summary')}
                 </button>
               </NavbarMenuItem>
             </>

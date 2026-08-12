@@ -110,6 +110,8 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'No equipment configured',
     'Show Resolved Calls',
     'Hide Resolved Calls',
+    'Show Resolved Clinic Calls',
+    'Hide Resolved Clinic Calls',
     'Total Patients',
     'Show Log',
     'Hide Log',
@@ -157,6 +159,12 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'Source',
     'Assign Team',
     'Select a team',
+    'Venue Map',
+    'Posting Schedule',
+    'End Event',
+    'Venues',
+    'Clear Event',
+    'Export Summary',
   ]),
 ];
 
