@@ -68,7 +68,7 @@ export default function AdminVenuesSection({ currentUser }: { currentUser: Servi
         {loading ? (
           <Spinner size="sm" />
         ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="minimal-scrollbar space-y-2 max-h-96 overflow-y-auto pr-2">
             {filtered.map((venue) => (
               <div
                 key={venue.id}

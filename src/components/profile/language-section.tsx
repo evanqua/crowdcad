@@ -24,7 +24,7 @@ const selectClassNames = {
     'rounded-2xl px-4 border border-surface-liner bg-transparent hover:bg-surface-deep data-[focus=true]:outline-none',
   value: 'text-surface-light',
   popover: 'bg-surface-deepest border border-surface-liner rounded-2xl',
-  listbox: 'p-1 [&_[data-hover=true]]:bg-surface-deep [&_[data-selected=true]]:bg-surface-deep',
+  listbox: 'p-1 [&_[data-hover=true]]:bg-surface-deep',
 } as const;
 
 const CATEGORY_ORDER: DispatchTermCategory[] = [
@@ -237,7 +237,7 @@ export default function LanguageSection() {
             <div className="flex flex-col sm:flex-row gap-2">
               <Select
                 label="Based on"
-                labelPlacement="inside"
+                labelPlacement="outside"
                 variant="bordered"
                 size="sm"
                 radius="lg"

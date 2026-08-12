@@ -374,7 +374,7 @@ export default function VenueSelection() {
                 }}
               />
 
-              <ScrollShadow className="space-y-3 hideScrollBar">
+              <ScrollShadow className="minimal-scrollbar space-y-3 max-h-[32rem] pr-2">
                 {filteredVenues.map((venue) => {
                   const stats = venueStats.byVenue[venue.id] ?? { count: 0, lastUsed: null };
                   return (
@@ -659,7 +659,7 @@ export default function VenueSelection() {
                 }}
               />
 
-              <ScrollShadow className="flex-1 space-y-2 scrollbar-hide">
+              <ScrollShadow className="minimal-scrollbar flex-1 space-y-2 pr-2">
                 {filteredVenues.map((venue) => {
                   const stats = venueStats.byVenue[venue.id] ?? { count: 0, lastUsed: null };
                   const isSelected = selectedVenueId === venue.id;
