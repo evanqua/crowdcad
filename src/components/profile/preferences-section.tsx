@@ -2,6 +2,7 @@
 
 import { Card, CardBody, Switch } from '@heroui/react';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import LanguageSection from './language-section';
 
 export default function PreferencesSection() {
   const { enabled, setEnabled } = useReducedMotion();
@@ -23,6 +24,8 @@ export default function PreferencesSection() {
           </div>
         </CardBody>
       </Card>
+
+      <LanguageSection />
     </div>
   );
 }
