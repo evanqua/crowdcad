@@ -11,6 +11,7 @@ import type {Event, Staff} from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 import DispatchMotionCell from './motioncell';
+import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 
 type TeamCardProps = {
   staff: Staff;
@@ -38,13 +39,13 @@ function useMMSS(since?: number) {
   return `${mm}:${ss}`;
 }
 
-function formatMemberLine(member: string) {
+function formatMemberLine(member: string, t: (key: string) => string) {
   const isLead = member.includes('(Lead)');
   const withoutLead = member.replace(/\s*\(Lead\)\s*/g, '').trim();
   const certMatches = [...withoutLead.matchAll(/\[(.+?)\]/g)].map(match => match[1]).filter(Boolean);
   const name = withoutLead.replace(/\s*\[.+?\]/g, '').trim();
   const certText = certMatches.map(cert => `[${cert}]`).join(' ');
-  const leadText = isLead ? ' [Lead]' : '';
+  const leadText = isLead ? ` [${t('Lead')}]` : '';
   return `${name}${certText ? ` ${certText}` : ''}${leadText}`.trim();
 }
 
@@ -53,6 +54,7 @@ export default function TeamCard({
   onStatusChange, onLocationChange,
   onEdit, onDelete, onRefreshPost, updateEvent
 }: TeamCardProps) {
+  const { t } = useDispatchTerms();
   const [expanded, setExpanded] = useState(false);
   // Persistent local state for log text — never goes null to prevent flicker
   const [logText, setLogText] = useState(() => {
@@ -85,8 +87,8 @@ export default function TeamCard({
     const members = Array.isArray(staff.members) ? staff.members : [];
     return members
       .filter((member): member is string => typeof member === 'string' && member.trim().length > 0)
-      .map(formatMemberLine);
-  }, [staff.members]);
+      .map(member => formatMemberLine(member, t));
+  }, [staff.members, t]);
   const timer = useMMSS(sinceMs);
 
   // Status options
@@ -164,9 +166,9 @@ export default function TeamCard({
                 if (key === 'delete') onDelete?.(staff.team);
               }}
             >
-              <DropdownItem key="refresh">Refresh Post</DropdownItem>
-              <DropdownItem key="edit">Edit</DropdownItem>
-              <DropdownItem key="delete" className="text-status-red">Delete</DropdownItem>
+              <DropdownItem key="refresh">{t('Refresh Post')}</DropdownItem>
+              <DropdownItem key="edit">{t('Edit')}</DropdownItem>
+              <DropdownItem key="delete" className="text-status-red">{t('Delete')}</DropdownItem>
             </DropdownMenu>
           </Dropdown>
         </div>
@@ -206,7 +208,7 @@ export default function TeamCard({
               }}
             >
               {statusOptions.map((s) => (
-                <SelectItem key={s}>{s}</SelectItem>
+                <SelectItem key={s}>{t(s)}</SelectItem>
               ))}
             </Select>
           </div>
@@ -262,7 +264,7 @@ export default function TeamCard({
               }}
             >
               {postOptions.map(p => (
-                <AutocompleteItem key={p}>{p}</AutocompleteItem>
+                <AutocompleteItem key={p}>{t(p)}</AutocompleteItem>
               ))}
             </Autocomplete>
           </div>
@@ -274,7 +276,7 @@ export default function TeamCard({
             onClick={e => e.stopPropagation()}
             aria-hidden={!expanded}
           >
-            <div className="text-xs font-bold text-surface-light mb-1">Team</div>
+            <div className="text-xs font-bold text-surface-light mb-1">{t('Team')}</div>
             <div className="space-y-1 mb-3">
               {memberLines.map((line, index) => (
                 <div key={`${staff.team}-member-${index}`} className="text-xs text-surface-faint truncate">
@@ -282,11 +284,11 @@ export default function TeamCard({
                 </div>
               ))}
               {memberLines.length === 0 && (
-                <div className="text-xs text-surface-faint italic">No members</div>
+                <div className="text-xs text-surface-faint italic">{t('No members')}</div>
               )}
             </div>
 
-            <div className="text-xs font-bold text-surface-light mb-1">Activity Log</div>
+            <div className="text-xs font-bold text-surface-light mb-1">{t('Activity Log')}</div>
             <TrackingTextEntry
               mode="log"
               value={logText}
@@ -322,7 +324,7 @@ export default function TeamCard({
               minRows={4}
               maxRows={5}
               variant="flat"
-              placeholder="No log entries"
+              placeholder={t('No log entries')}
               className="min-w-0"
             />
           </div>

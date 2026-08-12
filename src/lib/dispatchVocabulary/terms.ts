@@ -136,6 +136,10 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'No log entries',
     'Log for Call',
     'PRIORITY CALL: Life threat to patient/provider',
+    'Edit',
+    'Delete',
+    'No members',
+    'Activity Log',
   ]),
 ];
 

@@ -121,6 +121,10 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   'No log entries': "Aucune entrée dans le registre",
   'Log for Call': "Registre de l'appel",
   'PRIORITY CALL: Life threat to patient/provider': 'APPEL PRIORITAIRE : menace vitale pour le patient ou l’intervenant',
+  Edit: 'Modifier',
+  Delete: 'Supprimer',
+  'No members': 'Aucun membre',
+  'Activity Log': 'Registre d’activité',
 };
 
 export const BUILTIN_PRESETS: Record<BuiltinPresetId, DispatchVocabularyPresetSummary> = {
