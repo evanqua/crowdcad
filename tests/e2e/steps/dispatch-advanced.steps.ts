@@ -9,7 +9,8 @@ const { Given, When, Then } = createBdd(test);
 Given('I have a venue with location {string} and equipment {string} and am on the dispatch page', async ({ page }, location: string, equipment: string) => {
   const venueName = `AdvVenue-${uniqueSuffix()}`;
 
-  await page.goto('/venues/management', { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
+  await page.goto('/venues/management', { timeout: NAV_TIMEOUT });
+  await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(venueName);
 
   // Add location on Locations tab (default active)

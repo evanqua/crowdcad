@@ -7,10 +7,13 @@ import { uniqueSuffix } from '../helpers/unique';
 const { Given, When, Then } = createBdd(test);
 
 Given('I have created an event and am on the dispatch page', async ({ page }) => {
-  // networkidle ensures the Firebase Auth emulator token-validation (and any
-  // initial Firestore calls) complete before we interact with the form.
+  // Best-effort networkidle: gives the auth token validation (and any
+  // initial Firestore calls) a chance to settle before we interact with the
+  // form, but doesn't hard-fail — a backend with an open real-time channel
+  // (e.g. Firestore's Listen/Write long-poll) never reaches true idle.
   const venueName = `Dispatch-Venue-${uniqueSuffix()}`;
-  await page.goto('/venues/management', { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
+  await page.goto('/venues/management', { timeout: NAV_TIMEOUT });
+  await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(venueName);
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });

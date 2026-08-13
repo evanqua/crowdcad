@@ -39,9 +39,10 @@ When('I clear the venue name', async ({ page }) => {
 When('I create a venue with a unique name', async ({ page, scenarioState }) => {
   scenarioState.createdVenueName = `Playwright-Venue-${uniqueSuffix()}`;
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(scenarioState.createdVenueName);
-  // Ensure Firebase auth emulator has validated the token before submitting.
-  // networkidle settles quickly for /venues/management (no persistent connections).
-  await page.waitForLoadState('networkidle', { timeout: 5_000 });
+  // Best-effort: gives the auth token validation a moment to settle before
+  // submitting, but doesn't hard-fail — a backend with an open real-time
+  // channel (e.g. Firestore's Listen/Write long-poll) never reaches true idle.
+  await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
 });
@@ -58,7 +59,8 @@ When('I create two venues with unique names', async ({ page, scenarioState }) =>
   scenarioState.createdVenueNameB = `Beta-${suffix}`;
 
   for (const name of [scenarioState.createdVenueNameA, scenarioState.createdVenueNameB]) {
-    await page.goto('/venues/management', { waitUntil: 'networkidle', timeout: 15_000 });
+    await page.goto('/venues/management', { timeout: 15_000 });
+    await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
     await page.getByPlaceholder('e.g., Convention Center Hall A').fill(name);
     await page.getByRole('button', { name: 'Create Venue' }).click();
     await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });

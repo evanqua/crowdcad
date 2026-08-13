@@ -8,7 +8,8 @@ const { Given, When } = createBdd(test);
 
 Given('I have a venue ready for event creation', async ({ page, scenarioState }) => {
   scenarioState.eventVenueName = `EC-Venue-${uniqueSuffix()}`;
-  await page.goto('/venues/management', { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
+  await page.goto('/venues/management', { timeout: NAV_TIMEOUT });
+  await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(scenarioState.eventVenueName);
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
