@@ -131,7 +131,6 @@ export default function AddTeamModal({
                 classNames={inputClassNames}
                 value={teamName}
                 onValueChange={setTeamName}
-                aria-label="Team name"
               />
 
               {/* Member add row */}

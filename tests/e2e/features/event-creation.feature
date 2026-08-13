@@ -15,9 +15,9 @@ Feature: Event creation
 
   Scenario: Add a team via modal
     When I click the add team button
-    And I fill the "Team name" field with "Alpha"
+    And I fill the "Team Name" field with "Alpha"
     And I fill the "Member name" field with "John"
-    And I select "FR" from the "Certification" dropdown
+    And I select "EMT-B" from the "Certification" dropdown
     And I click the "Add member" button in the modal
     And I click the "Add Team" button in the modal
     Then I should see the text "Alpha"
@@ -39,7 +39,7 @@ Feature: Event creation
     When I click the "Supervisors" tab
     And I click the add event supervisor button
     And I fill the supervisor call sign with "Lead-1"
-    And I select event supervisor certification "FR"
+    And I select event supervisor certification "EMT-B"
     And I click the "Add Supervisor" button in the modal
     Then I should see the text "Lead-1"
 

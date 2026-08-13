@@ -22,7 +22,7 @@ Feature: Dispatch board
 
   Scenario: A team can be added to the dispatch board
     When I open the add team modal
-    And I create a team named "Alpha" with a member "John Doe" certified as "FA"
+    And I create a team named "Alpha" with a member "John Doe" certified as "CPR"
     Then the team "Alpha" should appear in the teams list
 
   Scenario: A call without a team assigned shows Pending status
@@ -33,7 +33,7 @@ Feature: Dispatch board
 
   Scenario: Assigning a call to a team changes team status to En Route
     When I open the add team modal
-    And I create a team named "Bravo" with a member "Jane Smith" certified as "FR"
+    And I create a team named "Bravo" with a member "Jane Smith" certified as "EMT-B"
     And I open the quick call modal
     And I log a call assigned to team "Bravo" at location "Main Stage" with complaint "Chest Pain"
     Then the call should appear in the call list
@@ -60,7 +60,7 @@ Feature: Dispatch board
   Scenario: A supervisor can be added to the dispatch board
     When I switch to the "Supervisors" section
     And I open the add supervisor modal
-    And I create a supervisor with call sign "Command-1" and certification "FR"
+    And I create a supervisor with call sign "Command-1" and certification "EMT-B"
     Then the supervisor "Command-1" should appear in the supervisors list
 
   Scenario: Multiple calls can be logged sequentially
@@ -73,7 +73,7 @@ Feature: Dispatch board
 
   Scenario: Team status can be progressed from En Route to On Scene
     When I open the add team modal
-    And I create a team named "Echo" with a member "Sam Lee" certified as "FA"
+    And I create a team named "Echo" with a member "Sam Lee" certified as "CPR"
     And I open the quick call modal
     And I log a call assigned to team "Echo" at location "South Gate" with complaint "Fall"
     Then the team "Echo" should have status "En Route"
@@ -82,7 +82,7 @@ Feature: Dispatch board
 
   Scenario: Refusal status closes the call and returns the team to Available
     When I open the add team modal
-    And I create a team named "Delta" with a member "Chris Roy" certified as "FR"
+    And I create a team named "Delta" with a member "Chris Roy" certified as "EMT-B"
     And I open the quick call modal
     And I log a call assigned to team "Delta" at location "North Entrance" with complaint "Headache"
     Then the team "Delta" should have status "En Route"
@@ -91,7 +91,7 @@ Feature: Dispatch board
 
   Scenario: Full call lifecycle — En Route, Transporting, then Delivered puts team In Clinic
     When I open the add team modal
-    And I create a team named "Foxtrot" with a member "Dana Kim" certified as "FR"
+    And I create a team named "Foxtrot" with a member "Dana Kim" certified as "EMT-B"
     And I open the quick call modal
     And I log a call assigned to team "Foxtrot" at location "Medical Tent" with complaint "Seizure"
     Then the team "Foxtrot" should have status "En Route"
@@ -102,7 +102,7 @@ Feature: Dispatch board
 
   Scenario: NMM status closes the call and returns the team to Available
     When I open the add team modal
-    And I create a team named "Golf" with a member "Pat Chen" certified as "FA"
+    And I create a team named "Golf" with a member "Pat Chen" certified as "CPR"
     And I open the quick call modal
     And I log a call assigned to team "Golf" at location "East Gate" with complaint "Nausea"
     Then the team "Golf" should have status "En Route"
@@ -126,7 +126,7 @@ Feature: Dispatch board
 
   Scenario: A team can be deleted from the dispatch board
     When I open the add team modal
-    And I create a team named "Hotel" with a member "Sam Park" certified as "FR"
+    And I create a team named "Hotel" with a member "Sam Park" certified as "EMT-B"
     Then the team "Hotel" should appear in the teams list
     When I delete the team "Hotel"
     Then the team "Hotel" should not be visible
@@ -146,7 +146,7 @@ Feature: Dispatch board
   Scenario: A supervisor can be deleted from the dispatch board
     When I switch to the "Supervisors" section
     And I open the add supervisor modal
-    And I create a supervisor with call sign "Command-Del" and certification "FR"
+    And I create a supervisor with call sign "Command-Del" and certification "EMT-B"
     Then the supervisor "Command-Del" should appear in the supervisors list
     When I delete the supervisor "Command-Del"
     Then I should see the text "No supervisors assigned"
@@ -165,8 +165,8 @@ Feature: Dispatch board
 
   Scenario: Multiple teams can coexist on the dispatch board
     When I open the add team modal
-    And I create a team named "Multi-A" with a member "User A" certified as "FR"
+    And I create a team named "Multi-A" with a member "User A" certified as "EMT-B"
     And I open the add team modal
-    And I create a team named "Multi-B" with a member "User B" certified as "FA"
+    And I create a team named "Multi-B" with a member "User B" certified as "CPR"
     Then the team "Multi-A" should appear in the teams list
     And the team "Multi-B" should appear in the teams list
