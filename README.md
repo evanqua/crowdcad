@@ -14,8 +14,9 @@ CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system f
 - **Architecture:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - **Component patterns:** [docs/COMPONENTS.md](docs/COMPONENTS.md)
 - **Firebase & setup:** [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md)
+- **PocketBase & setup:** [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md)
 - **Self-hosting (Firebase):** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-- **Self-hosting (PocketBase):** see [PocketBase section](#pocketbase-self-hosted--lan) below
+- **Self-hosting (PocketBase):** [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md)
 - **Contributing guide:** [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Code of Conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - **Changelog / Releases:** [CHANGELOG.md](CHANGELOG.md)
@@ -24,7 +25,7 @@ CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system f
 
 #### Quickstart
 
-**With Docker + PocketBase (Recommended for local/LAN, no cloud account required)**
+**With Docker + PocketBase (Recommended for local/LAN, no cloud account required)** — see [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md) for the full walkthrough, including Windows/Git Bash notes and SMTP configuration for "forgot password" emails.
 
 1. Copy and configure the environment file:
 ```bash
@@ -123,7 +124,7 @@ cp .env.example .env.local
 
 #### PocketBase (self-hosted / LAN)
 
-PocketBase is the recommended backend for local or LAN deployments — no cloud account required and all data stays on your machine.
+PocketBase is the recommended backend for local or LAN deployments — no cloud account required and all data stays on your machine. This section covers a non-Docker, download-the-binary setup; for the recommended Docker path (including Windows/Git Bash notes, troubleshooting, and SMTP configuration for password-reset emails) see [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md).
 
 **1. Download PocketBase**
 
@@ -238,6 +239,7 @@ npx playwright show-report
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making cross-cutting changes.
 - Read [docs/COMPONENTS.md](docs/COMPONENTS.md) before adding UI components or modals.
 - Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) for self-hosting and compliance guidance (BAA, rules, backups).
+- Follow [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md) for self-hosted/LAN deployments backed by PocketBase instead of Firebase.
 - See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for operator-facing workflows and screenshots.
 
 #### Reporting and policies
