@@ -53,7 +53,7 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   Available: 'Disponible',
   Detached: 'Dégagé',
   'On Break': 'En pause',
-  'In Clinic': 'Au poste de secours',
+  'In Clinic': 'À la clinique',
   'Delivered Eq': 'Équipement livré',
   'En Route Eq': 'Équipement en route',
   Assisting: 'En assistance',
@@ -69,7 +69,7 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
 
   // Actions & labels
   'Total Calls': 'Appels totaux',
-  'Call #': "N° d'appel",
+  'Call #': "Appel",
   'Chief Complaint': 'Plainte principale',
   'A/S': 'A/S',
   'Age/Sex': 'A/S',
