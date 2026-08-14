@@ -171,6 +171,36 @@ async function main() {
     { name: 'interactionSessions', type: 'json' },
   ]);
 
+  // Live TAK positions, one record per (eventId, callsign).
+  //
+  // These are deliberately NOT stored inside the `events` record. Teams live as
+  // a JSON array on `events`, so writing a position there meant reading the
+  // whole event, editing one array element and writing it all back — racing the
+  // dispatcher's browser on the same record, with no transactions and no version
+  // token to catch a lost update. Keeping positions in their own collection
+  // splits the writers by ownership (humans edit `events`, the bridge writes
+  // here), which removes the race instead of narrowing it.
+  await ensureCollection(headers, 'tak_positions', [
+    { name: 'eventId', type: 'text', required: true },
+    { name: 'callsign', type: 'text', required: true },
+    { name: 'lat', type: 'number' },
+    { name: 'lon', type: 'number' },
+    // Percent of the venue map image — same units as Post.x/Post.y. Nullable,
+    // so they stay plain numbers rather than a required pair.
+    { name: 'x', type: 'number' },
+    { name: 'y', type: 'number' },
+    // False when the fix is outside the map bounds. Recorded rather than
+    // clamped, so the UI hides the marker instead of drawing a confident lie.
+    { name: 'onMap', type: 'bool' },
+    { name: 'timestamp', type: 'number' },
+    { name: 'accuracy', type: 'number' },
+    { name: 'staleAt', type: 'number' },
+    { name: 'nearestPost', type: 'text' },
+    { name: 'boundTeam', type: 'text' },
+    { name: 'uid', type: 'text' },
+    { name: 'cotType', type: 'text' },
+  ]);
+
   await ensureCollection(headers, 'dispatchLogs', [
     { name: 'eventId', type: 'text' },
     { name: 'data', type: 'json' },

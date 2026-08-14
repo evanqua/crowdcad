@@ -113,6 +113,46 @@ export interface TakPosition {
   nearestPost?: string;
 }
 
+/**
+ * One row of the `tak_positions` collection — a live position as the bridge
+ * stores it.
+ *
+ * Why this is not just a `TakPosition` inside the event
+ * ----------------------------------------------------
+ * It used to be. Teams live as a JSON array inside a single `events` record, so
+ * writing one team's position meant reading the whole event, editing one array
+ * element, and writing the entire array back — while the dispatcher's browser
+ * was editing the same record. PocketBase has no multi-document transactions
+ * and no per-record version token, so that read-modify-write could silently
+ * clobber a status change with no error anywhere.
+ *
+ * Splitting positions into their own collection draws the line along ownership:
+ * the `events` record holds what humans edit, and `tak_positions` holds what the
+ * machine writes. Two writers never touch the same record, so the race is gone
+ * rather than merely narrowed — which is what makes writing a position every
+ * second safe.
+ *
+ * One record per (`eventId`, `callsign`). The bridge upserts by that pair and
+ * never reads or writes the event at all.
+ */
+export interface TakPositionRecord extends TakPosition {
+  /** PocketBase record id. Absent on a record being created. */
+  id?: string;
+  /** Event this position belongs to. */
+  eventId: string;
+  /** Device callsign. Required here — it is half the record's identity. */
+  callsign: string;
+  /**
+   * Team name supplied by the bridge's `--bind` flag, when one was used. Only a
+   * fallback for matching: `Staff.takCallsign` is the authoritative binding.
+   */
+  boundTeam?: string;
+  /** CoT `uid` of the reporting device, for tracing a marker back to a client. */
+  uid?: string;
+  /** CoT type string (`a-f-G-U-C`, …), kept for debugging misclassified events. */
+  cotType?: string;
+}
+
 export interface Staff {
   team: string;
   location: string;
@@ -120,14 +160,17 @@ export interface Staff {
   members: string[];
   log?: TeamLogEntry[];
   originalPost?: string;
+  /**
+   * Last known live position. **No longer persisted** — since positions moved to
+   * the `tak_positions` collection, nothing writes this field to the database.
+   * It is merged in client-side by `useTakPositions` so the map can keep reading
+   * `team.tak`, and any value still stored on an old event record is ignored.
+   */
   tak?: TakPosition;
   /**
-   * TAK callsign whose position reports belong to this team. Deliberately a
-   * sibling of `tak` rather than a field inside it: the bridge rewrites `tak`
-   * wholesale on every position, so a binding stored in there would be erased
-   * seconds after it was set. Kept here, it survives, and the bridge re-reads
-   * it on each write — so re-pointing a phone at a team takes effect without
-   * restarting anything.
+   * TAK callsign whose position reports belong to this team. This is the
+   * authoritative binding, and it is dispatcher-owned: the bridge only ever
+   * reads it, so changing it takes effect without restarting anything.
    */
   takCallsign?: string;
 }
@@ -139,7 +182,10 @@ export interface Supervisor {
   member: string;
   log?: TeamLogEntry[];
   originalPost?: string;
+  /** Merged in client-side from `tak_positions`, exactly as on `Staff`. */
   tak?: TakPosition;
+  /** TAK callsign bound to this supervisor. Same semantics as `Staff.takCallsign`. */
+  takCallsign?: string;
 }
 
 export type PostAssignment = {

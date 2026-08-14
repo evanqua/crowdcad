@@ -20,6 +20,7 @@ import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventSto
 import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4} from "lucide-react";
 import TeamWidget from '@/components/dispatch/teamwidget';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTakPositions, mergeTakPositions } from '@/hooks/useTakPositions';
 import { CallTrackingTable } from '@/components/dispatch/calltracking';
 import ClinicTrackingTable from '@/components/dispatch/clinictracking';
 import CallTrackingCard from '@/components/dispatch/calltrackingcard';
@@ -1424,8 +1425,16 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // state on every call/team update while off-screen).
   const isMobile = useIsMobile(1024);
 
+  // Live TAK positions come from their own collection rather than the event
+  // record, so the bridge writing a fix every second cannot clobber a
+  // dispatcher's edit. Merged back onto staff here so the map can go on reading
+  // `team.tak`. Lite mode has no backend, so it stays unsubscribed.
+  const takPositions = useTakPositions(isLiteMode ? undefined : eventId);
+  const staffWithTak = useMemo(
+    () => mergeTakPositions(event?.staff || [], takPositions),
+    [event?.staff, takPositions],
+  );
 
-  
   useEffect(() => {
     const handleHotkey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'Enter') {
@@ -3796,7 +3805,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       },
                     ]
               }
-              staff={event.staff || []}
+              staff={staffWithTak}
               equipment={event.eventEquipment || []}
               teamTimers={teamTimers}
             />
