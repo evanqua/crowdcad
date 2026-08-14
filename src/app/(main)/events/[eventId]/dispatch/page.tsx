@@ -101,6 +101,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     chiefComplaint: '',
   });
   const [teamName, setTeamName] = useState('');
+  const [takCallsign, setTakCallsign] = useState('');
   const [memberName, setMemberName] = useState('');
   const [memberCert, setMemberCert] = useState('');
   const [isTeamLead, setIsTeamLead] = useState(false);
@@ -415,6 +416,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const handleAddNewTeam = useCallback(() => {
     setTeamName('');
+    setTakCallsign('');
     setCurrentMembers([]);
     setMemberName('');
     setMemberCert('');
@@ -612,7 +614,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         members: membersStrings,
         status: 'Available',
         location: '',
-        log: [{ timestamp: Date.now(), message: 'Team created' }]
+        log: [{ timestamp: Date.now(), message: 'Team created' }],
+        ...(takCallsign.trim() ? { takCallsign: takCallsign.trim() } : {})
       };
 
       return { staff: [...(currentEvent.staff || []), staffEntry] };
@@ -620,12 +623,14 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
     // UI resets (only runs if transaction didn't throw)
     setTeamName('');
+    setTakCallsign('');
     setCurrentMembers([]);
     setShowAddTeamModal(false);
-  }, [teamName, currentMembers, updateEvent]);
+  }, [teamName, takCallsign, currentMembers, updateEvent]);
 
   const handleEditTeam = useCallback((staff: Staff) => {
     setTeamName(staff.team);
+    setTakCallsign(staff.takCallsign || '');
     const parsed = (staff.members || []).map((m) => {
       const lead = m.includes('(Lead)');
       const nameCertMatch = m.match(/^(.+?)\s\[(.+?)\]/);
@@ -663,10 +668,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     const now = new Date();
     const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
 
+    const newCallsign = takCallsign.trim();
+
     const updatedStaff = (event.staff || []).map(s => {
       if (s.team !== oldName) return s;
+
+      const oldCallsign = s.takCallsign || '';
+      // A position belongs to the device that reported it, not to the team it
+      // was parked on. When the binding changes, drop the old fix rather than
+      // leave a marker sitting where a different phone used to be.
+      const { tak, takCallsign: _prev, ...rest } = s;
+      const keepTak = newCallsign === oldCallsign ? tak : undefined;
+
       return {
-        ...s,
+        ...rest,
+        ...(keepTak ? { tak: keepTak } : {}),
+        ...(newCallsign ? { takCallsign: newCallsign } : {}),
         team: newName,
         members: membersStrings,
         log: [
@@ -696,6 +713,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       await updateEvent({ staff: updatedStaff, calls: updatedCalls });
 
       setTeamName('');
+      setTakCallsign('');
       setCurrentMembers([]);
       setEditTeamOriginalName(null);
       setShowEditTeamModal(false);
@@ -703,7 +721,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       console.error('Error saving team changes:', error);
       alert('Error saving team changes. Please try again.');
     }
-  }, [teamName, currentMembers, event, editTeamOriginalName, updateEvent]);
+  }, [teamName, takCallsign, currentMembers, event, editTeamOriginalName, updateEvent]);
 
   const handleDeleteTeam = useCallback(async (teamNameToDelete: string) => {
     if (!event) return;
@@ -2994,6 +3012,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         onSubmit={handleSaveNewTeam}
         teamName={teamName}
         setTeamName={setTeamName}
+        takCallsign={takCallsign}
+        setTakCallsign={setTakCallsign}
         memberName={memberName}
         setMemberName={setMemberName}
         memberCert={memberCert}
@@ -3012,6 +3032,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         onSubmit={handleSaveEditedTeam}
         teamName={teamName}
         setTeamName={setTeamName}
+        takCallsign={takCallsign}
+        setTakCallsign={setTakCallsign}
         memberName={memberName}
         setMemberName={setMemberName}
         memberCert={memberCert}

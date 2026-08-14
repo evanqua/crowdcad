@@ -35,6 +35,14 @@ type Props = {
   teamName: string;
   setTeamName: (v: string) => void;
 
+  /**
+   * TAK callsign binding. Optional so the flows that never see live positions
+   * (event creation, lite mode) can leave it out entirely; the field only
+   * renders when a setter is supplied.
+   */
+  takCallsign?: string;
+  setTakCallsign?: (v: string) => void;
+
   memberName: string;
   setMemberName: (v: string) => void;
 
@@ -60,6 +68,8 @@ export default function AddTeamModal({
   submitLabelOverride,
   teamName,
   setTeamName,
+  takCallsign,
+  setTakCallsign,
   memberName,
   setMemberName,
   memberCert,
@@ -132,6 +142,23 @@ export default function AddTeamModal({
                 value={teamName}
                 onValueChange={setTeamName}
               />
+
+              {/* TAK callsign — binds a radio/phone's position reports to this team */}
+              {setTakCallsign && (
+                <Input
+                  label={t("TAK Callsign")}
+                  description={t(
+                    "Optional. The callsign this team's device reports under — its live position appears on the venue map."
+                  )}
+                  labelPlacement="inside"
+                  variant="bordered"
+                  size="lg"
+                  radius="lg"
+                  classNames={inputClassNames}
+                  value={takCallsign ?? ""}
+                  onValueChange={setTakCallsign}
+                />
+              )}
 
               {/* Member add row */}
               <div className="flex gap-2 items-center">

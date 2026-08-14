@@ -121,6 +121,15 @@ export interface Staff {
   log?: TeamLogEntry[];
   originalPost?: string;
   tak?: TakPosition;
+  /**
+   * TAK callsign whose position reports belong to this team. Deliberately a
+   * sibling of `tak` rather than a field inside it: the bridge rewrites `tak`
+   * wholesale on every position, so a binding stored in there would be erased
+   * seconds after it was set. Kept here, it survives, and the bridge re-reads
+   * it on each write — so re-pointing a phone at a team takes effect without
+   * restarting anything.
+   */
+  takCallsign?: string;
 }
 
 export interface Supervisor {
