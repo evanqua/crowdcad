@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Modal, ModalContent, ModalBody, Button, Card } from '@heroui/react';
 import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus } from 'lucide-react';
-import { Post, Staff, Equipment, Layer } from '@/app/types';
+import { Post, Staff, Equipment, Layer, TakPosition } from '@/app/types';
+import { getStatusColor } from '@/lib/statusColors';
 
 function StatusTimer({ since }: { since: number }) {
   const [elapsed, setElapsed] = React.useState(0);
@@ -41,6 +42,19 @@ interface ImageRect {
   y: number;
   width: number;
   height: number;
+}
+
+// A fix nobody has updated in over a minute is not "live" anymore, regardless
+// of how confident the last reading was.
+const TAK_STALE_MS = 60_000;
+
+function formatTakAge(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const totalHours = Math.floor(totalMinutes / 60);
+  return `${totalHours}h`;
 }
 
 interface PostMarkerProps {
@@ -416,6 +430,97 @@ function TeamMarker({
   );
 }
 
+// Live GPS marker sourced from a team's `tak` field, distinct from PostMarker
+// (which shows where a post is defined) and TeamMarker (which shows the post
+// a team is currently assigned to). This shows where the unit actually is.
+interface TakMarkerProps {
+  team: Staff;
+  rect: ImageRect;
+}
+
+function TakMarker({ team, rect }: TakMarkerProps) {
+  const [hovered, setHovered] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const markerRef = useRef<HTMLDivElement>(null);
+
+  // Staleness depends on wall-clock time, not just on new tak data arriving,
+  // so re-render periodically to let the marker fade and the tooltip's
+  // "Xs ago" advance even when the event document hasn't changed.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const tak: TakPosition | undefined = team.tak;
+  if (!tak || tak.x == null || tak.y == null || tak.onMap === false) return null;
+
+  const { x, y, width, height } = rect;
+  const left = x + (tak.x / 100) * width;
+  const top = y + (tak.y / 100) * height;
+
+  const ageMs = now - tak.timestamp;
+  const isStale = ageMs > TAK_STALE_MS;
+  const colorClass = getStatusColor(team.status).textClass;
+
+  const handleMouseEnter = () => {
+    setHovered(true);
+    if (markerRef.current) {
+      const r = markerRef.current.getBoundingClientRect();
+      const yPos = Math.max(10, r.top);
+      setTooltipPos({ x: r.right + 10, y: yPos });
+    }
+  };
+
+  return (
+    <div
+      ref={markerRef}
+      style={{
+        position: 'absolute',
+        left: `${left}px`,
+        top: `${top}px`,
+        transform: 'translate(-50%, -50%)',
+        zIndex: 30,
+        cursor: 'pointer',
+        opacity: isStale ? 0.35 : 1,
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setHovered(false)}
+      className="flex items-center justify-center"
+    >
+      {/* Pulsing halo signals "live"; a stale fix drops opacity and stops pulsing above */}
+      {!isStale && <div className={`cc-tak-pulse-ring ${colorClass} bg-current`} />}
+      <div
+        className={`cc-tak-dot ${colorClass} bg-current`}
+        style={{ border: '2px solid rgba(255,255,255,0.9)' }}
+      />
+
+      {hovered && typeof window !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: `${tooltipPos.x}px`,
+            top: `${tooltipPos.y}px`,
+            zIndex: 10000,
+            pointerEvents: 'none',
+          }}
+        >
+          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
+            <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}>
+              {team.team}
+            </div>
+            {tak.callsign && <div><strong>Callsign:</strong> {tak.callsign}</div>}
+            <div><strong>Fix:</strong> {formatTakAge(ageMs)} ago</div>
+            {typeof tak.accuracy === 'number' && <div><strong>Accuracy:</strong> ±{Math.round(tak.accuracy)}m</div>}
+            {tak.nearestPost && <div><strong>Nearest Post:</strong> {tak.nearestPost}</div>}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 interface VenueMapWithPostsProps {
   layers: Layer[];
   currentLayer: number;
@@ -649,6 +754,11 @@ function VenueMapWithPosts({
                 />
               );
             })}
+            {staff
+              .filter((team) => team.tak && team.tak.x != null && team.tak.y != null && team.tak.onMap !== false)
+              .map((team) => (
+                <TakMarker key={`tak-${team.team}`} team={team} rect={rect} />
+              ))}
           </>
         )}
       </div>
@@ -928,6 +1038,37 @@ export default function VenueMapModal({
           z-index: 0;
           animation: ccTeamBob 2s ease-in-out infinite;
           will-change: transform, opacity;
+        }
+        @keyframes ccTakPulse {
+          0% {
+            transform: translate(-50%, -50%) scale(0.6);
+            opacity: 0.55;
+          }
+          70%,
+          100% {
+            transform: translate(-50%, -50%) scale(1.8);
+            opacity: 0;
+          }
+        }
+        .cc-tak-pulse-ring {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          pointer-events: none;
+          z-index: 0;
+          animation: ccTakPulse 1.8s ease-out infinite;
+          will-change: transform, opacity;
+        }
+        .cc-tak-dot {
+          position: relative;
+          z-index: 1;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
         }
       `}</style>
     </Modal>
