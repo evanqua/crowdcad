@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "test:unit": "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/lib/takInterpolation.test.ts",
     "bddgen": "bddgen",
     "test:e2e": "bddgen && playwright test",
     "test:e2e:ui": "bddgen && playwright test --ui",

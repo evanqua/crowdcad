@@ -10,6 +10,11 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    // `npm run test:unit` runs TypeScript through Node's own type stripping, and
+    // Node's ESM resolver does no extension guessing — a relative import must
+    // name the file exactly. Safe here because this config never emits (noEmit
+    // above); Next.js compiles the app itself and is unaffected.
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,

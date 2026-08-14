@@ -87,6 +87,15 @@ CrowdCAD can show live responder positions on the venue map, fed from TAK client
   hides the marker instead of drawing it somewhere the unit demonstrably is not.
   `nearestPost` is context only — never write it to `Staff.location`, because letting
   GPS silently reassign a team would make walking around a destructive act.
+- **The marker is tweened, not teleported.** A position carries `path` — the fixes
+  the bridge received since the last write — and `src/lib/takInterpolation.ts` +
+  `src/hooks/useTakTween.ts` walk it by arc length so a unit rounding a corner
+  follows the corner. Two rules there are load-bearing: the tween works in **map
+  percentages, never pixels**, or panning the map lurches every marker mid-tween;
+  and it **never extrapolates past a reported position**, because a dot that keeps
+  gliding after the feed dies makes "walking north" and "pipeline down" look
+  identical. `npm run test:unit` covers the geometry (no framework — Node strips
+  the types), and the bridge half is `node bridge.test.js` in the parent repo.
 - **Run the dev server from `core/`, not the repo root** (`npm run dev`, pinned to port
   3004 for TAK work). The root wrapper shadows `core/src/` through the `@/*` alias, so
   running from the root can serve a different file than the one you just edited.

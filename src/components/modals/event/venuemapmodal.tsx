@@ -6,6 +6,7 @@ import { Modal, ModalContent, ModalBody, Button, Card } from '@heroui/react';
 import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus } from 'lucide-react';
 import { Post, Staff, Equipment, Layer, TakPosition } from '@/app/types';
 import { getStatusColor } from '@/lib/statusColors';
+import { useTakTween } from '@/hooks/useTakTween';
 
 // A campus-sized venue map is mostly empty space at 1x, so zoom has to go far
 // enough to separate two posts a few hundred metres apart. Steps are
@@ -62,8 +63,21 @@ const TAK_STALE_MS = 60_000;
 // is a different kind of thing from the post/assignment markers around it.
 const TAK_LIVE_COLOR = '#22d3ee';
 
+// How often the tooltip re-reads the clock while it is open. The marker's
+// staleness fade only needs to be roughly right, but the age readout is the
+// one number that says whether the whole TAK pipeline is alive, and rounding
+// it to the nearest ten seconds makes a healthy one-second feed and a stalled
+// bridge display the same value for most of a minute.
+const TAK_AGE_TICK_MS = 500;
+const TAK_STALENESS_TICK_MS = 10_000;
+
 function formatTakAge(ms: number): string {
-  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const seconds = Math.max(0, ms / 1000);
+  // One decimal while the fix is fresh. The difference between 0.4 s and 4 s of
+  // latency is the difference between "working" and "something is buffering",
+  // and whole seconds cannot show it.
+  if (seconds < 10) return `${seconds.toFixed(1)}s`;
+  const totalSeconds = Math.round(seconds);
   if (totalSeconds < 60) return `${totalSeconds}s`;
   const totalMinutes = Math.floor(totalSeconds / 60);
   if (totalMinutes < 60) return `${totalMinutes}m`;
@@ -468,18 +482,36 @@ function TakMarker({ team, rect, mapScale }: TakMarkerProps) {
   // Staleness depends on wall-clock time, not just on new tak data arriving,
   // so re-render periodically to let the marker fade and the tooltip's
   // "Xs ago" advance even when the event document hasn't changed.
+  //
+  // Twice a second while the tooltip is open, because the age readout is then
+  // being used to diagnose the feed and needs to move like a clock; back to
+  // every ten seconds when it is closed, which is all the fade needs and keeps
+  // idle markers off the render path.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 10_000);
+    const period = hovered ? TAK_AGE_TICK_MS : TAK_STALENESS_TICK_MS;
+    const interval = setInterval(() => setNow(Date.now()), period);
     return () => clearInterval(interval);
-  }, []);
+  }, [hovered]);
 
   const tak: TakPosition | undefined = team.tak;
+
+  // Tween between fixes, in map percentages. Positions land about once a second
+  // and used to be written straight to left/top, so the dot teleported on every
+  // update; this walks it there, through the intermediate fixes on `tak.path`
+  // when the bridge sent any. Called before the early return below because it
+  // is a hook — a team whose device drops off the feed must not change how many
+  // hooks this component runs.
+  const tweened = useTakTween(tak);
+
   if (!tak || tak.x == null || tak.y == null || tak.onMap === false) return null;
 
   const { x, y, width, height } = rect;
-  const left = x + (tak.x / 100) * width;
-  const top = y + (tak.y / 100) * height;
+  // Fall back to the reported position for the frame before the first tween
+  // commits, so the marker never renders at the origin.
+  const drawn = tweened ?? { x: tak.x, y: tak.y };
+  const left = x + (drawn.x / 100) * width;
+  const top = y + (drawn.y / 100) * height;
 
   const ageMs = now - tak.timestamp;
   const isStale = ageMs > TAK_STALE_MS;
@@ -545,7 +577,13 @@ function TakMarker({ team, rect, mapScale }: TakMarkerProps) {
             </div>
             <div><strong>Status:</strong> {team.status}</div>
             {tak.callsign && <div><strong>Callsign:</strong> {tak.callsign}</div>}
-            <div><strong>Fix:</strong> {formatTakAge(ageMs)} ago</div>
+            {/* The one number that says whether the feed is alive. A healthy
+                pipeline sits near a second; anything growing without bound
+                means the bridge, the server or the phone has stopped, and
+                naming it "stale" saves working that out from the fade. */}
+            <div className={isStale ? 'text-status-orange' : undefined}>
+              <strong>Fix:</strong> {formatTakAge(ageMs)} ago{isStale ? ' (stale)' : ''}
+            </div>
             {typeof tak.accuracy === 'number' && <div><strong>Accuracy:</strong> ±{Math.round(tak.accuracy)}m</div>}
             {tak.nearestPost && <div><strong>Nearest Post:</strong> {tak.nearestPost}</div>}
           </div>
