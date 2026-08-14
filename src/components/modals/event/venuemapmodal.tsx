@@ -1,11 +1,18 @@
 'use client';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Modal, ModalContent, ModalBody, Button, Card } from '@heroui/react';
 import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus } from 'lucide-react';
 import { Post, Staff, Equipment, Layer, TakPosition } from '@/app/types';
 import { getStatusColor } from '@/lib/statusColors';
+
+// A campus-sized venue map is mostly empty space at 1x, so zoom has to go far
+// enough to separate two posts a few hundred metres apart. Steps are
+// multiplicative: additive steps feel fast when zoomed out and glacial when in.
+const MIN_MAP_SCALE = 0.5;
+const MAX_MAP_SCALE = 8;
+const ZOOM_STEP = 1.5;
 
 function StatusTimer({ since }: { since: number }) {
   const [elapsed, setElapsed] = React.useState(0);
@@ -61,9 +68,10 @@ interface PostMarkerProps {
   post: Post;
   rect: ImageRect;
   staff: Staff[];
+  mapScale: number;
 }
 
-function PostMarker({ post, rect }: PostMarkerProps) {
+function PostMarker({ post, rect, mapScale }: PostMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
@@ -95,7 +103,7 @@ function PostMarker({ post, rect }: PostMarkerProps) {
         position: "absolute",
         left: `${left}px`,
         top: `${top}px`,
-        transform: "translate(-50%, -50%)",
+        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
         zIndex: 12,
         cursor: "pointer",
       }}
@@ -202,12 +210,14 @@ interface EquipmentMarkerProps {
   equipment: Equipment;
   post: Post;
   rect: ImageRect;
+  mapScale: number;
 }
 
 function EquipmentMarker({
   equipment,
   post,
   rect,
+  mapScale,
 }: EquipmentMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -217,8 +227,10 @@ function EquipmentMarker({
   if (!postIsValid) return null;
 
   // Position equipment marker
-  const left = rect.x + (post.x / 100) * rect.width - 15;
-  const top = rect.y + (post.y / 100) * rect.height + 15;
+  // The stagger offset is applied in map-container pixels, so it has to shrink
+  // with zoom to keep a constant on-screen gap from the post marker.
+  const left = rect.x + (post.x / 100) * rect.width - 15 / mapScale;
+  const top = rect.y + (post.y / 100) * rect.height + 15 / mapScale;
 
   const iconType = getEquipmentIcon(equipment);
 
@@ -238,7 +250,7 @@ function EquipmentMarker({
         position: 'absolute',
         left: `${left}px`,
         top: `${top}px`,
-        transform: 'translate(-50%, -50%)',
+        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
         zIndex: 15,
         cursor: 'pointer',
         display: 'flex',
@@ -335,6 +347,7 @@ interface TeamMarkerProps {
   post: Post;
   rect: ImageRect;
   teamTimers: { [team: string]: number };
+  mapScale: number;
 }
 
 function TeamMarker({
@@ -342,6 +355,7 @@ function TeamMarker({
   post,
   rect,
   teamTimers,
+  mapScale,
 }: TeamMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -351,8 +365,8 @@ function TeamMarker({
   if (!postIsValid) return null;
 
   // Stagger team marker 8px right and 8px up from post center
-  const left = rect.x + (post.x / 100) * rect.width + 16;
-  const top = rect.y + (post.y / 100) * rect.height - 16;
+  const left = rect.x + (post.x / 100) * rect.width + 16 / mapScale;
+  const top = rect.y + (post.y / 100) * rect.height - 16 / mapScale;
 
   const { color } = getTeamMarkerColors(team);
 
@@ -373,7 +387,7 @@ function TeamMarker({
         position: 'absolute',
         left: `${left}px`,
         top: `${top}px`,
-        transform: 'translate(-50%, -50%)',
+        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
         zIndex: 25,
         cursor: 'pointer',
         display: 'flex',
@@ -436,9 +450,10 @@ function TeamMarker({
 interface TakMarkerProps {
   team: Staff;
   rect: ImageRect;
+  mapScale: number;
 }
 
-function TakMarker({ team, rect }: TakMarkerProps) {
+function TakMarker({ team, rect, mapScale }: TakMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
@@ -479,7 +494,7 @@ function TakMarker({ team, rect }: TakMarkerProps) {
         position: 'absolute',
         left: `${left}px`,
         top: `${top}px`,
-        transform: 'translate(-50%, -50%)',
+        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
         zIndex: 30,
         cursor: 'pointer',
         opacity: isStale ? 0.35 : 1,
@@ -535,8 +550,10 @@ interface VenueMapWithPostsProps {
   onMouseDown: (e: React.MouseEvent<HTMLDivElement>) => void;
   onMouseMove: (e: React.MouseEvent<HTMLDivElement>) => void;
   onMouseUp: () => void;
-  onWheel: (e: React.WheelEvent<HTMLDivElement>) => void;
   imgRef: React.RefObject<HTMLImageElement | null>;
+  // Owned by the parent: it needs the viewport box to clamp panning and to
+  // anchor wheel zoom, and it attaches its own non-passive wheel listener here.
+  imgContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 function VenueMapWithPosts({
@@ -553,14 +570,13 @@ function VenueMapWithPosts({
   onMouseDown,
   onMouseMove,
   onMouseUp,
-  onWheel,
   imgRef,
+  imgContainerRef,
 }: VenueMapWithPostsProps) {
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const imgContainerRef = useRef<HTMLDivElement | null>(null);
 
   const mapUrl = layers[currentLayer]?.mapUrl || '';
   const posts = layers[currentLayer]?.posts || [];
@@ -681,7 +697,6 @@ function VenueMapWithPosts({
       <div
         ref={imgContainerRef}
         className="relative overflow-hidden h-full w-full rounded-2xl"
-        onWheel={onWheel}
         style={{
           cursor: isPanning ? 'grabbing' : 'grab',
           height: '100%',
@@ -723,6 +738,7 @@ function VenueMapWithPosts({
                 post={post}
                 rect={rect}
                 staff={staff}
+                mapScale={scale}
               />
             ))}
             {equipment.map((equip) => {
@@ -737,6 +753,7 @@ function VenueMapWithPosts({
                   equipment={equip}
                   post={postObj}
                   rect={rect}
+                  mapScale={scale}
                 />
               );
             })}
@@ -751,13 +768,14 @@ function VenueMapWithPosts({
                   post={postObj}
                   rect={rect}
                   teamTimers={teamTimers}
+                  mapScale={scale}
                 />
               );
             })}
             {staff
               .filter((team) => team.tak && team.tak.x != null && team.tak.y != null && team.tak.onMap !== false)
               .map((team) => (
-                <TakMarker key={`tak-${team.team}`} team={team} rect={rect} />
+                <TakMarker key={`tak-${team.team}`} team={team} rect={rect} mapScale={scale} />
               ))}
           </>
         )}
@@ -815,24 +833,80 @@ export default function VenueMapModal({
     }
   }, [isOpen]);
 
-  // Zoom handlers
-  const handleZoomIn = () => {
-    setScale(prev => Math.min(prev + 0.25, 3));
+  // Keep the map from being dragged off screen: the image may be panned until
+  // one of its edges reaches the viewport edge, and locks to centre whenever it
+  // is smaller than the viewport. `position` is applied before `scale` in the
+  // transform, so it is in unscaled screen pixels.
+  const clampPosition = useCallback((pos: { x: number; y: number }, s: number) => {
+    const container = imgContainerRef.current;
+    const img = imgRef.current;
+    if (!container || !img) return pos;
+
+    const { width: cw, height: ch } = container.getBoundingClientRect();
+    const image = getContainedImageRect(cw, ch, img.naturalWidth, img.naturalHeight);
+    if (!image.width || !image.height) return pos;
+
+    const maxX = Math.max(0, (image.width * s - cw) / 2);
+    const maxY = Math.max(0, (image.height * s - ch) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, pos.x)),
+      y: Math.min(maxY, Math.max(-maxY, pos.y)),
+    };
+  }, []);
+
+  // Zoom about a fixed point, so the map grows around what you are looking at
+  // rather than around the middle of the modal. The container is transformed
+  // about its centre, so a point p (measured from that centre, unscaled) lands
+  // at position + scale * p; holding that landing point still across a scale
+  // change gives the new translation. `anchor` is also measured from the
+  // centre, so the zoom buttons pass null and get centre-anchored zoom.
+  const zoomAbout = (nextScale: number, anchor: { x: number; y: number } | null) => {
+    const next = Math.min(MAX_MAP_SCALE, Math.max(MIN_MAP_SCALE, nextScale));
+    if (next === scale) return;
+
+    const nextPosition = anchor
+      ? {
+          x: anchor.x - (next / scale) * (anchor.x - position.x),
+          y: anchor.y - (next / scale) * (anchor.y - position.y),
+        }
+      : position;
+
+    setScale(next);
+    setPosition(clampPosition(nextPosition, next));
   };
 
-  const handleZoomOut = () => {
-    setScale(prev => Math.max(prev - 0.25, 0.5));
-  };
+  const handleZoomIn = () => zoomAbout(scale * ZOOM_STEP, null);
+  const handleZoomOut = () => zoomAbout(scale / ZOOM_STEP, null);
 
   const handleResetZoom = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
   };
 
-  // Handle wheel (prevent default scrolling)
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  };
+  // Wheel zooms the map rather than scrolling the modal. This is attached
+  // natively rather than through onWheel because React registers wheel
+  // listeners as passive, where preventDefault() is ignored. deltaMode varies
+  // by browser and device (pixels, lines, pages), so the per-event factor is
+  // clamped rather than trusting deltaY's magnitude.
+  useEffect(() => {
+    const viewport = imgContainerRef.current;
+    if (!viewport || !isOpen) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+
+      const rect = viewport.getBoundingClientRect();
+      const anchor = {
+        x: e.clientX - (rect.left + rect.width / 2),
+        y: e.clientY - (rect.top + rect.height / 2),
+      };
+      const factor = Math.min(1.5, Math.max(1 / 1.5, Math.exp(-e.deltaY * 0.002)));
+      zoomAbout(scale * factor, anchor);
+    };
+
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', onWheel);
+  });
 
   // Handle pan start
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -844,30 +918,9 @@ export default function VenueMapModal({
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isPanning) return;
 
-    const img = imgRef.current;
-    const container = imgContainerRef.current;
-    if (!img || !container) {
-      setPosition({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const imgWidth = img.offsetWidth * scale;
-    const imgHeight = img.offsetHeight * scale;
-
-    const newX = e.clientX - panStart.x;
-    const newY = e.clientY - panStart.y;
-
-    const maxX = Math.max(0, (imgWidth - containerRect.width) / scale);
-    const maxY = Math.max(0, (imgHeight - containerRect.height) / scale);
-
-    setPosition({
-      x: Math.min(0, Math.max(-maxX, newX)),
-      y: Math.min(0, Math.max(-maxY, newY)),
-    });
+    setPosition(
+      clampPosition({ x: e.clientX - panStart.x, y: e.clientY - panStart.y }, scale)
+    );
   };
 
   // Handle pan end
@@ -939,8 +992,8 @@ export default function VenueMapModal({
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
-                onWheel={handleWheel}
                 imgRef={imgRef}
+                imgContainerRef={imgContainerRef}
               />
 
               {/* Zoom Controls */}
