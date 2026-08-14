@@ -84,6 +84,23 @@ export interface TeamLogEntry {
  * Every field is optional on the parent because a team with no TAK device
  * simply never has one, and nothing in the app requires it.
  */
+/**
+ * One intermediate fix on the way to a `TakPosition`, in map percentages.
+ *
+ * Deliberately not a full `TakPosition`: this is drawing data, not a record of
+ * a reading. It exists so the marker can be animated along the route actually
+ * taken, and carrying accuracy, callsign or lat/lon per point would multiply
+ * the size of every position write for information nothing renders.
+ */
+export interface TakPathPoint {
+  /** Percent of venue map width — same units as `Post.x`. */
+  x: number;
+  /** Percent of venue map height — same units as `Post.y`. */
+  y: number;
+  /** Epoch ms when the bridge received this fix, on the bridge's clock. */
+  t: number;
+}
+
 export interface TakPosition {
   lat: number;
   lon: number;
@@ -101,6 +118,19 @@ export interface TakPosition {
   timestamp: number;
   /** TAK callsign that reported it, for tracing a marker back to a device. */
   callsign?: string;
+  /**
+   * Fixes received between this position and the previous write, oldest first
+   * and excluding this one. Empty whenever the device reports no faster than
+   * the bridge writes, which is the normal case.
+   *
+   * The bridge used to keep only the newest fix per callsign and discard the
+   * rest, so the map had two points seconds apart and no choice but to draw the
+   * straight line between them — a unit rounding a corner appeared to cut
+   * through it. Interpolating along this path instead follows the route that
+   * was actually taken. Off-map fixes are omitted rather than clamped, on the
+   * same reasoning as `onMap`.
+   */
+  path?: TakPathPoint[];
   /** Reported accuracy in metres (CoT circular error); absent when unknown. */
   accuracy?: number;
   /** Epoch ms after which the reporting client considers this position stale. */

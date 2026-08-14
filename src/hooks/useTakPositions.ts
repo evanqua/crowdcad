@@ -79,6 +79,10 @@ function toTakPosition(record: TakPositionRecord): TakPosition {
     onMap: record.onMap,
     timestamp: record.timestamp,
     callsign: record.callsign,
+    // Only carried when it has points. An empty array is the common case — the
+    // device reporting no faster than the bridge writes — and passing it on
+    // would give the marker a new object identity on every fix for no reason.
+    ...(Array.isArray(record.path) && record.path.length > 0 ? { path: record.path } : {}),
     ...(record.accuracy !== undefined && record.accuracy !== null
       ? { accuracy: record.accuracy }
       : {}),

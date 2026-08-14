@@ -193,6 +193,11 @@ async function main() {
     // clamped, so the UI hides the marker instead of drawing a confident lie.
     { name: 'onMap', type: 'bool' },
     { name: 'timestamp', type: 'number' },
+    // Fixes received between this write and the previous one, as
+    // [{ x, y, t }, ...] in chronological order. The map interpolates through
+    // them, so a unit that rounds a corner follows the corner rather than
+    // cutting the chord across it.
+    { name: 'path', type: 'json' },
     { name: 'accuracy', type: 'number' },
     { name: 'staleAt', type: 'number' },
     { name: 'nearestPost', type: 'text' },
@@ -200,6 +205,12 @@ async function main() {
     { name: 'uid', type: 'text' },
     { name: 'cotType', type: 'text' },
   ]);
+
+  // ensureCollection skips a collection that already exists, so an install set
+  // up before the trail landed would silently never gain this field — and the
+  // symptom would be a marker that still moves, still updates, and just never
+  // gets smooth. Add it explicitly for those.
+  await ensureField(headers, 'tak_positions', { name: 'path', type: 'json' });
 
   await ensureCollection(headers, 'dispatchLogs', [
     { name: 'eventId', type: 'text' },
