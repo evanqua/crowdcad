@@ -70,6 +70,49 @@ export interface TeamLogEntry {
   message: string;
 }
 
+/**
+ * A team's live GPS position, reported by a TAK client (ATAK/iTAK) and written
+ * by the CrowdCAD-TAK bridge.
+ *
+ * This is the only geographic concept in the data model. Everywhere else a
+ * position is a percentage of the venue map image (see `Post`), because a venue
+ * map is just a picture with no inherent coordinate system. The bridge does the
+ * projection and stores both forms: `lat`/`lon` are the ground truth it
+ * received, and `x`/`y` are that position expressed in the same units as
+ * `Post.x`/`Post.y` so the map can draw it without knowing any geography.
+ *
+ * Every field is optional on the parent because a team with no TAK device
+ * simply never has one, and nothing in the app requires it.
+ */
+export interface TakPosition {
+  lat: number;
+  lon: number;
+  /** Percent of venue map width — same units as `Post.x`. Null if unprojectable. */
+  x: number | null;
+  /** Percent of venue map height — same units as `Post.y`. Null if unprojectable. */
+  y: number | null;
+  /**
+   * False when the unit is outside the venue map's bounds. The position is
+   * still recorded rather than clamped, so the UI can choose to hide the
+   * marker instead of drawing it somewhere the unit demonstrably is not.
+   */
+  onMap: boolean;
+  /** Epoch ms when the bridge received the position. */
+  timestamp: number;
+  /** TAK callsign that reported it, for tracing a marker back to a device. */
+  callsign?: string;
+  /** Reported accuracy in metres (CoT circular error); absent when unknown. */
+  accuracy?: number;
+  /** Epoch ms after which the reporting client considers this position stale. */
+  staleAt?: number;
+  /**
+   * Nearest `Post` by map distance, as context only. Deliberately NOT written
+   * into `location`: that field drives post assignments, and letting GPS
+   * silently reassign a team would be a destructive side effect of walking.
+   */
+  nearestPost?: string;
+}
+
 export interface Staff {
   team: string;
   location: string;
@@ -77,6 +120,7 @@ export interface Staff {
   members: string[];
   log?: TeamLogEntry[];
   originalPost?: string;
+  tak?: TakPosition;
 }
 
 export interface Supervisor {
@@ -86,6 +130,7 @@ export interface Supervisor {
   member: string;
   log?: TeamLogEntry[];
   originalPost?: string;
+  tak?: TakPosition;
 }
 
 export type PostAssignment = {
