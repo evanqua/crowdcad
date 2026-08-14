@@ -55,6 +55,13 @@ interface ImageRect {
 // of how confident the last reading was.
 const TAK_STALE_MS = 60_000;
 
+// The live-position dot deliberately does NOT use the team's status colour.
+// Most statuses (Available, Assigned, Pending, ...) map to the default palette,
+// whose text colour is near-white -- invisible as a 10px dot on a light map
+// image. A fixed high-contrast cyan also reads as "this is the GPS fix", which
+// is a different kind of thing from the post/assignment markers around it.
+const TAK_LIVE_COLOR = '#22d3ee';
+
 function formatTakAge(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
   if (totalSeconds < 60) return `${totalSeconds}s`;
@@ -476,7 +483,6 @@ function TakMarker({ team, rect, mapScale }: TakMarkerProps) {
 
   const ageMs = now - tak.timestamp;
   const isStale = ageMs > TAK_STALE_MS;
-  const colorClass = getStatusColor(team.status).textClass;
 
   const handleMouseEnter = () => {
     setHovered(true);
@@ -504,10 +510,17 @@ function TakMarker({ team, rect, mapScale }: TakMarkerProps) {
       className="flex items-center justify-center"
     >
       {/* Pulsing halo signals "live"; a stale fix drops opacity and stops pulsing above */}
-      {!isStale && <div className={`cc-tak-pulse-ring ${colorClass} bg-current`} />}
+      {!isStale && (
+        <div className="cc-tak-pulse-ring" style={{ backgroundColor: TAK_LIVE_COLOR }} />
+      )}
       <div
-        className={`cc-tak-dot ${colorClass} bg-current`}
-        style={{ border: '2px solid rgba(255,255,255,0.9)' }}
+        className="cc-tak-dot"
+        style={{
+          backgroundColor: TAK_LIVE_COLOR,
+          border: '2px solid rgba(255,255,255,0.95)',
+          // Dark halo so the dot stays legible over pale areas of the map image
+          boxShadow: '0 0 0 1px rgba(0,0,0,0.55), 0 1px 4px rgba(0,0,0,0.5)',
+        }}
       />
 
       {hovered && typeof window !== 'undefined' && createPortal(
@@ -521,9 +534,16 @@ function TakMarker({ team, rect, mapScale }: TakMarkerProps) {
           }}
         >
           <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
-            <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}>
+            {/* Status colour lives in the tooltip rather than on the dot: over a
+                dark panel it actually reads, and the dot needs to stay legible
+                over the map image regardless of status. */}
+            <div
+              className={getStatusColor(team.status).textClass}
+              style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}
+            >
               {team.team}
             </div>
+            <div><strong>Status:</strong> {team.status}</div>
             {tak.callsign && <div><strong>Callsign:</strong> {tak.callsign}</div>}
             <div><strong>Fix:</strong> {formatTakAge(ageMs)} ago</div>
             {typeof tak.accuracy === 'number' && <div><strong>Accuracy:</strong> ±{Math.round(tak.accuracy)}m</div>}
@@ -1107,8 +1127,8 @@ export default function VenueMapModal({
           position: absolute;
           left: 50%;
           top: 50%;
-          width: 14px;
-          height: 14px;
+          width: 18px;
+          height: 18px;
           border-radius: 50%;
           pointer-events: none;
           z-index: 0;
@@ -1118,10 +1138,9 @@ export default function VenueMapModal({
         .cc-tak-dot {
           position: relative;
           z-index: 1;
-          width: 10px;
-          height: 10px;
+          width: 13px;
+          height: 13px;
           border-radius: 50%;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
         }
       `}</style>
     </Modal>
