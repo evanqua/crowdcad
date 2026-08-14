@@ -65,3 +65,31 @@ The app is backend-agnostic by design, selected at build time via `NEXT_PUBLIC_B
 - When touching auth/db/storage code, go through `src/lib/services` (backend-agnostic interfaces), not Firebase or PocketBase APIs directly, unless you're inside one of the two adapter implementations themselves.
 - HIPAA/PHI conventions (per `docs/FIREBASE_SETUP.md`, `docs/DEPLOYMENT.md`): no analytics/telemetry that could capture PHI, respect `DISABLE_TELEMETRY`, don't log call/patient details (`Call`/`Staff`/`Supervisor` fields) to `console.*`.
 - `docs/ARCHITECTURE.md` and `docs/COMPONENTS.md` are kept current with the actual component layout — trust them over guessing from folder names alone when planning cross-cutting changes.
+
+## TAK / live GPS positions
+
+CrowdCAD can show live responder positions on the venue map, fed from TAK clients
+(ATAK on Android, iTAK on iOS) via a local FreeTAKServer.
+
+- **The bridge is not in this repo.** It lives in the parent wrapper repo at
+  `dev/crowdcad-tak-bridge/` (with the server stack in `dev/freetakserver/`), because
+  it is a standalone Node sidecar rather than part of the Next.js app. Read
+  `dev/TAK_DECISIONS.md` there before changing anything TAK-related — several
+  constraints that look arbitrary are load-bearing.
+- **Binding a phone to a team** is `Staff.takCallsign` (`src/app/types.ts`): it must
+  match the callsign set on the device (iTAK: Settings → Preferences → My Callsign).
+  Resolution order is `takCallsign` → the bridge's `--bind` flag → an exact team-name
+  match, and an unmatched callsign is logged once and **ignored rather than guessed**.
+  Binding the wrong phone to the wrong team puts a responder somewhere they are not.
+- **Positions are `TakPosition` on `Staff`/`Supervisor`.** They carry both `lat`/`lon`
+  and `x`/`y` percentages of the map image (the same units as `Post.x`/`Post.y`), plus
+  `onMap`. Off-map fixes are recorded `onMap: false` rather than clamped, so the UI
+  hides the marker instead of drawing it somewhere the unit demonstrably is not.
+  `nearestPost` is context only — never write it to `Staff.location`, because letting
+  GPS silently reassign a team would make walking around a destructive act.
+- **Run the dev server from `core/`, not the repo root** (`npm run dev`, pinned to port
+  3004 for TAK work). The root wrapper shadows `core/src/` through the `@/*` alias, so
+  running from the root can serve a different file than the one you just edited.
+- **Never commit `certs-export/`, `fts-itak-tls.zip`, or `fts-local-tcp.zip`** from the
+  parent repo. Those bundles contain a private CA key that can mint client certificates
+  the server will trust. They are gitignored; keep it that way.
