@@ -204,6 +204,14 @@ async function main() {
   // (or the Manage Admins panel, once at least one admin exists).
   await ensureField(headers, 'users', { name: 'isAdmin', type: 'bool' });
 
+  // `dispatchVocabularyPresetId` on `users` — stores the dispatcher's chosen
+  // dispatch-language preset (see src/hooks/useDispatchVocabulary.ts). Without
+  // this field, PocketBase silently drops it from update requests since it's
+  // not in the users schema, which also triggers an authStore refresh (PocketBase
+  // auto-syncs authStore on updates to the authenticated user's own record) that
+  // immediately reloads the stale preset from the server and undoes the change.
+  await ensureField(headers, 'users', { name: 'dispatchVocabularyPresetId', type: 'text' });
+
   console.log('\nDone. CrowdCAD collections are ready.');
   console.log(
     'Review access rules in the PocketBase admin UI at ' + PB_URL + '/_/ before going to production.',
