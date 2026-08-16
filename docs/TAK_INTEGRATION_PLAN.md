@@ -33,7 +33,8 @@ trusted and it will be wrong.
 |---|---|
 | Repo | the **`core/` submodule**, not the root wrapper |
 | This document | `core/docs/TAK_INTEGRATION_PLAN.md` — **the canonical copy** |
-| Latest commit | `52fe6c5` — Phase 0 completion + Phase 1 pure modules |
+| Branch | `feature/tak-phase0` |
+| Latest **code** commit | `52fe6c5` — Phase 0 completion + Phase 1 pure modules. Later commits on this branch touch only this document. |
 | Parent commit | `9fe8de6` — georeference groundwork (was uncommitted WIP before 2026-08-15) |
 | Pushed? | **No.** See the warning below. |
 
@@ -49,21 +50,31 @@ branch you're on up to date (a pure fast-forward, no merge commit, nothing lost)
 
 ```bash
 cd core
-git log --oneline -1                       # if this is NOT 52fe6c5, keep reading
+git branch --show-current                  # if not feature/tak-phase0, keep reading
 git merge --ff-only feature/tak-phase0     # from feature/tak-georeference
 ```
 
 ### Verify the state you inherited
 
+Don't verify by commit SHA — this document gets amended, so the tip moves while the
+code doesn't. Check for the *artifacts* instead:
+
 ```bash
 cd core
-git log --oneline -2     # expect: 52fe6c5, then 9fe8de6
+ls src/lib/tak/          # expect: cot.ts  redaction.ts  types.ts  uid.ts
 npm run test:unit        # expect: 5 files, 81 passed
 npm run type-check       # expect: clean, no output
 ```
 
-If the test count is 34, you are on `9fe8de6` and are missing this session's work.
-If `src/lib/tak/` does not exist, likewise.
+Failure modes, in the order you're likely to hit them:
+
+| Symptom | What it means |
+|---|---|
+| `src/lib/tak/` missing, 34 tests pass | You're on `9fe8de6` or earlier — Phase 1 code is absent. Fast-forward, above. |
+| `src/lib/tak/` missing, 0 tests / no `geoUtils.test.ts` | You're on a branch with no TAK work at all. Check `git branch -a`. |
+| 81 tests pass | You have everything described in §0.1. Proceed. |
+
+If the counts drift after future work, trust §0.1's table over these numbers.
 
 > **Placement note — resolved 2026-08-15.** This document originally lived in the
 > root wrapper's `docs/` because the `core/` submodule had uncommitted work on
@@ -248,6 +259,14 @@ Restructured this file for cold-session pickup: added the "How to use this docum
 header, the code-location and state-verification blocks, the branch-discoverability
 warning, and this session log. Pinned commit SHAs in the §0.1 table instead of branch
 names, since branches move and SHAs do not. No code changed.
+
+Then fixed a self-reference bug that pass introduced: "verify you're on `52fe6c5`"
+was already false the moment the doc commit landed on top of it, which would have
+sent the next session chasing a phantom missing commit. The verification block now
+checks for *artifacts* (`ls src/lib/tak/`, the test count) rather than the branch
+tip, and the §0.1 SHAs are labelled **code** commits so doc-only amendments don't
+invalidate them. Rule for future passes: nothing in the orientation header may
+assert what the tip of the branch is.
 
 ---
 
