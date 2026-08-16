@@ -12,11 +12,27 @@ export interface Clinic {
   name: string;
 }
 
+export interface ControlPoint {
+  x: number;      // percentage of image width,  0-100
+  y: number;      // percentage of image height, 0-100
+  lat: number;
+  lon: number;
+  label?: string; // e.g. "NW corner of main stage"
+}
+
+export interface Georeference {
+  controlPoints: ControlPoint[];  // 2 = similarity transform, 3+ = least-squares affine
+  version: number;                // bump on recalibration
+  updatedAt: number;              // epoch ms
+  updatedBy?: string;
+}
+
 export interface Layer {
   id: string;
   name: string;
   mapUrl?: string;
   posts: Post[];
+  georeference?: Georeference;
 }
 
 export interface Venue {
@@ -73,6 +89,12 @@ export interface TeamLogEntry {
 export interface Staff {
   team: string;
   location: string;
+  position?: {
+    lat: number;
+    lon: number;
+    accuracy: number;             // metres, CEP
+    timestamp: number;            // epoch ms
+  };
   status: string;
   members: string[];
   log?: TeamLogEntry[];
@@ -82,6 +104,12 @@ export interface Staff {
 export interface Supervisor {
   team: string;
   location: string;
+  position?: {
+    lat: number;
+    lon: number;
+    accuracy: number;             // metres, CEP
+    timestamp: number;            // epoch ms
+  };
   status: string;
   member: string;
   log?: TeamLogEntry[];
