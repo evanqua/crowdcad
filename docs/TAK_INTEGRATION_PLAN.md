@@ -181,6 +181,12 @@ from the phase section it affects.
 | **1.2** | **`mapping.ts` — `eventToCotEvents()` + 22 tests** | **Done** | `3f0451c` |
 | **1.2** | **`COT_TYPE_CODES_VERIFIED` flag, propagated onto every `MappingResult`** | **Done** | `3f0451c` |
 | **1.2** | **Call markers now carry a `callsign` (redaction allowlist extended by one already-allowed value)** | **Done** | `3f0451c` |
+| **1.4** | **`settings.ts` — `DEFAULT_TAK_PUBLISH_SETTINGS`, `withTakDefaults`, `describeSkipReason`, `summarizeSkips` + 17 tests** | **Done** | this session |
+| **1.4** | **`TakSection.tsx` — event-settings TAK panel, wired into the create/edit page as a `TAK` tab** | **Done** | this session |
+| **1.4** | **Live diagnostics preview — `eventToCotEvents`'s first non-test caller (read-only, transmits nothing)** | **Done** | this session |
+| **1.4** | **Unverified-type-code banner surfaced to the operator** | **Done** | this session |
+| — | **`types.ts` cross-refs to a nonexistent "plan §0.6" corrected to §0.45/§7.3** | **Done** | this session |
+| — | **Disambiguation banner on the root wrapper's rival `dev/TAK_INTEGRATION_PLAN.md`** | **Done** | this session |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -191,6 +197,13 @@ so an isolated branch could be cut from it.
 `npm run test:unit` 81/81 passing (up from 34), `npm run build` succeeds with all
 routes compiling. Two pre-existing lint warnings in `page.client.tsx` (`uploadWithRetry`,
 `LayerControlBar` unused) were confirmed to predate this work and were left alone.
+
+**Verification at the close of the 2026-08-16 session (Phase 1.4):** `npm run type-check`
+clean, `npm run test:unit` **139/139 passing across 8 files** (122 before 1.4 — the 81
+figure above predates `mapping.ts`'s 22 landing — plus 17 new in `settings.test.ts`).
+`npm run lint` shows only pre-existing warnings; `npx eslint` on the three new/changed
+files individually is silent. Both numbers were re-run independently after the
+implementing agent reported them, not taken on trust.
 
 ### 0.2 Explicitly NOT done, and why
 
@@ -220,8 +233,12 @@ routes compiling. Two pre-existing lint warnings in `page.client.tsx` (`uploadWi
 - **Phase 2 — INBOUND bridge (TAK → CrowdCAD).** ✅ Built and proven on real hardware.
   Lives in the root wrapper at `dev/crowdcad-tak-bridge/` and `dev/freetakserver/`. See §0.45.
 - **Phase 2 — OUTBOUND publishing (CrowdCAD → TAK).** ⛔ Still not done, and easy to
-  miss now that the inbound half works. `eventToCotEvents` has **no non-test callers** —
-  the pure modules are tested but nothing in the running app transmits. Gated on §7.3.
+  miss now that the inbound half works. **Nothing in the running app transmits.**
+  As of Phase 1.4 `eventToCotEvents` finally has a non-test caller — the settings
+  panel's diagnostics preview — but that caller renders the result to the operator's
+  own screen and opens no socket. The gap between "the mapper runs in the app" and
+  "the app publishes" is still the whole of §7.3 plus a transport. Do not read the
+  diagnostics preview as evidence that publishing works.
 - **Phase 3 — inbound positions in the dispatch UI.** ✅ Built, including device
   binding: `takInterpolation.ts`, `useTakTween.ts`, `useTakPositions.ts` wired into the
   map, and `Staff.takCallsign` editable from `addteammodal.tsx`.
@@ -388,6 +405,62 @@ routes compiling. Two pre-existing lint warnings in `page.client.tsx` (`uploadWi
     TAK has real basemaps, so publishing it beats falling back to the post the member
     was merely assigned to. A test pins this.
 
+--- *Phase 1.4, 2026-08-16* ---
+
+21. **The feed URL and rotate-token button were deliberately left out of §1.4.** The
+    phase as drafted asks the settings panel for "a copyable feed URL with a rotate
+    token button". The §1.3 route that URL would point at does not exist and is gated
+    on the §1.5 spike. Building the control anyway — even disabled, even labelled
+    "coming soon" — would put a string in the UI that looks like a working feed
+    endpoint and returns 404 to anyone who pastes it into WinTAK. A missing control
+    is honest about the missing feature; a placeholder URL is not. The rest of §1.4
+    shipped in full. Add this when §1.3 lands, not before.
+
+22. **The settings panel renders `eventToCotEvents`'s `skipped` records as a live
+    diagnostics preview.** §0.3(11) argued for typed skip records specifically so the
+    operator question "why isn't Team 3 showing up in TAK?" would not require a
+    debugger, and named the §1.4 UI as where they would be rendered. That is now
+    built: the panel calls the mapper in a `useMemo` over data the page already has
+    and shows marker counts plus grouped skips, surfacing the `layer-fit-unacceptable`
+    detail string (measured error and the limit it exceeded) per subject. **This makes
+    the mapper's first non-test caller a read-only one** — it computes into React
+    state and opens no socket. That ordering is deliberate and worth preserving: the
+    mapper gets exercised against real event shapes by real operators well before
+    anything transmits, which is the cheapest possible place to discover that it is
+    wrong.
+
+23. **The unverified-type-code banner ignores the enable toggle.** Every other control
+    in the panel dims when TAK publishing is off. The `COT_TYPE_CODES_VERIFIED` banner
+    does not, because it is not a publish control — it is a statement about the state
+    of the integration, and the operator most likely to need it is precisely the one
+    about to turn publishing on for the first time. It is gated on the constant alone,
+    so it disappears by itself when §7.3 flips the flag; nothing about the warning is
+    hardcoded.
+
+24. **`withTakDefaults` merges with `??`, never `||`.** Four of the nine fields in
+    `TakPublishSettings` are booleans that default to `true`. Under `||`, an operator
+    who deliberately turned `publishTeams` off would have that choice silently
+    reverted on every read, because `false` is falsy — a settings panel that does not
+    keep the setting. Both the panel and `eventToCotEvents` read through this one
+    function, so "never configured" and "explicitly saved the defaults" behave
+    identically. A test pins the `false`-preservation case.
+
+25. **`describeSkipReason` is a `Record` keyed by the full union, not a `switch` with a
+    default.** Adding a new `MappingSkipReason` to `mapping.ts` and forgetting to
+    describe it now fails the type-check instead of rendering a blank row in the
+    operator's diagnostics list. The failure mode this prevents is quiet: a skip
+    reason with no label still *counts*, so the panel would report "3 skipped" and
+    explain none of them — worse than not having the panel, because it looks
+    authoritative.
+
+26. **Diagnostics split teams from supervisors by `detail.groupRole`, not by type
+    code.** `COT_TYPE_TEAM` and `COT_TYPE_SUPERVISOR` are currently the same string
+    (`a-f-G-U-C`) — deliberately, per the note in `types.ts`: supervisors are
+    distinguished in CoT by `groupRole`, not a distinct type. So the preview cannot
+    count them apart by `type`, and reads `groupRole` instead, which `mapping.ts`
+    already sets correctly for both. If §7.3 ever gives supervisors their own type
+    code, this stays correct either way.
+
 ### 0.4 Recommended next steps, in order
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
@@ -401,19 +474,29 @@ routes compiling. Two pre-existing lint warnings in `page.client.tsx` (`uploadWi
    `types.ts`, flip `COT_TYPE_CODES_VERIFIED`, and settle `b-m-p-w` vs `b-m-p-s-m`
    (the merge kept both codes alive precisely because neither is verified). This
    single afternoon unblocks the feed route, the bridge, and everything downstream.
-3. **Run the §1.5 KML network-link spike** — same sitting, same equipment.
-4. **Get the IC-EMS overlay** for Phase 0.4 and turn it into a vitest fixture.
-5. **Then** the feed route (§1.3) → the event-settings UI (§1.4). The feed route
-   is where `typeCodesVerified` must be enforced — see §0.3(10).
-6. Answer the six open questions in §11 — several change the adapter priority for
+2. **Run the §1.5 KML network-link spike** — same sitting, same equipment.
+3. **Get the IC-EMS overlay** for Phase 0.4 and turn it into a vitest fixture.
+4. **Then** the feed route (§1.3), and only then the feed-URL half of §1.4 that
+   §0.3(21) deliberately left out. The feed route is where `typeCodesVerified`
+   must be enforced — see §0.3(10).
+5. Answer the six open questions in §11 — several change the adapter priority for
    Phase 2 and are organizational lead-time items, not coding tasks.
 
-**What is safe to start right now, with no spike and no external input:** the
-event-settings UI (§1.4) is the honest answer. `TakPublishSettings` exists,
-`eventToCotEvents` now produces `skipped` records written specifically to be
-rendered in it, and a settings panel transmits nothing — so no spike gates it.
-It would also give the spike-runner a way to configure the very event they test
-with. Everything past that touches the network and should wait.
+**~~What is safe to start right now~~ — the event-settings UI (§1.4) — was built
+2026-08-16.** It is no longer available as the answer to this question, and that
+changes the shape of the project: *every remaining item in this plan is now gated
+on something that is not typing.* Three of the four are one afternoon with a phone;
+the fourth is an email to IC-EMS. Nobody is blocked on a hard technical problem.
+
+If you have arrived here looking for code to write and cannot run a spike, the
+honest answer is that there is very little left that is both safe and useful, and
+the temptation to build the feed route "ready for when the spike lands" should be
+resisted for the reason §1.5 gives in its own text: the spike may return "network
+links are unreliable on the target release", which changes what the feed route
+*is*. Writing it first means writing it twice. Better uses of a session with no
+hardware: turn the §11 open questions into a written list for whoever can answer
+them, or reconcile the two georeference models (§0.3(19)) — the one piece of real
+technical debt the merge knowingly left behind.
 
 ### 0.45 The second TAK effort, and the merge that ended the split
 
@@ -428,6 +511,32 @@ checked out at `.claude/worktrees/fts-local-dev/`. Its pre-merge state was **com
 and pushed** — root to the private `iv-zhang/CrowdCAD`, `core` to the public
 `evanqua/crowdcad`. It is now also the home of everything that used to be on
 `feature/tak-phase0`.
+
+> #### ⚠️ The sibling effort left a rival document with the same filename
+>
+> Found 2026-08-16, during the Phase 1.4 session. The code was merged; **the
+> documents were not.** There are two:
+>
+> | | This file | The other |
+> |---|---|---|
+> | Path | `core/docs/TAK_INTEGRATION_PLAN.md` | `dev/TAK_INTEGRATION_PLAN.md` (root wrapper) |
+> | Covers | The whole system, outbound-first | The inbound bridge only |
+> | "Phase 1" means | The read-only outbound feed — *partial* | Position ingest + tweening — *complete* |
+>
+> **The phase numbers are unrelated and contradict each other.** "Phase 1 complete"
+> and "Phase 1 partial" are both true, about different work. A banner now sits at
+> the top of each file tabling the difference; do not remove it, and never carry a
+> phase number across without translating it.
+>
+> The other document is kept rather than folded in, because it is the only detailed
+> record of how the inbound bridge actually works. `dev/TAK_DECISIONS.md` beside it
+> is likewise still live — `core/CLAUDE.md` tells you to read it before touching
+> anything TAK-related, and that instruction stands.
+>
+> This is the same failure as the original split, one layer up: merging the branches
+> did not merge the *maps*, so a session reading only one file still gets a confident
+> and wrong picture of what is built. The branch rule at the top of this document
+> covers code; this note is the documentation half of it.
 
 It was not an earlier or later version of this plan. It was a **sibling effort from
 the same ancestor commit** (`7a82626`), with a different architecture, *further along
@@ -626,6 +735,28 @@ assert what the tip of the branch is.
   inbound path to prove a point. §0.3(19).
 - Tests 105 → 122 (7 files). `type-check` clean across the whole merged tree.
 - Decisions recorded in §0.3(17)–(20). **Not pushed.**
+
+**2026-08-16 — Phase 1.4: the event-settings TAK panel.**
+- Picked 1.4 because §0.4 named it the only remaining item gated on nothing: the
+  §7.3 and §1.5 spikes both need a phone and a real TAK client, and Phase 0.4 needs
+  an artifact from IC-EMS. A settings panel transmits nothing, so none of that
+  applies to it.
+- Built `src/lib/tak/settings.ts` (defaults, `??`-merge semantics, skip-reason
+  presentation) with 17 tests, and `TakSection.tsx` (411 lines), wired into the
+  event create/edit page as a `TAK` tab persisting to `Event.tak`.
+- Gave `eventToCotEvents` its **first non-test caller** — the diagnostics preview,
+  which is read-only and opens no socket. §0.3(22).
+- **Deliberately did not build the feed URL / rotate-token control**, because the
+  §1.3 route it points at does not exist. §0.3(21).
+- Fixed two dangling `types.ts` cross-references to a "plan §0.6" that has never
+  existed; the intended target was §0.45.
+- Found that the code merge had left the *documents* unmerged: a rival
+  `dev/TAK_INTEGRATION_PLAN.md` in the root wrapper with contradictory phase
+  numbering, plus 80 lines of uncommitted progress log in it. Banners added to
+  both files; see the warning box in §0.45.
+- Tests 122 → **139 (8 files)**. `type-check` clean, lint shows only pre-existing
+  warnings. Both figures re-verified independently of the implementing agent.
+- Decisions recorded in §0.3(21)–(26). **Not pushed.**
 
 ---
 
@@ -975,9 +1106,15 @@ when the fit is too poor to trust).
 
 ### Phase 1 — Read-only feed (no new infrastructure) — 🟡 PARTIAL
 
-*Status 2026-08-15: the spike-independent half of 1.1 is built and tested. `mapping.ts`,
-`kml.ts`, and everything in 1.3–1.4 remain gated on the two spikes (§1.5, §7.3) —
-see §0.2 for why that boundary was drawn where it was.*
+*Status 2026-08-16: **1.1, 1.2 and 1.4 are built and tested.** What remains is
+`kml.ts`, the 1.3 feed route, the feed-URL control §0.3(21) held back with it, and
+the 1.5 spike that gates all three. Every remaining piece of Phase 1 is a piece
+that touches the network — which is exactly the boundary §0.2 drew, now reached.*
+
+*(The superseded 2026-08-15 note said 1.3–1.4 were both spike-gated. That was
+half wrong: a settings panel transmits nothing, so no spike ever gated 1.4. The
+error is instructive — "this phase is blocked" was inherited from the phase
+number rather than checked against what the work actually does.)*
 
 Ship value against the existing serverless deploy, before anyone stands up a TAK
 server.
@@ -1060,14 +1197,33 @@ says must return before this is built.*
   existence to an unauthenticated caller.
 - Rate-limit per token.
 
-**1.4 UI.** ⛔ *Not started.* The `TakPublishSettings` type it binds to exists;
-nothing reads or writes it yet.
+**1.4 UI.** ✅ *Built 2026-08-16, except the feed URL.* `TakSection.tsx` is wired
+into `src/app/(main)/events/[eventId]/create/page.tsx` as a `TAK` tab, reading and
+writing `Event.tak` through the page's existing `stripUndefined` save path. An
+event whose operator never opens the tab gains no `tak` field.
 
 A "TAK" section in the event settings: enable toggle, publish switches,
-callsign prefix, group, and a copyable feed URL with a "rotate token" button.
+callsign prefix, group, ~~and a copyable feed URL with a "rotate token" button~~.
 Compose from existing `event-create/` section components; follow the
 `GeoreferenceSection.tsx` layout conventions (HeroUI `Card`, surface tokens,
 status-tone banner).
+
+Built as specified, plus three things the draft did not ask for:
+
+- **A `publishCalls` three-way control with an explicit PHI warning on `full`.**
+  The warning names what full mode transmits (the chief complaint, to every
+  connected client and federated partner) *and* what it never transmits in any
+  mode (age, gender, notes, call log) — the latter because an operator who
+  cannot see the boundary will assume the worst and leave calls off entirely,
+  which loses the genuinely useful `location-only` mode. Copy checked against
+  `redaction.ts`'s actual allowlist, not against intent.
+- **The `COT_TYPE_CODES_VERIFIED` banner** — see §0.3(23).
+- **A live diagnostics preview** rendering `eventToCotEvents`'s `skipped`
+  records — see §0.3(22). This is the payoff §0.3(11) was written to enable.
+
+**The feed URL was deliberately omitted** — §0.3(21). Add it with §1.3, not before.
+`staleSeconds` and `publishIntervalSeconds` are exposed with the §6.2 write-rate
+reasoning as helper text, defaulting to 120s/30s (a 4× margin, per §7.4).
 
 **1.5 Verification spike** ⛔ *NOT RUN — this is now the single highest-priority
 item in the whole plan.* It needs no code, only a WinTAK/ATAK install and a test
@@ -1588,30 +1744,48 @@ New:
 ✅ src/lib/tak/uid.ts                      deterministic UID helpers + echo-suppression test
 ✅ src/lib/tak/redaction.ts                applyRedaction — the PHI allowlist
 ✅ src/lib/tak/mapping.ts                  eventToCotEvents — Event+Venue -> CoT markers
-✅ src/lib/__tests__/tak/{cot,uid,redaction,mapping}.test.ts
+✅ src/lib/tak/settings.ts                 defaults, withTakDefaults, skip-reason presentation (§1.4)
+✅ src/lib/__tests__/tak/{cot,uid,redaction,mapping,settings}.test.ts
+✅ src/lib/takInterpolation.ts             arc-length tween along a position's `path` (inbound)
+✅ src/hooks/useTakTween.ts                drives the tween in map percentages, never pixels
+✅ src/hooks/useTakPositions.ts            live position subscription for the dispatch map
+✅ src/components/event-create/TakSection.tsx   the §1.4 settings panel; renders MappingResult.skipped
 ✅ docs/TAK_INTEGRATION_PLAN.md            this document, moved here from the root wrapper
    src/lib/tak/kml.ts                      gated on the §1.5 KML spike
    src/app/api/tak/[eventId]/feed.kml/route.ts   MUST honour typeCodesVerified — §0.3(10)
    src/app/api/tak/[eventId]/feed.cot/route.ts   MUST honour typeCodesVerified — §0.3(10)
-   src/components/event-create/TakIntegrationSection.tsx  renders MappingResult.skipped
-   src/hooks/useTeamPositions.ts
-   services/tak-bridge/**                  (package.json, src/, Dockerfile.tak-bridge)
    docs/TAK_DEPLOYMENT.md
    tests/e2e/features/{tak-config,tak-positions}.feature
 ```
 
+In the **root wrapper** repo, not `core` (see §0.45 — this is the inbound half,
+and it is a standalone Node sidecar rather than part of the Next.js app):
+
+```
+✅ dev/crowdcad-tak-bridge/**              bridge.js, cot.js, georef.js, pocketbase.js + their .test.js
+✅ dev/freetakserver/**                    Dockerized FTS, cert tooling, iTAK TLS package, probe scripts
+✅ dev/TAK_DECISIONS.md                    load-bearing constraints — core/CLAUDE.md says read this first
+✅ dev/TAK_INTEGRATION_PLAN.md             the RIVAL plan doc — different phase numbering, see §0.45
+```
+
+**Never commit** `dev/freetakserver/certs-export/`, `fts-itak-tls.zip`, or
+`fts-local-tcp.zip` — they contain a private CA key that can mint client
+certificates the server will trust. They are gitignored; keep it that way.
+
 Modified:
 
 ```
-✅ src/app/types.ts                                  TakPublishSettings, TeamPosition, PositionSource, takUid, Event.tak
+✅ src/app/types.ts                                  TakPublishSettings, TakPosition/TakPositionRecord, takCallsign, Event.tak
 ✅ src/lib/geoUtils.ts                               georeferenceResiduals + threshold constants (Phase 0.3)
 ✅ src/lib/__tests__/geoUtils.test.ts                residual tests
 ✅ src/app/(main)/venues/management/page.client.tsx  derived lat/lon readout (Phase 0.2)
 ✅ src/components/venue-management/GeoreferenceSection.tsx  residual readout (Phase 0.3)
-   firestore.rules                                   positions collection — deferred to Phase 2/3, see §0.2
-   scripts/setup-pocketbase.js                       positions collection — deferred to Phase 2/3
-   src/app/(main)/events/[eventId]/dispatch/page.tsx position overlay + TAK UID binding
-   src/components/dispatch/teamcard.tsx              TAK device binding affordance
+✅ src/app/(main)/events/[eventId]/create/page.tsx   TAK tab hosting TakSection (§1.4)
+✅ src/app/(main)/events/[eventId]/dispatch/page.tsx position overlay
+✅ src/components/modals/event/addteammodal.tsx      Staff.takCallsign device binding
+✅ core/CLAUDE.md                                    the TAK / live GPS positions section
+   firestore.rules                                   tak_positions collection — deferred to Phase 2/3, see §0.2
+   scripts/setup-pocketbase.js                       tak_positions collection — deferred to Phase 2/3
    docker-compose.yml                                opt-in tak-bridge service
    docs/ARCHITECTURE.md                              document the bridge boundary
 ```

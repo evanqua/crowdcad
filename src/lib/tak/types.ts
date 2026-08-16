@@ -78,7 +78,7 @@ export const COT_UNKNOWN = 9999999.0;
 // (e.g. a Leaflet page colouring by the `a-f-` / `a-h-` prefix). That proves
 // the CoT is well-formed and the coordinates are right. It proves nothing
 // about which MIL-STD-2525 symbol a real TAK client picks, which is the entire
-// question. See plan §0.6.
+// question. See plan §0.45 and §7.3.
 //
 // eventToCotEvents() mirrors this flag onto every MappingResult so that a
 // caller about to transmit cannot fail to notice it.
@@ -93,7 +93,8 @@ export const COT_TYPE_SUPERVISOR = 'a-f-G-U-C';
 
 // Waypoint, used for static posts (gates, aid stations, etc).
 // Confidence: MEDIUM — and there is now a known DISAGREEMENT to settle here.
-// The sibling `feature/tak-integration` effort (see plan §0.6) emits
+// The sibling inbound-bridge effort (see plan §0.45; both efforts now live on
+// this same `feature/tak-integration` branch, merged 2026-08-16) emits
 // 'b-m-p-s-m' ("map pin, static marker") for the same concept and has run it
 // through a real FreeTAKServer, where it relayed cleanly. That is evidence
 // 'b-m-p-s-m' is at least well-formed and accepted by a real server; it is not

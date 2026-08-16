@@ -20,6 +20,7 @@ import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
 import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
 import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
 import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/event-create/PostsEquipmentSection';
+import TakSection from '@/components/event-create/TakSection';
 import { stripUndefined } from '@/lib/utils';
 import AddTeamModal from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
@@ -54,7 +55,7 @@ export default function EventCreation() {
     eventEquipment: [],
   });
 
-  const [selectedTab, setSelectedTab] = useState<'teams' | 'supervisors' | 'posts' | 'equipment'>('teams');
+  const [selectedTab, setSelectedTab] = useState<'teams' | 'supervisors' | 'posts' | 'equipment' | 'tak'>('teams');
   const [currentLayer, setCurrentLayer] = useState(0);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
@@ -578,6 +579,7 @@ export default function EventCreation() {
                       <Tab key="supervisors" title="Supervisors" />
                       <Tab key="posts" title="Posts" />
                       <Tab key="equipment" title="Equipment" />
+                      <Tab key="tak" title="TAK" />
                     </Tabs>
 
                     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -659,6 +661,19 @@ export default function EventCreation() {
                             allPosts={allPosts}
                             getPostName={getPostName}
                           />
+                        </div>
+                      )}
+
+                      {selectedTab === 'tak' && (
+                        <div className="px-4 py-3 flex-1 min-h-0 flex flex-col">
+                          <ScrollShadow className="pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
+                            <TakSection
+                              settings={eventData.tak}
+                              onChange={(next) => setEventData((prev) => ({ ...prev, tak: next }))}
+                              event={eventData as Event}
+                              venue={hasVenue ? (eventData.venue as Venue) : null}
+                            />
+                          </ScrollShadow>
                         </div>
                       )}
                     </div>
