@@ -1,10 +1,15 @@
 # TAK Integration — Implementation Plan
 
-**Status:** In progress — Phase 0 complete, Phase 1 partially complete (see §0)
+**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 complete, 1.3–1.5 blocked (see §0)
 **Target:** CrowdCAD (`core/`), general-purpose capability; IC-EMS is the first deployer
 **Author:** drafted 2026-08-11
 **Last updated:** 2026-08-16
-**Latest code:** `52fe6c5` on `feature/tak-phase0` (in the `core/` submodule)
+**Latest code:** `3f0451c` on `feature/tak-phase0` (in the `core/` submodule)
+
+> ⚠️ **This is not the only TAK branch.** A second, architecturally different effort
+> exists on `feature/tak-integration` — with a running FreeTAKServer and a working
+> inbound bridge — and it is committed and pushed. **Read §0.45 before planning
+> Phase 2**, or you will rebuild something that already works.
 
 ---
 
@@ -34,15 +39,16 @@ trusted and it will be wrong.
 | Repo | the **`core/` submodule**, not the root wrapper |
 | This document | `core/docs/TAK_INTEGRATION_PLAN.md` — **the canonical copy** |
 | Branch | `feature/tak-phase0` |
-| Latest **code** commit | `52fe6c5` — Phase 0 completion + Phase 1 pure modules. Later commits on this branch touch only this document. |
-| Parent commit | `9fe8de6` — georeference groundwork (was uncommitted WIP before 2026-08-15) |
+| Latest **code** commit | `3f0451c` — Phase 1.2, `mapping.ts`. Any later commit on this branch touches only this document. |
+| Earlier **code** commits | `52fe6c5` — Phase 0 completion + Phase 1 pure modules · `9fe8de6` — georeference groundwork (uncommitted WIP before 2026-08-15) |
 | Pushed? | **No.** See the warning below. |
+| Other TAK branch | `feature/tak-integration` — **pushed**, different architecture, §0.45 |
 
 ⚠️ **`core`'s only remote is the PUBLIC `evanqua/crowdcad`.** A bare `git push`
 publishes. Nothing here has been pushed; treat pushing as a deliberate, owner-only
 act.
 
-⚠️ **Branch discoverability.** `52fe6c5` lives on `feature/tak-phase0`, which was cut
+⚠️ **Branch discoverability.** All TAK code here lives on `feature/tak-phase0`, cut
 from `feature/tak-georeference`. If your `core/` checkout is on
 `feature/tak-georeference`, **this file and all Phase 1 code will not be present** —
 you would be reading a stale tree and could easily redo finished work. To bring the
@@ -61,8 +67,8 @@ code doesn't. Check for the *artifacts* instead:
 
 ```bash
 cd core
-ls src/lib/tak/          # expect: cot.ts  redaction.ts  types.ts  uid.ts
-npm run test:unit        # expect: 5 files, 81 passed
+ls src/lib/tak/          # expect: cot.ts  mapping.ts  redaction.ts  types.ts  uid.ts
+npm run test:unit        # expect: 6 files, 105 passed
 npm run type-check       # expect: clean, no output
 ```
 
@@ -72,7 +78,9 @@ Failure modes, in the order you're likely to hit them:
 |---|---|
 | `src/lib/tak/` missing, 34 tests pass | You're on `9fe8de6` or earlier — Phase 1 code is absent. Fast-forward, above. |
 | `src/lib/tak/` missing, 0 tests / no `geoUtils.test.ts` | You're on a branch with no TAK work at all. Check `git branch -a`. |
-| 81 tests pass | You have everything described in §0.1. Proceed. |
+| `src/lib/tak/` present but no `mapping.ts`, 81 tests pass | You're on `52fe6c5` — Phase 1.2 is absent. Fast-forward. |
+| 105 tests pass | You have everything described in §0.1. Proceed. |
+| `Cannot find module 'vitest'` | This worktree has no `node_modules`. Either `npm install` here, or symlink `core/node_modules` (it is excluded locally via `.git/modules/core/info/exclude`, not `.gitignore` — the tracked ignore pattern is `node_modules/` with a trailing slash and does not match a symlink). |
 
 If the counts drift after future work, trust §0.1's table over these numbers.
 
@@ -113,6 +121,9 @@ from the phase section it affects.
 | **0.3** | **Residual / fit-quality readout in metres + unacceptable-fit warning** | **Done** | `52fe6c5` |
 | **1.1** | **Pure modules `tak/{types,uid,cot,redaction}.ts` + tests** | **Done** | `52fe6c5` |
 | **1.1** | **`TakPublishSettings`, `TeamPosition`, `PositionSource`, `Staff/Supervisor.takUid`, `Event.tak` types** | **Done** | `52fe6c5` |
+| **1.2** | **`mapping.ts` — `eventToCotEvents()` + 22 tests** | **Done** | `3f0451c` |
+| **1.2** | **`COT_TYPE_CODES_VERIFIED` flag, propagated onto every `MappingResult`** | **Done** | `3f0451c` |
+| **1.2** | **Call markers now carry a `callsign` (redaction allowlist extended by one already-allowed value)** | **Done** | `3f0451c` |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -126,12 +137,22 @@ routes compiling. Two pre-existing lint warnings in `page.client.tsx` (`uploadWi
 
 ### 0.2 Explicitly NOT done, and why
 
-- **`mapping.ts` (`eventToCotEvents`), `kml.ts`, and the `/api/tak/...` feed routes.**
-  Deferred on purpose. §7.3 and §1.5 gate exactly these on two verification spikes
-  that need real TAK clients and a real TAK server — neither of which was available.
-  Building them from documentation alone is the specific failure mode §7.3 warns
-  against (a wrong CoT type code renders as a confusing or alarming symbol on a
-  partner agency's map). The modules that are spike-*independent* were built instead.
+- **`kml.ts` and the `/api/tak/...` feed routes.** Still deferred. §1.5 gates these
+  on the KML network-link spike, which needs a real TAK client. The feed route is
+  also the *first place CrowdCAD would transmit to a network*, so it is exactly
+  where the unverified-type-code gate has to be enforced — see §0.3(10).
+- ~~**`mapping.ts` (`eventToCotEvents`)**~~ — **built 2026-08-16.** The original
+  deferral reasoning was that §7.3's type-code spike gates it. On re-examination
+  that conflated two different things: *choosing* the four type-code strings (which
+  the spike settles) with *the mapping logic that consumes them* (which it does
+  not). The strings were already committed as named constants in `types.ts`, so
+  when the spike lands, correcting them is a four-line edit in one file and
+  `mapping.ts` becomes correct for free. Meanwhile the spike-independent 95% —
+  georeference solving, position fallback, status derivation, UID determinism, the
+  PHI boundary — was blocking on nothing. What the deferral was actually protecting
+  against is *broadcast*, and that protection now lives where broadcast happens:
+  `COT_TYPE_CODES_VERIFIED` is propagated onto every `MappingResult`, and §1.3's
+  feed route must refuse to transmit while it is false. See §0.3(10).
 - **Phase 0.4 — validating the solver against a real georeferenced overlay.**
   Blocked on an external artifact: an existing WinTAK KMZ/GeoTIFF from IC-EMS.
   This is an open ask, not a technical obstacle. Until it is satisfied, the solver
@@ -206,22 +227,161 @@ routes compiling. Two pre-existing lint warnings in `page.client.tsx` (`uploadWi
    `feature/tak-georeference`.** Nothing was pushed: `core`'s only remote is the
    **public** `evanqua/crowdcad`, so publishing is a deliberate, owner-only act.
 
+10. **The unverified-type-code guard is data, not a lock.** The obvious way to keep
+    unverified type codes off a partner's map is to make `eventToCotEvents` refuse
+    to emit anything until the spike runs. That was rejected: it would make the
+    module untestable by default, and it puts the guard in the wrong place —
+    building a `CotEvent` object in memory harms nobody, *transmitting* it does.
+    Instead `types.ts` exports a single `COT_TYPE_CODES_VERIFIED = false`, and
+    every `MappingResult` carries it as `typeCodesVerified`. The obligation is
+    stated in the module header and repeated here: **§1.3's feed route and §2's
+    bridge must check that flag and refuse to transmit to a shared or partner TAK
+    server while it is false.** One flag, one place to flip, and a caller that
+    cannot plausibly claim not to have seen it.
+
+11. **`eventToCotEvents` returns `{ events, skipped, typeCodesVerified }`, not a
+    bare `CotEvent[]`** (a deviation from §1.2's stated signature). §11 requires
+    refusing to publish a layer whose georeference residual exceeds 25 m, and §1.2
+    requires silently skipping uncalibrated layers and unplaced posts. A bare array
+    can express *that* something was dropped only by its absence, which turns the
+    single most likely operator question — "why isn't Team 3 showing up in TAK?" —
+    into a debugging session. Every skip is now a typed `{ reason, subject, detail }`
+    record, and the detail string for a rejected layer contains the measured error
+    and the limit it exceeded, ready to render in the §1.4 settings UI.
+
+12. **A post-derived team position reports `how="h-e"` and `geopointsrc="USER"`,
+    never `"m-g"`/`"GPS"`.** §1.2 makes falling back to the assigned post's location
+    a deliberate default, and it is a good one — it means a fleet with no GPS devices
+    at all still produces a real picture. But that position is a human-placed post on
+    a human-georeferenced map, and labelling it as a GPS fix would tell every TAK
+    client it is a live satellite position accurate to metres when it is a
+    building-scale estimate of where someone was last *assigned*. The distinction is
+    the difference between "Team 3 is here" and "Team 3 was posted here"; TAK has a
+    field for it, so it gets used honestly.
+
+13. **A marker's circular error carries the georeference fit's own residual.** For a
+    live GPS fix, `ce` is the device's reported accuracy. For anything placed via a
+    georeferenced layer — every post marker, and every post-derived team marker —
+    `ce` is that layer's `maxMetres` residual, because a post is only as
+    well-located as the transform that placed it. This costs nothing (the residual
+    is already computed to enforce the 25 m gate) and makes the uncertainty visible
+    to a TAK operator instead of implying millimetre precision.
+
+14. **Posts are indexed by *slugified* name for team-location lookup.** `Staff.location`
+    is a free-text field a dispatcher types; the post name is a free-text field
+    someone else typed months earlier. Exact-match lookup makes "gate 4" vs "Gate 4"
+    a silent no-marker failure. Reusing `slugify` from `uid.ts` means the matcher and
+    the UID builder normalize identically, so a team that matches a post is
+    guaranteed to match the same post the UID scheme names. Duplicate post names
+    across layers resolve to the first georeferenced layer in order — genuinely
+    ambiguous ("Medical Tent" on two levels are different places), so it is at least
+    deterministic and documented rather than arbitrary.
+
+15. **`applyRedaction` now emits `detail.callsign`** — a change to the PHI module,
+    made deliberately and narrowly. It emits the *same* `identifier` value that
+    already went into `remarks`, so no information that was previously withheld now
+    leaves the system, and the allowlist stays a real field-by-field construction.
+    The reason: a CoT event with no `<contact callsign>` renders in TAK as its raw
+    UID (`crowdcad.evt1.call.abc123`) — unreadable as a map label and a gratuitous
+    disclosure of internal identifiers to every federated partner. The chief
+    complaint is pointedly **not** included: a callsign is a permanent label beside
+    the icon and appears in contact lists, whereas remarks require opening the
+    marker, so even in `'full'` mode clinical text stays behind that extra tap.
+    Two tests in `redaction.test.ts` pin both halves of this.
+
+16. **`mapping.ts` takes `now` as a parameter and reads no clock.** Combined with the
+    deterministic UIDs, the whole module is a pure function, so the determinism test
+    is a literal `JSON.stringify(a) === JSON.stringify(b)` and the republish-idempotency
+    property (same UIDs at a later `now`, advanced timestamps) is directly assertable.
+
 ### 0.4 Recommended next steps, in order
 
-1. **Run the two gating spikes** (§1.5 and §7.3) — they block the most valuable
-   remaining work and need only a test TAK server plus the WinTAK install IC-EMS
-   already has.
-2. **Get the IC-EMS overlay** for Phase 0.4 and turn it into a vitest fixture.
-3. **Then** `mapping.ts` → the feed route → the event-settings UI, in that order.
-4. Answer the six open questions in §11 — several change the adapter priority for
+1. **Read §0.45.** There is a second TAK branch with a running FreeTAKServer and a
+   working inbound bridge. Planning Phase 2 without it means rebuilding it.
+2. **Run the §7.3 type-code spike.** It is now cheaper than it has ever been: the
+   `feature/tak-integration` branch has a Dockerized FTS and a working TLS iTAK
+   package, so the missing ingredient is one person, one phone, and an afternoon —
+   *not* a TAK.gov registration or a WinTAK licence. Publish one marker of each
+   candidate type, screenshot the icons, correct the four constants in `types.ts`,
+   flip `COT_TYPE_CODES_VERIFIED`, and settle `b-m-p-w` vs `b-m-p-s-m`. This single
+   afternoon unblocks the feed route, the bridge, and everything downstream.
+3. **Run the §1.5 KML network-link spike** — same sitting, same equipment.
+4. **Get the IC-EMS overlay** for Phase 0.4 and turn it into a vitest fixture.
+5. **Then** the feed route (§1.3) → the event-settings UI (§1.4). The feed route
+   is where `typeCodesVerified` must be enforced — see §0.3(10).
+6. Answer the six open questions in §11 — several change the adapter priority for
    Phase 2 and are organizational lead-time items, not coding tasks.
 
-**What is safe to start right now, with no spike and no external input:** nothing
-large. That is the honest answer, and it is why §0.4 leads with the spikes rather
-than with code. The next meaningful code (`mapping.ts`) is one spike away, and
-that spike needs an afternoon with WinTAK, not a development environment. Resist
-the temptation to build `mapping.ts` speculatively — §7.3 explains exactly what
-goes wrong.
+**What is safe to start right now, with no spike and no external input:** the
+event-settings UI (§1.4) is the honest answer. `TakPublishSettings` exists,
+`eventToCotEvents` now produces `skipped` records written specifically to be
+rendered in it, and a settings panel transmits nothing — so no spike gates it.
+It would also give the spike-runner a way to configure the very event they test
+with. Everything past that touches the network and should wait.
+
+### 0.45 ⚠️ There is a SECOND TAK effort. Read this before planning Phase 2.
+
+Discovered 2026-08-16. Everything this document said about Phase 2 being untouched
+was wrong — not stale, wrong, because it never knew this existed.
+
+**Branch `feature/tak-integration`** (in **both** the root wrapper and `core`),
+checked out at `.claude/worktrees/fts-local-dev/`. It is **committed and pushed** —
+root to the private `iv-zhang/CrowdCAD`, `core` to the public `evanqua/crowdcad`.
+
+It is not an earlier or later version of this plan. It is a **sibling effort from the
+same ancestor commit** (`7a82626`), with a different architecture, and it is *further
+along in a different direction*:
+
+| | `feature/tak-phase0` (this doc) | `feature/tak-integration` |
+|---|---|---|
+| Backend | Firestore | PocketBase |
+| Shape | In-app pure modules, publish CoT **outbound** | Standalone Node bridge, ingest CoT **inbound** |
+| TAK server | none stood up | **real FreeTAKServer, Dockerized, running** |
+| Georeference | control points + affine solver | image-percentage projection (`georef.js`) |
+| Reached | Phase 0 + Phase 1.2 | its own "Phase 1 complete" |
+
+**What is actually there:** `dev/freetakserver/` — a working `docker-compose` FTS
+stack with real self-generated certs, a TLS iTAK data package (`fts-itak-tls.zip`),
+and diagnostic scripts. `dev/crowdcad-tak-bridge/` — ~2,300 lines of dependency-free
+Node (bridge, CoT parse/build, georef, PocketBase store) with ~1,100 lines of tests.
+And in its `core/`: `takInterpolation.ts`, `useTakTween.ts`, `useTakPositions.ts`,
+wired into `venuemapmodal.tsx` and the dispatch page.
+
+**Empirically established over there, and worth trusting** (measured on real hardware,
+per its `dev/TAK_DECISIONS.md`):
+
+- iTAK **forces TLS**: adding a server produces a TLS ClientHello on 8446 and *zero*
+  connections to the plaintext 8087 port. A plain-TCP data package is rejected outright.
+- FTS **swallows the first event on every connection** — five markers on one socket
+  deliver four. Any bridge must send a throwaway first event or re-send.
+- A real iPhone running iTAK connected over TLS 8089 and its live GPS was relayed
+  out by FTS. **The inbound path works on real hardware.**
+
+These are backend-agnostic facts about FreeTAKServer and iTAK. Phase 2 here will hit
+every one of them, and they cost someone real hours to find.
+
+**What is NOT established over there — checked specifically, because it looked like it
+might be:** the §7.3 type-code spike is **still un-run in both lineages.** That branch
+emits `a-f-G-U-C`, `a-f-G-E-V-C`, `a-f-G-E-V-M`, and `b-m-p-s-m`, and its README says
+markers were "verified end to end". But what did the verifying was `map-view.py` — a
+home-made Python/Leaflet page that parses CoT and draws *its own* circles, colouring
+them by the `a-f-` / `a-h-` prefix according to what the code *assumes* TAK does. That
+proves the CoT is well-formed and the coordinates are right. It proves nothing about
+which MIL-STD-2525 symbol a real TAK client picks, which is the entire question §7.3
+asks. **No one has yet looked at a CrowdCAD marker on an ATAK, WinTAK, or iTAK screen.**
+This is an easy mistake to repeat — the warning in `types.ts` now names it explicitly.
+
+One concrete disagreement to settle when the spike runs: this branch proposes
+`b-m-p-w` for posts, that branch ships `b-m-p-s-m`. Both are unverified. Resolve them
+together and make the branches agree.
+
+**Recommendation — do not merge these branches.** They disagree architecturally
+(Firestore vs PocketBase, outbound vs inbound, two different georeference models) and
+a merge would produce something neither design intended. They are complementary
+halves: this branch publishes CrowdCAD *out* to TAK; that branch brings TAK positions
+*in*. Phase 2/3 is where they must meet, and the decision to make there is which
+georeference model survives — **not** how to reconcile the diff. Before writing a line
+of Phase 2, read `dev/TAK_DECISIONS.md` end to end.
 
 ### 0.5 Session log
 
@@ -267,6 +427,24 @@ checks for *artifacts* (`ls src/lib/tak/`, the test count) rather than the branc
 tip, and the §0.1 SHAs are labelled **code** commits so doc-only amendments don't
 invalidate them. Rule for future passes: nothing in the orientation header may
 assert what the tip of the branch is.
+
+**2026-08-16 — Phase 1.2 (`mapping.ts`) + discovery of the parallel effort.**
+- Surveyed the other TAK worktrees before writing code, and found
+  `feature/tak-integration`: a committed, pushed, architecturally distinct sibling
+  effort with a running FreeTAKServer and an inbound bridge. Recorded in §0.45.
+  This document had been asserting Phase 2 was untouched; it was not.
+- Checked specifically whether that branch's real-hardware work had satisfied the
+  §7.3 type-code spike. **It had not** — the "verification" was a home-made Leaflet
+  viewer, not a TAK client. Wrote that trap into the `types.ts` warning so the next
+  reader doesn't re-make the inference.
+- Re-examined the §7.3 deferral of `mapping.ts` and concluded it over-reached:
+  the spike settles four *string constants*, not the mapping logic. Built
+  `eventToCotEvents` (`mapping.ts`, ~330 lines) and moved the broadcast guard to
+  `COT_TYPE_CODES_VERIFIED`, propagated onto every result. §0.2, §0.3(10).
+- Extended `applyRedaction` to emit `detail.callsign` — same already-allowlisted
+  value as `remarks`, no new disclosure; chief complaint pointedly excluded. §0.3(15).
+- Tests 81 → 105. `type-check` clean, `npm run build` exit 0, no new lint warnings.
+- Decisions recorded in §0.3(10)–(16). **Not pushed.**
 
 ---
 
@@ -636,7 +814,8 @@ core/src/lib/tak/
                   postUid, callUid, isCrowdcadUid
   redaction.ts ✅ applyRedaction(cot, mode): CotEvent | null
   kml.ts       ⛔ deferred — gated on the §1.5 KML network-link spike
-  mapping.ts   ⛔ deferred — gated on the §7.3 CoT type-code spike
+  mapping.ts   ✅ eventToCotEvents(event, venue, settings, now): MappingResult
+                  DEFAULT_STALE_SECONDS, MappingSkip, MappingSkipReason
 ```
 
 The purity constraint below is enforced in what shipped: the only imports anywhere
@@ -657,10 +836,13 @@ uses string templating with strict XML escaping — do not pull in a DOM/XML lib
 for output. `parseCotXml` may use `fast-xml-parser` (MIT), which is
 environment-neutral.
 
-**1.2 `eventToCotEvents`** ⛔ *Not started — gated on the §7.3 type-code spike.*
-The building blocks it needs (UID helpers, XML builder, redaction, and the
-georeference accessors from Phase 0) are all in place, so this becomes mostly
-assembly once the spike locks the type codes down.
+**1.2 `eventToCotEvents`** ✅ *Built 2026-08-16.* Every responsibility listed below
+is implemented and tested (22 tests). Two deliberate deviations from the text as
+drafted, both recorded in §0.3: it returns `{ events, skipped, typeCodesVerified }`
+rather than a bare `CotEvent[]` (§0.3(11)), and it enforces the §11 residual gate by
+refusing any layer whose georeference fit exceeds `MAX_ACCEPTABLE_RESIDUAL_METRES`,
+reporting the measured error. The type codes it emits remain UNVERIFIED — the module
+propagates that fact rather than blocking on it (§0.3(10)).
 
 — the heart of the integration. Pure function,
 `(Event, Venue, TakPublishSettings, nowMs) => CotEvent[]`. Responsibilities:
@@ -993,12 +1175,18 @@ crowdcad.{eventId}.call.{callId}
 | Call / incident | `b-r-f-h-c` (CASEVAC / 9-line) or a generic point | **Low — verify** |
 | Emergency beacon | `b-a-o-tbl` / `b-a-o-pan` / `b-a-o-can` | Medium |
 
-**Status 2026-08-15:** ⛔ spike NOT run. The four candidate codes above are committed
-as constants in `src/lib/tak/types.ts`, each annotated with its confidence level and
-sitting behind a prominent UNVERIFIED warning comment. Nothing consumes them yet
-(`mapping.ts` is deferred precisely so that they cannot leak into a real broadcast
-before being confirmed). The spike's deliverable is concrete: confirm or correct four
-named constants, then delete the warning.
+**Status 2026-08-16:** ⛔ spike STILL NOT run — in *either* branch (see §0.45; the
+sibling effort's "verified end to end" refers to a home-made Leaflet viewer, not a
+TAK client, and does not settle this). The candidate codes are committed as constants
+in `src/lib/tak/types.ts`, each annotated with its confidence level and sitting behind
+a prominent UNVERIFIED warning. `mapping.ts` now consumes them, but nothing
+*transmits*: `COT_TYPE_CODES_VERIFIED = false` rides on every `MappingResult`, and the
+feed route and bridge are required to refuse transmission while it is false (§0.3(10)).
+
+The spike's deliverable is concrete and small: publish one marker of each candidate
+type, look at the icons on a real client, correct the constants, resolve `b-m-p-w`
+vs the sibling branch's `b-m-p-s-m`, flip `COT_TYPE_CODES_VERIFIED` to `true`, delete
+the warning. The equipment now exists — §0.45.
 
 **Action:** before implementing `mapping.ts`, run a verification spike — publish one
 of each candidate type to a test server, observe the rendered icon in ATAK-CIV and
@@ -1141,8 +1329,8 @@ rendering per type code, stale behavior, network-link refresh, callsign display.
 | Phase | Status | Rough effort | Depends on | Ships |
 |---|---|---|---|---|
 | 0 — georeference completion | ✅ done (0.4 blocked) | S | — | Calibratable venue layers with visible fit quality |
-| 1 — read-only feed | 🟡 1.1 partial | M | 0 + KML spike | One URL into WinTAK, live-ish picture |
-| 2 — bridge (outbound) | ⛔ | L | 1 + type-code spike | Real-time CoT to a real TAK server |
+| 1 — read-only feed | 🟡 1.1–1.2 done | M | 0 + KML spike | One URL into WinTAK, live-ish picture |
+| 2 — bridge (outbound) | ⛔ but see §0.45 | L | 1 + type-code spike | Real-time CoT to a real TAK server |
 | 3 — inbound + dispatch map | ⛔ | M | 2 | Field positions on the dispatch board |
 | 4 — field PWA | ⛔ | L | 3 (schema only) | **The thing IC-EMS actually needs** |
 | 5 — ops docs | ⛔ | S | 2 | Deployers can self-serve |
@@ -1153,11 +1341,17 @@ rendering per type code, stale behavior, network-link refresh, callsign display.
 | Spike | Gates | Status |
 |---|---|---|
 | (a) KML network-link support on WinTAK / ATAK-CIV | `kml.ts`, feed route (1.3) | ⛔ NOT RUN |
-| (b) CoT type-code icon rendering | `mapping.ts` (1.2), and everything downstream | ⛔ NOT RUN |
+| (b) CoT type-code icon rendering | transmission of anything `mapping.ts` produces | ⛔ NOT RUN |
 
-Neither needs a development environment — they need a TAK client and a test server.
-Until they run, Phase 1 cannot correctly proceed past the pure modules already built,
-and Phases 2–3 inherit the same blocker.
+Neither needs a development environment — they need a TAK client and a test server,
+**and as of §0.45 both now exist on this machine**: a Dockerized FreeTAKServer and a
+working TLS iTAK data package on `feature/tak-integration`. What is missing is a
+person with a phone and an afternoon.
+
+Spike (b)'s gate moved on 2026-08-16. It used to block `mapping.ts` from being
+written at all; it now blocks only *transmission*, enforced by
+`COT_TYPE_CODES_VERIFIED` (§0.3(10)). Phase 1 can therefore proceed as far as the
+event-settings UI (1.4) without it — but not one step past that.
 
 **If the season is short and only one thing ships: Phase 0 + Phase 4.** That
 delivers the operational need — field providers reporting status without radio —
@@ -1167,7 +1361,7 @@ and leaves the TAK export as a follow-on that reuses everything already built.
 
 ## 13. File manifest
 
-✅ = landed as of 2026-08-15. Unmarked = still outstanding.
+✅ = landed as of 2026-08-16. Unmarked = still outstanding.
 
 New:
 
@@ -1176,13 +1370,13 @@ New:
 ✅ src/lib/tak/cot.ts                      escapeXml, formatCotTime, buildCotXml, parseCotXml
 ✅ src/lib/tak/uid.ts                      deterministic UID helpers + echo-suppression test
 ✅ src/lib/tak/redaction.ts                applyRedaction — the PHI allowlist
-✅ src/lib/__tests__/tak/{cot,uid,redaction}.test.ts
+✅ src/lib/tak/mapping.ts                  eventToCotEvents — Event+Venue -> CoT markers
+✅ src/lib/__tests__/tak/{cot,uid,redaction,mapping}.test.ts
 ✅ docs/TAK_INTEGRATION_PLAN.md            this document, moved here from the root wrapper
-   src/lib/tak/{kml,mapping}.ts            gated on the §1.5 / §7.3 spikes
-   src/lib/__tests__/tak/mapping.test.ts
-   src/app/api/tak/[eventId]/feed.kml/route.ts
-   src/app/api/tak/[eventId]/feed.cot/route.ts
-   src/components/event-create/TakIntegrationSection.tsx
+   src/lib/tak/kml.ts                      gated on the §1.5 KML spike
+   src/app/api/tak/[eventId]/feed.kml/route.ts   MUST honour typeCodesVerified — §0.3(10)
+   src/app/api/tak/[eventId]/feed.cot/route.ts   MUST honour typeCodesVerified — §0.3(10)
+   src/components/event-create/TakIntegrationSection.tsx  renders MappingResult.skipped
    src/hooks/useTeamPositions.ts
    services/tak-bridge/**                  (package.json, src/, Dockerfile.tak-bridge)
    docs/TAK_DEPLOYMENT.md
