@@ -187,6 +187,9 @@ from the phase section it affects.
 | **1.4** | **Unverified-type-code banner surfaced to the operator** | **Done** | this session |
 | — | **`types.ts` cross-refs to a nonexistent "plan §0.6" corrected to §0.45/§7.3** | **Done** | this session |
 | — | **Disambiguation banner on the root wrapper's rival `dev/TAK_INTEGRATION_PLAN.md`** | **Done** | this session |
+| — | **Georeference reconciliation — `geoUtils.mercator-conformance.test.ts` (14 tests) proving the affine solver and `georef.js` agree** | **Done** | this session |
+| — | **`georef.js` "How far this applies" scoping header + `georef.test.js` cross-pin tripwire on the shared fixture** | **Done** | this session |
+| — | **`docs/TAK_OPEN_QUESTIONS.md` — §11's six questions restated for IC-EMS** | **Done** | this session |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -204,6 +207,14 @@ figure above predates `mapping.ts`'s 22 landing — plus 17 new in `settings.tes
 `npm run lint` shows only pre-existing warnings; `npx eslint` on the three new/changed
 files individually is silent. Both numbers were re-run independently after the
 implementing agent reported them, not taken on trust.
+
+**Verification at the close of the 2026-08-16 session (georeference reconciliation):**
+`npm run type-check` clean, `npm run test:unit` **153/153 passing across 9 files**
+(139 before — 14 new in `geoUtils.mercator-conformance.test.ts`), and the bridge's
+`node georef.test.js` **12/12** (11 before — one new cross-pin tripwire). All three
+numbers were re-run independently after the implementing agent reported them, same
+practice as above. No production code was touched this session: the diff is one new
+test file, one new test case, one doc comment, and this tracker.
 
 ### 0.2 Explicitly NOT done, and why
 
@@ -399,6 +410,13 @@ implementing agent reported them, not taken on trust.
     inbound path to prove a point. Left as Phase 2/3 work. This is the one place the
     old "they disagree architecturally" warning still has teeth.
 
+    > **Superseded 2026-08-16 by §0.3(27).** The instinct not to force a merge was
+    > right; the stated reason was wrong. They do not "disagree architecturally" —
+    > they answer different questions, and one is a special case of the other. This
+    > entry is kept because the decision it records (don't unify under pressure) was
+    > correct and the reasoning is instructive about why a plausible framing survived
+    > this long unchallenged.
+
 20. **`mapping.ts` reads `member.tak`, and publishes off-map fixes.** The merge's only
     real integration edit. `onMap: false` means the fix falls outside the venue map
     *image* — a limitation of drawing on a picture, not doubt about the position — and
@@ -461,6 +479,155 @@ implementing agent reported them, not taken on trust.
     already sets correctly for both. If §7.3 ever gives supervisors their own type
     code, this stays correct either way.
 
+27. **The two georeference "models" were never rivals, and neither one is going
+    away.** §0.45 and §0.3(19) both recorded this as technical debt — two
+    implementations of the same thing that ought eventually to be unified, with
+    `geoUtils.ts` named as "the better-specified of the two". That framing was
+    wrong, and acting on it would have made the system worse. They answer
+    different questions:
+
+    - **`core/src/lib/geoUtils.ts` is a calibration solver.** An operator places
+      2+ control points on an arbitrary venue image — a scanned floor plan, a
+      hand-drawn site map, a PDF rotated to fit a page — and it fits a 4-DOF
+      anti-similarity (exactly 2 points, exact fit) or a 6-DOF least-squares
+      affine (3+ points). It has rotation and shear terms because it must: the
+      image can be at any angle to north. Its output is an *estimate*, gated by
+      `MAX_ACCEPTABLE_RESIDUAL_METRES = 25`.
+    - **`dev/crowdcad-tak-bridge/georef.js` is the analytic inverse of a known
+      crop.** `make-campus-map.py` builds the venue image by stitching OSM tiles
+      for an exact bounding box, so the coordinate of every pixel is *known*, not
+      fitted. `project()` computes image-x from longitude alone and image-y from
+      latitude alone — there are no cross terms in the arithmetic — so it is
+      structurally incapable of expressing rotation or shear. Not "assumes zero
+      rotation": *has nowhere to put it.*
+
+    So `georef.js` is a degenerate, diagonal-only member of the family `geoUtils.ts`
+    fits. One general model, one exact shortcut valid only for one script's output.
+    Unifying them would mean deleting exact arithmetic and replacing it with a
+    fitted approximation of itself — strictly a downgrade, and the reason the
+    "affine solver is better-specified" line has been struck from §0.45.
+
+    **What was done instead of a refactor**, all of it additive:
+
+    - `core/src/lib/__tests__/geoUtils.mercator-conformance.test.ts` (14 tests)
+      pins the real `campus-map.json` `mercator` block as a fixture, derives four
+      corner control points from `georef.js`'s own `unproject()`, fits
+      `solveGeoreference` to them, and asserts the two agree across the interior.
+      Measured divergence, affine-fit vs. Mercator-exact:
+
+      | sample point | divergence |
+      |---|---|
+      | centre (50, 50) | **0.0370 m** |
+      | (25, 75) | **0.0278 m** |
+      | (10, 90) | **0.0133 m** |
+      | (95, 5) near-edge | **0.0070 m** |
+
+      The asserted bound is 0.1 m, comfortably above the 3.7 cm worst case. Note
+      the *shape* of that table: error is largest in the middle and smallest near
+      the corners, which is exactly what fitting an affine to four corner points
+      should do, and is a useful sanity signal that the test measures what it
+      claims to.
+    - The same test perturbs the corner control points by hand-written asymmetric
+      offsets of ~3–5 cm (no `Math.random()` — a flaky georeference test is worse
+      than none) and shows divergence jumping to **0.67–5.59 m**, one to two
+      orders of magnitude larger. This is the load-bearing result: *the model
+      disagreement is negligible next to operator calibration error.* Anyone
+      chasing centimetres between the two implementations is optimising the wrong
+      term.
+    - `georef.js` gained a "How far this applies" section stating the north-up-only
+      limitation, that it throws rather than guesses on a sidecar with no
+      `mercator` block, and that `geoUtils.ts` is the general solver for every
+      other venue — with the conformance test named by path as the proof.
+    - `dev/crowdcad-tak-bridge/georef.test.js` gained a tripwire that loads the
+      real `campus-map.json` and asserts its four corner `unproject()` values still
+      match the literals pinned in the core test. The two files are in different
+      repos and different languages; without this, regenerating the campus map
+      would silently make the core fixture stale and the conformance proof
+      meaningless while both suites stayed green.
+
+    **The scoping rule this establishes:** any venue image that is not
+    `make-campus-map.py` output goes through `geoUtils.ts`, always. `georef.js`
+    is not a faster path to be preferred where it happens to work — it is a
+    special case that must refuse anything outside its narrow input shape, which
+    it now does loudly.
+
+28. **§11's open questions were extracted into a standalone IC-EMS-facing
+    document** (`core/docs/TAK_OPEN_QUESTIONS.md`) rather than left as a section
+    of an engineering plan. The plan is written for whoever is writing the code;
+    it assumes CoT, federation, and GOTS mean something to the reader. The people
+    who can actually answer these six questions are a clinical authority, a comms
+    ops lead, and an inter-agency liaison, and none of them should have to read
+    §7.3 to answer "can chief complaint leave CrowdCAD". The new document orders
+    the questions by urgency rather than by plan numbering, and each one states
+    what changes depending on the answer and what a *usable* answer looks like —
+    because "we'll get back to you on the server" is not an answer that unblocks
+    anything, whereas "undecided, ask again in two weeks" genuinely is.
+
+    Each heading carries a `*(Plan §11, question N)*` cross-reference so the two
+    documents cannot drift apart silently. §11 remains the source of truth for the
+    engineering consequences; the new file is a translation, not a fork.
+
+    One caution recorded because it nearly went wrong: the drafting agent's first
+    version claimed CrowdCAD has adapters for all three TAK server types, that the
+    feed URL ships today, and that PHI export defaults to on. All three were false,
+    and all three would have been read by IC-EMS as commitments. They were caught
+    by grepping `core/src` and reading `settings.ts` rather than by reviewing the
+    agent's prose. **An outward-facing document generated from an inward-facing one
+    must have every capability claim re-derived from the code**, not from the
+    summary of the code — the failure mode is not a typo, it is promising a
+    customer something that does not exist.
+
+29. **The bridge stays in the wrapper repo for now — but the reason usually given
+    for splitting it out is wrong, and the precondition for splitting it is not
+    yet met.** The question was raised 2026-08-16: should
+    `dev/crowdcad-tak-bridge/` become its own repository, on the standard
+    reasoning that a standalone sidecar with its own runtime and deploy lifecycle
+    normally earns one?
+
+    The *pattern* is real and eventually right here. The *premise* — that the
+    bridge is "unrelated" to the app — is the opposite of true, and it is the
+    premise that decides the timing. Verified against the code:
+
+    - `pocketbase.js` reads `events` records, mutates the **`staff` array (core's
+      `Staff[]`)** and writes it back, and owns the `tak_positions` collection.
+    - `georef.js`'s `nearestPost()` consumes core's `Post[]` shape, legacy
+      bare-string entries included.
+    - Device binding is `Staff.takCallsign`, defined in `core/src/app/types.ts`.
+
+    The bridge is not adjacent to CrowdCAD's data model — it is a **direct writer
+    into CrowdCAD's database using CrowdCAD's schema**. And that contract is held
+    together by nothing but proximity: there is no schema-validation layer
+    (`types.ts` is authoritative by convention only), and the bridge is plain JS,
+    so nothing type-checks it even today. What actually catches drift is that both
+    trees sit in one checkout and their suites run together — see the §0.3(27)
+    tripwire, where `georef.test.js` asserts values pinned in a test inside
+    `core/`. Split the repos as things stand and that check *cannot run in one CI
+    job*: it degrades into two suites that stay green while disagreeing, which is
+    strictly worse than the coupling it replaced.
+
+    Two further costs specific to this project:
+
+    - Repo count is already expensive here. §0.45 documents an entire parallel
+      TAK effort lost to the wrapper/submodule/worktree topology. Going 2 → 3
+      multiplies that, and the branch rule at the top of this document becomes
+      unenforceable — a change spanning core and bridge could no longer be one
+      atomic, reviewable commit.
+    - The `certs-export/` and `fts-*.zip` ignore rules exist because those bundles
+      contain a **private CA key**. Ignore rules are per-repo. A new repo starts
+      with an empty `.gitignore` on the same day someone is copying files into it.
+
+    **Decision: split later, contract first.** The precondition is that core↔bridge
+    drift is caught by something other than shared folder membership — a versioned
+    schema the bridge validates against at runtime, and the georeference fixture
+    published as a data file both sides read rather than two hand-pinned copies.
+    Once that exists the split is cheap and the standard reasoning applies
+    properly. Done in the other order, it trades a coupling that is checked for one
+    that is silent.
+
+    **This changes no phase ordering** — nothing in §0.4 depends on repo layout.
+    When the split does happen it touches core's `CLAUDE.md` ("The bridge is not
+    in this repo…"), §13's file manifest, and the tripwire in §0.3(27).
+
 ### 0.4 Recommended next steps, in order
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
@@ -494,9 +661,31 @@ the temptation to build the feed route "ready for when the spike lands" should b
 resisted for the reason §1.5 gives in its own text: the spike may return "network
 links are unreliable on the target release", which changes what the feed route
 *is*. Writing it first means writing it twice. Better uses of a session with no
-hardware: turn the §11 open questions into a written list for whoever can answer
+hardware: ~~turn the §11 open questions into a written list for whoever can answer
 them, or reconcile the two georeference models (§0.3(19)) — the one piece of real
-technical debt the merge knowingly left behind.
+technical debt the merge knowingly left behind.~~
+
+**~~Both of those were done 2026-08-16.~~** The open questions are now
+`core/docs/TAK_OPEN_QUESTIONS.md` (§0.3(28)), and the georeference reconciliation
+turned out not to be debt at all: the two models answer different questions and
+both are staying, now with a conformance test and an explicit scoping rule proving
+it (§0.3(27)).
+
+That leaves the honest answer to "what can I do with no hardware?" as: **very
+little, and that is now the accurate state of the project rather than a temporary
+one.** Every remaining item needs a phone, a real TAK client, or an answer from
+IC-EMS. If you are here with a free session and no hardware, the highest-value
+things left are not code:
+
+- **Chase the §11 answers.** `TAK_OPEN_QUESTIONS.md` exists precisely so this is
+  an email, not a drafting exercise. Questions 1–4 unblock the next two sprints,
+  and two of them (TAK.gov registration, federation) have organizational lead time
+  measured in weeks that no amount of engineering compresses.
+- **Do not build the feed route ahead of the §1.5 spike.** This warning is
+  unchanged and is now the *only* thing standing between a spare session and a
+  rewrite: the spike may return "network links are unreliable on the target
+  release", which changes what the feed route *is*. Writing it first means writing
+  it twice.
 
 ### 0.45 The second TAK effort, and the merge that ended the split
 
@@ -627,12 +816,15 @@ drawing on a picture, not doubt about where the unit is, and TAK has real basema
 
 **Still genuinely unreconciled — do not mistake "merged" for "unified":**
 
-- **Two georeference models coexist.** `core/src/lib/geoUtils.ts` (control points →
-  least-squares affine, with a 25 m residual gate) and the bridge's `georef.js`
-  (image-percentage projection). They are not in conflict at the code level — nothing
-  imports both — so the merge did not force a choice. One should eventually win, and
-  the affine solver is the better-specified of the two, but that is Phase 2/3 work and
-  it is not urgent.
+- ~~**Two georeference models coexist.**~~ **Resolved 2026-08-16 — the premise was
+  wrong.** See §0.3(27). They were never two models of the same thing: `geoUtils.ts`
+  is a general calibration solver for arbitrary venue images, and the bridge's
+  `georef.js` is the exact analytic inverse of a *known* north-up Web Mercator tile
+  crop. The second is a degenerate case of the first, not a rival to it. Nothing needs
+  to win. The sentence this replaces — "the affine solver is the better-specified of
+  the two" — was true in the narrow sense that affine is the more general family, and
+  misleading in the sense every reader took it: it implied `geoUtils` should absorb
+  `georef.js`, which would replace exact arithmetic with a fitted estimate.
 - **Firestore vs PocketBase.** Unchanged by the merge; the service abstraction already
   covers it.
 
@@ -757,6 +949,41 @@ assert what the tip of the branch is.
 - Tests 122 → **139 (8 files)**. `type-check` clean, lint shows only pre-existing
   warnings. Both figures re-verified independently of the implementing agent.
 - Decisions recorded in §0.3(21)–(26). **Not pushed.**
+
+**2026-08-16 (later) — georeference reconciliation and the IC-EMS question list.**
+- Took the two items §0.4 named as the only hardware-free work left. Both are now
+  closed, and neither closed the way the plan predicted.
+- **The georeference "debt" was a false premise.** §0.45 and §0.3(19) recorded two
+  rival models needing unification, with `geoUtils.ts` named the better-specified.
+  Reading both showed they answer different questions: `geoUtils.ts` fits a
+  transform to operator-placed control points on an arbitrary image, while
+  `georef.js` inverts a known Mercator tile crop and has no cross terms in its
+  arithmetic at all — it cannot express rotation, structurally. Unifying them
+  would have replaced exact maths with a fitted estimate of itself. §0.3(27), and
+  the §0.45 bullet and §0.3(19) are struck through rather than deleted.
+- Proved it numerically instead of asserting it:
+  `geoUtils.mercator-conformance.test.ts` fits the affine solver to four corners
+  derived from `georef.js`'s own `unproject()` and measures **0.7–3.7 cm**
+  agreement across the interior, against a 10 cm asserted bound. Perturbing the
+  control points by ~3–5 cm pushes divergence to **0.67–5.59 m** — the result that
+  actually matters, because it shows operator calibration error dominates model
+  disagreement by one to two orders of magnitude.
+- Added a cross-repo tripwire: `georef.test.js` now pins the same `campus-map.json`
+  corners the core test depends on, so regenerating the map can't quietly make the
+  conformance proof meaningless while both suites stay green.
+- Wrote `docs/TAK_OPEN_QUESTIONS.md` for IC-EMS. **Caught three false capability
+  claims** in the drafting agent's output — adapters for all three server types,
+  a shipping feed URL, PHI export defaulting to on — by re-deriving each from
+  `core/src` rather than reviewing the prose. §0.3(28).
+- Answered a question raised mid-session about giving the bridge its own repo:
+  the pattern is standard, but the "it's unrelated" premise is backwards — the
+  bridge writes core's `Staff[]` into core's database. Recorded as §0.3(29):
+  split later, make the contract explicit first.
+- Tests 139 → **153 (9 files)**; bridge `georef.test.js` 11 → **12**. `type-check`
+  clean. All three figures re-verified independently of the implementing agent.
+- No production code touched: one new test file, one new test case, one doc
+  comment, and this tracker.
+- Decisions recorded in §0.3(27)–(29). **Not pushed.**
 
 ---
 
