@@ -7,9 +7,10 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
 import { dbService, storageService } from '@/lib/services';
-import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
+import type { Post, Venue, Equipment, EquipmentStatus, Layer, ControlPoint, Georeference } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
+import { layerPostsLatLon } from '@/lib/geoUtils';
 import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import NewLayerModal from '@/components/modals/venue/newlayer';
@@ -19,6 +20,8 @@ import LayerControlBar from '@/components/venue-management/LayerControlBar';
 import MarkerModeToggleButton from '@/components/venue-management/MarkerModeToggleButton';
 import PendingMarkerDialog from '@/components/venue-management/PendingMarkerDialog';
 import MarkerPlacementInstruction from '@/components/venue-management/MarkerPlacementInstruction';
+import GeoreferenceSection from '@/components/venue-management/GeoreferenceSection';
+import GeoreferencePointDialog from '@/components/venue-management/GeoreferencePointDialog';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
 import {
@@ -29,15 +32,17 @@ import {
   Tab,
   ScrollShadow,
 } from '@heroui/react';
-import { 
-  MapPin, 
-  Plus,  
-  Upload, 
-  Trash2, 
+import {
+  MapPin,
+  Plus,
+  Upload,
+  Trash2,
   Edit2,
   MapPinned,
   ChevronLeft,
   ChevronRight,
+  Crosshair,
+  MousePointer2,
 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -46,6 +51,46 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 interface EquipmentWithLocation extends Equipment {
   locationId?: string;
+}
+
+// Builds the Georeference object to persist for a layer, honoring the two
+// Firestore constraints: undefined is rejected at ANY depth (so `label` and
+// `updatedBy` must be OMITTED, never set to undefined), and version/updatedAt
+// must only advance when the control points actually changed this editing
+// session (isDirty) rather than on every unrelated save.
+function buildGeoreferenceForSave(
+  layer: Layer,
+  isDirty: boolean,
+  userId: string
+): Georeference | undefined {
+  const georeference = layer.georeference;
+  const controlPoints = georeference?.controlPoints ?? [];
+  if (controlPoints.length === 0) {
+    // No control points -> omit the georeference key entirely.
+    return undefined;
+  }
+
+  const sanitizedPoints: ControlPoint[] = controlPoints.map((cp) => {
+    const trimmedLabel = cp.label?.trim();
+    const point: ControlPoint = { x: cp.x, y: cp.y, lat: cp.lat, lon: cp.lon };
+    if (trimmedLabel) {
+      point.label = trimmedLabel;
+    }
+    return point;
+  });
+
+  const result: Georeference = {
+    controlPoints: sanitizedPoints,
+    version: isDirty ? (georeference?.version ?? 0) + 1 : (georeference?.version ?? 1),
+    updatedAt: isDirty ? Date.now() : (georeference?.updatedAt ?? Date.now()),
+  };
+
+  const updatedBy = isDirty ? userId : georeference?.updatedBy;
+  if (updatedBy) {
+    result.updatedBy = updatedBy;
+  }
+
+  return result;
 }
 
 export default function VenueManagementPageClient() {
@@ -85,6 +130,31 @@ export default function VenueManagementPageClient() {
   const [markerNameInput, setMarkerNameInput] = useState('');
   const [markerIsClinicInput, setMarkerIsClinicInput] = useState(false);
 
+  // Georeference (control point) placement mode — mutually exclusive with
+  // marker placement mode.
+  const [isGeoreferenceMode, setIsGeoreferenceMode] = useState(false);
+
+  // Control point just clicked on the map, awaiting lat/lon confirmation.
+  // Unlike pendingMarker, this is NOT added to the layer's control points
+  // until confirmed — cancel simply discards it, no cleanup needed.
+  const [pendingGeoPoint, setPendingGeoPoint] = useState<{
+    x: number;
+    y: number;
+    layerIdx: number;
+  } | null>(null);
+  const [geoLatInput, setGeoLatInput] = useState('');
+  const [geoLonInput, setGeoLonInput] = useState('');
+  const [geoLabelInput, setGeoLabelInput] = useState('');
+  const [geoLatError, setGeoLatError] = useState<string | null>(null);
+  const [geoLonError, setGeoLonError] = useState<string | null>(null);
+  const geoLatInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Layer ids whose control points were added/edited/removed this editing
+  // session. Only these layers get their georeference version/updatedAt
+  // bumped on save — an unrelated save (renaming the venue, etc.) must not
+  // touch it. Reset on venue load and after a successful save.
+  const [georeferenceDirtyLayerIds, setGeoreferenceDirtyLayerIds] = useState<Set<string>>(new Set());
+
   // Inputs
   const [equipmentInput, setEquipmentInput] = useState('');
   const [locationInput, setLocationInput] = useState('');
@@ -119,7 +189,7 @@ export default function VenueManagementPageClient() {
   } = useZoomPan(imgRef, imgContainerRef, {
     minScale: 1,
     maxScale: 5,
-    disablePan: () => isAddMarkerMode || draggingIdx !== null,
+    disablePan: () => isAddMarkerMode || isGeoreferenceMode || draggingIdx !== null,
   });
 
   // Drag/hover
@@ -167,6 +237,13 @@ export default function VenueManagementPageClient() {
     }
   }, [pendingMarker]);
 
+  // Auto-focus latitude input when a pending georeference point is set
+  useEffect(() => {
+    if (pendingGeoPoint && geoLatInputRef.current) {
+      geoLatInputRef.current.focus();
+    }
+  }, [pendingGeoPoint]);
+
   // Load venue data if editing
   useEffect(() => {
     if (venueId && userId) {
@@ -193,6 +270,7 @@ export default function VenueManagementPageClient() {
               layers,
             });
             setCurrentLayer(0);
+            setGeoreferenceDirtyLayerIds(new Set());
           }
         } catch (error) {
           console.error('Error loading venue:', error);
@@ -239,6 +317,32 @@ export default function VenueManagementPageClient() {
   // All posts from all layers
   const allPosts = venueData.layers.flatMap((layer, layerIdx) =>
     layer.posts.map((post, postIdx) => ({ post, layerIdx, postIdx, layerName: layer.name }))
+  );
+
+  // Derived lat/lon for every post in EVERY layer. The posts list below is
+  // cross-layer (each row is tagged with its layer name), so scoping this to
+  // the active layer alone would leave rows from other georeferenced layers
+  // silently blank — indistinguishable from "this layer isn't calibrated".
+  //
+  // layerPostsLatLon solves each layer's georeference ONCE and reuses the
+  // transform across that layer's posts, so this is one solve per layer, not
+  // one per post. The result is indexed [layerIdx][postIdx], matching the
+  // (layerIdx, postIdx) pairs allPosts already carries.
+  //
+  // This readout is the operator's calibration feedback loop: it is how
+  // someone tells a good georeference from a bad one before it silently
+  // produces wrong coordinates downstream.
+  const layerPostLatLons = useMemo(
+    () => venueData.layers.map((layer) => layerPostsLatLon(layer)),
+    [venueData.layers]
+  );
+
+  // A layer counts as georeferenced once it has enough control points to
+  // solve a transform (>= 2) — below that, every post's latLon is null by
+  // definition and showing a "not placed" hint on each row would be noise.
+  const layerIsGeoreferenced = useMemo(
+    () => venueData.layers.map((layer) => (layer.georeference?.controlPoints.length ?? 0) >= 2),
+    [venueData.layers]
   );
 
   // Equipment
@@ -304,9 +408,9 @@ export default function VenueManagementPageClient() {
     setLocationInput('');
   };
 
-  // Handle map click for marker placement
+  // Handle map click for marker placement / georeference control point placement
   const handleImageClick = (evt: React.MouseEvent<HTMLDivElement>) => {
-    if (!isAddMarkerMode || isPanning) return;
+    if ((!isAddMarkerMode && !isGeoreferenceMode) || isPanning) return;
 
     const img = imgRef.current;
     if (!img) return;
@@ -318,6 +422,18 @@ export default function VenueManagementPageClient() {
     }
 
     const { x, y } = pixelToPercent(evt.clientX, evt.clientY, rect);
+
+    if (isGeoreferenceMode) {
+      // Georeference control points are NOT written into layer state until
+      // the pending-point dialog is confirmed — do not create a Post here.
+      setPendingGeoPoint({ x, y, layerIdx: currentLayer });
+      setGeoLatInput('');
+      setGeoLonInput('');
+      setGeoLabelInput('');
+      setGeoLatError(null);
+      setGeoLonError(null);
+      return;
+    }
 
     // Create temporary marker
     const newPost: Post = {
@@ -388,6 +504,151 @@ export default function VenueManagementPageClient() {
       };
       return { ...prev, layers: newLayers };
     });
+  };
+
+  // Mark a layer's georeference as edited this session, so its version only
+  // bumps on save if it actually changed (not on an unrelated save).
+  const markGeoreferenceDirty = (layerId: string) => {
+    setGeoreferenceDirtyLayerIds((prev) => {
+      if (prev.has(layerId)) return prev;
+      const next = new Set(prev);
+      next.add(layerId);
+      return next;
+    });
+  };
+
+  const addControlPoint = (layerIdx: number, point: ControlPoint) => {
+    const layerId = venueData.layers[layerIdx].id;
+    setVenueData((prev) => {
+      const layer = prev.layers[layerIdx];
+      const existingPoints = layer.georeference?.controlPoints ?? [];
+      const newLayers = [...prev.layers];
+      newLayers[layerIdx] = {
+        ...layer,
+        georeference: {
+          controlPoints: [...existingPoints, point],
+          version: layer.georeference?.version ?? 0,
+          updatedAt: layer.georeference?.updatedAt ?? Date.now(),
+          ...(layer.georeference?.updatedBy ? { updatedBy: layer.georeference.updatedBy } : {}),
+        },
+      };
+      return { ...prev, layers: newLayers };
+    });
+    markGeoreferenceDirty(layerId);
+  };
+
+  const updateControlPoint = (index: number, patch: Partial<ControlPoint>) => {
+    const layerId = venueData.layers[currentLayer].id;
+    setVenueData((prev) => {
+      const layer = prev.layers[currentLayer];
+      const georeference = layer.georeference;
+      if (!georeference || index < 0 || index >= georeference.controlPoints.length) return prev;
+      const newLayers = [...prev.layers];
+      newLayers[currentLayer] = {
+        ...layer,
+        georeference: {
+          ...georeference,
+          controlPoints: georeference.controlPoints.map((p, i) => (i === index ? { ...p, ...patch } : p)),
+        },
+      };
+      return { ...prev, layers: newLayers };
+    });
+    markGeoreferenceDirty(layerId);
+  };
+
+  const removeControlPoint = (index: number) => {
+    const layerId = venueData.layers[currentLayer].id;
+    setVenueData((prev) => {
+      const layer = prev.layers[currentLayer];
+      const georeference = layer.georeference;
+      if (!georeference) return prev;
+      const newLayers = [...prev.layers];
+      newLayers[currentLayer] = {
+        ...layer,
+        georeference: {
+          ...georeference,
+          controlPoints: georeference.controlPoints.filter((_, i) => i !== index),
+        },
+      };
+      return { ...prev, layers: newLayers };
+    });
+    markGeoreferenceDirty(layerId);
+  };
+
+  const clearControlPoints = () => {
+    const layerId = venueData.layers[currentLayer].id;
+    setVenueData((prev) => {
+      const layer = prev.layers[currentLayer];
+      const georeference = layer.georeference;
+      if (!georeference || georeference.controlPoints.length === 0) return prev;
+      const newLayers = [...prev.layers];
+      newLayers[currentLayer] = {
+        ...layer,
+        georeference: {
+          ...georeference,
+          controlPoints: [],
+        },
+      };
+      return { ...prev, layers: newLayers };
+    });
+    markGeoreferenceDirty(layerId);
+  };
+
+  // Confirm the pending georeference point: validate lat/lon, then add it
+  // to the current layer's control points.
+  const confirmGeoPoint = () => {
+    if (!pendingGeoPoint) return;
+
+    const latValue = Number(geoLatInput);
+    const lonValue = Number(geoLonInput);
+    let hasError = false;
+
+    if (geoLatInput.trim() === '' || !Number.isFinite(latValue)) {
+      setGeoLatError('Latitude must be a number');
+      hasError = true;
+    } else if (latValue < -90 || latValue > 90) {
+      setGeoLatError('Latitude must be between -90 and 90');
+      hasError = true;
+    } else {
+      setGeoLatError(null);
+    }
+
+    if (geoLonInput.trim() === '' || !Number.isFinite(lonValue)) {
+      setGeoLonError('Longitude must be a number');
+      hasError = true;
+    } else if (lonValue < -180 || lonValue > 180) {
+      setGeoLonError('Longitude must be between -180 and 180');
+      hasError = true;
+    } else {
+      setGeoLonError(null);
+    }
+
+    if (hasError) return;
+
+    const trimmedLabel = geoLabelInput.trim();
+    const newPoint: ControlPoint = trimmedLabel
+      ? { x: pendingGeoPoint.x, y: pendingGeoPoint.y, lat: latValue, lon: lonValue, label: trimmedLabel }
+      : { x: pendingGeoPoint.x, y: pendingGeoPoint.y, lat: latValue, lon: lonValue };
+
+    addControlPoint(pendingGeoPoint.layerIdx, newPoint);
+
+    setPendingGeoPoint(null);
+    setGeoLatInput('');
+    setGeoLonInput('');
+    setGeoLabelInput('');
+    setGeoLatError(null);
+    setGeoLonError(null);
+  };
+
+  // Cancel the pending georeference point — it was never added to the
+  // layer's control points, so this just discards the dialog state.
+  const cancelGeoPoint = () => {
+    setPendingGeoPoint(null);
+    setGeoLatInput('');
+    setGeoLonInput('');
+    setGeoLabelInput('');
+    setGeoLatError(null);
+    setGeoLonError(null);
   };
 
   const renamePost = (layerIdx: number, postIdx: number) => {
@@ -521,6 +782,28 @@ export default function VenueManagementPageClient() {
       });
   };
 
+  // Render the current layer's georeference control points as map overlays,
+  // visually distinct from post markers (numbered, status-orange, no drag).
+  const renderControlPointMarkers = () => {
+    const controlPoints = venueData.layers[currentLayer]?.georeference?.controlPoints ?? [];
+
+    return controlPoints.map((cp, idx) => {
+      const left = `calc(${cp.x}% - 12px)`;
+      const top = `calc(${cp.y}% - 12px)`;
+
+      return (
+        <div
+          key={idx}
+          style={{ left, top }}
+          className="absolute z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-status-orange bg-status-orange/20 text-[10px] font-semibold text-status-orange shadow-sm pointer-events-none"
+          title={cp.label ? `Control point ${idx + 1}: ${cp.label}` : `Control point ${idx + 1}`}
+        >
+          {idx + 1}
+        </div>
+      );
+    });
+  };
+
   // Create venue
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -540,6 +823,11 @@ export default function VenueManagementPageClient() {
       return;
     }
 
+    if (pendingGeoPoint) {
+      alert('Please finish naming the control point or cancel it before saving');
+      return;
+    }
+
     setIsUploading(true);
     try {
       let newMapUrl: string | undefined;
@@ -550,12 +838,30 @@ export default function VenueManagementPageClient() {
 
       const equipmentToSave = venueData.equipment.map(({ ...rest }) => rest);
 
-      // Update current layer's mapUrl if new map uploaded
-      const updatedLayers = venueData.layers.map((layer, idx) => {
-        const layerData = idx === (pendingLayer ?? currentLayer) && newMapUrl ? { ...layer, mapUrl: newMapUrl } : layer;
-        // Remove undefined properties from each layer
+      // Update current layer's mapUrl if new map uploaded, and finalize each
+      // layer's georeference (bumping version/updatedAt only for layers
+      // whose control points actually changed this session).
+      const layersForSave: Layer[] = venueData.layers.map((layer, idx) => {
+        const layerWithMap = idx === (pendingLayer ?? currentLayer) && newMapUrl ? { ...layer, mapUrl: newMapUrl } : layer;
+        const isDirty = georeferenceDirtyLayerIds.has(layer.id);
+        const georeferenceForSave = buildGeoreferenceForSave(layerWithMap, isDirty, userId);
+        const finalizedLayer: Layer = { ...layerWithMap };
+        if (georeferenceForSave) {
+          finalizedLayer.georeference = georeferenceForSave;
+        } else {
+          // No control points -> omit the georeference key entirely.
+          delete finalizedLayer.georeference;
+        }
+        return finalizedLayer;
+      });
+
+      // Remove undefined properties from each layer — Firestore rejects
+      // undefined at any depth. georeference was already deeply sanitized
+      // above by buildGeoreferenceForSave; this only strips top-level keys
+      // (e.g. a layer with no mapUrl).
+      const updatedLayers = layersForSave.map((layer) => {
         const filteredLayer: Record<string, unknown> = {};
-        Object.entries(layerData).forEach(([key, value]) => {
+        Object.entries(layer).forEach(([key, value]) => {
           if (value !== undefined) {
             filteredLayer[key] = value;
           }
@@ -581,6 +887,13 @@ export default function VenueManagementPageClient() {
       } else {
         await dbService.addDocument('venues', dataToSave);
       }
+
+      // Sync local state with what was actually persisted (finalized
+      // georeference versions, new mapUrl) and clear the dirty set so a
+      // subsequent save doesn't double-bump an already-saved version.
+      setVenueData((prev) => ({ ...prev, layers: layersForSave }));
+      setGeoreferenceDirtyLayerIds(new Set());
+
       router.push('/venues/selection')
     } catch (error: unknown) {
       console.error('Error saving venue:', error);
@@ -642,6 +955,24 @@ export default function VenueManagementPageClient() {
       return { ...prev, layers: newLayers };
     });
     setCurrentLayer(Math.max(0, currentLayer - 1));
+  };
+
+  // Marker placement and georeference placement are mutually exclusive map
+  // interaction modes — turning one on turns the other off.
+  const toggleAddMarkerMode = () => {
+    setIsAddMarkerMode((prev) => {
+      const next = !prev;
+      if (next) setIsGeoreferenceMode(false);
+      return next;
+    });
+  };
+
+  const toggleGeoreferenceMode = () => {
+    setIsGeoreferenceMode((prev) => {
+      const next = !prev;
+      if (next) setIsAddMarkerMode(false);
+      return next;
+    });
   };
 
   return (
@@ -729,49 +1060,67 @@ export default function VenueManagementPageClient() {
                             const hasCoordinates = typeof post === 'object' && post.x !== null && post.y !== null;
                             const isPending = pendingMarker?.layerIdx === item.layerIdx && pendingMarker?.postIdx === item.postIdx;
 
+                            const derivedLatLon =
+                              layerPostLatLons[item.layerIdx]?.[item.postIdx]?.latLon ?? null;
+
                             return (
                               <Card
                                 key={idx}
                                 isBlurred
                                 className="border-2 rounded-2xl border-default-200 bg-transparent"
                               >
-                                <div className="flex items-center justify-between px-3 py-2">
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    {hasCoordinates ? (
-                                      <MapPinned className="h-4 w-4 flex-shrink-0 text-accent" />
-                                    ) : (
-                                      <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />
-                                    )}
-                                    <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-surface-light'}`}>
-                                      {label}
-                                    </span>
-                                    {item.layerName && (
-                                      <span className="text-xs text-surface-light">({item.layerName})</span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    {typeof post !== 'string' && (
+                                <div className="flex flex-col px-3 py-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      {hasCoordinates ? (
+                                        <MapPinned className="h-4 w-4 flex-shrink-0 text-accent" />
+                                      ) : (
+                                        <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />
+                                      )}
+                                      <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-surface-light'}`}>
+                                        {label}
+                                      </span>
+                                      {item.layerName && (
+                                        <span className="text-xs text-surface-light">({item.layerName})</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      {typeof post !== 'string' && (
+                                        <Button
+                                          isIconOnly
+                                          size="sm"
+                                          variant="light"
+                                          onPress={() => renamePost(item.layerIdx, item.postIdx)}
+                                          className="min-w-6 w-6 h-6"
+                                        >
+                                          <Edit2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      )}
                                       <Button
                                         isIconOnly
                                         size="sm"
                                         variant="light"
-                                        onPress={() => renamePost(item.layerIdx, item.postIdx)}
+                                        color="danger"
+                                        onPress={() => removePost(item.layerIdx, item.postIdx)}
                                         className="min-w-6 w-6 h-6"
                                       >
-                                        <Edit2 className="h-3.5 w-3.5" />
+                                        <Trash2 className="h-3.5 w-3.5" />
                                       </Button>
-                                    )}
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      variant="light"
-                                      color="danger"
-                                      onPress={() => removePost(item.layerIdx, item.postIdx)}
-                                      className="min-w-6 w-6 h-6"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
+                                    </div>
                                   </div>
+                                  {derivedLatLon ? (
+                                    <p className="pl-6 text-xs text-surface-faint">
+                                      {derivedLatLon.lat.toFixed(6)}, {derivedLatLon.lon.toFixed(6)}
+                                    </p>
+                                  ) : (
+                                    // Only worth saying when the layer IS calibrated: then a
+                                    // missing coordinate is about this post specifically, not
+                                    // about the layer. On an uncalibrated layer every row
+                                    // would say it, which is pure noise.
+                                    layerIsGeoreferenced[item.layerIdx] && (
+                                      <p className="pl-6 text-xs text-surface-faint">not placed on map</p>
+                                    )
+                                  )}
                                 </div>
                               </Card>
                             );
@@ -792,6 +1141,14 @@ export default function VenueManagementPageClient() {
                         cancelEquipmentEdit={cancelEquipmentEdit}
                         startEditEquipment={startEditEquipment}
                         removeEquipment={removeEquipment}
+                      />
+                    </Tab>
+                    <Tab key="georeference" title="Georeference">
+                      <GeoreferenceSection
+                        controlPoints={venueData.layers[currentLayer]?.georeference?.controlPoints ?? []}
+                        onUpdatePoint={updateControlPoint}
+                        onRemovePoint={removeControlPoint}
+                        onClearAll={clearControlPoints}
                       />
                     </Tab>
                   </Tabs>
@@ -848,8 +1205,24 @@ export default function VenueManagementPageClient() {
                   <div className="flex gap-2">
                     <MarkerModeToggleButton
                       isAddMarkerMode={isAddMarkerMode}
-                      onToggle={() => setIsAddMarkerMode(!isAddMarkerMode)}
+                      onToggle={toggleAddMarkerMode}
                     />
+                    <Button
+                      size="md"
+                      variant={isGeoreferenceMode ? 'solid' : 'bordered'}
+                      color={isGeoreferenceMode ? 'primary' : 'default'}
+                      onPress={toggleGeoreferenceMode}
+                      startContent={
+                        isGeoreferenceMode ? (
+                          <MousePointer2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Crosshair className="h-3.5 w-3.5" />
+                        )
+                      }
+                      className={isGeoreferenceMode ? 'bg-status-orange hover:bg-status-orange/90 text-surface-deepest' : ''}
+                    >
+                      {isGeoreferenceMode ? 'Click to Place' : 'Add Control Point'}
+                    </Button>
                   </div>
                 )}
               </div>
@@ -867,7 +1240,7 @@ export default function VenueManagementPageClient() {
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         style={{ 
-                          cursor: isAddMarkerMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
+                          cursor: isAddMarkerMode || isGeoreferenceMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
                           maxHeight: 'calc(100vh - 200px)',
                         }}
                       >
@@ -907,6 +1280,7 @@ export default function VenueManagementPageClient() {
                           <div className="absolute inset-0 pointer-events-none">
                             <div className="relative w-full h-full pointer-events-auto">
                               {renderMarkers()}
+                              {renderControlPointMarkers()}
                             </div>
                           </div>
                         </div>
@@ -924,6 +1298,22 @@ export default function VenueManagementPageClient() {
                         />
                       )}
 
+                      {pendingGeoPoint && (
+                        <GeoreferencePointDialog
+                          latInput={geoLatInput}
+                          lonInput={geoLonInput}
+                          labelInput={geoLabelInput}
+                          latInputRef={geoLatInputRef}
+                          setLatInput={setGeoLatInput}
+                          setLonInput={setGeoLonInput}
+                          setLabelInput={setGeoLabelInput}
+                          latError={geoLatError}
+                          lonError={geoLonError}
+                          onConfirm={confirmGeoPoint}
+                          onCancel={cancelGeoPoint}
+                        />
+                      )}
+
                       {/* Zoom Controls - Top Right */}
                       <MapZoomControls
                         onZoomIn={() => zoomIn(0.5)}
@@ -935,6 +1325,13 @@ export default function VenueManagementPageClient() {
 
                       {/* Instructions overlay - Top Left */}
                       {isAddMarkerMode && !pendingMarker && <MarkerPlacementInstruction />}
+                      {isGeoreferenceMode && !pendingGeoPoint && (
+                        <div className="absolute left-3 top-3 rounded-lg border border-status-orange/50 bg-surface-deepest/95 px-3 py-2 z-20 pointer-events-none">
+                          <p className="text-xs text-status-orange">
+                            Click on the map to place a georeference control point
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Bottom Info Bar - Now OUTSIDE and BELOW the image container */}

@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Venue map georeferencing** — venue map layers can now be pinned to real-world coordinates by placing control points on the map image and entering each point's latitude and longitude. Two points fit a similarity transform (rotation, uniform scale, no shear); three or more fit a least-squares affine. Control points live per-layer on `Layer.georeference`, since each layer carries its own map image and its own alignment.
+  - `src/lib/geoUtils.ts` — pure conversion math (`solveGeoreference`, `pixelToLatLon`, `latLonToPixel`). Fits in a local tangent-plane frame scaled by `cos(latitude)`, accurate at venue scale.
+  - Post coordinates are **derived on read** (`postLatLon`, `layerPostsLatLon`) rather than stored, so recalibrating a layer's control points immediately corrects every post on it. No migration or backfill is involved.
+- `Staff.position` and `Supervisor.position` — optional `{ lat, lon, accuracy, timestamp }` carried *alongside* the existing `location` post assignment rather than replacing it: the assigned post and the physical position are different facts. The field is defined but not yet populated; this change ships no geolocation capture.
+- **Vitest unit-test runner** (`npm run test:unit`), alongside the existing Playwright/BDD end-to-end suite, covering the georeferencing math.
+
 ---
 
 ## [1.4.0] - 2026-08-11

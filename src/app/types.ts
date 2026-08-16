@@ -12,11 +12,27 @@ export interface Clinic {
   name: string;
 }
 
+export interface ControlPoint {
+  x: number;      // percentage of image width,  0-100
+  y: number;      // percentage of image height, 0-100
+  lat: number;
+  lon: number;
+  label?: string; // e.g. "NW corner of main stage"
+}
+
+export interface Georeference {
+  controlPoints: ControlPoint[];  // 2 = similarity transform, 3+ = least-squares affine
+  version: number;                // bump on recalibration
+  updatedAt: number;              // epoch ms
+  updatedBy?: string;
+}
+
 export interface Layer {
   id: string;
   name: string;
   mapUrl?: string;
   posts: Post[];
+  georeference?: Georeference;
 }
 
 export interface Venue {
@@ -63,6 +79,8 @@ export interface Event {
   end?: string | number;
 
   interactionSessions?: InteractionSession[];
+
+  tak?: TakPublishSettings;
 }
 
 export interface TeamLogEntry {
@@ -325,3 +343,53 @@ export type Role = {
   name: string;
   fullName: string;
 }
+
+// --- TAK (Team Awareness Kit) / CoT bridge -------------------------------
+
+export type TakCallPublishMode = 'off' | 'location-only' | 'full';
+
+// Per-event configuration for the CoT bridge that mirrors CrowdCAD dispatch
+// state out to TAK clients (ATAK-CIV, WinTAK, etc).
+//
+// This document is deliberately NON-SECRET: it lives on the Event document,
+// which any member of the owning organization can read. Certificates, key
+// passwords, and server auth tokens for the TAK server connection must NEVER
+// be stored here (or anywhere in Firestore/PocketBase) — they belong in a
+// server-side secret store, referenced by ID/name if needed, never by value.
+export interface TakPublishSettings {
+  enabled: boolean;
+  publishTeams: boolean;
+  publishSupervisors: boolean;
+  publishPosts: boolean;
+  publishCalls: TakCallPublishMode;
+  callsignPrefix?: string;
+  cotGroup?: string;
+  staleSeconds?: number;
+  publishIntervalSeconds?: number;
+}
+
+// --- Why there is only one live-position model ------------------------------
+//
+// Two TAK efforts ran in parallel and each independently designed a live GPS
+// position type: `TakPosition`/`TakPositionRecord` (above) and a `TeamPosition`
+// with a parallel `Staff.position` mirror. Both reached the SAME structural
+// conclusion for the same three reasons — positions belong in their own
+// top-level collection, never nested in the Event document, because (1) an
+// Event doc is one record every dispatcher subscribes to and has a practical
+// ~1 write/sec ceiling that device-rate GPS blows straight past, (2) high-rate
+// position writes would contend with dispatcher edits in the same record, and
+// (3) every listening client would otherwise re-download the whole event
+// payload on every GPS tick. That agreement is the strongest evidence the
+// design is right.
+//
+// `TeamPosition`, `PositionSource`, `Staff.position` and `Supervisor.position`
+// were deleted when the branches were merged, because `TakPositionRecord` is
+// the one that is actually built, wired to the bridge, and proven against a
+// real FreeTAKServer. Keeping both would have meant two names for one concept
+// and a standing invitation to write to the wrong one.
+//
+// If you need something the deleted type had and `TakPosition` lacks — `orgId`,
+// `hae`, `heading`, `speed`, a server-side `receivedAt` distinct from device
+// `timestamp`, an advisory `layerId`, or a `source` discriminator for non-TAK
+// position providers — ADD IT TO `TakPosition`/`TakPositionRecord` above. Do
+// not reintroduce a second position type.
