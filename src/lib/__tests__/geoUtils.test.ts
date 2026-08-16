@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { ControlPoint, Georeference, Layer, Post } from '@/app/types';
 import {
+  georeferenceResiduals,
   latLonToPixel,
   layerPostsLatLon,
+  MAX_ACCEPTABLE_RESIDUAL_METRES,
+  METRES_PER_DEGREE_LATITUDE,
   pixelToLatLon,
   postLatLon,
   postName,
@@ -537,6 +540,175 @@ describe('postName / postPercent / postLatLon / layerPostsLatLon (derive-on-read
 
       expect(resultB.lat).not.toBeCloseTo(resultA.lat, 3);
       expect(resultB.lon).not.toBeCloseTo(resultA.lon, 3);
+    });
+  });
+});
+
+describe('georeferenceResiduals', () => {
+  it('exports MAX_ACCEPTABLE_RESIDUAL_METRES as 25', () => {
+    expect(MAX_ACCEPTABLE_RESIDUAL_METRES).toBe(25);
+  });
+
+  it('returns null for an undefined georeference', () => {
+    expect(georeferenceResiduals(undefined)).toBeNull();
+  });
+
+  it('returns null for a single control point (same condition as solveGeoreference)', () => {
+    expect(
+      georeferenceResiduals(makeGeoref([{ x: 50, y: 50, lat: BASE_LAT, lon: BASE_LON }]))
+    ).toBeNull();
+  });
+
+  it('returns null for a degenerate (collinear) control point set', () => {
+    // Same three collinear points as the solveGeoreference degenerate test
+    // above — the affine design matrix is singular, so there's no fitted
+    // transform to measure residuals against.
+    const controlPoints: ControlPoint[] = [
+      { x: 10, y: 10, lat: BASE_LAT, lon: BASE_LON, label: 'A' },
+      { x: 50, y: 50, lat: BASE_LAT - 0.001, lon: BASE_LON + 0.001, label: 'B' },
+      { x: 90, y: 90, lat: BASE_LAT - 0.002, lon: BASE_LON + 0.002, label: 'C' },
+    ];
+    expect(georeferenceResiduals(makeGeoref(controlPoints))).toBeNull();
+  });
+
+  describe('exactly 2 control points (anti-similarity fit is exact)', () => {
+    // The 2-point solver is a determined 4-DOF system solved directly from
+    // the two points, not a least-squares fit over more data than
+    // parameters — so by construction it passes through both points
+    // exactly. Residuals here should be ~0 up to floating-point noise, not
+    // merely "small", which is the whole reason 3+ points is a materially
+    // different case worth reporting separately.
+    const controlPoints: ControlPoint[] = [
+      { x: 10, y: 20, lat: BASE_LAT, lon: BASE_LON, label: 'NW' },
+      { x: 90, y: 80, lat: BASE_LAT - 0.002, lon: BASE_LON + 0.002, label: 'SE' },
+    ];
+
+    it('reports ~0 residuals for every point, and ~0 max/rms', () => {
+      const result = georeferenceResiduals(makeGeoref(controlPoints));
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      expect(result.perPoint).toHaveLength(2);
+      for (const d of result.perPoint) {
+        expect(d).toBeCloseTo(0, 6);
+      }
+      expect(result.maxMetres).toBeCloseTo(0, 6);
+      expect(result.rmsMetres).toBeCloseTo(0, 6);
+    });
+  });
+
+  describe('4+ control points (least-squares affine fit is generally inexact)', () => {
+    // Base dataset: 7 points laid out symmetrically (four corners, a dead
+    // center, and two off-diagonal points) all placed EXACTLY on a single
+    // affine map, so a clean fit would reproduce every one of them with ~0
+    // residual (same style as the "4-point least-squares affine transform"
+    // dataset above, just with more points).
+    const lat0 = BASE_LAT;
+    const lon0 = BASE_LON;
+    const cosLat0 = Math.cos((lat0 * Math.PI) / 180);
+    const a = 0.00002;
+    const b = 0.000005;
+    const c = -0.001;
+    const d = -0.000004;
+    const e = 0.000018;
+    const f = 0.0005;
+
+    function exactLatLon(x: number, y: number): { lat: number; lon: number } {
+      const u = a * x + b * y + c;
+      const v = d * x + e * y + f;
+      return { lat: lat0 + v, lon: lon0 + u / cosLat0 };
+    }
+
+    const pixelPoints: [number, number][] = [
+      [5, 5],
+      [95, 5],
+      [5, 95],
+      [95, 95],
+      [50, 50], // center — deliberately mismatched below
+      [20, 80],
+      [80, 20],
+    ];
+
+    it('gives a much larger residual to the one deliberately-mismatched point, at the correct index, and preserves perPoint length/order', () => {
+      const perturbedIndex = 4; // pixelPoints[4] = [50, 50], the center point
+      const latOffset = 0.02; // deliberately large vs. the ~0 misfit of the consistent points
+
+      const controlPoints: ControlPoint[] = pixelPoints.map(([x, y], i) => {
+        const { lat, lon } = exactLatLon(x, y);
+        return {
+          x,
+          y,
+          lat: i === perturbedIndex ? lat + latOffset : lat,
+          lon,
+          label: `cp${i}`,
+        };
+      });
+
+      const result = georeferenceResiduals(makeGeoref(controlPoints));
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      // perPoint tracks control points 1:1, in original order.
+      expect(result.perPoint).toHaveLength(controlPoints.length);
+
+      // The perturbed point's residual dominates every other point's by a
+      // wide margin, and lands at the SAME index it was placed at (index 4)
+      // — verifying georeferenceResiduals doesn't silently reorder or
+      // misalign perPoint against controlPoints.
+      for (let i = 0; i < pixelPoints.length; i++) {
+        if (i === perturbedIndex) continue;
+        expect(result.perPoint[perturbedIndex]).toBeGreaterThan(result.perPoint[i] * 5);
+      }
+
+      expect(result.maxMetres).toBeCloseTo(result.perPoint[perturbedIndex], 6);
+      // rms can never exceed max — max is one of the terms being averaged
+      // into it, and the others are non-negative.
+      expect(result.rmsMetres).toBeLessThanOrEqual(result.maxMetres);
+      // With 6 near-zero points and 1 large one, rms is well below max.
+      expect(result.rmsMetres).toBeLessThan(result.maxMetres);
+    });
+
+    it('produces a residual close to the analytically-expected ground distance for a known latitude offset', () => {
+      // A symmetric 4-corner square — (0,0) (100,0) (0,100) (100,100) — all
+      // at the SAME longitude (so the u/longitude fit is exactly consistent:
+      // zero residual on that axis for every point) and the SAME latitude,
+      // except one corner offset by a known delta.
+      //
+      // solveAffine fits u and v completely independently (two separate
+      // 3x3 normal-equations solves sharing only the x/y design matrix), so
+      // perturbing only latitude only perturbs the v-fit. For this square,
+      // the design matrix M = X^T X (X's rows are [x, y, 1]) works out to
+      //   M = [[20000, 10000, 200], [10000, 20000, 200], [200, 200, 4]]
+      // and the least-squares "hat" matrix H = X * M^-1 * X^T has, for this
+      // symmetric configuration, H_ii = 0.75 at every corner (equal
+      // leverage by symmetry; trace(H) = rank(X) = 3 = 4 * 0.75, which
+      // checks out). Because the design includes a constant ("1") column,
+      // H's rows each sum to 1 (a target of all-ones is fit exactly), which
+      // reduces the residual at a single perturbed point of offset `delta`
+      // to exactly `delta * (1 - H_ii)` regardless of the other points'
+      // shared latitude value. So the expected residual is
+      // `delta * (1 - 0.75) = 0.25 * delta` in latitude-degree-equivalent
+      // v-units — converted to metres via METRES_PER_DEGREE_LATITUDE (no
+      // cosLat0 factor: this offset is pure latitude/v, not longitude/u).
+      const lonSame = BASE_LON;
+      const latOffset = 0.001; // degrees of latitude
+
+      const controlPoints: ControlPoint[] = [
+        { x: 0, y: 0, lat: lat0, lon: lonSame, label: 'A' },
+        { x: 100, y: 0, lat: lat0, lon: lonSame, label: 'B' },
+        { x: 0, y: 100, lat: lat0, lon: lonSame, label: 'C' },
+        { x: 100, y: 100, lat: lat0 + latOffset, lon: lonSame, label: 'D (offset)' },
+      ];
+
+      const result = georeferenceResiduals(makeGeoref(controlPoints));
+      expect(result).not.toBeNull();
+      if (!result) return;
+
+      const expectedMetres = 0.25 * latOffset * METRES_PER_DEGREE_LATITUDE;
+      expect(expectedMetres).toBeCloseTo(27.83, 2);
+
+      expect(result.perPoint[3]).toBeCloseTo(expectedMetres, 4);
+      expect(result.maxMetres).toBeCloseTo(expectedMetres, 4);
     });
   });
 });

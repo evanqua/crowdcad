@@ -306,6 +306,99 @@ export function latLonToPixel(t: GeoTransform, lat: number, lon: number): { x: n
   return { x, y };
 }
 
+/**
+ * Ground distance, in metres, represented by one degree of latitude — and,
+ * by construction of the local tangent-plane frame (see toLocalPlane), one
+ * unit of the u/v axes too. This is the standard WGS84 mean (1 deg lat ~=
+ * 111.32 km); like the rest of this module's flat-earth tangent-plane model,
+ * it is a venue-scale approximation and does not account for the small
+ * latitude-dependent variation in true meridional arc length.
+ */
+export const METRES_PER_DEGREE_LATITUDE = 111320;
+
+/**
+ * The largest georeferenceResiduals().maxMetres considered acceptable for
+ * publishing geospatial data (post locations, exports, etc.) derived from a
+ * georeference. Beyond this threshold, a "successfully georeferenced" UI
+ * state would be actively misleading: everything computed from the
+ * transform could be tens of metres from its real position while looking
+ * exactly as authoritative as a tight fit. A bad georeference that LOOKS
+ * trustworthy is worse than one that visibly failed to solve at all, so
+ * callers should treat residuals above this as a hard warning, not a soft
+ * one.
+ */
+export const MAX_ACCEPTABLE_RESIDUAL_METRES = 25;
+
+export interface GeoreferenceResiduals {
+  /** Per control point, in original order: distance in metres between the
+   *  operator-entered lat/lon and where the fitted transform actually puts
+   *  that point's (x%, y%). */
+  perPoint: number[];
+  maxMetres: number;
+  rmsMetres: number;
+}
+
+/**
+ * Measures how well the fitted GeoTransform actually reproduces the control
+ * points it was fit from, in metres.
+ *
+ * This distinction is the whole reason the readout matters:
+ *
+ * - With exactly 2 control points, solveGeoreference fits its 4-DOF
+ *   anti-similarity transform directly from those 2 points — a determined
+ *   system, not a least-squares one, so the fit passes through both points
+ *   exactly. Residuals here are ~0 up to floating-point noise. This function
+ *   still computes and reports them (rather than special-casing them away)
+ *   so callers don't need their own 2-vs-3+ branch just to know that.
+ * - With 3+ control points, solveGeoreference fits a 6-DOF least-squares
+ *   affine transform to an overdetermined system, which generally does NOT
+ *   pass through every point exactly. A large residual there means the
+ *   control points aren't consistent with a single affine map — an operator
+ *   mistyped a lat/lon, or the venue map isn't a clean affine projection
+ *   across the span the points cover. Without surfacing this number, a bad
+ *   multi-point fit looks identical in the UI to a good one.
+ *
+ * Distances are measured in the SAME local tangent-plane frame the solver
+ * fits in (see toLocalPlane and the module doc comment above), for
+ * consistency with what the transform is actually optimizing: both the
+ * fitted and the operator-entered positions are projected to (u, v) using
+ * the transform's own lat0/lon0/cosLat0, the Euclidean distance between them
+ * is taken in degree-equivalent units, then scaled to metres via
+ * METRES_PER_DEGREE_LATITUDE.
+ *
+ * Returns null under the same conditions as solveGeoreference: fewer than 2
+ * control points, coincident/collinear points, or a near-polar origin.
+ */
+export function georeferenceResiduals(
+  georef: Georeference | undefined
+): GeoreferenceResiduals | null {
+  const transform = solveGeoreference(georef);
+  if (!transform || !georef?.controlPoints) {
+    return null;
+  }
+
+  const perPoint = georef.controlPoints.map((p) => {
+    const fitted = pixelToLatLon(transform, p.x, p.y);
+    const entered = toLocalPlane(p.lat, p.lon, transform.lat0, transform.lon0, transform.cosLat0);
+    const fittedLocal = toLocalPlane(
+      fitted.lat,
+      fitted.lon,
+      transform.lat0,
+      transform.lon0,
+      transform.cosLat0
+    );
+    const du = fittedLocal.u - entered.u;
+    const dv = fittedLocal.v - entered.v;
+    return Math.sqrt(du * du + dv * dv) * METRES_PER_DEGREE_LATITUDE;
+  });
+
+  const maxMetres = perPoint.reduce((max, d) => Math.max(max, d), 0);
+  const sumSquares = perPoint.reduce((sum, d) => sum + d * d, 0);
+  const rmsMetres = Math.sqrt(sumSquares / perPoint.length);
+
+  return { perPoint, maxMetres, rmsMetres };
+}
+
 // --- Derive-on-read Post accessors -----------------------------------------
 //
 // A Post's lat/lon is intentionally never stored: it is always recomputed

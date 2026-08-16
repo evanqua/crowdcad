@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button, Card, Input, ScrollShadow } from '@heroui/react';
 import { AlertTriangle, CheckCircle2, Crosshair, Trash2 } from 'lucide-react';
 import type { ControlPoint, Georeference } from '@/app/types';
-import { solveGeoreference } from '@/lib/geoUtils';
+import { MAX_ACCEPTABLE_RESIDUAL_METRES, georeferenceResiduals, solveGeoreference } from '@/lib/geoUtils';
 
 interface GeoreferenceSectionProps {
   controlPoints: ControlPoint[];
@@ -44,6 +44,28 @@ function describeGeoreferenceStatus(controlPoints: ControlPoint[]): Georeference
     return {
       tone: 'ok',
       message: 'Georeferenced — similarity fit (rotation + uniform scale, no shear)',
+    };
+  }
+
+  // For 3+ points the affine fit is least-squares, not exact (see
+  // georeferenceResiduals doc comment) — surface the fit error so an
+  // operator can tell a tight fit from one where a mistyped control point
+  // is quietly dragging the whole transform off.
+  const residuals = georeferenceResiduals(georeference);
+  if (residuals) {
+    const maxMetres = residuals.maxMetres.toFixed(1);
+    const rmsMetres = residuals.rmsMetres.toFixed(1);
+
+    if (residuals.maxMetres > MAX_ACCEPTABLE_RESIDUAL_METRES) {
+      return {
+        tone: 'warn',
+        message: `Fit error too large (max ${maxMetres} m) — this georeference is too inaccurate to use for geospatial export. Re-check the control point coordinates.`,
+      };
+    }
+
+    return {
+      tone: 'ok',
+      message: `Georeferenced — least-squares affine fit (${controlPoints.length} points), max error ${maxMetres} m, RMS ${rmsMetres} m`,
     };
   }
 

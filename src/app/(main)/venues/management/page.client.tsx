@@ -10,6 +10,7 @@ import { dbService, storageService } from '@/lib/services';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer, ControlPoint, Georeference } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
+import { layerPostsLatLon } from '@/lib/geoUtils';
 import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import NewLayerModal from '@/components/modals/venue/newlayer';
@@ -316,6 +317,32 @@ export default function VenueManagementPageClient() {
   // All posts from all layers
   const allPosts = venueData.layers.flatMap((layer, layerIdx) =>
     layer.posts.map((post, postIdx) => ({ post, layerIdx, postIdx, layerName: layer.name }))
+  );
+
+  // Derived lat/lon for every post in EVERY layer. The posts list below is
+  // cross-layer (each row is tagged with its layer name), so scoping this to
+  // the active layer alone would leave rows from other georeferenced layers
+  // silently blank — indistinguishable from "this layer isn't calibrated".
+  //
+  // layerPostsLatLon solves each layer's georeference ONCE and reuses the
+  // transform across that layer's posts, so this is one solve per layer, not
+  // one per post. The result is indexed [layerIdx][postIdx], matching the
+  // (layerIdx, postIdx) pairs allPosts already carries.
+  //
+  // This readout is the operator's calibration feedback loop: it is how
+  // someone tells a good georeference from a bad one before it silently
+  // produces wrong coordinates downstream.
+  const layerPostLatLons = useMemo(
+    () => venueData.layers.map((layer) => layerPostsLatLon(layer)),
+    [venueData.layers]
+  );
+
+  // A layer counts as georeferenced once it has enough control points to
+  // solve a transform (>= 2) — below that, every post's latLon is null by
+  // definition and showing a "not placed" hint on each row would be noise.
+  const layerIsGeoreferenced = useMemo(
+    () => venueData.layers.map((layer) => (layer.georeference?.controlPoints.length ?? 0) >= 2),
+    [venueData.layers]
   );
 
   // Equipment
@@ -1033,49 +1060,67 @@ export default function VenueManagementPageClient() {
                             const hasCoordinates = typeof post === 'object' && post.x !== null && post.y !== null;
                             const isPending = pendingMarker?.layerIdx === item.layerIdx && pendingMarker?.postIdx === item.postIdx;
 
+                            const derivedLatLon =
+                              layerPostLatLons[item.layerIdx]?.[item.postIdx]?.latLon ?? null;
+
                             return (
                               <Card
                                 key={idx}
                                 isBlurred
                                 className="border-2 rounded-2xl border-default-200 bg-transparent"
                               >
-                                <div className="flex items-center justify-between px-3 py-2">
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    {hasCoordinates ? (
-                                      <MapPinned className="h-4 w-4 flex-shrink-0 text-accent" />
-                                    ) : (
-                                      <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />
-                                    )}
-                                    <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-surface-light'}`}>
-                                      {label}
-                                    </span>
-                                    {item.layerName && (
-                                      <span className="text-xs text-surface-light">({item.layerName})</span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    {typeof post !== 'string' && (
+                                <div className="flex flex-col px-3 py-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      {hasCoordinates ? (
+                                        <MapPinned className="h-4 w-4 flex-shrink-0 text-accent" />
+                                      ) : (
+                                        <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />
+                                      )}
+                                      <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-surface-light'}`}>
+                                        {label}
+                                      </span>
+                                      {item.layerName && (
+                                        <span className="text-xs text-surface-light">({item.layerName})</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      {typeof post !== 'string' && (
+                                        <Button
+                                          isIconOnly
+                                          size="sm"
+                                          variant="light"
+                                          onPress={() => renamePost(item.layerIdx, item.postIdx)}
+                                          className="min-w-6 w-6 h-6"
+                                        >
+                                          <Edit2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      )}
                                       <Button
                                         isIconOnly
                                         size="sm"
                                         variant="light"
-                                        onPress={() => renamePost(item.layerIdx, item.postIdx)}
+                                        color="danger"
+                                        onPress={() => removePost(item.layerIdx, item.postIdx)}
                                         className="min-w-6 w-6 h-6"
                                       >
-                                        <Edit2 className="h-3.5 w-3.5" />
+                                        <Trash2 className="h-3.5 w-3.5" />
                                       </Button>
-                                    )}
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      variant="light"
-                                      color="danger"
-                                      onPress={() => removePost(item.layerIdx, item.postIdx)}
-                                      className="min-w-6 w-6 h-6"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
+                                    </div>
                                   </div>
+                                  {derivedLatLon ? (
+                                    <p className="pl-6 text-xs text-surface-faint">
+                                      {derivedLatLon.lat.toFixed(6)}, {derivedLatLon.lon.toFixed(6)}
+                                    </p>
+                                  ) : (
+                                    // Only worth saying when the layer IS calibrated: then a
+                                    // missing coordinate is about this post specifically, not
+                                    // about the layer. On an uncalibrated layer every row
+                                    // would say it, which is pure noise.
+                                    layerIsGeoreferenced[item.layerIdx] && (
+                                      <p className="pl-6 text-xs text-surface-faint">not placed on map</p>
+                                    )
+                                  )}
                                 </div>
                               </Card>
                             );
