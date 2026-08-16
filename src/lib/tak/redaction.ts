@@ -74,16 +74,29 @@ export function applyRedaction(cot: CotEvent, mode: TakCallPublishMode): CotEven
 
   const identifier = deriveCallIdentifier(cot);
 
+  // `callsign` carries the SAME allowlisted value that already goes into
+  // `remarks` below — no additional information leaves the system by emitting
+  // it twice. It is emitted because a CoT event with no <contact callsign>
+  // renders in TAK as its bare UID ("crowdcad.evt1.call.abc123"), which is
+  // both unreadable on a map and a needless disclosure of internal ids to
+  // every federated partner. Whatever is safe to put in remarks is safe here;
+  // whatever is not safe here was already unsafe in remarks. Keep the two
+  // fields fed from the one `identifier` so they can never diverge.
   if (mode === 'location-only') {
-    redacted.detail = { remarks: identifier };
+    redacted.detail = { callsign: identifier, remarks: identifier };
     return redacted;
   }
 
   // mode === 'full'. The ONLY additional field permitted through is
   // `detail.chiefComplaint` — named explicitly here, not "everything except
   // the fields we know are bad".
+  // Note that the chief complaint goes into `remarks` ONLY, never into
+  // `callsign`. A callsign is a map label rendered permanently next to the
+  // icon and shown in contact lists; remarks require opening the marker. Even
+  // in 'full' mode, clinical text belongs behind that one extra tap.
   const chiefComplaint = cot.detail?.chiefComplaint?.trim();
   redacted.detail = {
+    callsign: identifier,
     remarks: chiefComplaint ? `${identifier}: ${chiefComplaint}` : identifier,
   };
   return redacted;

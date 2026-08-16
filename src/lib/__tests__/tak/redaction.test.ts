@@ -117,6 +117,27 @@ describe('applyRedaction PHI safety (allowlist enforcement)', () => {
     expect(result?.detail?.remarks).not.toContain('log=');
   });
 
+  it('emits a callsign so the marker is not labelled with its raw UID', () => {
+    // A CoT event with no <contact callsign> renders in TAK as its bare uid.
+    // That is unreadable on a map and needlessly discloses internal ids to
+    // every federated partner.
+    for (const mode of ['location-only', 'full'] as const) {
+      expect(applyRedaction(input, mode)?.detail?.callsign).toBeTruthy();
+    }
+  });
+
+  it('never puts clinical text in the callsign, even in full mode', () => {
+    // The callsign is a permanent map label and appears in contact lists;
+    // remarks require opening the marker. Full mode permits the chief
+    // complaint in remarks ONLY — it must never become the icon's label.
+    const result = applyRedaction(input, 'full');
+    expect(result?.detail?.callsign).not.toContain(CHIEF_COMPLAINT_SENTINEL);
+    expect(result?.detail?.callsign).not.toContain(AGE_SENTINEL);
+    expect(result?.detail?.callsign).not.toContain(GENDER_SENTINEL);
+    expect(result?.detail?.callsign).not.toContain(NOTES_SENTINEL);
+    expect(result?.detail?.callsign).not.toContain(LOG_SENTINEL);
+  });
+
   it('does not mutate the input CotEvent', () => {
     const before = JSON.parse(JSON.stringify(input));
     applyRedaction(input, 'off');
