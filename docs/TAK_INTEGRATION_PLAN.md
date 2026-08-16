@@ -3,17 +3,80 @@
 **Status:** In progress — Phase 0 complete, Phase 1 partially complete (see §0)
 **Target:** CrowdCAD (`core/`), general-purpose capability; IC-EMS is the first deployer
 **Author:** drafted 2026-08-11
-**Last updated:** 2026-08-15
-**Related branches:** `feature/tak-georeference` (georeference groundwork, committed),
-`feature/tak-phase0` (Phase 0 completion + Phase 1 pure modules)
+**Last updated:** 2026-08-16
+**Latest code:** `52fe6c5` on `feature/tak-phase0` (in the `core/` submodule)
+
+---
+
+## How to use this document
+
+**This is the progress tracker for the TAK integration. It is written to be picked
+up cold, in a fresh session, with no other context.**
+
+- **§0 is the current state.** Read it first. It says what exists, what does not,
+  why the work stopped where it did, and what to do next.
+- **§1 onward is the original plan**, preserved as drafted and annotated inline with
+  ✅ (done) / 🟡 (partial) / ⛔ (not started, and why). The plan itself is settled —
+  don't re-plan it. What changes between sessions is §0.
+- **§0.5 is the session log.** Append to it.
+
+**If you are starting a session:** read §0.1–§0.3, then §0.4 for the next action,
+then only the phase section you are about to touch.
+
+**Before you end a session:** update the §0.1 table, add any judgment calls to
+§0.3, and append a §0.5 entry. A stale tracker is worse than none — it will be
+trusted and it will be wrong.
+
+### Where the code is
+
+| | |
+|---|---|
+| Repo | the **`core/` submodule**, not the root wrapper |
+| This document | `core/docs/TAK_INTEGRATION_PLAN.md` — **the canonical copy** |
+| Latest commit | `52fe6c5` — Phase 0 completion + Phase 1 pure modules |
+| Parent commit | `9fe8de6` — georeference groundwork (was uncommitted WIP before 2026-08-15) |
+| Pushed? | **No.** See the warning below. |
+
+⚠️ **`core`'s only remote is the PUBLIC `evanqua/crowdcad`.** A bare `git push`
+publishes. Nothing here has been pushed; treat pushing as a deliberate, owner-only
+act.
+
+⚠️ **Branch discoverability.** `52fe6c5` lives on `feature/tak-phase0`, which was cut
+from `feature/tak-georeference`. If your `core/` checkout is on
+`feature/tak-georeference`, **this file and all Phase 1 code will not be present** —
+you would be reading a stale tree and could easily redo finished work. To bring the
+branch you're on up to date (a pure fast-forward, no merge commit, nothing lost):
+
+```bash
+cd core
+git log --oneline -1                       # if this is NOT 52fe6c5, keep reading
+git merge --ff-only feature/tak-phase0     # from feature/tak-georeference
+```
+
+### Verify the state you inherited
+
+```bash
+cd core
+git log --oneline -2     # expect: 52fe6c5, then 9fe8de6
+npm run test:unit        # expect: 5 files, 81 passed
+npm run type-check       # expect: clean, no output
+```
+
+If the test count is 34, you are on `9fe8de6` and are missing this session's work.
+If `src/lib/tak/` does not exist, likewise.
 
 > **Placement note — resolved 2026-08-15.** This document originally lived in the
 > root wrapper's `docs/` because the `core/` submodule had uncommitted work on
 > `feature/tak-georeference`. That work is now committed (`9fe8de6`), so per the
-> original note this file has been moved to `core/docs/TAK_INTEGRATION_PLAN.md` and
-> travels with the code it describes. **This file is the canonical copy** — the copy
-> on the root wrapper's `docs/` branch is superseded and should be deleted rather
-> than edited, to avoid the two drifting apart.
+> original note this file was moved to `core/docs/TAK_INTEGRATION_PLAN.md` and now
+> travels with the code it describes.
+>
+> **A superseded copy still exists** at
+> `.claude/worktrees/tak-integration-plan/docs/TAK_INTEGRATION_PLAN.md` (branch
+> `worktree-tak-integration-plan` in the **root** repo). It is the original 861-line
+> draft with **no status annotations at all** — it does not know any code was ever
+> written. Delete that worktree and branch rather than editing it; if you find
+> yourself reading an 861-line copy with no ✅ markers, you have the wrong file.
 
 ---
 
@@ -35,10 +98,10 @@ from the phase section it affects.
 | 0 | Control-point placement mode, editing UI, `GeoreferenceSection` / `GeoreferencePointDialog` | Done | `9fe8de6` |
 | 0 | vitest harness (`npm run test:unit`) + 34 solver tests | Done | `9fe8de6` |
 | **0.1** | **Georeference persistence round-trip** | **Verified — no code change needed** | — |
-| **0.2** | **Derived lat/lon readout per post in the venue editor** | **Done** | `feature/tak-phase0` |
-| **0.3** | **Residual / fit-quality readout in metres + unacceptable-fit warning** | **Done** | `feature/tak-phase0` |
-| **1.1** | **Pure modules `tak/{types,uid,cot,redaction}.ts` + tests** | **Done** | `feature/tak-phase0` |
-| **1.1** | **`TakPublishSettings`, `TeamPosition`, `PositionSource`, `Staff/Supervisor.takUid`, `Event.tak` types** | **Done** | `feature/tak-phase0` |
+| **0.2** | **Derived lat/lon readout per post in the venue editor** | **Done** | `52fe6c5` |
+| **0.3** | **Residual / fit-quality readout in metres + unacceptable-fit warning** | **Done** | `52fe6c5` |
+| **1.1** | **Pure modules `tak/{types,uid,cot,redaction}.ts` + tests** | **Done** | `52fe6c5` |
+| **1.1** | **`TakPublishSettings`, `TeamPosition`, `PositionSource`, `Staff/Supervisor.takUid`, `Event.tak` types** | **Done** | `52fe6c5` |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -142,9 +205,58 @@ routes compiling. Two pre-existing lint warnings in `page.client.tsx` (`uploadWi
 4. Answer the six open questions in §11 — several change the adapter priority for
    Phase 2 and are organizational lead-time items, not coding tasks.
 
+**What is safe to start right now, with no spike and no external input:** nothing
+large. That is the honest answer, and it is why §0.4 leads with the spikes rather
+than with code. The next meaningful code (`mapping.ts`) is one spike away, and
+that spike needs an afternoon with WinTAK, not a development environment. Resist
+the temptation to build `mapping.ts` speculatively — §7.3 explains exactly what
+goes wrong.
+
+### 0.5 Session log
+
+Append one entry per working session. Keep entries short: what changed, what was
+decided, where it stopped. Detail belongs in §0.1–§0.3.
+
+**2026-08-11 — planning.**
+Drafted this document (`8344a6a`, root wrapper). No code written. Grounded the plan
+in two findings from reading the codebase: the whole event is one Firestore document
+behind a single `updateEvent()` transaction (so live GPS cannot be written into
+`Staff.position` at device rate — §6.2), and the georeference math had no production
+callers (so Phase 0 is a hard prerequisite).
+
+**Earlier sessions (pre-2026-08-15) — georeference groundwork.**
+Built the types, the solvers in `geoUtils.ts`, the control-point placement UI, and the
+vitest harness with 34 tests. **This work was left uncommitted** on
+`feature/tak-georeference`.
+
+**2026-08-15 — Phase 0 completion + Phase 1 pure modules.**
+- Committed the inherited uncommitted groundwork as `9fe8de6` before touching
+  anything else, so it could not be lost.
+- Verified Phase 0.1 (persistence) — already correct, no code change.
+- Implemented Phase 0.2 (per-post derived lat/lon, all layers) and Phase 0.3
+  (residuals in metres + 25 m warning threshold). Phase 0 exit criteria met.
+- Implemented the spike-independent half of Phase 1.1: `src/lib/tak/{types,uid,cot,
+  redaction}.ts` plus tests, and the TAK config/position types.
+- **Deliberately did not build** `mapping.ts`, `kml.ts`, or the feed routes — all
+  gated on the two spikes (§0.2, §7.3, §1.5).
+- Committed as `52fe6c5` on `feature/tak-phase0`. **Not pushed.**
+- Tests 34 → 81. `type-check` clean, `npm run build` clean.
+- Decisions recorded in §0.3(1)–(9).
+
+**2026-08-16 — documentation pass.**
+Restructured this file for cold-session pickup: added the "How to use this document"
+header, the code-location and state-verification blocks, the branch-discoverability
+warning, and this session log. Pinned commit SHAs in the §0.1 table instead of branch
+names, since branches move and SHAs do not. No code changed.
+
 ---
 
 ## 1. Executive summary
+
+> *Everything from here on is the original plan as drafted on 2026-08-11, annotated
+> inline with ✅ / 🟡 / ⛔ status markers. It records the reasoning and the target
+> design, **not** current progress — for that, see §0. The recommendation below still
+> stands; nothing found during implementation has contradicted it.*
 
 **Recommendation: build a CoT (Cursor on Target) *bridge*, not a TAK client and not
 an ATAK plugin.**
@@ -595,7 +707,7 @@ and team positions with correct status colors.
 
 ---
 
-### Phase 2 — The bridge (`crowdcad-tak-bridge`)
+### Phase 2 — The bridge (`crowdcad-tak-bridge`) — ⛔ NOT STARTED
 
 **2.1 Location and packaging.** `core/services/tak-bridge/`, its own
 `package.json`, TypeScript, built with `tsup`/`esbuild` to a single bundle.
@@ -677,7 +789,7 @@ notes, ever, per `core/CLAUDE.md`. Log team callsigns and UIDs only.
 
 ---
 
-### Phase 3 — Inbound positions in the dispatch UI
+### Phase 3 — Inbound positions in the dispatch UI — ⛔ NOT STARTED
 
 **3.1 Subscribe.** New hook `core/src/hooks/useTeamPositions.ts`, built on
 `dbService.subscribeToQuery<TeamPosition>('positions', [where('eventId','==',id)])`.
@@ -703,7 +815,7 @@ layer based on it, and do not present it as ground truth. See §2.2.
 
 ---
 
-### Phase 4 — Field client PWA (deferred, but this is what IC-EMS actually asked for)
+### Phase 4 — Field client PWA — ⛔ NOT STARTED (but this is what IC-EMS actually asked for)
 
 Scoped here for sequencing, planned in detail separately.
 
@@ -723,7 +835,7 @@ exponential backoff, visible "not synced" state, and never block the UI on a wri
 
 ---
 
-### Phase 5 — Ops guidance, no code
+### Phase 5 — Ops guidance, no code — ⛔ NOT STARTED
 
 Documentation deliverables in `core/docs/TAK_DEPLOYMENT.md`:
 
@@ -745,7 +857,7 @@ Documentation deliverables in `core/docs/TAK_DEPLOYMENT.md`:
 
 ---
 
-### Phase 6 — ATAK plugin (explicitly deferred)
+### Phase 6 — ATAK plugin — ⛔ NOT STARTED (explicitly deferred)
 
 Only revisit if field providers end up carrying ATAK as their primary device *and*
 the PWA proves insufficient. Requires TAK.gov approval, the Android plugin SDK,
@@ -1007,18 +1119,26 @@ rendering per type code, stale behavior, network-link refresh, callsign display.
 
 ## 12. Sequencing
 
-| Phase | Rough effort | Depends on | Ships |
-|---|---|---|---|
-| 0 — georeference completion | S | — | Calibratable venue layers with visible fit quality |
-| 1 — read-only feed | M | 0 + KML spike | One URL into WinTAK, live-ish picture |
-| 2 — bridge (outbound) | L | 1 + type-code spike | Real-time CoT to a real TAK server |
-| 3 — inbound + dispatch map | M | 2 | Field positions on the dispatch board |
-| 4 — field PWA | L | 3 (schema only) | **The thing IC-EMS actually needs** |
-| 5 — ops docs | S | 2 | Deployers can self-serve |
-| 6 — ATAK plugin | XL | — | Deferred; revisit after a full season |
+| Phase | Status | Rough effort | Depends on | Ships |
+|---|---|---|---|---|
+| 0 — georeference completion | ✅ done (0.4 blocked) | S | — | Calibratable venue layers with visible fit quality |
+| 1 — read-only feed | 🟡 1.1 partial | M | 0 + KML spike | One URL into WinTAK, live-ish picture |
+| 2 — bridge (outbound) | ⛔ | L | 1 + type-code spike | Real-time CoT to a real TAK server |
+| 3 — inbound + dispatch map | ⛔ | M | 2 | Field positions on the dispatch board |
+| 4 — field PWA | ⛔ | L | 3 (schema only) | **The thing IC-EMS actually needs** |
+| 5 — ops docs | ⛔ | S | 2 | Deployers can self-serve |
+| 6 — ATAK plugin | ⛔ deferred | XL | — | Revisit after a full season |
 
-Two spikes gate real work and should run first, in parallel with Phase 0:
-**(a)** KML network-link support on WinTAK/ATAK-CIV, **(b)** CoT type-code rendering.
+**Spike status — both still outstanding, and they are now the critical path:**
+
+| Spike | Gates | Status |
+|---|---|---|
+| (a) KML network-link support on WinTAK / ATAK-CIV | `kml.ts`, feed route (1.3) | ⛔ NOT RUN |
+| (b) CoT type-code icon rendering | `mapping.ts` (1.2), and everything downstream | ⛔ NOT RUN |
+
+Neither needs a development environment — they need a TAK client and a test server.
+Until they run, Phase 1 cannot correctly proceed past the pure modules already built,
+and Phases 2–3 inherit the same blocker.
 
 **If the season is short and only one thing ships: Phase 0 + Phase 4.** That
 delivers the operational need — field providers reporting status without radio —
