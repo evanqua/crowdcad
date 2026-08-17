@@ -1,9 +1,9 @@
 # TAK Integration — Implementation Plan
 
-**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 complete, inbound bridge complete, 1.3–1.5 blocked (see §0)
+**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 and 1.4 complete, inbound bridge complete, 1.3/1.5 blocked, **Phase 7 (call pins + coordinate-first map) newly scoped and mostly unblocked** (see §0)
 **Target:** CrowdCAD (`core/`), general-purpose capability; IC-EMS is the first deployer
 **Author:** drafted 2026-08-11
-**Last updated:** 2026-08-16
+**Last updated:** 2026-08-17
 **Branch:** `feature/tak-integration` — **the single branch for all TAK work**
 **Latest code:** the merge of `feature/tak-phase0` into `feature/tak-integration` (2026-08-16)
 
@@ -190,11 +190,34 @@ from the phase section it affects.
 | — | **Georeference reconciliation — `geoUtils.mercator-conformance.test.ts` (14 tests) proving the affine solver and `georef.js` agree** | **Done** | this session |
 | — | **`georef.js` "How far this applies" scoping header + `georef.test.js` cross-pin tripwire on the shared fixture** | **Done** | this session |
 | — | **`docs/TAK_OPEN_QUESTIONS.md` — §11's six questions restated for IC-EMS** | **Done** | this session |
+| **7.3** | **`dev/freetakserver/spike-typecodes.mjs` — the type-code spike harness. Publishes one marker per candidate code and prints an observation sheet** | **Done** | this session |
+| **2.5** | **Bridge echo suppression widened from one hardcoded UID to a `crowdcad.` prefix match, + cross-repo tripwire test** | **Done — ⚠️ UNCOMMITTED** | working tree only |
+| **7** | **Phase 7 scoped: pin-droppable calls (both directions) + coordinate-first map — §6 Phase 7, §5.2 types, §7.2 UID rules, §7.3 seventh observation, §8(9) inbound PHI, §12, §13** | **Planned — no code** | 2026-08-17 |
+| — | **Call-position gap and the map's raster assumptions recorded in §0.2; §0.4's "everything is hardware-gated" conclusion superseded a second time** | **Done** | 2026-08-17 |
+| — | **Bridge pin-misfiling defect documented (§0.2, §0.3(40)) — live today, found while scoping Phase 7** | **Documented, NOT fixed** | 2026-08-17 |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
 of the 2026-08-15 session was to commit it as `9fe8de6` so it could not be lost and
 so an isolated branch could be cut from it.
+
+> 🔴 **It happened again. Verified 2026-08-17: two completed items are uncommitted in
+> the root wrapper's working tree**, which is precisely the state the branch rule above
+> was written to prevent — *"a phase that is finished but uncommitted is a phase that
+> can be lost, and worse, a phase the next session cannot see."*
+>
+> | Item | Where | Evidence |
+> |---|---|---|
+> | §2.5 echo suppression + tripwire test | `dev/crowdcad-tak-bridge/bridge.js`, `bridge.test.js` | `git show HEAD:…/bridge.js \| grep -c CROWDCAD_UID_PREFIX` → **0** |
+> | §0.3(30) type-code spike harness | `dev/freetakserver/spike-typecodes.mjs` | **untracked** |
+> | §0.3(34) FTS findings | `dev/TAK_DECISIONS.md` | modified, uncommitted |
+>
+> The echo-suppression fix is the one that matters most: without it **every marker
+> CrowdCAD publishes under its own documented prefix comes straight back in as a GPS
+> fix** (§0.3(32)). It exists only in this working tree. Commit these before doing
+> anything else — and note that this is now the second occurrence, so the rule is not
+> being followed as written. Do not verify by SHA (this document is amended, so tips
+> move); verify by the commands in the evidence column.
 
 **Verification at the close of the 2026-08-15 session:** `npm run type-check` clean,
 `npm run test:unit` 81/81 passing (up from 34), `npm run build` succeeds with all
@@ -254,6 +277,31 @@ test file, one new test case, one doc comment, and this tracker.
   binding: `takInterpolation.ts`, `useTakTween.ts`, `useTakPositions.ts` wired into the
   map, and `Staff.takCallsign` editable from `addteammodal.tsx`.
 - **Phases 4–6.** Untouched, as scoped.
+- **Phase 7 — calls cannot be placed at a coordinate, in either direction.** Added to
+  this plan 2026-08-17 after it was reported from the running app ("I can't drop a pin
+  for a specific call"). This was never a deferral; it was an **unexamined assumption**
+  baked in from the first draft — that a call's location is the name of a post. It is:
+  `Call.location` is a `string` and `Call` has no coordinate field at all, so
+  `buildCallEvent` can only locate a call by string-matching a placed post, and the
+  venue map has no call marker. See Phase 7 for the full statement. §0.3(36) covers why
+  the plan did not notice, which is the more useful lesson.
+- **Phase 7.E — the venue map is not yet a coordinate space.** Also reported from the
+  running app ("the map is still a .png so all the locations are just hard coded"). Half
+  of that is a misreading worth correcting in writing, because it will recur: post
+  positions are *not* baked into the image — `Post` stores percentages of image
+  width/height as data, and Phase 0's georeference already gives them real lat/lon. The
+  half that is right is that the map still behaves like an image with dots on it: an
+  off-image coordinate renders as nothing, and `Georeference.version` exists but nothing
+  consumes it, so replacing a venue image silently moves every post. Phase 7.E(2) is a
+  latent data-integrity bug rather than a missing feature.
+
+⚠️ **Known defect, live today, found while scoping Phase 7:** the bridge misfiles a
+hand-dropped iTAK pin as a team GPS fix. `cot.js` accepts both `a-*` and `b-m-p-*` as
+positional and writes everything surviving to `tak_positions`, so a pin somebody taps
+moves a *team's* marker on the dispatch map. Echo suppression does not help — it filters
+CrowdCAD's own UIDs, not a phone's. This is the same failure mode `core/CLAUDE.md`
+already forbids for `nearestPost`, arriving by a different route. Fix is the first half
+of Phase 7.D and is a behaviour change to tested code.
 
 ### 0.3 Decisions made during implementation
 
@@ -628,6 +676,228 @@ test file, one new test case, one doc comment, and this tracker.
     When the split does happen it touches core's `CLAUDE.md` ("The bridge is not
     in this repo…"), §13's file manifest, and the tripwire in §0.3(27).
 
+30. **The §7.3 spike was never "one afternoon with a phone" — it was an
+    afternoon of building a publisher, and nobody had built it.** §0.4 has
+    called the spike the top priority for three sessions running, on the
+    grounds that the equipment already exists and only a person with a phone
+    is missing. That was true about the *equipment* and wrong about the
+    *work*. Checked against the tree rather than the claim: nothing anywhere
+    in `dev/` could publish a caller-chosen type code. `probe-cot.py`
+    hardcodes `a-f-G-U-C` inline. `seed-berkeley.py` has a `cot()` helper that
+    takes a `cot_type` parameter, but its `argparse` surface exposes only
+    `--host/--plain/--move`, so changing a type means editing source. And the
+    two codes core actually emits — `b-m-p-w` and `b-r-f-h-c` — appear
+    **nowhere in `dev/` at all**: they have never been sent to a TAK server by
+    anything, which also means they have never even been shown to be
+    well-formed enough for a server to accept.
+
+    So whoever finally sat down with a phone would have spent their afternoon
+    hand-rolling CoT and reading this plan to reconstruct the candidate list,
+    then eyeballed icons against a mental table. That is how a spike returns
+    "mostly fine, I think."
+
+    `dev/freetakserver/spike-typecodes.mjs` removes that afternoon. It
+    publishes one marker per candidate, laid out on a spaced grid, and prints
+    a numbered observation sheet. Three properties are deliberate:
+
+    - **The callsign is the type code**, so the observer reads the icon and
+      the code off the same label. No lookup table, no assumption that
+      markers arrived in order, nothing to transcribe wrongly.
+    - **The expected rendering is printed before the observation blank**, so
+      the answer is compared against a written prediction rather than decided
+      after the fact. A prediction you write down first is evidence; one you
+      write down after is a rationalisation.
+    - **There is a control marker** (`a-h-G-U-C`, hostile) that CrowdCAD must
+      never publish. If it does not render obviously differently from the
+      friendly team marker, the client is not doing symbol lookup by type and
+      every other answer on the sheet is void. The sheet says to check it
+      first. Without a control, "all the icons looked plausible" and "the
+      client ignored my type codes entirely" are the same observation.
+
+31. **The harness imports core's real modules rather than copying the codes,
+    and this is the first time the §1.1 purity constraint has been cashed
+    in.** §1.1 requires everything under `src/lib/tak/` to "run unmodified in
+    the browser, in a Cloud Function, and in the sidecar." Until now that was
+    an untested assertion — every consumer was a vitest file or a React
+    component, both inside the app's build.
+
+    The harness imports `cot.ts`, `types.ts` and `uid.ts` straight from
+    `core/src/lib/tak/` into a plain `node` process with no build step, using
+    Node's built-in type stripping plus a ~15-line resolve hook (needed only
+    because TypeScript writes `./types` where Node's ESM resolver wants
+    `./types.ts`). It works, unmodified, which is the claim §1.1 makes.
+
+    The reason to do it this way rather than paste the four strings into the
+    script: **the harness cannot drift from the thing it verifies.** Correct a
+    constant in `types.ts` and the next run tests the corrected value. A
+    copied list would be a second source of truth for exactly the values whose
+    single source of truth is the entire point, and it would go stale on the
+    same day the spike succeeded. It also means the spike publishes core's own
+    `buildCotXml()` output, so it tests the real serializer and not a
+    stand-in.
+
+32. **Echo suppression in the bridge was a single hardcoded UID, not a prefix
+    match, and would have fed CrowdCAD its own markers back as GPS fixes.**
+    §2.5 lists echo suppression as mandatory. The inbound bridge was built by
+    the sibling effort, which had no outbound half to defend against, so what
+    it actually implemented was `if (ev.uid === 'CROWDCAD-BRIDGE') continue`
+    — enough to skip its own announce and nothing else.
+
+    Every marker CrowdCAD publishes carries a `crowdcad.`-prefixed UID
+    (`uid.ts`), none of which equal that string, and team markers are
+    `a-f-G-U-C`, which `cot.js` classifies as a **position**. So on the day
+    outbound publishing lands, the bridge would have read CrowdCAD's own
+    published team positions back out of the relay and written them to
+    `tak_positions` as though a phone had reported them. The failure mode is
+    the dangerous kind: the map keeps moving and looks entirely healthy, while
+    what it is drawing is CrowdCAD's own echo rather than anybody's location.
+
+    Now `isSelfPublished(uid)` prefix-matches `crowdcad.` and keeps the legacy
+    exact match for the bridge's own announce. The prefix constant is
+    duplicated in the bridge rather than imported — that file is
+    dependency-free CommonJS and core's is TypeScript — so `bridge.test.js`
+    pins the two together by reading `uid.ts` off disk and comparing the
+    declared literal, the same cross-repo tripwire pattern §0.3(27) used for
+    the georeference fixture. The test asserts the regex matched before
+    comparing, so a rename in core fails loudly instead of passing on `null`.
+
+33. **The bridge stores positions for callsigns that match no team, so
+    publishing test markers into a live stack is not the harmless act it
+    looks like.** This nearly cost real data this session. `core/CLAUDE.md`
+    says an unmatched callsign is "logged once and **ignored** rather than
+    guessed", which reads as "nothing is written". The code says otherwise:
+    `bridge.js` comments that "binding is now purely a display concern — the
+    position is stored either way, and the dispatch page decides what to
+    draw", and warns the operator that the callsign "is stored but not shown
+    on the map".
+
+    Both statements are true of different things — the *team binding* is
+    ignored rather than guessed, which is the §6.3 safety property; the
+    *position record* is written regardless. But the wording invites exactly
+    the wrong inference at exactly the wrong moment, which is when someone is
+    deciding whether it is safe to fire test CoT at a stack with a live
+    bridge on it. It is not: every marker of an `a-*` or `b-m-p-*` type
+    becomes a `tak_positions` record keyed by its callsign.
+
+    Hence the warning at the top of `spike-typecodes.mjs` telling you to stop
+    the bridge first, and hence §0.3(32) mattering more than it looks — with
+    the prefix fix in place, a current bridge ignores every marker the
+    harness sends, because they all carry `crowdcad.` UIDs.
+
+34. **The local FreeTAKServer had relayed nothing for two days while every
+    check said it was fine.** This was found by accident, while smoke-testing
+    the §7.3 harness against it, and it is the single most dangerous state
+    this stack can be in.
+
+    What the server's own logs say:
+
+    - `messages sent to clients in 15 seconds: 0` — in **all 4026** sampling
+      windows since the container started. Not a dip; it had never once
+      fanned anything out.
+    - `TypeError: a bytes-like object is required, not 'NoneType'` at
+      `send_component_data_controller.py:65`, on `connection.sock.send(message)`,
+      thrown 82 times, on `Action: connection` and `Action: disconnection`.
+      FTS is holding connection records whose socket is `None` and dying in
+      the fan-out loop.
+
+    What every check available said, at the same time:
+
+    | check | verdict | what it actually proves |
+    |---|---|---|
+    | `docker ps` | **healthy** | a process is running |
+    | `probe-cot.py` | **✓ genuinely serving CoT** | the port accepts a connection and replies |
+    | second client connected | received a `b-t-f` welcome banner | the port is alive |
+
+    `probe-cot.py` cannot catch this, and the reason is worth stating plainly
+    because `dev/TAK_DECISIONS.md` §9 currently recommends it as *the* way to
+    confirm FTS is really live: its success criterion is "the server replied
+    with CoT", and the reply it receives is FTS's own GeoChat welcome banner.
+    That banner is generated locally on connect. It proves the listener is up.
+    It says nothing whatsoever about fan-out — which, for a server whose
+    entire job is fan-out, is the only property that matters.
+
+    So the diagnostic ladder in §9 has a missing rung. `nc -z` proves less
+    than `probe-cot.py`, and `probe-cot.py` proves less than "a second client
+    saw the marker". Only the third is the actual question.
+
+35. **Phase 7's sub-items are lettered (7.A–7.E), not numbered.** `§7.3` has meant
+    *CoT type codes* since the first draft, and this document's own convention is that
+    `§N.M` denotes Phase N.M for N ≤ 6 while `§7`–`§13` are spec sections. Adding a
+    "Phase 7.3" would produce two live meanings for one label in a document whose
+    stated purpose is to be picked up cold by someone with no other context. Letters
+    cost nothing and remove the collision entirely. The alternative considered was
+    numbering the new phase 8 to dodge the clash, which would have left a permanent
+    gap at 7 that future readers would have to be told about.
+
+36. **The plan missed the call-position gap for six phases, and the reason generalises.**
+    Every layer of the export path was specified against `Call.location` without anyone
+    writing down that `Call.location` is a *name*, not a place. The mapper's
+    post-name lookup, the redaction allowlist, `publishCalls`, the settings panel and
+    its diagnostics preview were all designed, built, and tested — and every one of them
+    is *correct* given the assumption. That is exactly why it survived: nothing failed.
+    The diagnostics preview even reports the symptom in production wording — `Call
+    location "X" is not a placed post on a georeferenced layer` — and it reads as a
+    configuration nag, not as "this data model cannot express a call's position."
+
+    The lesson matches §0.4's earlier one about spikes almost exactly: *a skip reason
+    that fires constantly is a design report, not a warning.* When a mapper's normal
+    operating state is "this entity has no resolvable position", the thing to check is
+    whether the entity can ever have one. Worth applying to the remaining skip reasons
+    before Phase 1.3 treats them as ordinary.
+
+37. **`Call.position` stores lat/lon as of record; `Post` keeps percent-of-image.** The
+    inversion is intentional and is argued in Phase 7.A. Short form: a post is only ever
+    authored by clicking an image, so image coordinates are its natural record; a call
+    pin can arrive from a phone that has never seen the image, so lat/lon is the only
+    representation a dispatcher's click and a responder's pin share. The rejected
+    alternative — percent-of-image for both, for consistency — forces the bridge to pick
+    a venue layer at ingest in order to store anything at all, which puts a venue
+    decision in the one component that has no venue context (§6.4).
+
+38. **A pin dropped on an uncalibrated layer is refused, not stored degraded.** A
+    percent-only call position would be unpublishable, uncomparable to any GPS fix, and
+    invisible to a partner agency, while looking on screen exactly like a working one.
+    Refusing and surfacing the georeference prompt makes calibration a precondition
+    instead of a silent quality tier. This mirrors §0.3(2)'s reasoning about not printing
+    a fit quality that implies precision the fit does not have.
+
+39. **An inbound pin becomes a *proposed* call, never a call.** §2.3(1) already makes
+    CrowdCAD the system of record and TAK non-authoritative for call state; auto-creation
+    would make a tactical map app on a volunteer-managed phone fleet an unauthenticated
+    writer to the call queue. Pins land in `tak_pin_reports` (§5.2) for explicit dispatch
+    accept/dismiss. The accept step is also where a human must type the chief complaint —
+    which doubles as a PHI boundary (§8(9)), since a pin's operator-typed remarks are
+    untrusted text that must never be auto-copied into a clinical field.
+
+40. **Splitting `a-*` from `b-m-p-*` in the bridge is recorded as a behaviour change,
+    not a fix in passing.** `cot.js` treats both as positional today, so a hand-dropped
+    pin already moves a team's marker (§0.2). Two tested files encode the current
+    behaviour, and the temptation will be to adjust them until they pass. They should
+    change *visibly*, with the old expectation deleted on purpose — the whole reason this
+    defect is invisible is that everything currently passes. Gated on §7.3's spike for
+    the pin type code, and only for that: the split itself is knowable without hardware
+    because CrowdCAD's *own* posts are already `b-m-p-w`.
+
+    **Restarting the container did not fix it.** It came back `healthy`, and a
+    re-run of the A/B test still relayed nothing (`number of CoT messages
+    received by services: 0` while bytes were demonstrably being sent). This
+    is still open — see §0.5.
+
+    Why this belongs in a *type-code* plan: the §7.3 spike's whole method is
+    "publish a marker, look at the phone, write down what you see". Against a
+    server in this state the phone shows an empty map for every candidate, and
+    the natural reading of an empty map is *the type codes are wrong*. They
+    would not be. A silent relay failure and a bad type code are
+    indistinguishable at the point of observation, and one of them would have
+    been written into `types.ts` as a finding.
+
+    That is why `spike-typecodes.mjs` now opens a second client before it
+    publishes and reports which of its own markers came back. Zero returned
+    prints a block telling the operator not to record the run as "did not
+    render", and points at the two log greps above. The harness had to be able
+    to tell "the server dropped it" from "the client drew it oddly" before any
+    of its output could be trusted.
+
 ### 0.4 Recommended next steps, in order
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
@@ -649,11 +919,41 @@ test file, one new test case, one doc comment, and this tracker.
 5. Answer the six open questions in §11 — several change the adapter priority for
    Phase 2 and are organizational lead-time items, not coding tasks.
 
-**~~What is safe to start right now~~ — the event-settings UI (§1.4) — was built
-2026-08-16.** It is no longer available as the answer to this question, and that
-changes the shape of the project: *every remaining item in this plan is now gated
-on something that is not typing.* Three of the four are one afternoon with a phone;
-the fourth is an email to IC-EMS. Nobody is blocked on a hard technical problem.
+**Amended 2026-08-17 — items 1 and 2 gained a seventh observation and a co-beneficiary.**
+While running the spike, also drop a pin by hand in iTAK and record the CoT type it
+emits (§7.3). That single line settles the gate on Phase 7.D, so the same afternoon now
+unblocks the feed route, the bridge, everything downstream, *and* inbound pin-drop.
+
+**Also amended: there is unblocked code to write again, for the first time since 1.4.**
+
+> **~~Every remaining item in this plan is now gated on something that is not
+> typing.~~ Superseded 2026-08-17.** ~~What is safe to start right now — the
+> event-settings UI (§1.4) — was built 2026-08-16, and that changes the shape of the
+> project.~~ The claim was accurate about every phase this plan *contained*, and wrong
+> about the plan's coverage. **Phase 7 — pin-droppable calls and a coordinate-first
+> map — was missing entirely**, because the plan assumed a call's location is a post
+> name and never wrote that assumption down (§0.3(36)). 7.A–7.C and 7.E depend only on
+> Phase 0, which is done.
+>
+> This is the second time this section has confidently declared the project
+> hardware-gated and been wrong, and the two failures have the same shape: the first
+> mistook "a spike settles this decision" for "a spike blocks everything adjacent to
+> it" (see the superseded block below); this one mistook "every phase in the plan is
+> gated" for "everything worth doing is gated." **A plan is not an inventory of the
+> work.** Before concluding that nothing can proceed, check the running app against
+> the plan rather than the plan against itself — both of these were reported by
+> someone using CrowdCAD, not found by reading.
+
+**So: 1a. Phase 7.E(2) and 7.A–7.C**, in that order, needing nothing but a keyboard.
+7.E(2) first because it is the only *defect* among them: `Georeference.version` exists
+and nothing consumes it, so replacing a venue map image silently relocates every post
+on it. Then the `Call.position` model and pin-drop, which is the reported gap. 7.D
+joins the queue behind the spike.
+
+**And before anything else, the live one:** the bridge misfiles a hand-dropped pin as a
+team GPS fix *today* (§0.2, §0.3(40)). Anyone who drops a pin during an event moves a
+team's marker. If a phone is in the field before Phase 7 lands, that is worth a same-day
+fix on its own.
 
 If you have arrived here looking for code to write and cannot run a spike, the
 honest answer is that there is very little left that is both safe and useful, and
@@ -671,11 +971,36 @@ turned out not to be debt at all: the two models answer different questions and
 both are staying, now with a conformance test and an explicit scoping rule proving
 it (§0.3(27)).
 
-That leaves the honest answer to "what can I do with no hardware?" as: **very
-little, and that is now the accurate state of the project rather than a temporary
-one.** Every remaining item needs a phone, a real TAK client, or an answer from
-IC-EMS. If you are here with a free session and no hardware, the highest-value
-things left are not code:
+> **~~That leaves the honest answer to "what can I do with no hardware?" as: very
+> little.~~ Superseded 2026-08-16 (later still).** The claim was that every
+> remaining item needs a phone, a TAK client, or IC-EMS. That was true of the
+> *spikes* and false of the *preparation for them*, and the distinction was
+> worth about a session's work:
+>
+> - The §7.3 spike had **no publisher**. Nothing in the tree could send a
+>   caller-chosen type code, and the two codes core actually emits had never
+>   been sent to a TAK server by anything. Built this session as
+>   `dev/freetakserver/spike-typecodes.mjs` — §0.3(30). The spike is now
+>   genuinely "one person, one phone, ten minutes", which is what this section
+>   kept claiming it already was.
+> - Echo suppression in the bridge was **one hardcoded UID**, not a prefix
+>   match, and would have looped CrowdCAD's own markers back in as GPS fixes
+>   the day outbound publishing landed — §0.3(32). No hardware required to
+>   find or to fix.
+> - The local FreeTAKServer had **relayed nothing for two days** while
+>   reporting healthy — §0.3(34). Had that gone unnoticed, the spike would
+>   have shown zero markers and the obvious conclusion would have been that
+>   the type codes were wrong.
+>
+> The general lesson, which is the same one §0.2 learned about `mapping.ts`:
+> "this is blocked on a spike" is a statement about the *decision* the spike
+> settles, not about everything adjacent to it. Ask what the blocked work
+> actually needs before inheriting the block. Two of the three items above
+> were sitting inside something this document had already marked as blocked.
+
+The remaining items below **do** need a phone, a real TAK client, or an answer
+from IC-EMS. If you are here with a free session and no hardware, the
+highest-value things left are not code:
 
 - **Chase the §11 answers.** `TAK_OPEN_QUESTIONS.md` exists precisely so this is
   an email, not a drafting exercise. Questions 1–4 unblock the next two sprints,
@@ -985,6 +1310,84 @@ assert what the tip of the branch is.
   comment, and this tracker.
 - Decisions recorded in §0.3(27)–(29). **Not pushed.**
 
+**2026-08-16 (later still) — the §7.3 spike harness, echo suppression, and a dead relay.**
+- Started from §0.4's conclusion that everything left was hardware-gated, and
+  checked the tree instead of the claim. Three items were not gated on hardware
+  at all. §0.4 now carries the superseded conclusion and the general lesson:
+  *"this is blocked on a spike" is a statement about the decision the spike
+  settles, not about everything adjacent to it.*
+- **Built the §7.3 spike harness** — `dev/freetakserver/spike-typecodes.mjs`. The
+  spike had been described for months as "one afternoon with a phone", but nothing
+  in either branch could publish a marker of a caller-chosen type code, and the two
+  codes the spike exists to settle appeared nowhere in `dev/`. The afternoon could
+  not have happened. Design notes in §7.3, rationale in §0.3(30)–(31).
+- Ran core's `src/lib/tak/` modules unmodified under plain Node for the first time,
+  which is the §1.1 purity constraint finally being cashed in. Node ≥22.6 strips
+  the types; a ~15-line `node:module` resolve hook covers TypeScript's
+  extensionless `./types` import, which the ESM resolver otherwise rejects.
+- **Fixed echo suppression** (§2.5, marked mandatory since the first draft). It was
+  one hardcoded UID literal. Every marker CrowdCAD published under its own
+  documented prefix would have come straight back in as a GPS fix. Now a prefix
+  match, with a cross-repo tripwire test. Bridge tests 18 → **23**; suites
+  re-verified independently at 23 / 12 / 12. §0.3(32).
+- **Found the local FreeTAKServer had relayed nothing for two days** while
+  `docker ps` said healthy and `probe-cot.py` said "✓ genuinely serving CoT".
+  Its own counters: `messages sent to clients: 0` in all 4026 windows, plus 82
+  `NoneType` socket crashes in the fan-out loop. Restarting did not fix it.
+  **Still open.** §0.3(34), and added to `dev/TAK_DECISIONS.md` §9 — the ladder
+  there was missing its top rung, because `probe-cot.py`'s success criterion is
+  satisfied by FTS's own welcome banner and says nothing about fan-out.
+- Consequently gave the harness its own relay check: it opens a second client
+  before publishing and reports which markers came back. A silent relay failure
+  and a wrong type code look identical on a phone, and one of them would have been
+  written into `types.ts` as a finding.
+- **Nearly wrote junk into live PocketBase**, and did not, by checking `bridge.js`
+  rather than trusting `core/CLAUDE.md`'s "ignored rather than guessed" — the team
+  *binding* is ignored, the *position record* is written regardless. §0.3(33). The
+  live spike run is therefore still pending: it needs the bridge stopped, a working
+  relay, and a phone.
+- `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits.
+- Decisions recorded in §0.3(30)–(34). **Not pushed.**
+
+**2026-08-17 — Phase 7 scoped. Planning only; no code written.**
+- Started from two reports from the running app — *"I can't drop a pin for a specific
+  call"* and *"the map is still a .png so all the locations are just hard coded"* — and
+  checked them against the tree. Both are real. The first is a **data-model gap**:
+  `Call.location` is a `string`, `Call` has no coordinate field, `buildCallEvent` can
+  only locate a call by string-matching a placed post, and the venue map has no call
+  marker at all. The second is **half a misreading worth correcting in writing** (post
+  positions are percent-of-image *data*, not baked into the PNG, and Phase 0 already
+  gives them real lat/lon) over **a real gap** (the map still behaves as an image with
+  dots on it). Written up as Phase 7, §0.2, §0.3(36)–(38).
+- **Added Phase 7 to §6** — 7.A `Call.position` (lat/lon of record, inverting `Post` on
+  purpose), 7.B pin-drop in CrowdCAD, 7.C publish calls at their own coordinate, 7.D
+  inbound pins from iTAK/ATAK as *proposed* calls, 7.E coordinate-first map. Supporting
+  edits in §2.2 (no basemap — expectation-setting), §5.2 (types), §7.2 (inbound UIDs stay
+  the device's), §7.3 (seventh observation for the spike), §8(9) (inbound free text is a
+  PHI carrier — §8 had only ever looked outward), §12, §13.
+- **Found a live defect while scoping 7.D:** the bridge misfiles a hand-dropped pin as a
+  team GPS fix. `cot.js` accepts `a-*` and `b-m-p-*` alike as positional and writes both
+  to `tak_positions`, so a tap on a phone moves a *team's* marker on the dispatch board.
+  Echo suppression does not catch it (it filters CrowdCAD's own UIDs, not a phone's).
+  Same failure mode `core/CLAUDE.md` forbids for `nearestPost`, by a different route.
+  Documented in §0.2 and §0.3(40); **not fixed** — it is a behaviour change to two tested
+  files and belongs in a code session.
+- **§0.4's "everything is hardware-gated" conclusion superseded for the second time.**
+  It was true of every phase the plan *contained* and false of the plan's coverage.
+  Recorded the shared shape of both failures: a plan is not an inventory of the work, and
+  both gaps were reported by someone *using* CrowdCAD rather than found by reading.
+- **Verified §0.1's claims rather than inheriting them**, and found two completed items
+  uncommitted in the root wrapper — the §2.5 echo-suppression fix and the §0.3(30) spike
+  harness. `git show HEAD:…/bridge.js | grep -c CROWDCAD_UID_PREFIX` → 0. The §0.1 row
+  that said `b4c7a3b` was wrong and now says so. This is the second recurrence of the
+  exact failure the branch rule exists to prevent; flagged at the top of §0.1.
+- Also this session, outside the plan: diagnosed a `Cannot read properties of undefined
+  (reading 'call')` 500 on the dispatch route as a 3-day-stale `next dev` whose `.next`
+  had a production build written into it (4 of 6 client chunks 404ing). Not a code fault
+  — cleared `.next`, restarted, route returns 200. Recorded here only so the next session
+  does not go looking for it in the TAK code.
+- `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
+
 ---
 
 ## 1. Executive summary
@@ -1062,6 +1465,13 @@ the work; it is the honest framing to put in front of IC-EMS.
   engagement producing a georeferenced digital twin. It is a vendor procurement,
   not a software feature, and nothing in this plan moves toward it. TAK's 3D model
   support is a static decoration layer, not live occupancy.
+- **A real basemap for CrowdCAD's own map.** Georeferencing a venue image (Phase 0)
+  gives every placed thing a true lat/lon, and Phase 7 makes calls first-class in that
+  coordinate space. Neither turns the venue map into a GIS: there are no OSM/satellite
+  tiles, no vector layers, and no panning beyond the image. The raster stays the
+  backdrop; what changes is that coordinates — not pixels — become the system of record.
+  Anyone who hears "the map is dynamic now" and pictures Google Maps has the wrong
+  picture. Phase 7.E says what it would actually take.
 - **The actual stated operational need.** IC-EMS wants field providers to press
   *arrived / clear from patient / moving patient* because radio fails in a loud
   stadium. ATAK is a poor UI for that: it is a dense tactical map app on a
@@ -1255,6 +1665,84 @@ export interface TeamPosition {
 once per team per few minutes, for the summary view and for offline reads), but the
 live dispatch map subscribes to `positions`. Document this in the type comment so
 nobody re-plumbs high-rate writes into the event doc later.
+
+### 5.2 Call positions and georeference provenance (Phase 7)
+
+```ts
+// ── A call's own location, independent of any named post ────────────────────
+/**
+ * lat/lon is the SYSTEM OF RECORD; x/y are derived for drawing. This is the
+ * INVERSE of `Post`, deliberately — see Phase 7.A. A post is always authored by
+ * clicking the venue image, so image coordinates are natural for it. A call pin
+ * can arrive from a phone that has never seen the image, so lat/lon is the only
+ * representation both sources share.
+ */
+export interface CallPosition {
+  lat: number;
+  lon: number;
+  /** Percent of image width/height, derived via the layer georeference. Null if
+   *  the point falls outside this layer's image — see Phase 7.E(1). */
+  x: number | null;
+  y: number | null;
+  /** Layer the pin is drawn on. Resolved by georeference containment, and
+   *  CORRECTABLE BY DISPATCH — unlike `TakPosition.layerId`, this is durable
+   *  call state, not a transient fix. Phase 7.E(3). */
+  layerId?: string;
+  /** Which georeference produced x/y. Mismatch against the layer's current
+   *  `Georeference.version` means the map image changed underneath this pin and
+   *  the derived coordinates are stale — Phase 7.E(2). */
+  georeferenceVersion?: number;
+  source: PositionSource;          // 'manual' = dropped in CrowdCAD, 'tak' = accepted from a pin
+  placedAt: number;                // epoch ms
+  placedBy?: string;
+  /** CoT uid of the originating pin, when source is 'tak'. Provenance only —
+   *  never used to locate the call. See §7.2. */
+  takUid?: string;
+}
+
+export interface Call {
+  // …existing fields…
+  /** Absent = legacy behaviour: position derived from `location` by post-name
+   *  match, exactly as `buildCallEvent` does today. */
+  position?: CallPosition;
+}
+```
+
+`Call.location` (free text) is **kept and stays primary** in the Quick Call flow. It is
+not superseded by `position` — `"NW concourse, by gate 4"` carries information a
+coordinate does not, and dispatch types under time pressure. Phase 7.B.
+
+Inbound pins awaiting dispatch review are **not** `Call`s and must not be written into
+`Event.calls` (Phase 7.D — CrowdCAD is the system of record; a pin is a proposal):
+
+```ts
+/** One document per unreviewed inbound pin. Collection: `tak_pin_reports`. */
+export interface TakPinReport {
+  id: string;
+  eventId: string;
+  orgId: string;
+  lat: number;
+  lon: number;
+  /** Operator-typed label/remarks from the device. UNTRUSTED FREE TEXT and a
+   *  possible PHI carrier — see §8(9). Never auto-copied into a Call field. */
+  label?: string;
+  remarks?: string;
+  takUid: string;
+  takCallsign?: string;
+  cotType: string;
+  timestamp: number;               // device time
+  receivedAt: number;              // server time
+  status: 'pending' | 'accepted' | 'dismissed';
+  reviewedBy?: string;
+  reviewedAt?: number;
+  /** Set when accepted, so a pin can be traced to the call it became. */
+  callId?: string;
+}
+```
+
+Rules for `tak_pin_reports` mirror `positions` in §5.1 (org-scoped read/write, bridge
+writes via Admin SDK / PocketBase admin and bypasses them). Add the collection to
+`core/scripts/setup-pocketbase.js` alongside `tak_positions`.
 
 ### 5.1 Firestore rules (`core/firestore.rules`)
 
@@ -1566,6 +2054,20 @@ Two implementations:
    device → team (§6.3). **Never auto-bind** by callsign string matching.
 4. Apply the write throttle (§6.2) and write to `positions`.
 
+**Step 2 status: ✅ done this session.** It was specified as "UID prefix match"
+above and implemented as `ev.uid === 'CROWDCAD-BRIDGE'` — one hardcoded literal,
+which suppressed only the bridge's own announce and nothing else. Every marker
+CrowdCAD published under its documented `crowdcad.` prefix would have come back
+in and been written as a GPS fix for whatever callsign it carried. `bridge.js` now
+has `isSelfPublished(uid)`, which prefix-matches `CROWDCAD_UID_PREFIX` and still
+matches the legacy `CROWDCAD-BRIDGE` announce (which predates the prefix scheme).
+
+The prefix constant is duplicated in `bridge.js` rather than imported — `uid.ts`
+is TypeScript and the bridge is dependency-free CommonJS — so `bridge.test.js`
+carries a cross-repo tripwire that reads `core/src/lib/tak/uid.ts` off disk and
+asserts the two agree, failing loudly if the regex stops matching rather than
+passing on a `null`. Bridge tests: 18 → 23. Detail in §0.3(32).
+
 **2.6 Health and observability.** `GET /healthz` on the bridge: transport state,
 last publish time, last inbound CoT time, event subscription count, reconnect
 count. Structured logs. **Log no PHI** — no chief complaint, age, gender, patient
@@ -1668,6 +2170,189 @@ now, and revisit no earlier than a full season of production use.
 
 ---
 
+### Phase 7 — Pin-droppable calls and a coordinate-first map — ⛔ NOT STARTED
+
+**This is the only substantial item left in the plan that is not gated on a spike, a
+phone, or IC-EMS.** §0.4 spent two revisions concluding that nothing unblocked
+remained. That was true of the *export* work and false of the *model underneath it*.
+See §0.3(36).
+
+**Why this phase exists, and why §1–§6 do not contain it.** The original plan assumed
+a call's location is the name of a post. It is:
+
+```ts
+// src/app/types.ts — the only spatial field on a Call
+export interface Call { location: string; /* no lat/lon, no x/y */ }
+```
+
+Everything downstream inherited that assumption without ever stating it:
+
+- `buildCallEvent` resolves a call's position by string match —
+  `posts.get(slugify(call.location))` — and returns `null` on a miss, surfacing as the
+  skip `Call location "X" is not a placed post on a georeferenced layer`
+  (`src/lib/tak/mapping.ts`).
+- The venue map renders `PostMarker` and `TakMarker` and has **no call marker at all**
+  (`src/components/modals/event/venuemapmodal.tsx`).
+- The Quick Call *Location* field is a free-text `Input` — not a post picker, not a map
+  affordance. Blank becomes the literal string `"Unknown"`
+  (`src/components/modals/event/quickcallmodal.tsx`).
+
+So a call cannot be placed anywhere that is not already a named post, on any surface,
+in either direction. This is not missing UI on top of a working model: **there is
+nowhere to put the coordinate.**
+
+**Sub-items are lettered, not numbered.** `§7.3` already means *CoT type codes*
+throughout this document — the convention here is that `§N.M` denotes Phase N.M for
+N ≤ 6, while `§7`–`§13` are specification sections. A "Phase 7.3" would be genuinely
+ambiguous in a document meant to be picked up cold. §0.3(35).
+
+#### 7.A — `Call.position`: lat/lon of record, percent derived
+
+Types in §5. The asymmetry with `Post` is deliberate and load-bearing:
+
+| | authored by | system of record | derived on read |
+|---|---|---|---|
+| `Post` | clicking the venue image | percent of image (`x`, `y`) | lat/lon, via the layer georeference |
+| `Call.position` | clicking the map **or** a pin from a phone | **lat/lon** | percent of image, for drawing |
+
+A post only ever comes into existence by clicking an image, so image coordinates are
+its natural system of record. A call pin can arrive from a phone that has never seen
+the image, so lat/lon is the only representation both sources share. Storing a call as
+percent-of-image would make an inbound TAK pin unrepresentable until someone chose a
+layer for it — and that choice would fall to the bridge at ingest time, the component
+least qualified to make it (§6.4: the bridge knows sockets, not venues).
+
+**Consequence to accept up front:** a call pinned on an *uncalibrated* layer cannot be
+stored as a coordinate. Two options — refuse the pin, or store percent-only as a
+degraded mode. **Recommend refusing**, surfacing the georeference prompt the venue
+editor already has. A call position that cannot be expressed as lat/lon cannot be
+published to TAK, cannot be handed to a partner agency, and cannot be compared against
+a team's GPS fix; it is a coordinate in name only. A degraded mode would make
+calibration look optional when it is the entire mechanism. This makes calibration a
+*precondition* for pin-drop rather than a silent quality difference.
+
+#### 7.B — Pin-drop in CrowdCAD
+
+- A placement mode on the venue map modal, modelled on the control-point placement mode
+  the venue editor already has (`GeoreferenceSection`, `MarkerModeToggleButton`) rather
+  than a new interaction vocabulary.
+- A `CallMarker` beside `PostMarker` / `TakMarker`, coloured through
+  `getStatusColor()` from `src/lib/statusColors.ts` so a call pin carries status the way
+  every other dispatch surface does. **No hardcoded marker colours** — `core/CLAUDE.md`
+  is explicit that status colour lives in one place.
+- Re-drag to correct a pin, with the move appended to `Call.log`. Position is
+  operationally significant and call state already keeps a log.
+- The Quick Call modal **keeps free text as the primary field** and gains an *optional*
+  "drop pin" affordance. Dispatchers type what the caller said, under time pressure;
+  that must not regress into a required map interaction. Text and coordinate are
+  complementary — `"NW concourse, by gate 4"` carries information a coordinate does not.
+
+#### 7.C — Outbound: a call publishes at its own coordinate
+
+One change in `buildCallEvent`: prefer `call.position` when present, fall back to the
+existing post-name lookup, then skip. The skip plumbing already exists (`MappingSkip`,
+`describeSkipReason`), so this is one branch and one new reason string — not new
+architecture. Redaction is untouched: `applyRedaction` operates on the assembled
+`CotEvent`, and a coordinate is not PHI — but see §8 for why a pin *label* is.
+
+This also removes the sharpest edge in the current mapper: today a call at a real
+location that simply is not a named post is silently absent from the TAK picture,
+indistinguishable on a partner agency's map from no call existing.
+
+#### 7.D — Inbound: a dropped pin from iTAK / ATAK
+
+⚠️ **This sub-item begins by fixing a live misfiling, not by adding a feature.**
+`dev/crowdcad-tak-bridge/cot.js` classifies inbound CoT as:
+
+```js
+const isAtom   = cotType.startsWith('a-');      // a unit reporting itself
+const isMapPin = cotType.startsWith('b-m-p-');  // ← a hand-dropped pin lands here
+if (!isAtom && !isMapPin) return { kind: 'ignore', reason: 'not a positional type', cotType };
+// everything surviving becomes { kind: 'position' } → written to tak_positions
+```
+
+A pin dropped by hand in iTAK is therefore **already ingested today, and recorded as a
+team GPS fix.** It is not dropped on the floor; it is silently wrong, and it will move
+a team's marker on the dispatch map to wherever somebody tapped. Echo suppression does
+not catch it — that is a UID-prefix test (§2.5) and filters only CrowdCAD's *own*
+markers, so the posts CrowdCAD publishes as `b-m-p-w` are excluded while a phone's pin
+is not.
+
+This is the same class of error `core/CLAUDE.md` already legislates against for
+`nearestPost` — *"never write it to `Staff.location`, because letting GPS silently
+reassign a team would make walking around a destructive act."* Here a stranger's tap
+does the reassigning.
+
+Splitting `a-*` (position) from `b-m-p-*` (map pin) is a **behaviour change to
+existing, tested code**: `cot.test.js` and `bridge.test.js` encode the current
+classification, so the change must land visibly in the diff, not be absorbed as a
+still-passing test.
+
+**Never auto-create a call from a pin.** §2.3(1) makes CrowdCAD the system of record
+and TAK never authoritative for call state; auto-creation would make a tactical map app
+on a volunteer-managed phone fleet an unauthenticated writer to the call queue. An
+inbound pin becomes a **proposed call** in a review queue that dispatch explicitly
+accepts — creating a real `Call` with `position.source = 'tak'` — or dismisses. The
+accept action is where a human supplies the chief complaint, which is precisely the
+field a pin cannot carry and dispatch must not invent.
+
+⚠️ **The exact CoT type for a hand-dropped pin is UNVERIFIED**, and it is the *same
+question* §7.3's spike already exists to settle: `b-m-p-w` (waypoint) vs `b-m-p-s-m`
+(spot marker), both of which the merge kept alive precisely because neither was
+confirmed. Add *"drop a pin by hand in iTAK and record the type it emits"* to the
+spike's observation sheet — one extra line on a sheet somebody is already holding a
+phone to fill in, and it turns this sub-item from guesswork into a lookup. Until the
+spike runs, 7.D is gated with the rest of §7.3. **7.A–7.C and 7.E are not.**
+
+#### 7.E — The map: coordinate-first, raster as backdrop
+
+This is the "the map is still just a PNG" complaint, stated precisely. Post locations
+are **not** baked into the image: `Post` stores `{ name, x, y }` as percentages of image
+width and height, operator-placed and persisted in Firestore/PocketBase. The PNG is
+already a backdrop rather than the source of truth, and the georeference work
+(`Georeference.controlPoints`, `geoUtils.pixelToLatLon` / `latLonToPixel`) already gives
+those percentages real-world meaning. What is *not* yet true is that the map behaves as
+a coordinate space rather than an image with dots on it. Three concrete gaps:
+
+1. **Anything whose lat/lon falls outside the image is invisible.** The map returns
+   early: `if (!tak || tak.x == null || tak.y == null || tak.onMap === false) return
+   null`. This is *not* an oversight — `core/CLAUDE.md` records the reasoning: off-map
+   fixes are stored `onMap: false` "rather than clamped, so the UI hides the marker
+   instead of drawing it somewhere the unit demonstrably is not." That decision is
+   correct and stays. What is missing is the third option it never considered: an
+   **edge indicator carrying bearing and distance**, which is neither a lie about
+   position nor silence. A team or a call just outside the mapped area is exactly the
+   case where dispatch most needs to know a direction.
+2. **Swapping the PNG silently moves every post.** Percent coordinates are meaningful
+   only against one image; re-crop or replace it and every post shifts with no signal.
+   `Georeference.version` exists to be bumped on recalibration and **nothing consumes
+   it**. Stamp derived coordinates with the version that produced them (§5) and surface
+   a "recalibration needed" state instead of quietly serving wrong positions. This is
+   the one item here that is a latent data-integrity bug rather than a missing feature.
+3. **Which layer does a bare lat/lon belong to?** A pin from a phone names no layer.
+   Resolve by testing georeference containment per layer, preferring the active layer on
+   a tie, and marking genuinely ambiguous results rather than guessing. Say the limit
+   out loud, per §2.2: GPS altitude cannot separate stadium levels, so a pin dropped on
+   level 3 lands on whichever layer's bounds contain it. `TakPosition.layerId` is
+   already documented as advisory — a *call's* layer must additionally be **correctable
+   by dispatch**, not merely advisory, because it is durable call state rather than a
+   transient fix.
+
+**Explicitly not in scope: a real basemap.** No OSM/satellite tiles, no vector layers,
+no panning beyond the image. Georeferencing yields coordinates, not a GIS. Tiles would
+mean a tile source and its licensing, an offline story (stadium connectivity is a
+premise of this project, not an edge case), and reconciling a projection with
+`geoUtils`'s deliberately flat tangent-plane model, whose venue-scale assumption is
+documented at `METRES_PER_DEGREE_LATITUDE`. That is its own project. Recorded here so
+nobody reads "coordinate-first map" as a promise of one — §2.2 exists for exactly this
+kind of expectation-setting.
+
+**Effort:** 7.A S, 7.B M, 7.C S, 7.D M (behaviour change plus a review-queue UI), 7.E M.
+7.E(1) and 7.E(2) are independently shippable and improve the map whether or not calls
+ever get pins.
+
+---
+
 ## 6.1 – 6.4 Cross-cutting design notes
 
 ### 6.2 Write-rate constraint (important)
@@ -1765,6 +2450,20 @@ crowdcad.{eventId}.post.{layerId}.{slug(postName)}
 crowdcad.{eventId}.call.{callId}
 ```
 
+**Inbound pins keep the device's UID; they never borrow CrowdCAD's namespace.** A pin
+accepted into a call is republished under `crowdcad.{eventId}.call.{callId}` like any
+other call, and the originating device UID is retained only as
+`CallPosition.takUid` provenance (§5.2). Two reasons this matters, both load-bearing:
+
+1. Echo suppression is a prefix test on `crowdcad.` (§2.5). A pin that entered under a
+   device UID and left under a CrowdCAD UID is correctly filtered on the way back in;
+   one that kept the device UID on republish would be filtered on the way *out* of the
+   bridge's perspective and could round-trip.
+2. The originating device still owns its own marker. CrowdCAD publishing a *second*
+   marker at the same point under a different UID is correct and expected — one is "a
+   responder marked this spot", the other is "dispatch opened a call here". Collapsing
+   them would let CrowdCAD silently mutate a marker it does not own.
+
 ### 7.3 Type codes — **verify before trusting**
 
 | CrowdCAD entity | Proposed CoT type | Confidence |
@@ -1787,6 +2486,51 @@ The spike's deliverable is concrete and small: publish one marker of each candid
 type, look at the icons on a real client, correct the constants, resolve `b-m-p-w`
 vs the sibling branch's `b-m-p-s-m`, flip `COT_TYPE_CODES_VERIFIED` to `true`, delete
 the warning. The equipment now exists — §0.45.
+
+**Added 7th observation, for Phase 7.D:** *drop a pin by hand in iTAK and record the
+CoT type it emits.* This is the same `b-m-p-w` vs `b-m-p-s-m` question from the other
+direction, and answering it is the whole gate on inbound pin-drop. It costs one line on
+a sheet somebody is already holding a phone to fill in. Record the answer as a named
+constant next to the others, because the bridge must be able to tell a hand-dropped pin
+from a self-reported position — today it cannot, and misfiles the former as the latter
+(Phase 7.D). Note the type may differ between iTAK and ATAK-CIV; capture both if both
+are on hand, since the bridge has to accept either.
+
+**The harness now exists too** — `dev/freetakserver/spike-typecodes.mjs`, written
+this session. It was the missing half nobody had noticed: the spike was described
+for months as "one afternoon with a phone", but nothing in either branch could
+publish a marker of a caller-chosen type code. `seed-berkeley.py` sends a fixed
+set; the bridge only ever emits its own announce; `b-m-p-w` and `b-r-f-h-c` — the
+two codes the spike exists to settle — appeared nowhere in `dev/` at all. The
+afternoon with the phone could not have happened. See §0.3(30).
+
+What it does, and why each part is the way it is:
+
+- Publishes one marker per candidate over plain TCP 8087, laid out on a grid
+  (default 150 m spacing) so they are individually clickable at a normal zoom.
+- **The callsign IS the type code** (`03 b-m-p-w`), so the observer can identify a
+  marker from the label without cross-referencing anything while holding a phone.
+- Prints the **expected** rendering next to a blank for the **observed** one. An
+  observation sheet that only asks "what do you see" invites recording what you
+  expected to see.
+- Includes a **control**: `a-h-G-U-C` (hostile), which must render as a red diamond
+  obviously distinct from `team`. If the control renders the same as `team`, the
+  client is not doing symbol lookup by type and every other answer on the sheet is
+  meaningless. The checklist says to check it first.
+- Imports core's real `buildCotXml` and the real constants from `types.ts` rather
+  than reimplementing them, so it cannot drift from the thing it verifies — the
+  first time §1.1's purity constraint has actually been cashed in (§0.3(31)).
+- Opens a **second client before publishing** and reports which of its own markers
+  came back. Without this, a silent relay failure is indistinguishable from a bad
+  type code — which is not hypothetical; it is the state the local server was found
+  in this session (§0.3(34)).
+- Carries a **stop the bridge first** warning, because a running bridge writes a
+  `tak_positions` record for every `a-*` and `b-m-p-*` marker it sees, matched team
+  or not (§0.3(33)).
+
+Emergency beacons are behind `--include-beacons` and off by default: on a real
+client they can raise alarm UI. Verified end-to-end in `--dry-run`; the live run
+still needs a phone.
 
 **Action:** before implementing `mapping.ts`, run a verification spike — publish one
 of each candidate type to a test server, observe the rendered icon in ATAK-CIV and
@@ -1842,6 +2586,31 @@ access control beyond coarse group/channel scoping.
    without PHI. Positions should not outlive the event: add a retention job that
    deletes `positions` documents for ended events after a configurable window
    (default 30 days).
+
+9. **Inbound free text is a PHI carrier, and §8 previously only looked outward.**
+   Every rule above governs what CrowdCAD *publishes*. Phase 7.D opens a channel in the
+   other direction: a hand-dropped pin in iTAK carries an operator-typed label and
+   remarks, and a responder standing over a patient will type what they see. That text
+   arrives from a device on a volunteer-managed fleet, over a channel other agencies may
+   also be on, and lands in CrowdCAD's datastore.
+
+   Consequences, all of which belong in Phase 7.D rather than being discovered later:
+
+   - `TakPinReport.label` / `.remarks` are **untrusted input**, stored for a dispatcher
+     to read and never auto-copied into any `Call` field. The accept action requires a
+     human to type the chief complaint (Phase 7.D) — that requirement is a PHI boundary,
+     not merely a data-quality one.
+   - A pin's remarks must **never be echoed back out** in a republished call marker.
+     `applyRedaction` already rebuilds output remarks from an allowlist and discards
+     input remarks wholesale (§0.3(6)); that behaviour now protects against inbound text
+     as well as a future upstream mapping bug, and the redaction test's worst-case
+     simulation should gain an inbound-sourced case.
+   - Pin reports need the **same retention treatment as positions** (item 8): dismissed
+     and accepted reports should not outlive the event.
+   - Per `core/CLAUDE.md`, no `console.*` of these fields. The bridge is the most likely
+     place to violate this, because its whole debugging idiom is logging what it
+     received — and it runs with `--verbose` in exactly the situations where somebody is
+     watching output.
 
 ---
 
@@ -1935,6 +2704,13 @@ rendering per type code, stale behavior, network-link refresh, callsign display.
 | 4 — field PWA | ⛔ | L | 3 (schema only) | **The thing IC-EMS actually needs** |
 | 5 — ops docs | ⛔ | S | 2 | Deployers can self-serve |
 | 6 — ATAK plugin | ⛔ deferred | XL | — | Revisit after a full season |
+| **7 — call pins + coordinate-first map** | ⛔ | **M** | **0 only** (7.D also on spike b) | **Calls have real positions, in both directions** |
+
+**Phase 7 is the exception to the "everything is gated" reading of this table.** 7.A–7.C
+and 7.E depend on Phase 0, which is done; only 7.D waits on spike (b). It is therefore
+the one place where a session with no phone and no IC-EMS response can do substantial
+work — and 7.E(2) is a latent data-integrity bug (swapping a venue image silently moves
+every post), not a feature, which argues for doing it regardless of the TAK schedule.
 
 **Spike status — both still outstanding, and they are now the critical path:**
 
@@ -1983,6 +2759,39 @@ New:
    src/app/api/tak/[eventId]/feed.cot/route.ts   MUST honour typeCodesVerified — §0.3(10)
    docs/TAK_DEPLOYMENT.md
    tests/e2e/features/{tak-config,tak-positions}.feature
+```
+
+Phase 7 (call pins + coordinate-first map) — new:
+
+```
+   src/lib/callPosition.ts                 resolve a lat/lon to a layer + percent coords;
+                                           containment tests, version-staleness check (7.A, 7.E)
+   src/lib/__tests__/callPosition.test.ts  pure, so it gets the same vitest treatment as geoUtils
+   src/components/dispatch/CallMarker.tsx  status-coloured via getStatusColor() — 7.B
+   src/components/dispatch/OffMapIndicator.tsx  edge bearing/distance affordance — 7.E(1)
+   src/components/dispatch/PinReviewQueue.tsx   accept/dismiss inbound pins — 7.D
+```
+
+Phase 7 — modified:
+
+```
+   src/app/types.ts                                     CallPosition, Call.position, TakPinReport (§5.2)
+   src/lib/tak/mapping.ts                               buildCallEvent prefers call.position — 7.C
+   src/components/modals/event/venuemapmodal.tsx        placement mode, CallMarker, off-map indicators
+   src/components/modals/event/quickcallmodal.tsx       optional drop-pin; free text STAYS primary — 7.B
+   src/lib/geoUtils.ts                                  containment / inverse-solve helpers if not already covered
+   firestore.rules                                      tak_pin_reports, mirroring positions (§5.1)
+   scripts/setup-pocketbase.js                          tak_pin_reports collection
+```
+
+Phase 7 — modified in the **root wrapper** (the inbound half):
+
+```
+   dev/crowdcad-tak-bridge/cot.js          SPLIT a-* (position) from b-m-p-* (map pin) — 7.D.
+                                           BEHAVIOUR CHANGE: pins are misfiled as positions today.
+   dev/crowdcad-tak-bridge/cot.test.js     the classification tests that encode the old behaviour
+   dev/crowdcad-tak-bridge/bridge.test.js  ditto — the change must be visible in the diff
+   dev/crowdcad-tak-bridge/pocketbase.js   write tak_pin_reports, separate from tak_positions
 ```
 
 In the **root wrapper** repo, not `core` (see §0.45 — this is the inbound half,
