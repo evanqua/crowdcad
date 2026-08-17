@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ControlPoint, Georeference, Layer, Post } from '@/app/types';
 import {
   georeferenceResiduals,
+  georeferenceStaleness,
   latLonToPixel,
   layerPostsLatLon,
   MAX_ACCEPTABLE_RESIDUAL_METRES,
@@ -458,6 +459,19 @@ describe('postName / postPercent / postLatLon / layerPostsLatLon (derive-on-read
       if (!upperResult || !lowerResult) return;
       expect(upperResult.lat).toBeGreaterThan(lowerResult.lat);
     });
+
+    it('stamps the result with the georeference version that produced it', () => {
+      const versionedGeoref: Georeference = { ...northUpGeoref, version: 7 };
+      const layer = makeLayer({
+        georeference: versionedGeoref,
+        posts: [{ name: 'Aid Station', x: 25, y: 75 }],
+      });
+
+      const result = postLatLon(layer, layer.posts[0]);
+      expect(result).not.toBeNull();
+      if (!result) return;
+      expect(result.georeferenceVersion).toBe(7);
+    });
   });
 
   describe('layerPostsLatLon', () => {
@@ -487,6 +501,19 @@ describe('postName / postPercent / postLatLon / layerPostsLatLon (derive-on-read
       expect(result[2].latLon).toBeNull();
       expect(result[3].latLon).not.toBeNull();
       expect(result[4].latLon).toBeNull();
+    });
+
+    it('stamps every located entry with the layer\'s current georeference version', () => {
+      const versionedGeoref: Georeference = { ...northUpGeoref, version: 3 };
+      const posts: Post[] = [
+        { name: 'Aid Station', x: 25, y: 75 },
+        { name: 'Overlook', x: 90, y: 10 },
+      ];
+      const layer = makeLayer({ georeference: versionedGeoref, posts });
+
+      const result = layerPostsLatLon(layer);
+      expect(result[0].latLon?.georeferenceVersion).toBe(3);
+      expect(result[1].latLon?.georeferenceVersion).toBe(3);
     });
 
     it('returns all-null entries when the layer has no georeference', () => {
@@ -710,5 +737,66 @@ describe('georeferenceResiduals', () => {
       expect(result.perPoint[3]).toBeCloseTo(expectedMetres, 4);
       expect(result.maxMetres).toBeCloseTo(expectedMetres, 4);
     });
+  });
+});
+
+describe('georeferenceStaleness', () => {
+  it("returns 'fresh' when the stamped version matches the georeference's current version", () => {
+    const georef: Georeference = { controlPoints: [], version: 2, updatedAt: 0 };
+    expect(georeferenceStaleness(2, georef)).toBe('fresh');
+  });
+
+  it("returns 'stale' when the stamped version no longer matches — the operator recalibrated (or replaced the map image) since the coordinate was derived", () => {
+    const georef: Georeference = { controlPoints: [], version: 4, updatedAt: 0 };
+    expect(georeferenceStaleness(3, georef)).toBe('stale');
+  });
+
+  it("returns 'stale' even when the stamped version is NEWER than the current one (defensive: any mismatch is reported, not just 'behind')", () => {
+    const georef: Georeference = { controlPoints: [], version: 1, updatedAt: 0 };
+    expect(georeferenceStaleness(2, georef)).toBe('stale');
+  });
+
+  it("returns 'unknown' when the coordinate carries no stamp at all — a legacy/external value, not a proven mismatch", () => {
+    const georef: Georeference = { controlPoints: [], version: 1, updatedAt: 0 };
+    expect(georeferenceStaleness(undefined, georef)).toBe('unknown');
+  });
+
+  it("returns 'unknown' when there is no current georeference to compare against, even though the stamp itself is present", () => {
+    expect(georeferenceStaleness(1, undefined)).toBe('unknown');
+  });
+
+  it("returns 'unknown' rather than 'stale', when both the stamp and the current georeference are entirely absent — 'no information' must not present as 'proven wrong'", () => {
+    expect(georeferenceStaleness(undefined, undefined)).toBe('unknown');
+  });
+
+  it('integrates with postLatLon: a coordinate derived just now is always fresh against the layer it came from', () => {
+    const georef: Georeference = {
+      controlPoints: [
+        { x: 0, y: 0, lat: 37.87, lon: -122.27, label: 'A' },
+        { x: 100, y: 100, lat: 37.869, lon: -122.269, label: 'B' },
+      ],
+      version: 9,
+      updatedAt: 0,
+    };
+    const layer: Layer = { id: 'layer-1', name: 'Main', posts: [], georeference: georef };
+    const post: Post = { name: 'Aid Station', x: 50, y: 50 };
+
+    const result = postLatLon(layer, post);
+    expect(result).not.toBeNull();
+    if (!result) return;
+
+    expect(georeferenceStaleness(result.georeferenceVersion, layer.georeference)).toBe('fresh');
+
+    // Simulate the layer being recalibrated (or its map image swapped —
+    // see the version-bump-on-mapUrl-replace fix in
+    // venues/management/page.client.tsx) after the coordinate was derived:
+    // the SAME stamped value is now stale against the layer's new version.
+    const recalibratedLayer: Layer = {
+      ...layer,
+      georeference: { ...georef, version: 10 },
+    };
+    expect(georeferenceStaleness(result.georeferenceVersion, recalibratedLayer.georeference)).toBe(
+      'stale'
+    );
   });
 });

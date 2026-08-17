@@ -840,10 +840,34 @@ export default function VenueManagementPageClient() {
 
       // Update current layer's mapUrl if new map uploaded, and finalize each
       // layer's georeference (bumping version/updatedAt only for layers
-      // whose control points actually changed this session).
+      // whose control points actually changed this session, OR whose map
+      // image was just replaced out from under existing control points).
       const layersForSave: Layer[] = venueData.layers.map((layer, idx) => {
-        const layerWithMap = idx === (pendingLayer ?? currentLayer) && newMapUrl ? { ...layer, mapUrl: newMapUrl } : layer;
-        const isDirty = georeferenceDirtyLayerIds.has(layer.id);
+        const mapReplaced = idx === (pendingLayer ?? currentLayer) && !!newMapUrl;
+        const layerWithMap = mapReplaced ? { ...layer, mapUrl: newMapUrl } : layer;
+        // A layer's control points are percentages of ITS map image — they
+        // carry no reference to which image they were placed on, so nothing
+        // stops them from surviving an image swap unchanged and silently
+        // wrong. Replacing mapUrl for a layer that already has control
+        // points must bump version exactly like an operator editing those
+        // points directly would, even though the two cases are making a
+        // slightly different claim: editing control points means "the
+        // calibration changed"; swapping the image means "the calibration
+        // is now wrong, and needs to be redone." Both correctly invalidate
+        // any coordinate stamped with the old version (see
+        // GeoTransform.version / georeferenceStaleness in geoUtils.ts),
+        // which is why one counter can carry both meanings without
+        // conflating them.
+        //
+        // The control points themselves are deliberately left untouched
+        // here, not cleared: they are operator-entered work, and a percent
+        // coordinate against the old image is still a usable starting point
+        // for re-placing them against the new one. Clearing them would trade
+        // a recoverable "needs recalibration" state for an unrecoverable
+        // one — the version bump alone is what signals staleness.
+        const hasExistingControlPoints = (layer.georeference?.controlPoints.length ?? 0) > 0;
+        const isDirty =
+          georeferenceDirtyLayerIds.has(layer.id) || (mapReplaced && hasExistingControlPoints);
         const georeferenceForSave = buildGeoreferenceForSave(layerWithMap, isDirty, userId);
         const finalizedLayer: Layer = { ...layerWithMap };
         if (georeferenceForSave) {

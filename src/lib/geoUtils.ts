@@ -23,6 +23,24 @@ export interface GeoTransform {
   lat0: number;
   lon0: number;
   cosLat0: number; // local tangent-plane origin
+  // The Georeference.version this transform was solved from. Georeference
+  // control points are meaningful only in the context of ONE specific map
+  // image: recropping or replacing Layer.mapUrl leaves every percentage
+  // coordinate pointing at a different piece of ground with no signal
+  // anywhere that this happened, because control points are numbers, not a
+  // reference to the image they were placed on. version is the only marker
+  // that a recalibration (or, as of the mapUrl-swap fix below, an
+  // invalidation) occurred — see the doc comment on Georeference.version in
+  // app/types.ts and markGeoreferenceDirty's callers in
+  // venues/management/page.client.tsx. Carrying it through the transform,
+  // and from there into every derived lat/lon (see postLatLon /
+  // layerPostsLatLon), is what lets a caller who is holding on to a derived
+  // coordinate later ask "is this still the calibration this layer is
+  // using?" instead of silently trusting a stale position. Typed as
+  // possibly-undefined, defensively, in case a caller hands
+  // solveGeoreference a Georeference object that predates the version field
+  // despite the type declaring it required.
+  version: number | undefined;
 }
 
 /**
@@ -136,19 +154,34 @@ export function solveGeoreference(georef: Georeference | undefined): GeoTransfor
     y: p.y,
   }));
 
-  if (points.length === 2) {
-    return solveSimilarity(local, lat0, lon0, cosLat0);
+  const transform =
+    points.length === 2
+      ? solveSimilarity(local, lat0, lon0, cosLat0)
+      : solveAffine(local, lat0, lon0, cosLat0);
+
+  if (!transform) {
+    return null;
   }
 
-  return solveAffine(local, lat0, lon0, cosLat0);
+  // Stamp the transform with the georeference version it was solved from
+  // (see the doc comment on GeoTransform.version) so everything derived
+  // from it — pixelToLatLon results included, via postLatLon /
+  // layerPostsLatLon below — can be traced back to the calibration that
+  // produced it.
+  return { ...transform, version: georef.version };
 }
 
+// The two solvers below produce everything a GeoTransform needs EXCEPT
+// version — they only ever see the control points, not the Georeference
+// they came from. solveGeoreference (the sole caller of both) stamps
+// version onto the result afterward, so the version-carrying contract lives
+// in exactly one place instead of being duplicated into both solvers.
 function solveSimilarity(
   local: { x: number; y: number; u: number; v: number }[],
   lat0: number,
   lon0: number,
   cosLat0: number
-): GeoTransform | null {
+): Omit<GeoTransform, 'version'> | null {
   const [p1l, p2l] = local;
 
   // p = x + i*y (image-percentage space), q = u + i*v (local tangent plane)
@@ -216,7 +249,7 @@ function solveAffine(
   lat0: number,
   lon0: number,
   cosLat0: number
-): GeoTransform | null {
+): Omit<GeoTransform, 'version'> | null {
   // Normal equations for least-squares fit of [x_i, y_i, 1] * coeffs = target_i
   // M^T M * coeffs = M^T target
   let sxx = 0;
@@ -450,11 +483,25 @@ export function postPercent(post: Post): { x: number; y: number } | null {
  * position — rather than throwing, since both legacy string posts and
  * unplaced posts are expected, live production shapes.
  *
+ * The result carries `georeferenceVersion`, copied from the GeoTransform
+ * that produced it (see GeoTransform.version) — the same field name and
+ * meaning as `CallPosition.georeferenceVersion` in app/types.ts. Because
+ * this function derives on every call, the version it stamps is always the
+ * layer's CURRENT version, so a caller comparing `result.georeferenceVersion`
+ * against `layer.georeference.version` immediately after calling postLatLon
+ * will always see 'fresh' (see georeferenceStaleness below). The field earns
+ * its keep once a caller holds onto the result — storing it, passing it
+ * across a render, exporting it to TAK — past the point where the layer's
+ * georeference might have changed underneath it.
+ *
  * When deriving lat/lon for every post in a layer, prefer
  * layerPostsLatLon — it solves the georeference once instead of once per
  * post.
  */
-export function postLatLon(layer: Layer, post: Post): { lat: number; lon: number } | null {
+export function postLatLon(
+  layer: Layer,
+  post: Post
+): { lat: number; lon: number; georeferenceVersion: number | undefined } | null {
   const transform = solveGeoreference(layer.georeference);
   if (!transform) {
     return null;
@@ -463,7 +510,8 @@ export function postLatLon(layer: Layer, post: Post): { lat: number; lon: number
   if (!percent) {
     return null;
   }
-  return pixelToLatLon(transform, percent.x, percent.y);
+  const { lat, lon } = pixelToLatLon(transform, percent.x, percent.y);
+  return { lat, lon, georeferenceVersion: transform.version };
 }
 
 /**
@@ -478,10 +526,16 @@ export function postLatLon(layer: Layer, post: Post): { lat: number; lon: number
  * usable georeference at all (every entry gets `latLon: null`, but posts are
  * never dropped from the result). `layer.posts` is treated defensively as an
  * empty array when undefined/null.
+ *
+ * Each non-null `latLon` carries `georeferenceVersion` — see the identical
+ * field on postLatLon's return value above for what it means and why it's
+ * there.
  */
-export function layerPostsLatLon(
-  layer: Layer
-): Array<{ post: Post; name: string; latLon: { lat: number; lon: number } | null }> {
+export function layerPostsLatLon(layer: Layer): Array<{
+  post: Post;
+  name: string;
+  latLon: { lat: number; lon: number; georeferenceVersion: number | undefined } | null;
+}> {
   const posts = layer.posts ?? [];
   const transform = solveGeoreference(layer.georeference);
 
@@ -490,10 +544,89 @@ export function layerPostsLatLon(
       return { post, name: postName(post), latLon: null };
     }
     const percent = postPercent(post);
+    if (!percent) {
+      return { post, name: postName(post), latLon: null };
+    }
+    const { lat, lon } = pixelToLatLon(transform, percent.x, percent.y);
     return {
       post,
       name: postName(post),
-      latLon: percent ? pixelToLatLon(transform, percent.x, percent.y) : null,
+      latLon: { lat, lon, georeferenceVersion: transform.version },
     };
   });
+}
+
+// --- Staleness detection -----------------------------------------------
+//
+// version existed on Georeference from the start (see the doc comment in
+// app/types.ts), but nothing ever read it: a Post's lat/lon derives fresh
+// from the CURRENT georeference on every call (see the "Derive-on-read Post
+// accessors" section above), so as long as a caller re-derives immediately
+// before use, the value is always correct by construction and version never
+// needed to be consulted.
+//
+// The gap is everything that ISN'T "re-derive immediately before use": a
+// coordinate captured once and held onto — cached in component state across
+// renders, exported to an external system (TAK, a partner agency feed),
+// stamped onto a CallPosition when a pin is placed (see
+// CallPosition.georeferenceVersion in app/types.ts, which uses this same
+// field name and mechanism) — can silently outlive the calibration that
+// produced it. And critically, "the calibration changed" is not limited to
+// an operator editing control points: replacing a layer's map image
+// (Layer.mapUrl) while its OLD control points remain in place invalidates
+// every derived coordinate just as thoroughly, because percent-of-image
+// coordinates from the old image mean nothing against the new one. See the
+// map-swap fix in buildGeoreferenceForSave's caller in
+// venues/management/page.client.tsx, which now bumps version in that case
+// too — both causes correctly funnel through the same version counter,
+// because both are "the coordinates you derived earlier are no longer
+// trustworthy," even though one means "recalibrated" and the other means
+// "the calibration is now wrong underneath you."
+
+/**
+ * The three states a derived coordinate's provenance can be in relative to
+ * a layer's CURRENT georeference:
+ *
+ * - `'fresh'`: the coordinate was stamped with the same version the layer is
+ *   on right now. Safe to trust.
+ * - `'stale'`: the coordinate was stamped with a version that is no longer
+ *   current — a PROVEN mismatch between two known numbers. This is the only
+ *   state that should drive a "recalibration needed" warning.
+ * - `'unknown'`: there isn't enough information to say either way — the
+ *   coordinate carries no stamp at all (e.g. it predates this stamping
+ *   mechanism, or arrived from an external system that doesn't round-trip
+ *   `georeferenceVersion`), or the layer has no current, numbered
+ *   georeference to compare against. This is deliberately NOT the same
+ *   claim as `'stale'`: an unstamped legacy coordinate has provenance we
+ *   don't have, not provenance we've checked and found wrong. Conflating
+ *   the two would either cry wolf on every pre-existing record (if
+ *   'unknown' were folded into 'stale') or let real drift hide behind an
+ *   unearned "trust me" (if it were folded into 'fresh').
+ */
+export type GeoreferenceStaleness = 'fresh' | 'stale' | 'unknown';
+
+/**
+ * Compares a derived coordinate's stamped `georeferenceVersion` (from
+ * `postLatLon`, `layerPostsLatLon`, or a `CallPosition.georeferenceVersion`)
+ * against a layer's CURRENT `Georeference.version`, and reports which of the
+ * three GeoreferenceStaleness states applies. See the module comment above
+ * for why a mismatch can come from either an operator recalibrating control
+ * points OR replacing the map image underneath them, and the doc comment on
+ * GeoreferenceStaleness for why the "no stamp" case is kept explicitly
+ * distinct from a proven mismatch rather than being folded into 'stale' or
+ * 'fresh'.
+ *
+ * Pass the layer's `georeference` directly (not the whole `Layer`) so this
+ * stays usable for coordinates whose home layer may since have been deleted
+ * or reassigned — callers that still have the `Layer` can pass
+ * `layer.georeference`.
+ */
+export function georeferenceStaleness(
+  stampedVersion: number | undefined,
+  georef: Georeference | undefined
+): GeoreferenceStaleness {
+  if (stampedVersion === undefined || typeof georef?.version !== 'number') {
+    return 'unknown';
+  }
+  return stampedVersion === georef.version ? 'fresh' : 'stale';
 }
