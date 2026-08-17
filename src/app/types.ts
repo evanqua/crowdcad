@@ -25,6 +25,30 @@ export interface Georeference {
   version: number;                // bump on recalibration
   updatedAt: number;              // epoch ms
   updatedBy?: string;
+  /**
+   * The `Layer.mapUrl` these control points were last placed or confirmed
+   * against.
+   *
+   * Control points are percentages of an image, and carry no reference to
+   * WHICH image — so they survive a map swap unchanged and silently wrong.
+   * `version` records that something invalidating happened, but only helps a
+   * coordinate that was stamped at derivation time; it cannot tell an operator
+   * reopening this venue tomorrow whether the calibration on screen still
+   * describes the picture under it. Comparing this against the layer's current
+   * `mapUrl` can, and it is derived rather than a flag, so there is no
+   * "someone forgot to clear it" failure mode.
+   *
+   * Written only when the control points are actually placed or edited — NOT
+   * when the map image is replaced. That asymmetry is the whole point: a swap
+   * must leave the old URL behind so the mismatch persists across a save and
+   * a reload.
+   *
+   * Optional because every georeference written before this field existed has
+   * none. Absent means "unknown", which must never be reported as stale — see
+   * `GeoreferenceStaleness` in `lib/geoUtils.ts` for why crying wolf on the
+   * entire existing corpus is the worse error.
+   */
+  calibratedForMapUrl?: string;
 }
 
 export interface Layer {

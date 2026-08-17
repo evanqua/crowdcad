@@ -10,7 +10,7 @@ import { dbService, storageService } from '@/lib/services';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer, ControlPoint, Georeference } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
-import { layerPostsLatLon } from '@/lib/geoUtils';
+import { georeferenceMapMatch, layerPostsLatLon } from '@/lib/geoUtils';
 import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import NewLayerModal from '@/components/modals/venue/newlayer';
@@ -58,9 +58,19 @@ interface EquipmentWithLocation extends Equipment {
 // `updatedBy` must be OMITTED, never set to undefined), and version/updatedAt
 // must only advance when the control points actually changed this editing
 // session (isDirty) rather than on every unrelated save.
+//
+// `pointsConfirmed` is narrower than `isDirty` and the two must not be merged.
+// `isDirty` means "something invalidating happened" and covers both an operator
+// editing the points and the map image being swapped from under them.
+// `pointsConfirmed` means specifically "the operator placed or edited these
+// points against the image now on screen", which is the only thing that earns
+// the right to stamp `calibratedForMapUrl` forward. A map swap must leave the
+// old URL behind, or the staleness it creates would be erased by the very save
+// that creates it.
 function buildGeoreferenceForSave(
   layer: Layer,
   isDirty: boolean,
+  pointsConfirmed: boolean,
   userId: string
 ): Georeference | undefined {
   const georeference = layer.georeference;
@@ -88,6 +98,18 @@ function buildGeoreferenceForSave(
   const updatedBy = isDirty ? userId : georeference?.updatedBy;
   if (updatedBy) {
     result.updatedBy = updatedBy;
+  }
+
+  // Advance to the image the points were just confirmed against; otherwise
+  // carry the old value forward untouched. Carrying it forward is what makes
+  // "the map was replaced and nobody re-checked the points" survive this save
+  // and be visible when the venue is reopened — the in-session staged-file
+  // signal cannot, because handleSubmit navigates away on success.
+  const calibratedForMapUrl = pointsConfirmed
+    ? layer.mapUrl
+    : georeference?.calibratedForMapUrl;
+  if (calibratedForMapUrl) {
+    result.calibratedForMapUrl = calibratedForMapUrl;
   }
 
   return result;
@@ -356,10 +378,29 @@ export default function VenueManagementPageClient() {
   // actually gets persisted never disagree about what counts as "replaced."
   // Gated on having existing points: with none yet, "place at least 2
   // points" is already the whole story and there's nothing stale to flag.
-  const currentLayerNeedsGeoreferenceReconfirmation =
-    pendingLayer === currentLayer &&
-    !!mapFile &&
-    (venueData.layers[currentLayer]?.georeference?.controlPoints.length ?? 0) > 0;
+  //
+  // Two independent ways to be stale, and both are needed. The staged-file case
+  // is the only one visible while the operator is mid-edit, and the only one the
+  // persisted record cannot see (nothing is saved yet). The persisted case is
+  // the only one visible after a save — handleSubmit navigates away on success,
+  // so an operator reopening this venue tomorrow has no staged file to go on,
+  // and until calibratedForMapUrl existed they were shown a confident "ok"
+  // computed from points placed on a different picture.
+  const currentLayerNeedsGeoreferenceReconfirmation = (() => {
+    const layer = venueData.layers[currentLayer];
+    if ((layer?.georeference?.controlPoints.length ?? 0) === 0) {
+      // With no points yet, "place at least 2 points" is already the whole
+      // story and there is nothing stale to flag.
+      return false;
+    }
+    const stagedReplacement = pendingLayer === currentLayer && !!mapFile;
+    // Only a proven mismatch counts. 'unknown' — a georeference written before
+    // calibratedForMapUrl existed — must not be reported as stale; see
+    // georeferenceMapMatch.
+    const persistedMismatch =
+      georeferenceMapMatch(layer?.mapUrl, layer?.georeference) === 'stale';
+    return stagedReplacement || persistedMismatch;
+  })();
 
   // Equipment
   const addEquipment = () => {
@@ -529,6 +570,20 @@ export default function VenueManagementPageClient() {
       if (prev.has(layerId)) return prev;
       const next = new Set(prev);
       next.add(layerId);
+      return next;
+    });
+  };
+
+  // The inverse: a layer's points are no longer "confirmed against the image on
+  // screen" once a different image is staged for it. Clearing the flag does not
+  // lose the version bump — handleSubmit's `mapReplaced` branch still supplies
+  // one — it only stops the swap from being mistaken for the operator having
+  // re-checked the points, which is the claim `calibratedForMapUrl` records.
+  const clearGeoreferenceConfirmed = (layerId: string) => {
+    setGeoreferenceDirtyLayerIds((prev) => {
+      if (!prev.has(layerId)) return prev;
+      const next = new Set(prev);
+      next.delete(layerId);
       return next;
     });
   };
@@ -882,9 +937,20 @@ export default function VenueManagementPageClient() {
         // a recoverable "needs recalibration" state for an unrecoverable
         // one — the version bump alone is what signals staleness.
         const hasExistingControlPoints = (layer.georeference?.controlPoints.length ?? 0) > 0;
-        const isDirty =
-          georeferenceDirtyLayerIds.has(layer.id) || (mapReplaced && hasExistingControlPoints);
-        const georeferenceForSave = buildGeoreferenceForSave(layerWithMap, isDirty, userId);
+        // Choosing a new map file clears this layer from the dirty set (see the
+        // file input's onChange), so a set membership here means the points were
+        // edited AFTER the currently-staged image was chosen — i.e. confirmed
+        // against the picture the operator was actually looking at. Without that
+        // reset, "edit points, then swap the image, then save" would stamp
+        // calibratedForMapUrl forward onto an image those points never saw.
+        const pointsConfirmed = georeferenceDirtyLayerIds.has(layer.id);
+        const isDirty = pointsConfirmed || (mapReplaced && hasExistingControlPoints);
+        const georeferenceForSave = buildGeoreferenceForSave(
+          layerWithMap,
+          isDirty,
+          pointsConfirmed,
+          userId
+        );
         const finalizedLayer: Layer = { ...layerWithMap };
         if (georeferenceForSave) {
           finalizedLayer.georeference = georeferenceForSave;
@@ -1033,6 +1099,8 @@ export default function VenueManagementPageClient() {
             onChange={(e) => {
               setMapFile(e.target.files?.[0] ?? null);
               setPendingLayer(currentLayer);
+              const layerId = venueData.layers[currentLayer]?.id;
+              if (layerId) clearGeoreferenceConfirmed(layerId);
             }}
           />
 

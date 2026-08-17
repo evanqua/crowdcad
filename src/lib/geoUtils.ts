@@ -630,3 +630,41 @@ export function georeferenceStaleness(
   }
   return stampedVersion === georef.version ? 'fresh' : 'stale';
 }
+
+/**
+ * Reports whether a layer's control points still describe the image currently
+ * under them, by comparing the layer's `mapUrl` against the `mapUrl` the points
+ * were last placed or confirmed against (`Georeference.calibratedForMapUrl`).
+ *
+ * This answers a different question from `georeferenceStaleness`, and the two
+ * are not interchangeable. That one asks "was this coordinate derived from the
+ * calibration currently in force?" and needs a coordinate to have been stamped
+ * at derivation time. This one asks "is the calibration currently in force
+ * still valid at all?" and needs nothing but the layer — which is what an
+ * operator opening the venue editor has, and what the venue editor's status
+ * banner had no way to determine before this existed.
+ *
+ * Same tri-state, same reason. `'unknown'` covers a layer with no map image, a
+ * georeference written before `calibratedForMapUrl` existed, and a layer with
+ * no georeference at all: in every one of those the honest answer is that we
+ * cannot tell, and reporting it as `'stale'` would flag every pre-existing
+ * calibrated layer in every venue as broken. `'stale'` means two known URLs
+ * were compared and differed.
+ *
+ * Note what a URL comparison does and does not catch. Uploads are written to
+ * `venue_maps/{Date.now()}_{filename}`, so re-uploading the byte-identical
+ * file yields a new URL and reports `'stale'` — a false alarm, but one that
+ * costs the operator a re-confirmation of points that are already right, which
+ * is the safe direction to be wrong in. It will not catch an image edited in
+ * place at the same URL; nothing short of hashing the bytes would, and a
+ * storage layer that overwrites URLs is not how this app uploads.
+ */
+export function georeferenceMapMatch(
+  layerMapUrl: string | undefined,
+  georef: Georeference | undefined
+): GeoreferenceStaleness {
+  if (!layerMapUrl || !georef?.calibratedForMapUrl) {
+    return 'unknown';
+  }
+  return layerMapUrl === georef.calibratedForMapUrl ? 'fresh' : 'stale';
+}

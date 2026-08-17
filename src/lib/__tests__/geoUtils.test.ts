@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ControlPoint, Georeference, Layer, Post } from '@/app/types';
 import {
+  georeferenceMapMatch,
   georeferenceResiduals,
   georeferenceStaleness,
   latLonToPixel,
@@ -798,5 +799,71 @@ describe('georeferenceStaleness', () => {
     expect(georeferenceStaleness(result.georeferenceVersion, recalibratedLayer.georeference)).toBe(
       'stale'
     );
+  });
+});
+
+describe('georeferenceMapMatch', () => {
+  const pointsAt = (mapUrl: string | undefined): Georeference => ({
+    controlPoints: [
+      { x: 10, y: 10, lat: 37.87, lon: -122.26 },
+      { x: 90, y: 90, lat: 37.88, lon: -122.25 },
+    ],
+    version: 3,
+    updatedAt: 0,
+    ...(mapUrl ? { calibratedForMapUrl: mapUrl } : {}),
+  });
+
+  it("returns 'fresh' when the layer's map image is the one the points were confirmed against", () => {
+    const georef = pointsAt('venue_maps/1000_plan.png');
+    expect(georeferenceMapMatch('venue_maps/1000_plan.png', georef)).toBe('fresh');
+  });
+
+  it("returns 'stale' when the map image was replaced after the points were placed", () => {
+    const georef = pointsAt('venue_maps/1000_plan.png');
+    expect(georeferenceMapMatch('venue_maps/2000_plan-v2.png', georef)).toBe('stale');
+  });
+
+  it("returns 'unknown' for a georeference written before calibratedForMapUrl existed — the entire pre-existing corpus must not be reported as broken", () => {
+    const georef = pointsAt(undefined);
+    expect(georeferenceMapMatch('venue_maps/1000_plan.png', georef)).toBe('unknown');
+  });
+
+  it("returns 'unknown' when the layer has no map image, rather than treating 'no image' as a mismatch", () => {
+    const georef = pointsAt('venue_maps/1000_plan.png');
+    expect(georeferenceMapMatch(undefined, georef)).toBe('unknown');
+  });
+
+  it("returns 'unknown' when there is no georeference at all", () => {
+    expect(georeferenceMapMatch('venue_maps/1000_plan.png', undefined)).toBe('unknown');
+  });
+
+  it('reports a re-upload of the same file as stale, because uploads are timestamped into their path', () => {
+    // venue_maps/{Date.now()}_{name} means byte-identical content lands at a
+    // new URL. A false alarm, deliberately: it costs a re-confirmation of
+    // points that were already right, which is the safe direction to err in.
+    const georef = pointsAt('venue_maps/1000_plan.png');
+    expect(georeferenceMapMatch('venue_maps/1755_plan.png', georef)).toBe('stale');
+  });
+
+  it('answers a different question from georeferenceStaleness: a layer can be map-stale while a freshly derived coordinate is version-fresh', () => {
+    // The two checks are not interchangeable. A coordinate derived right now
+    // carries the current version, so georeferenceStaleness says 'fresh' — it
+    // only ever compares provenance. Whether the calibration itself still
+    // describes the image underneath is what georeferenceMapMatch is for, and
+    // it is the question the venue editor's banner had no way to ask before.
+    const georef = pointsAt('venue_maps/1000_plan.png');
+    const layer: Layer = {
+      id: 'layer-1',
+      name: 'Main',
+      posts: [],
+      mapUrl: 'venue_maps/2000_plan-v2.png',
+      georeference: georef,
+    };
+    const result = postLatLon(layer, { name: 'Aid Station', x: 50, y: 50 });
+    expect(result).not.toBeNull();
+    if (!result) return;
+
+    expect(georeferenceStaleness(result.georeferenceVersion, layer.georeference)).toBe('fresh');
+    expect(georeferenceMapMatch(layer.mapUrl, layer.georeference)).toBe('stale');
   });
 });
