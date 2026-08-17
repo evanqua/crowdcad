@@ -13,16 +13,23 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react";
-import type { Event, Staff, Call, TeamLogEntry } from "@/app/types";
+import { MapPin, X } from "lucide-react";
+import type { Event, Staff, Call, CallPosition, TeamLogEntry } from "@/app/types";
 import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
 
-type QuickCallState = {
+export type QuickCallState = {
   location: string;
   source: string;
   age: string;
   gender: string;
   chiefComplaint: string;
   assignedTeam: string; // single select
+  // Optional map pin, set only via the venue map's draft-pin picker (see
+  // onRequestDropPin below). Deliberately never required and never touched
+  // by anything else in this form -- `location` (free text) stays the
+  // primary field a dispatcher fills in under time pressure; a pin is a
+  // bonus, not a replacement. See CallPosition's doc comment in app/types.ts.
+  position?: CallPosition;
 };
 
 type Props = {
@@ -38,6 +45,14 @@ type Props = {
   parseAgeSex: (raw: string) => { age: string; gender: string };
 
   quickCallRef?: React.RefObject<HTMLFormElement | null>;
+
+  // Opens the venue map's draft-pin picker for this call. Omitted entirely
+  // in Lite Mode (see page.tsx) -- this modal is shared between Lite and
+  // cloud dispatch, and the picker is backed by VenueMapModal, which is
+  // cloud-only (auth + a real venue with layers). When omitted, the
+  // drop-pin affordance below simply doesn't render; nothing else in this
+  // form changes.
+  onRequestDropPin?: () => void;
 };
 
 export default function QuickCallModal({
@@ -50,6 +65,7 @@ export default function QuickCallModal({
   formatAgeSex,
   parseAgeSex,
   quickCallRef,
+  onRequestDropPin,
 }: Props) {
   const { t } = useDispatchTerms();
   const [submitting, setSubmitting] = React.useState(false);
@@ -110,6 +126,7 @@ export default function QuickCallModal({
         ...(quickCall.source?.trim() && { source: quickCall.source.trim() }),
         ...(quickCall.age?.trim() && { age: quickCall.age.trim() }),
         ...(quickCall.gender?.trim() && { gender: quickCall.gender.trim() }),
+        ...(quickCall.position && { position: quickCall.position }),
         priority: false,
         log: [
           {
@@ -161,6 +178,7 @@ export default function QuickCallModal({
         gender: "",
         chiefComplaint: "",
         assignedTeam: "",
+        position: undefined,
       });
       onClose();
     } finally {
@@ -226,6 +244,42 @@ export default function QuickCallModal({
                 value={quickCall.location}
                 onValueChange={(v) => setQuickCall((p) => ({ ...p, location: v }))}
               />
+              {onRequestDropPin && (
+                // Optional, secondary to the free-text Location field above --
+                // never required, never removes/replaces it. A dispatcher who
+                // just wants to type "NW concourse" and move on can ignore
+                // this entirely; one who has the venue map open can also drop
+                // an exact pin. type="button" so it can't submit the form.
+                <div className="flex items-center gap-2 -mt-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="light"
+                    onPress={onRequestDropPin}
+                    startContent={<MapPin className="h-3.5 w-3.5" />}
+                    className={
+                      quickCall.position
+                        ? "text-status-blue"
+                        : "text-surface-faint hover:text-surface-light"
+                    }
+                  >
+                    {quickCall.position ? t("Pin set on map") : t("Drop pin on map")}
+                  </Button>
+                  {quickCall.position && (
+                    <Button
+                      type="button"
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      aria-label={t("Clear pin")}
+                      onPress={() => setQuickCall((p) => ({ ...p, position: undefined }))}
+                      className="text-surface-faint hover:text-status-red"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              )}
               <Input
                 label={t("Source")}
                 labelPlacement="inside"
@@ -311,6 +365,7 @@ export default function QuickCallModal({
                     gender: "",
                     chiefComplaint: "",
                     assignedTeam: "",
+                    position: undefined,
                   });
                   close();
                   onClose();

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useRef, useCallback, use } from 'react';
 import PostingScheduleModal from '@/components/modals/event/postingschedulemodal';
 import VenueMapModal from '@/components/modals/event/venuemapmodal';
 import EndEventModal from '@/components/modals/event/endeventmodal';
-import QuickCallModal from "@/components/modals/event/quickcallmodal";
+import QuickCallModal, { type QuickCallState } from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
 import AddTeamModal from "@/components/modals/event/addteammodal";
 import AddSupervisorModal from "@/components/modals/event/addsupervisormodal";
@@ -88,7 +88,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const quickCallRef = useRef<HTMLFormElement>(null);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
   const [showEditTeamModal, setShowEditTeamModal] = useState(false);
-  const [quickCall, setQuickCall] = useState({
+  const [quickCall, setQuickCall] = useState<QuickCallState>({
     location: '',
     source: '',
     age: '',
@@ -2621,6 +2621,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   }, [isLiteMode, eventId, router]);
 
   const [showVenueMap, setShowVenueMap] = useState(false);
+  // Quick Call's optional drop-pin picker: a second VenueMapModal instance
+  // opened in "draft" mode (see VenueMapModal's `draftPick` prop) so a
+  // dispatcher can place a call's pin before the call itself exists yet.
+  // Separate from `showVenueMap` (the normal read/edit-pins map) because the
+  // two are mutually exclusive UIs that happen to share almost all their
+  // pan/zoom/marker machinery -- reusing the component avoids duplicating
+  // that, rather than reusing the *state*, which would conflate "browsing
+  // the map" with "picking a pin for the call I'm creating."
+  const [showQuickCallPinPicker, setShowQuickCallPinPicker] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
   const [showEndEvent, setShowEndEvent] = useState(false);
 
@@ -2989,6 +2998,37 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     </div>
   );
 
+  // Shared by both VenueMapModal instances below (the normal read/edit-pins
+  // map and Quick Call's draft-pin picker), and memoized so the array identity
+  // is stable across renders.
+  //
+  // The synthetic layer's id MUST be deterministic. A venue with no explicit
+  // `layers` still needs one to hang its map and posts on, and this is it —
+  // but a `CallPosition` stamps the id of the layer it was placed on, and
+  // resolveCallPinPercent refuses to draw a pin whose layerId doesn't match
+  // the layer being viewed (correctly: that pin belongs somewhere else). A
+  // freshly-random id would therefore not survive the render that follows
+  // placing a pin, and the pin would silently vanish the instant it was
+  // dropped. This previously used crypto.randomUUID(), which is right for
+  // "make me a new layer" and wrong for "name the one implicit layer this
+  // venue has always had" — the venue's own id is stable and already unique.
+  const venueLayers = useMemo(
+    () =>
+      event?.venue
+        ? event.venue.layers && event.venue.layers.length
+          ? event.venue.layers
+          : [
+              {
+                id: `layer-${event.venue.id || eventId}`,
+                name: event.venue.name || 'Main Floor',
+                posts: event.eventPosts || [],
+                mapUrl: event.venue.mapUrl,
+              },
+            ]
+        : [],
+    [event?.venue, event?.eventPosts, eventId]
+  );
+
   return (
     <DispatchVocabularyProvider terms={vocabularyTerms}>
       {/* All your modals first - unchanged */}
@@ -3002,6 +3042,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         formatAgeSex={formatAgeSex}
         parseAgeSex={parseAgeSex}
         quickCallRef={quickCallRef}
+        // Cloud-only: the picker is backed by VenueMapModal (auth + a real
+        // venue), so this affordance simply doesn't exist in Lite Mode --
+        // see the guardrail note on QuickCallModal's onRequestDropPin prop.
+        onRequestDropPin={isLiteMode ? undefined : () => setShowQuickCallPinPicker(true)}
       />
       <ClinicWalkupModal
         isOpen={showQuickClinicCallForm}
@@ -3787,28 +3831,37 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         <>
           {/* Cloud-only modals */}
           {event?.venue && (
-            <VenueMapModal
-              isOpen={showVenueMap}
-              onClose={() => setShowVenueMap(false)}
-              layers={
-                event.venue.layers && event.venue.layers.length
-                  ? event.venue.layers
-                  : [
-                      {
-                        id:
-                          typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                            ? (crypto as unknown as { randomUUID?: () => string }).randomUUID?.() ?? `layer-${Date.now()}`
-                            : `layer-${Date.now()}`,
-                        name: event.venue.name || 'Main Floor',
-                        posts: event.eventPosts || [],
-                        mapUrl: event.venue.mapUrl,
-                      },
-                    ]
-              }
-              staff={staffWithTak}
-              equipment={event.eventEquipment || []}
-              teamTimers={teamTimers}
-            />
+            <>
+              <VenueMapModal
+                isOpen={showVenueMap}
+                onClose={() => setShowVenueMap(false)}
+                layers={venueLayers}
+                staff={staffWithTak}
+                equipment={event.eventEquipment || []}
+                teamTimers={teamTimers}
+                calls={event.calls || []}
+                updateEvent={updateEvent}
+                venueId={event.venue.id}
+              />
+              {/* Quick Call's optional drop-pin picker. Same component,
+                  same layers, opened in draft mode: it hands a finished
+                  CallPosition back into quickCall.position via draftPick's
+                  onPick rather than writing to the event directly, since the
+                  call doesn't exist yet. */}
+              <VenueMapModal
+                isOpen={showQuickCallPinPicker}
+                onClose={() => setShowQuickCallPinPicker(false)}
+                layers={venueLayers}
+                staff={staffWithTak}
+                equipment={event.eventEquipment || []}
+                teamTimers={teamTimers}
+                venueId={event.venue.id}
+                draftPick={{
+                  initial: quickCall.position ?? null,
+                  onPick: (position) => setQuickCall((p) => ({ ...p, position })),
+                }}
+              />
+            </>
           )}
 
           <EndEventModal
