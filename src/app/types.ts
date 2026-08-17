@@ -236,6 +236,89 @@ export interface Supervisor {
   takCallsign?: string;
 }
 
+/**
+ * How a position came to exist.
+ *
+ * `'manual'` is a dispatcher clicking the venue map; `'tak'` is a pin dropped on
+ * a phone and then *explicitly accepted* by dispatch. The distinction is kept
+ * forever because it is the difference between a coordinate CrowdCAD authored
+ * and one it received. CrowdCAD is the system of record for call state, so a
+ * position that arrived over the wire must stay identifiable as such rather than
+ * being laundered into looking dispatcher-authored.
+ *
+ * Not to be confused with the `PositionSource` that was deleted from this file
+ * along with `TeamPosition` (see the note at the end of the file): that one
+ * described *live GPS* provenance for a team. This describes how a *call* got a
+ * coordinate. Different concept, same obvious name.
+ */
+export type PositionSource = 'manual' | 'tak';
+
+/**
+ * A call's own location, independent of any named post.
+ *
+ * **`lat`/`lon` is the system of record; `x`/`y` are derived for drawing.** That
+ * is the *inverse* of `Post`, deliberately:
+ *
+ * | | authored by | system of record | derived on read |
+ * |---|---|---|---|
+ * | `Post` | clicking the venue image | percent of image (`x`, `y`) | lat/lon |
+ * | `CallPosition` | clicking the map **or** a pin from a phone | **lat/lon** | percent of image |
+ *
+ * A post only ever comes into existence by clicking an image, so image
+ * coordinates are its natural system of record. A call pin can arrive from a
+ * phone that has never seen the image, so lat/lon is the only representation
+ * both sources share. Storing a call as percent-of-image would make an inbound
+ * TAK pin unrepresentable until somebody chose a layer for it, and at ingest
+ * time that choice would fall to the bridge — the component least qualified to
+ * make it, since it knows sockets, not venues.
+ *
+ * **Consequence, accepted deliberately:** a call cannot be pinned on an
+ * uncalibrated layer at all. There is no percent-only degraded mode. A call
+ * position that cannot be expressed as lat/lon cannot be published to TAK,
+ * cannot be handed to a partner agency, and cannot be compared against a team's
+ * GPS fix; it is a coordinate in name only. Supporting it would make
+ * calibration look optional when calibration is the entire mechanism.
+ */
+export interface CallPosition {
+  lat: number;
+  lon: number;
+  /**
+   * Percent of venue map width — same units as `Post.x` — derived via the
+   * layer's georeference. Null when the point falls outside this layer's image:
+   * the pin is still real and still published; it is the *drawing* that is
+   * unavailable.
+   */
+  x: number | null;
+  /** Percent of venue map height — same units as `Post.y`. Null as for `x`. */
+  y: number | null;
+  /**
+   * Layer the pin is drawn on. Initially resolved by georeference containment,
+   * but **correctable by dispatch** — unlike `TakPosition.layerId`, which is
+   * only advisory, this is durable call state. GPS altitude cannot separate
+   * stadium levels, so containment alone puts a pin dropped on level 3 onto
+   * whichever layer's bounds happen to contain it. A human has to be able to say
+   * otherwise, and that correction has to survive.
+   */
+  layerId?: string;
+  /**
+   * Which `Georeference.version` produced `x`/`y`. A mismatch against the
+   * layer's current version means the map image or its calibration changed
+   * underneath this pin, so the derived percentages point somewhere the pin
+   * never was. Stale coordinates are surfaced, never silently redrawn.
+   */
+  georeferenceVersion?: number;
+  source: PositionSource;
+  /** Epoch ms when the pin was placed, or for `'tak'`, when it was accepted. */
+  placedAt: number;
+  placedBy?: string;
+  /**
+   * CoT `uid` of the originating pin, when `source` is `'tak'`. Provenance only
+   * — **never** used to locate the call. The device that reported a pin may have
+   * moved a mile since, and its own position is unrelated to the pin's.
+   */
+  takUid?: string;
+}
+
 export type PostAssignment = {
   [time: string]: {
     [post: string]: string;
@@ -275,6 +358,65 @@ export interface Call {
   clinic?: boolean;
   clinicId?: string;
   outcome?: ClinicOutcome;
+  /**
+   * The call's own coordinate, when one was placed.
+   *
+   * Absent means legacy behaviour, which is still the common case: the call's
+   * position is resolved by matching the free-text `location` against a placed
+   * post's name, and a call whose location is not a named post has no position
+   * at all.
+   *
+   * This does **not** supersede `location`. Free text stays the primary field in
+   * the Quick Call flow — dispatchers type what the caller said, under time
+   * pressure, and `"NW concourse, by gate 4"` carries information a coordinate
+   * does not. The two are complementary.
+   */
+  position?: CallPosition;
+}
+
+/**
+ * One unreviewed inbound pin, dropped by hand on a TAK client.
+ * Collection: `tak_pin_reports`.
+ *
+ * **A pin report is not a `Call` and must never be written into `Event.calls`.**
+ * CrowdCAD is the system of record for call state and TAK is never authoritative
+ * for it. Auto-creating a call from a pin would make a tactical map app, running
+ * on a volunteer-managed phone fleet, an unauthenticated writer to the call
+ * queue. A pin is a *proposal*: dispatch either accepts it — creating a real
+ * `Call` with `position.source = 'tak'` — or dismisses it. The accept action is
+ * where a human supplies the chief complaint, which is precisely the field a pin
+ * cannot carry and dispatch must not invent.
+ */
+export interface TakPinReport {
+  id: string;
+  eventId: string;
+  orgId: string;
+  lat: number;
+  lon: number;
+  /**
+   * Operator-typed label from the device.
+   *
+   * **UNTRUSTED FREE TEXT, and a possible PHI carrier.** Somebody typing a
+   * patient's name or condition into a marker label on their phone is entirely
+   * plausible. Never auto-copy this into any `Call` field; show it to the
+   * reviewing dispatcher and let them decide what, if anything, belongs in the
+   * record.
+   */
+  label?: string;
+  /** Device remarks. Same trust level and same PHI caution as `label`. */
+  remarks?: string;
+  takUid: string;
+  takCallsign?: string;
+  cotType: string;
+  /** Epoch ms on the reporting device's clock. */
+  timestamp: number;
+  /** Epoch ms on the server's clock, when the bridge received it. */
+  receivedAt: number;
+  status: 'pending' | 'accepted' | 'dismissed';
+  reviewedBy?: string;
+  reviewedAt?: number;
+  /** Set when accepted, so a pin can be traced to the call it became. */
+  callId?: string;
 }
 
 export interface CallLogEntry {
