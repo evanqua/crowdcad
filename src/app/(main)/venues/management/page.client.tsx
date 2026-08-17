@@ -345,6 +345,22 @@ export default function VenueManagementPageClient() {
     [venueData.layers]
   );
 
+  // True when the map image on screen for the currently-viewed layer is a
+  // staged replacement (picked via file input, not yet uploaded/saved) and
+  // that layer already has control points. The control points are still
+  // percentages solved against the OLD image (see buildGeoreferenceForSave's
+  // mapReplaced handling below) — GeoreferenceSection uses this to refuse to
+  // print residuals/an "ok" verdict for a fit that no longer describes the
+  // picture underneath it. This mirrors handleSubmit's own `mapReplaced`
+  // check (same pendingLayer/mapFile facts) so the live preview and what
+  // actually gets persisted never disagree about what counts as "replaced."
+  // Gated on having existing points: with none yet, "place at least 2
+  // points" is already the whole story and there's nothing stale to flag.
+  const currentLayerNeedsGeoreferenceReconfirmation =
+    pendingLayer === currentLayer &&
+    !!mapFile &&
+    (venueData.layers[currentLayer]?.georeference?.controlPoints.length ?? 0) > 0;
+
   // Equipment
   const addEquipment = () => {
     const name = equipmentInput.trim();
@@ -1170,6 +1186,7 @@ export default function VenueManagementPageClient() {
                     <Tab key="georeference" title="Georeference">
                       <GeoreferenceSection
                         controlPoints={venueData.layers[currentLayer]?.georeference?.controlPoints ?? []}
+                        needsReconfirmation={currentLayerNeedsGeoreferenceReconfirmation}
                         onUpdatePoint={updateControlPoint}
                         onRemovePoint={removeControlPoint}
                         onClearAll={clearControlPoints}

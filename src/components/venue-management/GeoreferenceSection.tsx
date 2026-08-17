@@ -2,25 +2,56 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, Card, Input, ScrollShadow } from '@heroui/react';
-import { AlertTriangle, CheckCircle2, Crosshair, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Crosshair, RefreshCw, Trash2 } from 'lucide-react';
 import type { ControlPoint, Georeference } from '@/app/types';
 import { MAX_ACCEPTABLE_RESIDUAL_METRES, georeferenceResiduals, solveGeoreference } from '@/lib/geoUtils';
 
 interface GeoreferenceSectionProps {
   controlPoints: ControlPoint[];
+  // Whether the control points below were solved against an image that is
+  // no longer the one on screen (the map was replaced this session but not
+  // yet saved). Deliberately a single precomputed boolean rather than, say,
+  // handing this component the Georeference plus the raw pending-map state
+  // (staged File, pendingLayer index, current layer index) and letting it
+  // work out "does that pending file belong to this layer" itself: the
+  // caller already has to make that same judgment call for
+  // buildGeoreferenceForSave, and a second, independently-written version of
+  // the same "which layer does the pending replacement apply to" check
+  // in this file could quietly drift from the one that decides what
+  // actually gets persisted. A boolean has no such second guess to get
+  // wrong — it's already the verdict.
+  needsReconfirmation: boolean;
   onUpdatePoint: (index: number, patch: Partial<ControlPoint>) => void;
   onRemovePoint: (index: number) => void;
   onClearAll: () => void;
 }
 
 interface GeoreferenceStatus {
-  tone: 'muted' | 'ok' | 'warn';
+  tone: 'muted' | 'ok' | 'warn' | 'stale';
   message: string;
 }
 
-function describeGeoreferenceStatus(controlPoints: ControlPoint[]): GeoreferenceStatus {
+function describeGeoreferenceStatus(controlPoints: ControlPoint[], needsReconfirmation: boolean): GeoreferenceStatus {
   if (controlPoints.length < 2) {
     return { tone: 'muted', message: 'Not georeferenced — place at least 2 points' };
+  }
+
+  // The map image was swapped out from under these points this session.
+  // Their x/y percentages still solve to *a* transform, but it's a
+  // transform for pixels in an image that's no longer on screen — a
+  // residual or "ok" verdict computed from it isn't a worse number, it's a
+  // meaningless one, and printing it invites an operator to judge whether
+  // 4.2 m is acceptable for a fit that no longer means anything. Say what
+  // happened instead. Checked before solveGeoreference runs at all, so a
+  // stale-but-degenerate point set doesn't fall through to the degenerate
+  // message below — the actionable fact right now is "re-confirm," not
+  // "these happen to be collinear too."
+  if (needsReconfirmation) {
+    return {
+      tone: 'stale',
+      message:
+        'Map image replaced — these control points were placed on the previous image and need to be re-confirmed. Nudge each point onto its landmark on the new map; there is no need to remove and re-place them.',
+    };
   }
 
   // solveGeoreference only reads controlPoints; version/updatedAt are
@@ -220,11 +251,12 @@ function ControlPointRow({ point, index, onUpdate, onRemove }: ControlPointRowPr
 
 export default function GeoreferenceSection({
   controlPoints,
+  needsReconfirmation,
   onUpdatePoint,
   onRemovePoint,
   onClearAll,
 }: GeoreferenceSectionProps) {
-  const status = describeGeoreferenceStatus(controlPoints);
+  const status = describeGeoreferenceStatus(controlPoints, needsReconfirmation);
 
   return (
     <>
@@ -245,12 +277,15 @@ export default function GeoreferenceSection({
             ? 'border-status-blue/50 text-status-blue'
             : status.tone === 'warn'
             ? 'border-status-red/50 text-status-red'
+            : status.tone === 'stale'
+            ? 'border-status-orange/50 text-status-orange'
             : 'border-surface-liner text-surface-faint'
         }`}
       >
         {status.tone === 'ok' && <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />}
         {status.tone === 'warn' && <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />}
         {status.tone === 'muted' && <Crosshair className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />}
+        {status.tone === 'stale' && <RefreshCw className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />}
         <span>{status.message}</span>
       </div>
 
