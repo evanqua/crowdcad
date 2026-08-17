@@ -200,6 +200,8 @@ from the phase section it affects.
 | **7.C** | **`buildCallEvent` precedence rewritten: a placed pin outranks the post name-match, and publishes with `ce = COT_UNKNOWN`. Skip detail now names both failure modes. `mapping.test.ts` 15 → 28 tests** | **Done** | `50dd6b4` |
 | **7.E(2)** | **`GeoTransform.version` stamping, `postLatLon` / `layerPostsLatLon` return `georeferenceVersion`, tri-state `georeferenceStaleness()`. `geoUtils.test.ts` 40 → 49 tests** | **Done** | `47157a4` |
 | **7.E(2)** | **Root cause behind it: replacing a layer's map image never invalidated that layer's georeference, so every post silently relocated. `handleSubmit` now treats a map swap on a layer that has control points as georeference-dirty (bumping `version`) without discarding the points** | **Done** | `47157a4` |
+| **7.E(2) f/u** | **`describeGeoreferenceStatus` stops reporting a stale fit as "ok" — residuals suppressed rather than shown beside a warning, because a fit measured against the wrong image is meaningless, not merely worse** | **Done** | `dbb7dce` |
+| **7.E(2) f/u** | **…and it now survives a save: `Georeference.calibratedForMapUrl` + `georeferenceMapMatch()` derive staleness from the image identity, so reopening the venue tomorrow no longer shows a confident "ok". `geoUtils.test.ts` 49 → 56** | **Done** | `a46de5c` |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -996,6 +998,49 @@ writing pins somewhere with no consumer.
     an operator reading the old message would have gone looking for a typo in a post
     name when the real answer was "drop a pin".
 
+45. **A calibration records which image it was made against; staleness is derived from
+    that, not stored as a flag.** `Georeference.calibratedForMapUrl` holds the
+    `Layer.mapUrl` the control points were last placed or confirmed against, and
+    `georeferenceMapMatch()` compares it with the layer's current `mapUrl`. Deriving
+    removes the "someone forgot to clear the flag" failure mode entirely: there is no
+    state to maintain, only two strings to compare.
+
+    **It answers a different question from `georeferenceStaleness()` and does not replace
+    it.** That one asks *"was this coordinate derived from the calibration currently in
+    force?"* and needs a coordinate that was stamped at derivation time. This one asks
+    *"is the calibration currently in force valid at all?"* and needs only the layer —
+    which is what an operator opening the venue editor has, and precisely what the status
+    banner had no way to determine. A test asserts both at once on the same layer: a
+    freshly derived coordinate is version-`'fresh'` while the layer is map-`'stale'`.
+
+    **The field advances only on a points edit, never on a map swap** — which is why
+    `buildGeoreferenceForSave` now takes `pointsConfirmed` separately from `isDirty`.
+    `isDirty` means "something invalidating happened" and covers both causes; only the
+    operator actually re-checking the points earns the stamp. Merging them would have the
+    swap's own save erase the staleness that swap created. For the same reason, choosing
+    a new map file *removes* that layer from `georeferenceDirtyLayerIds`, so "edit points,
+    then swap the image, then save" cannot stamp the new URL onto points that never saw
+    it; the version bump is unaffected because `mapReplaced` still supplies one.
+
+    Tri-state again, for §0.3(41)'s reason: a georeference written before this field
+    existed has no URL, and that is `'unknown'`, not `'stale'`. Reporting the entire
+    existing corpus as broken is how a warning gets clicked past. The field is
+    self-migrating — the first genuine points edit on a legacy layer starts tracking it.
+
+    **Known false alarm, accepted.** Uploads are pathed
+    `venue_maps/{Date.now()}_{filename}`, so re-uploading the byte-identical file yields
+    a new URL and reports `'stale'`. The cost is re-confirming points that were already
+    right, which is the safe direction to err; the alternative is hashing image bytes.
+
+46. **Two defect fixes in a row landed only half the fix on the first pass, and both
+    times the missing half was the durable one.** 7.E(2) as scoped stamped a version
+    nothing bumped (§0.3(42)); §0.4(1d) as scoped suppressed a stale banner that was
+    cleared on save moments before the page navigated away. The shape is the same: the
+    in-memory, this-session path is the one that is easy to see and easy to test, and the
+    persisted path is where the operator actually meets the bug — a day later, in a
+    different session, with no memory of the swap. **When fixing a staleness bug, ask
+    what a reader sees after a reload before considering it closed.**
+
 ### 0.4 Recommended next steps, in order
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
@@ -1073,8 +1118,8 @@ item on this list that was already hurting somebody with a phone in the field.
     demonstrably is not (`core/CLAUDE.md`), and a clamped dot is exactly that lie. And
     it is **not a basemap** — see §2.2.
 
-1d. **Follow-up defect from 7.E(2): `describeGeoreferenceStatus` now actively
-    misreports swapped-image layers.** `47157a4` made a map swap bump
+1d. ✅ **DONE (`dbb7dce`, then `a46de5c`) — Follow-up defect from 7.E(2):
+    `describeGeoreferenceStatus` ~~now actively misreports swapped-image layers~~.** `47157a4` made a map swap bump
     `georeference.version`, but `GeoreferenceSection` is passed only `controlPoints`
     (`page.client.tsx`) and cannot see the version or the swap. So a layer whose image
     was replaced still shows its old fit quality and an "ok" banner, computed from
@@ -1083,6 +1128,14 @@ item on this list that was already hurting somebody with a phone in the field.
     fine. Plumb `georeference.version` and the swap intent down, and let the section say
     "needs re-confirmation" instead of restating a stale residual. Small, self-contained,
     and touches no file 7.B or 7.E(1) is in.
+
+    **It was not as self-contained as that.** The first pass (`dbb7dce`) plumbed the
+    staged-file state down and suppressed the residuals — correct, and only half the
+    problem: `mapFile`/`pendingLayer` are cleared on save and `handleSubmit` navigates
+    away, so the case that actually bites — reopening the venue *tomorrow* — was still a
+    confident "ok" over points placed on a different picture. Closed properly in
+    `a46de5c` with `Georeference.calibratedForMapUrl` and `georeferenceMapMatch()`. See
+    §0.3(45); `geoUtils.test.ts` 49 → 56.
 
 7.D still joins the queue behind the spike — the pin type code is the gate, and the
 bridge half of it is already done.
@@ -1559,6 +1612,12 @@ all verified independently of the agents that wrote them (§0.1).
   the two rival TAK efforts (§0.45) ran for days unaware of each other. Resolved with the
   owner's explicit approval by setting `"worktree": {"bgIsolation": "none"}` in
   `.claude/settings.local.json`, staying in `.claude/worktrees/fts-local-dev`.
+- **Closed the follow-up 7.E(2) created**, in two passes (`dbb7dce`, `a46de5c`). Worth
+  noting *why* two: the first pass fixed the banner for the current editing session, which
+  is the version that is easy to see and easy to test, and left the operator who reopens
+  the venue tomorrow still being told "ok" over points placed on a different picture. That
+  is the second consecutive staleness fix whose first pass missed the durable half —
+  §0.3(46). `geoUtils.test.ts` 49 → 56.
 - **Stopped here:** 7.B (pin-drop UI) in flight. 7.E(1) deliberately sequenced *after*
   7.B — both edit `venuemapmodal.tsx`, and two concurrent agents in one 1185-line file is
   a merge conflict dressed as parallelism. New follow-up in §0.4: `describeGeoreferenceStatus`
@@ -2569,10 +2628,13 @@ a coordinate space rather than an image with dots on it. Three concrete gaps:
    is tri-state (`'fresh' | 'stale' | 'unknown'`); "no stamp" is never reported as
    "wrong". §0.3(41)–(42). `geoUtils.test.ts` 40 → 49 tests.
 
-   ⚠️ **Follow-up, open:** `describeGeoreferenceStatus` now *actively misreports* a
-   swapped-image layer as fine, because `GeoreferenceSection` is handed only
-   `controlPoints` and cannot see the version. See §0.4(1d) — being told "ok" is worse
-   than being told nothing, which was the pre-`47157a4` state.
+   ✅ **Follow-up closed (`dbb7dce` + `a46de5c`).** `describeGeoreferenceStatus` had
+   started *actively misreporting* a swapped-image layer as fine — being told "ok" is
+   worse than the silence that preceded `47157a4`. It now suppresses residuals outright
+   for a stale fit (a fit measured against the wrong image is not a worse number, it is a
+   meaningless one) and says to nudge the points, not to start over. Staleness is durable
+   via `Georeference.calibratedForMapUrl` / `georeferenceMapMatch()`, so it survives a
+   save and a reload — §0.3(45), and §0.3(46) on why the first pass missed that.
 3. **Which layer does a bare lat/lon belong to?** A pin from a phone names no layer.
    Resolve by testing georeference containment per layer, preferring the active layer on
    a tie, and marking genuinely ambiguous results rather than guessing. Say the limit
