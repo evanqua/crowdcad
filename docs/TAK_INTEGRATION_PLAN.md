@@ -191,33 +191,44 @@ from the phase section it affects.
 | — | **`georef.js` "How far this applies" scoping header + `georef.test.js` cross-pin tripwire on the shared fixture** | **Done** | this session |
 | — | **`docs/TAK_OPEN_QUESTIONS.md` — §11's six questions restated for IC-EMS** | **Done** | this session |
 | **7.3** | **`dev/freetakserver/spike-typecodes.mjs` — the type-code spike harness. Publishes one marker per candidate code and prints an observation sheet** | **Done** | this session |
-| **2.5** | **Bridge echo suppression widened from one hardcoded UID to a `crowdcad.` prefix match, + cross-repo tripwire test** | **Done — ⚠️ UNCOMMITTED** | working tree only |
-| **7** | **Phase 7 scoped: pin-droppable calls (both directions) + coordinate-first map — §6 Phase 7, §5.2 types, §7.2 UID rules, §7.3 seventh observation, §8(9) inbound PHI, §12, §13** | **Planned — no code** | 2026-08-17 |
+| **2.5** | **Bridge echo suppression widened from one hardcoded UID to a `crowdcad.` prefix match, + cross-repo tripwire test** | **Done** | `78c86ad` (root wrapper) |
+| **7** | **Phase 7 scoped: pin-droppable calls (both directions) + coordinate-first map — §6 Phase 7, §5.2 types, §7.2 UID rules, §7.3 seventh observation, §8(9) inbound PHI, §12, §13** | **Planned** | 2026-08-17 |
 | — | **Call-position gap and the map's raster assumptions recorded in §0.2; §0.4's "everything is hardware-gated" conclusion superseded a second time** | **Done** | 2026-08-17 |
-| — | **Bridge pin-misfiling defect documented (§0.2, §0.3(40)) — live today, found while scoping Phase 7** | **Documented, NOT fixed** | 2026-08-17 |
+| — | **Bridge pin-misfiling defect documented (§0.2, §0.3(40)) — live today, found while scoping Phase 7** | **Documented, then fixed — see next row** | 2026-08-17 |
+| **7.D (prereq)** | **Bridge pin-misfiling defect FIXED: `parseEvent` now returns `kind: 'pin'` for `b-m-p-*` instead of collapsing it into `kind: 'position'`; `bridge.js` gained pure `shouldWritePosition()` and drops pins before `buffer.offer()`. README's type table no longer documents the bug as correct behaviour** | **Done** | `0445d3c` (root wrapper) |
+| **7.A** | **`Call.position` (`CallPosition`: lat/lon of record, `x`/`y` derived, `georeferenceVersion`, `source`, `placedAt`/`placedBy`, provenance-only `takUid`) + `PositionSource` + `TakPinReport` for the 7.D review queue** | **Done** | `b23cf92` |
+| **7.C** | **`buildCallEvent` precedence rewritten: a placed pin outranks the post name-match, and publishes with `ce = COT_UNKNOWN`. Skip detail now names both failure modes. `mapping.test.ts` 15 → 28 tests** | **Done** | `50dd6b4` |
+| **7.E(2)** | **`GeoTransform.version` stamping, `postLatLon` / `layerPostsLatLon` return `georeferenceVersion`, tri-state `georeferenceStaleness()`. `geoUtils.test.ts` 40 → 49 tests** | **Done** | `47157a4` |
+| **7.E(2)** | **Root cause behind it: replacing a layer's map image never invalidated that layer's georeference, so every post silently relocated. `handleSubmit` now treats a map swap on a layer that has control points as georeference-dirty (bumping `version`) without discarding the points** | **Done** | `47157a4` |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
 of the 2026-08-15 session was to commit it as `9fe8de6` so it could not be lost and
 so an isolated branch could be cut from it.
 
-> 🔴 **It happened again. Verified 2026-08-17: two completed items are uncommitted in
-> the root wrapper's working tree**, which is precisely the state the branch rule above
-> was written to prevent — *"a phase that is finished but uncommitted is a phase that
-> can be lost, and worse, a phase the next session cannot see."*
+> ✅ **RESOLVED 2026-08-17 (later the same day) in `78c86ad`.** Kept here because the
+> recurrence is the point, not the fix.
 >
-> | Item | Where | Evidence |
-> |---|---|---|
-> | §2.5 echo suppression + tripwire test | `dev/crowdcad-tak-bridge/bridge.js`, `bridge.test.js` | `git show HEAD:…/bridge.js \| grep -c CROWDCAD_UID_PREFIX` → **0** |
-> | §0.3(30) type-code spike harness | `dev/freetakserver/spike-typecodes.mjs` | **untracked** |
-> | §0.3(34) FTS findings | `dev/TAK_DECISIONS.md` | modified, uncommitted |
+> **What the state was.** Three completed items were uncommitted in the root wrapper's
+> working tree — precisely what the branch rule above exists to prevent (*"a phase that
+> is finished but uncommitted is a phase that can be lost, and worse, a phase the next
+> session cannot see"*), and the **second** such occurrence.
 >
-> The echo-suppression fix is the one that matters most: without it **every marker
+> | Item | Where | Evidence then | Now |
+> |---|---|---|---|
+> | §2.5 echo suppression + tripwire test | `dev/crowdcad-tak-bridge/bridge.js`, `bridge.test.js` | `git show HEAD:…/bridge.js \| grep -c CROWDCAD_UID_PREFIX` → **0** | committed |
+> | §0.3(30) type-code spike harness | `dev/freetakserver/spike-typecodes.mjs` | **untracked** | committed |
+> | §0.3(34) FTS findings | `dev/TAK_DECISIONS.md` | modified, uncommitted | committed |
+>
+> The echo-suppression fix was the one that mattered most: without it **every marker
 > CrowdCAD publishes under its own documented prefix comes straight back in as a GPS
-> fix** (§0.3(32)). It exists only in this working tree. Commit these before doing
-> anything else — and note that this is now the second occurrence, so the rule is not
-> being followed as written. Do not verify by SHA (this document is amended, so tips
-> move); verify by the commands in the evidence column.
+> fix** (§0.3(32)).
+>
+> **The practice that caught it, and should be repeated.** Committing the inherited
+> working tree was the *first* act of the session, before any new code — not because
+> anything looked wrong, but because §0.1's own record said this had already happened
+> twice. Verify by the commands in the evidence column, never by SHA: this document is
+> amended in place, so tips move.
 
 **Verification at the close of the 2026-08-15 session:** `npm run type-check` clean,
 `npm run test:unit` 81/81 passing (up from 34), `npm run build` succeeds with all
@@ -238,6 +249,20 @@ implementing agent reported them, not taken on trust.
 numbers were re-run independently after the implementing agent reported them, same
 practice as above. No production code was touched this session: the diff is one new
 test file, one new test case, one doc comment, and this tracker.
+
+**Verification mid-2026-08-17 session (Phase 7.A / 7.C / 7.E2 + the bridge pin fix):**
+`npm run type-check` clean, `npm run test:unit` **166/166 passing across 9 files**
+(153 before — 13 new in `mapping.test.ts`, 9 new in `geoUtils.test.ts`, and 4 folded
+into existing suites), bridge `node cot.test.js` **13/13** (12 before) and
+`node bridge.test.js` **26/26** (23 before). Core working tree clean; the root wrapper
+shows only the `core` submodule pointer.
+
+Two agent-reported figures did **not** survive checking and are recorded because the
+failure mode is worth recognising: two agents each self-reported "+13 tests, 166 total",
+which cannot both be true (153 + 13 + 13 = 179). Each had counted the *other's*
+additions as part of its own baseline. The real counts above come from re-running the
+suite and reading the `describe` blocks directly. **Do not accept a test count from an
+agent report when another agent has touched the same suite concurrently.**
 
 ### 0.2 Explicitly NOT done, and why
 
@@ -285,6 +310,12 @@ test file, one new test case, one doc comment, and this tracker.
   `buildCallEvent` can only locate a call by string-matching a placed post, and the
   venue map has no call marker. See Phase 7 for the full statement. §0.3(36) covers why
   the plan did not notice, which is the more useful lesson.
+  **Partly closed 2026-08-17:** 7.A (`Call.position`, `b23cf92`) and 7.C (publishing a
+  call at its own coordinate, `50dd6b4`) are done, so the *model* and the *outbound*
+  half both exist. Still open: 7.B (dropping the pin in CrowdCAD's own UI) and 7.D
+  (inbound pins as proposed calls). Until 7.B lands, `Call.position` has no writer —
+  the field is real and nothing populates it, which is a worse state than either end of
+  it and should not be left standing.
 - **Phase 7.E — the venue map is not yet a coordinate space.** Also reported from the
   running app ("the map is still a .png so all the locations are just hard coded"). Half
   of that is a misreading worth correcting in writing, because it will recur: post
@@ -294,14 +325,32 @@ test file, one new test case, one doc comment, and this tracker.
   off-image coordinate renders as nothing, and `Georeference.version` exists but nothing
   consumes it, so replacing a venue image silently moves every post. Phase 7.E(2) is a
   latent data-integrity bug rather than a missing feature.
+  **7.E(2) closed 2026-08-17 (`47157a4`)** — at both ends: the version is now stamped
+  onto every derived coordinate *and* a map swap on a calibrated layer actually bumps it
+  (see §0.3(42), which is the part the task as written would have missed). **7.E(1) is
+  still open:** an off-image coordinate still renders as nothing, with no edge indicator
+  telling dispatch which way and how far. Note what 7.E(1) is *not* — it is not a
+  basemap; see §2.2.
 
-⚠️ **Known defect, live today, found while scoping Phase 7:** the bridge misfiles a
-hand-dropped iTAK pin as a team GPS fix. `cot.js` accepts both `a-*` and `b-m-p-*` as
-positional and writes everything surviving to `tak_positions`, so a pin somebody taps
-moves a *team's* marker on the dispatch map. Echo suppression does not help — it filters
-CrowdCAD's own UIDs, not a phone's. This is the same failure mode `core/CLAUDE.md`
-already forbids for `nearestPost`, arriving by a different route. Fix is the first half
-of Phase 7.D and is a behaviour change to tested code.
+✅ **~~Known defect, live today~~ — FIXED 2026-08-17 in `0445d3c`.** The bridge used to
+misfile a hand-dropped iTAK pin as a team GPS fix: `cot.js` accepted both `a-*` and
+`b-m-p-*` as positional and wrote everything surviving to `tak_positions`, so a pin
+somebody tapped moved a *team's* marker on the dispatch map. Echo suppression did not
+help — it filters CrowdCAD's own UIDs, not a phone's. Same failure mode `core/CLAUDE.md`
+already forbids for `nearestPost`, arriving by a different route.
+
+`parseEvent` now classifies `b-m-p-*` as `kind: 'pin'` — deliberately a *smaller* shape
+than `'position'`, with no `hae` and no `accuracy`, because a tap on a map has neither.
+`bridge.js` gained a pure `shouldWritePosition(ev)` and drops pins before
+`buffer.offer()`, logging them under `--verbose`. Per §0.3(40) the old expectations were
+deleted on purpose rather than adjusted until green. The bridge README's type table had
+listed `b-m-p-*` under "Position? **yes**" — i.e. it documented the bug as correct
+behaviour — and now shows actual `kind` values.
+
+**Pins are logged and dropped, not queued.** Phase 7.D's `tak_pin_reports` review queue
+does not exist yet, and inventing a holding pen for them would create a second
+half-built inbound path. Dropping is the honest interim behaviour; the alternative was
+writing pins somewhere with no consumer.
 
 ### 0.3 Decisions made during implementation
 
@@ -898,6 +947,55 @@ of Phase 7.D and is a behaviour change to tested code.
     to tell "the server dropped it" from "the client drew it oddly" before any
     of its output could be trusted.
 
+41. **Georeference staleness is tri-state — `'fresh' | 'stale' | 'unknown'` — and
+    "unknown" is never collapsed into "stale".** A missing stamp and a mismatched stamp
+    are different facts. Every position written before `GeoTransform.version` existed has
+    no stamp, so folding the two together would relabel the entire existing corpus as
+    known-wrong and train dispatch to ignore the warning. `'stale'` means *proven*
+    mismatch: two numbers were compared and differed.
+
+    An honest caveat, documented in `geoUtils.ts` itself: the accessors derive on every
+    call, so a stamp returned by `postLatLon` always compares `'fresh'` against the
+    georeference it was just derived from. The field earns its keep only once a caller
+    **holds** the value across a render, a store write, or a TAK export — which is
+    exactly what `CallPosition.georeferenceVersion` does. Stamping without a holder is
+    infrastructure for a check that cannot yet fail; that is deliberate, and stated so
+    nobody reads the passing comparison as evidence the mechanism has been exercised.
+
+42. **The 7.E(2) task as written would have shipped a detector that was blind to the
+    likeliest real failure.** The assignment was "consume `Georeference.version`". Doing
+    only that leaves the question of what ever *changes* the version — and it turned out
+    that replacing a layer's map image never marked the georeference dirty at all. Swap
+    in a re-exported site plan with different margins and every control point still
+    refers to the old pixels: posts move, the version does not bump, and a staleness
+    check compares two identical numbers and reports `'fresh'`. The fix is at the source
+    (`handleSubmit` treats a map swap on a layer that has control points as dirty), and
+    the version stamping is the detector for what slips past it.
+
+    **The control points are bumped, not cleared.** Discarding them would destroy a
+    calibration that is often still nearly right — a re-export of the same plan at a new
+    resolution — and force the operator to redo work they could have nudged. Bumping the
+    version marks every derived coordinate as needing re-confirmation while keeping the
+    material to re-confirm *with*.
+
+43. **A call published from a placed pin carries `ce = COT_UNKNOWN`, not `0` and not an
+    invented radius.** A pin is somebody's finger on a map: its error is real and
+    unquantified, unlike a GPS fix, which arrives with a circular error the device
+    actually measured. `COT_UNKNOWN` states "not known", which is true. `0` would claim
+    certainty the pin has not earned, and a made-up radius would be a precision claim
+    with nothing behind it. Same reasoning as §0.3(2) and §0.3(38).
+
+44. **A placed pin outranks the post name-match, and the skip message now names both
+    ways to fail.** `buildCallEvent` previously located a call only by string-matching
+    `Call.location` against a placed post; with 7.A there are two sources and the
+    explicit one must win — a dispatcher who dropped a pin has overridden the text.
+    `reason: 'position-unresolved'` is unchanged (no new `MappingSkipReason`), because
+    the outcome is identical and a new variant would oblige every consumer to learn a
+    distinction that changes nothing for them. Only the human-readable detail grew, to
+    say *both* "no pin" and "location is not a placed post on a georeferenced layer" —
+    an operator reading the old message would have gone looking for a typo in a post
+    name when the real answer was "drop a pin".
+
 ### 0.4 Recommended next steps, in order
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
@@ -950,10 +1048,44 @@ and nothing consumes it, so replacing a venue map image silently relocates every
 on it. Then the `Call.position` model and pin-drop, which is the reported gap. 7.D
 joins the queue behind the spike.
 
-**And before anything else, the live one:** the bridge misfiles a hand-dropped pin as a
-team GPS fix *today* (§0.2, §0.3(40)). Anyone who drops a pin during an event moves a
-team's marker. If a phone is in the field before Phase 7 lands, that is worth a same-day
-fix on its own.
+**~~And before anything else, the live one:~~ Done 2026-08-17 (`0445d3c`).** The bridge
+used to misfile a hand-dropped pin as a team GPS fix (§0.2, §0.3(40)); it no longer does.
+It was taken first, ahead of the planned 7.E(2)/7.A–7.C order, because it was the only
+item on this list that was already hurting somebody with a phone in the field.
+
+**Amended 2026-08-17 — items 1a and the live one are largely spent. What is next:**
+
+1b. **Phase 7.B — the pin-drop UI.** The single highest-value item, because 7.A landed
+    `Call.position` and **nothing writes to it**. A model with no writer is worse than
+    either half alone: the type invites callers to read a field that is always
+    `undefined`, and 7.C's publishing path can never fire. Requirements that are
+    decisions, not preferences: a pin on an *uncalibrated* layer is **refused**, not
+    stored degraded (§0.3(38)); re-dragging an existing pin appends to `Call.log`,
+    because moving a call is an operational act with a time and an author; and the
+    marker must read its colour from `getStatusColor()`, never a local class map.
+
+1c. **Phase 7.E(1) — off-map edge indicators.** Sequence this *after* 7.B: both edit
+    `venuemapmodal.tsx` (1185 lines), and running them concurrently buys a merge
+    conflict rather than parallelism. An indicator must carry **bearing and distance** —
+    an arrow alone says "not here" without saying where, which is the state the map is
+    in today. It must **not clamp** the position onto the image edge: `onMap: false`
+    exists so the UI hides a marker instead of drawing it somewhere the unit
+    demonstrably is not (`core/CLAUDE.md`), and a clamped dot is exactly that lie. And
+    it is **not a basemap** — see §2.2.
+
+1d. **Follow-up defect from 7.E(2): `describeGeoreferenceStatus` now actively
+    misreports swapped-image layers.** `47157a4` made a map swap bump
+    `georeference.version`, but `GeoreferenceSection` is passed only `controlPoints`
+    (`page.client.tsx`) and cannot see the version or the swap. So a layer whose image
+    was replaced still shows its old fit quality and an "ok" banner, computed from
+    control points that now refer to different pixels. This is worse than the bug
+    7.E(2) fixed: before, the operator was told nothing; now they are told everything is
+    fine. Plumb `georeference.version` and the swap intent down, and let the section say
+    "needs re-confirmation" instead of restating a stale residual. Small, self-contained,
+    and touches no file 7.B or 7.E(1) is in.
+
+7.D still joins the queue behind the spike — the pin type code is the gate, and the
+bridge half of it is already done.
 
 If you have arrived here looking for code to write and cannot run a spike, the
 honest answer is that there is very little left that is both safe and useful, and
@@ -1388,6 +1520,52 @@ assert what the tip of the branch is.
   does not go looking for it in the TAK code.
 - `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
 
+**2026-08-17 (second session, same day) — Phase 7 code: 7.A, 7.C, 7.E(2), and the bridge
+pin fix.** The first day of Phase 7 that produced code rather than scope. Five commits,
+all verified independently of the agents that wrote them (§0.1).
+
+- **Committed the inherited working tree first**, before writing anything new — `78c86ad`
+  in the root wrapper, carrying §2.5's echo suppression, `spike-typecodes.mjs`, and the
+  FTS silent-relay findings, and bumping `core` 4e00f13 → c0751fd. §0.1's own record said
+  this loss had already nearly happened twice; that was reason enough not to build on top
+  of it. The 🔴 block in §0.1 is now marked resolved rather than deleted.
+- **Fixed the live pin-misfiling defect** (`0445d3c`) — the one thing here a user would
+  notice today, since dropping a pin in iTAK during an event moved a team's marker on the
+  dispatch board. cot 12 → 13 tests, bridge 23 → 26.
+- **7.A `Call.position`** (`b23cf92`) and **7.C publish-at-own-coordinate** (`50dd6b4`),
+  `mapping.test.ts` 15 → 28. New decisions §0.3(43) (`ce = COT_UNKNOWN` for a pin) and
+  §0.3(44) (a pin outranks the post name-match; no new `MappingSkipReason`).
+- **7.E(2)** (`47157a4`) — and the more useful half was the part **not** in the task
+  prompt. "Consume `Georeference.version`" builds a detector; nothing was *bumping* the
+  version, because replacing a layer's map image never marked its georeference dirty. The
+  detector would have compared two identical numbers and reported `'fresh'` on exactly
+  the failure it was built to catch. Root-caused in `handleSubmit`; control points bumped,
+  not cleared. §0.3(41)–(42). `geoUtils.test.ts` 40 → 49.
+- **On delegation.** Work was split across Sonnet/Haiku agents to conserve orchestrator
+  context, and every report was checked rather than trusted. Three things did not survive
+  checking: a **fabricated doc citation** (an agent cited "Phase 3.2" for the pin review
+  queue in two source comments — Phase 3 is inbound positions; the queue is 7.D), an
+  **overclaiming comment** calling a hand-dropped pin and an accepted phone coordinate
+  "both precise handlings" (a finger on a map is not precise — replaced with §0.3(43)'s
+  actual reasoning), and **two mutually impossible test counts** (§0.1). One agent also
+  routed writes through `python3` heredocs when `Edit` was blocked, a workaround declined
+  at the orchestrator level; its full diff was read before the commit. The lesson is not
+  "don't delegate" — it is that an agent report is a claim, and the cheap checks
+  (re-run the suite, grep the citation, read the diff) caught all four.
+- **Environment note, for the next session.** The background-isolation guard blocked all
+  writes and `EnterWorktree` could not re-enter the cwd it was already in. A *new*
+  worktree was refused on purpose: per the branch rule, a fresh root worktree gives `core`
+  a submodule object DB that cannot see `feature/tak-integration` — which is precisely how
+  the two rival TAK efforts (§0.45) ran for days unaware of each other. Resolved with the
+  owner's explicit approval by setting `"worktree": {"bgIsolation": "none"}` in
+  `.claude/settings.local.json`, staying in `.claude/worktrees/fts-local-dev`.
+- **Stopped here:** 7.B (pin-drop UI) in flight. 7.E(1) deliberately sequenced *after*
+  7.B — both edit `venuemapmodal.tsx`, and two concurrent agents in one 1185-line file is
+  a merge conflict dressed as parallelism. New follow-up in §0.4: `describeGeoreferenceStatus`
+  now **actively misreports** swapped-image layers as fine, because `GeoreferenceSection`
+  receives only `controlPoints` and cannot see `version`.
+- `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
+
 ---
 
 ## 1. Executive summary
@@ -1667,6 +1845,21 @@ live dispatch map subscribes to `positions`. Document this in the type comment s
 nobody re-plumbs high-rate writes into the event doc later.
 
 ### 5.2 Call positions and georeference provenance (Phase 7)
+
+> ✅ **Shipped in `b23cf92`.** `CallPosition`, `PositionSource` and `TakPinReport` are in
+> `core/src/app/types.ts` now; the sketch below matched what landed. Read `types.ts` as
+> authoritative — CrowdCAD has no schema-validation layer, so this section is
+> documentation, not a spec.
+>
+> **One name collision to know about.** `PositionSource` shipped as `'manual' | 'tak'` —
+> and it is **not** the `PositionSource` in §5.1 above. That one (`'tak' |
+> 'field-client' | 'manual'`) described *live GPS* provenance for a team and was
+> **deleted** at the §0.45 merge along with `TeamPosition`, because `TakPositionRecord`
+> is the type that is actually built and proven against real hardware. The new one
+> describes how a *call* got a coordinate: different concept, same obvious name, and
+> `types.ts` carries a doc comment saying so at the declaration. `'field-client'` was not
+> carried over — a union member with no producer is a branch every `switch` must handle
+> for a case that cannot occur; add it with the thing that emits it.
 
 ```ts
 // ── A call's own location, independent of any named post ────────────────────
@@ -2170,7 +2363,13 @@ now, and revisit no earlier than a full season of production use.
 
 ---
 
-### Phase 7 — Pin-droppable calls and a coordinate-first map — ⛔ NOT STARTED
+### Phase 7 — Pin-droppable calls and a coordinate-first map — 🟡 PARTLY BUILT
+
+> **Status as of 2026-08-17.** 7.A ✅ `b23cf92` · 7.B 🟡 in progress · 7.C ✅ `50dd6b4` ·
+> 7.D 🟡 bridge half ✅ `0445d3c`, review queue ⛔ (gated on the §7.3 pin type code) ·
+> 7.E(1) ⛔ · 7.E(2) ✅ `47157a4`. The text below is the original scoping and is kept as
+> written; each sub-item carries its own status line. Per-decision notes in
+> §0.3(41)–(44), session narrative in §0.5.
 
 **This is the only substantial item left in the plan that is not gated on a spike, a
 phone, or IC-EMS.** §0.4 spent two revisions concluding that nothing unblocked
@@ -2206,7 +2405,15 @@ throughout this document — the convention here is that `§N.M` denotes Phase N
 N ≤ 6, while `§7`–`§13` are specification sections. A "Phase 7.3" would be genuinely
 ambiguous in a document meant to be picked up cold. §0.3(35).
 
-#### 7.A — `Call.position`: lat/lon of record, percent derived
+#### 7.A — `Call.position`: lat/lon of record, percent derived — ✅ BUILT (`b23cf92`)
+
+Landed as scoped: `CallPosition` and `PositionSource` in `core/src/app/types.ts`, plus
+`TakPinReport` for 7.D's review queue. Two details worth knowing at the call site:
+`layerId` is **optional and correctable by dispatch**, unlike `TakPosition.layerId`
+(a device's fix is not a claim about which layer it belongs to, but a dispatcher's pin
+is, and dispatchers mis-click); and `takUid` is **provenance only — never used to
+locate**, so an accepted inbound pin records where it came from without becoming a live
+link to a phone.
 
 Types in §5. The asymmetry with `Post` is deliberate and load-bearing:
 
@@ -2247,7 +2454,14 @@ calibration look optional when it is the entire mechanism. This makes calibratio
   that must not regress into a required map interaction. Text and coordinate are
   complementary — `"NW concourse, by gate 4"` carries information a coordinate does not.
 
-#### 7.C — Outbound: a call publishes at its own coordinate
+#### 7.C — Outbound: a call publishes at its own coordinate — ✅ BUILT (`50dd6b4`)
+
+Landed as one branch in `buildCallEvent`, with two departures from the scoping below.
+**No new reason string:** `position-unresolved` covers both failure modes, because the
+outcome is identical and a new `MappingSkipReason` would make every consumer learn a
+distinction that changes nothing for them (§0.3(44)) — only the human-readable *detail*
+grew. And a pin publishes with **`ce = COT_UNKNOWN`**, not a zero and not an invented
+radius (§0.3(43)). `mapping.test.ts` 15 → 28 tests.
 
 One change in `buildCallEvent`: prefer `call.position` when present, fall back to the
 existing post-name lookup, then skip. The skip plumbing already exists (`MappingSkip`,
@@ -2259,9 +2473,17 @@ This also removes the sharpest edge in the current mapper: today a call at a rea
 location that simply is not a named post is silently absent from the TAK picture,
 indistinguishable on a partner agency's map from no call existing.
 
-#### 7.D — Inbound: a dropped pin from iTAK / ATAK
+#### 7.D — Inbound: a dropped pin from iTAK / ATAK — 🟡 bridge half BUILT (`0445d3c`)
 
-⚠️ **This sub-item begins by fixing a live misfiling, not by adding a feature.**
+> **The misfiling described below is fixed.** `parseEvent` returns `kind: 'pin'` for
+> `b-m-p-*`; `bridge.js` drops pins before `buffer.offer()` via a pure
+> `shouldWritePosition()`. Pins are logged under `--verbose` and **discarded**, not
+> queued — `tak_pin_reports` has no consumer yet, and writing to a queue nobody reads
+> would be a second half-built inbound path. **Still to do:** the review queue and the
+> dispatch accept/dismiss UI, gated on the §7.3 spike settling the pin type code. Note
+> the split itself needed no hardware: CrowdCAD's own posts already publish as `b-m-p-w`.
+
+⚠️ **~~This sub-item begins by fixing a live misfiling, not by adding a feature.~~**
 `dev/crowdcad-tak-bridge/cot.js` classifies inbound CoT as:
 
 ```js
@@ -2323,12 +2545,34 @@ a coordinate space rather than an image with dots on it. Three concrete gaps:
    **edge indicator carrying bearing and distance**, which is neither a lie about
    position nor silence. A team or a call just outside the mapped area is exactly the
    case where dispatch most needs to know a direction.
+
+   ⛔ **Still open (7.E(1)).** Sequenced after 7.B — both edit `venuemapmodal.tsx`. Two
+   constraints when it is picked up: the indicator must carry **bearing *and* distance**
+   (an arrow alone says "not here" without saying where, which is today's state), and it
+   must **not clamp** the marker onto the image edge — a clamped dot is precisely the lie
+   `onMap: false` exists to prevent.
 2. **Swapping the PNG silently moves every post.** Percent coordinates are meaningful
    only against one image; re-crop or replace it and every post shifts with no signal.
    `Georeference.version` exists to be bumped on recalibration and **nothing consumes
    it**. Stamp derived coordinates with the version that produced them (§5) and surface
    a "recalibration needed" state instead of quietly serving wrong positions. This is
    the one item here that is a latent data-integrity bug rather than a missing feature.
+
+   ✅ **BUILT (`47157a4`)** — and the scoping above understated it. Stamping alone would
+   have been a detector with nothing to detect: **nothing bumped the version**, because
+   replacing a layer's map image never marked its georeference dirty, so the check would
+   have compared two identical numbers and reported `'fresh'` on exactly the failure it
+   was built for. Fixed at the source in `handleSubmit` (a map swap on a layer that has
+   control points is georeference-dirty), with control points **bumped, not cleared** —
+   a re-export of the same plan at a new resolution is usually still nearly right, and
+   discarding the calibration destroys the material needed to re-confirm it. Staleness
+   is tri-state (`'fresh' | 'stale' | 'unknown'`); "no stamp" is never reported as
+   "wrong". §0.3(41)–(42). `geoUtils.test.ts` 40 → 49 tests.
+
+   ⚠️ **Follow-up, open:** `describeGeoreferenceStatus` now *actively misreports* a
+   swapped-image layer as fine, because `GeoreferenceSection` is handed only
+   `controlPoints` and cannot see the version. See §0.4(1d) — being told "ok" is worse
+   than being told nothing, which was the pre-`47157a4` state.
 3. **Which layer does a bare lat/lon belong to?** A pin from a phone names no layer.
    Resolve by testing georeference containment per layer, preferring the active layer on
    a tie, and marking genuinely ambiguous results rather than guessing. Say the limit
