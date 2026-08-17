@@ -21,6 +21,26 @@ Optional: Cloud Functions if you add server-side integrations.
 
 Record the Project ID — you will use it in `NEXT_PUBLIC_FIREBASE_PROJECT_ID` and CI secrets.
 
+## Fork and clone the repository
+
+Since this is a shared project, start by creating your own copy rather than working directly against the upstream repository:
+
+1. Go to https://github.com/evanqua/crowdcad and click **Fork** to create a copy under your own GitHub account.
+2. Clone your fork (not the upstream repo):
+
+```bash
+git clone https://github.com/YOUR_USERNAME/crowdcad.git
+cd crowdcad
+```
+
+3. Add the original repository as an `upstream` remote so you can pull in future updates — this is recommended so your fork doesn't fall behind:
+
+```bash
+git remote add upstream https://github.com/evanqua/crowdcad.git
+```
+
+Do all local development, environment configuration, and deployment described below from your fork.
+
 ## Local environment variables
 
 Create a `.env.local` file in the project root with these variables (copy from `.env.example`):

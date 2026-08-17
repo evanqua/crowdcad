@@ -18,11 +18,19 @@ Important: do not commit secrets (admin passwords or `.env.local`) to the reposi
 
 ## Setup (Docker + PocketBase)
 
-**1. Clone the repository**
+**1. Fork and clone the repository**
+
+Since this is a shared project, start by creating your own copy rather than working directly against the upstream repository. Go to https://github.com/evanqua/crowdcad and click **Fork** to create a copy under your own GitHub account, then clone your fork (not the upstream repo):
 
 ```bash
-git clone https://github.com/evanqua/crowdcad.git
+git clone https://github.com/YOUR_USERNAME/crowdcad.git
 cd crowdcad
+```
+
+Add the original repository as an `upstream` remote so you can pull in future updates — this is recommended so your fork doesn't fall behind:
+
+```bash
+git remote add upstream https://github.com/evanqua/crowdcad.git
 ```
 
 If you already have a Firebase-configured checkout of this repo and want to try PocketBase alongside it, clone into a separate directory instead of reusing the existing one — each checkout has its own `.env.local` and `.pb-data/`, and running both from the same directory will collide.
