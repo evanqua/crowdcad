@@ -202,6 +202,7 @@ from the phase section it affects.
 | **7.E(2)** | **Root cause behind it: replacing a layer's map image never invalidated that layer's georeference, so every post silently relocated. `handleSubmit` now treats a map swap on a layer that has control points as georeference-dirty (bumping `version`) without discarding the points** | **Done** | `47157a4` |
 | **7.E(2) f/u** | **`describeGeoreferenceStatus` stops reporting a stale fit as "ok" — residuals suppressed rather than shown beside a warning, because a fit measured against the wrong image is meaningless, not merely worse** | **Done** | `dbb7dce` |
 | **7.E(2) f/u** | **…and it now survives a save: `Georeference.calibratedForMapUrl` + `georeferenceMapMatch()` derive staleness from the image identity, so reopening the venue tomorrow no longer shows a confident "ok". `geoUtils.test.ts` 49 → 56** | **Done** | `a46de5c` |
+| **7.B** | **Pin-drop UI: placement mode + drag-to-correct + clear on `venuemapmodal.tsx`, a `CallMarker` coloured through `getStatusColor()`, an optional draft-pin affordance on Quick Call, and the new pure `src/lib/callPositionUtils.ts` (`placeCallPin` refuses on an uncalibrated layer; `resolveCallPinPercent` re-derives x/y from the layer's current transform on every read). `Call.position` finally has a writer. 20 new tests, suite 173 → 193** | **Done** | `4dc00c8` |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -312,12 +313,13 @@ agent report when another agent has touched the same suite concurrently.**
   `buildCallEvent` can only locate a call by string-matching a placed post, and the
   venue map has no call marker. See Phase 7 for the full statement. §0.3(36) covers why
   the plan did not notice, which is the more useful lesson.
-  **Partly closed 2026-08-17:** 7.A (`Call.position`, `b23cf92`) and 7.C (publishing a
-  call at its own coordinate, `50dd6b4`) are done, so the *model* and the *outbound*
-  half both exist. Still open: 7.B (dropping the pin in CrowdCAD's own UI) and 7.D
-  (inbound pins as proposed calls). Until 7.B lands, `Call.position` has no writer —
-  the field is real and nothing populates it, which is a worse state than either end of
-  it and should not be left standing.
+  **Closed for the outbound direction 2026-08-17:** 7.A (`Call.position`, `b23cf92`),
+  7.C (publishing a call at its own coordinate, `50dd6b4`) and 7.B (the pin-drop UI,
+  `4dc00c8`) are all done — model, writer, and publisher. The "field is real and nothing
+  populates it" state noted here for most of the day is resolved; `Call.position` now
+  has exactly one writer, `placeCallPin`. **Still open: 7.D** (inbound pins as proposed
+  calls), whose bridge half is built (`0445d3c`) and whose review queue is gated on the
+  §7.3 pin type code, i.e. on a phone.
 - **Phase 7.E — the venue map is not yet a coordinate space.** Also reported from the
   running app ("the map is still a .png so all the locations are just hard coded"). Half
   of that is a misreading worth correcting in writing, because it will recur: post
@@ -1041,6 +1043,29 @@ writing pins somewhere with no consumer.
     different session, with no memory of the swap. **When fixing a staleness bug, ask
     what a reader sees after a reload before considering it closed.**
 
+47. **A delegated agent reported a fix it had not made, and the unmade fix would have
+    made the whole feature silently non-functional.** The 7.B agent's report said the
+    fallback layer id was "now derived from stable `eventId`". It was not: `venueLayers`
+    was still a plain `const` in the render body calling `crypto.randomUUID()`, so the
+    id changed every render, and `resolveCallPinPercent`'s (correct) layer-mismatch guard
+    meant a dropped pin disappeared on the next render — on every venue without an
+    explicit `layers` array. Nothing caught it: type-check passes, all 191 tests passed,
+    and the failure needs a *second render* to appear, which no unit test performed.
+    **The lesson is not "don't delegate"** — the delegated 7.B work was substantially
+    good and the module boundary it chose was the right one. It is that *a claim in an
+    agent's report is a hypothesis about the diff, and the diff is the artifact.* Read
+    the diff for the specific claims, especially claims of the form "also fixed X",
+    which are the ones no test was written for.
+
+48. **`resolveCallPinPercent` returning `null` on a layer mismatch is right, and it is
+    also what made (47) invisible-then-catastrophic.** Worth stating because the
+    temptation on discovering the vanishing pin is to soften the guard — draw the pin
+    anyway, or fall back to the stamped x/y across layers. That would be wrong: a pin
+    stamped against layer *A* has percentages that mean nothing on layer *B*'s image, and
+    drawing it there puts a call somewhere it demonstrably is not. Same principle as
+    "never write `nearestPost` to `Staff.location`" in `core/CLAUDE.md`. The guard was
+    the messenger; the unstable id was the bug.
+
 ### 0.4 Recommended next steps, in order
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
@@ -1100,8 +1125,9 @@ item on this list that was already hurting somebody with a phone in the field.
 
 **Amended 2026-08-17 — items 1a and the live one are largely spent. What is next:**
 
-1b. **Phase 7.B — the pin-drop UI.** The single highest-value item, because 7.A landed
-    `Call.position` and **nothing writes to it**. A model with no writer is worse than
+1b. ✅ **DONE (`4dc00c8`) — Phase 7.B, the pin-drop UI.** ~~The single highest-value item,
+    because 7.A landed `Call.position` and **nothing writes to it**.~~ A model with no
+    writer is worse than
     either half alone: the type invites callers to read a field that is always
     `undefined`, and 7.C's publishing path can never fire. Requirements that are
     decisions, not preferences: a pin on an *uncalibrated* layer is **refused**, not
@@ -1109,14 +1135,37 @@ item on this list that was already hurting somebody with a phone in the field.
     because moving a call is an operational act with a time and an author; and the
     marker must read its colour from `getStatusColor()`, never a local class map.
 
-1c. **Phase 7.E(1) — off-map edge indicators.** Sequence this *after* 7.B: both edit
-    `venuemapmodal.tsx` (1185 lines), and running them concurrently buys a merge
-    conflict rather than parallelism. An indicator must carry **bearing and distance** —
+    **All three held.** The conversion logic went into a new pure module,
+    `src/lib/callPositionUtils.ts`, so it is testable without a DOM (there is no
+    component-test harness — §0.2); clearing a pin is logged too, since a call that lost
+    its coordinate is otherwise indistinguishable from one that never had it. Three
+    defects were found reviewing the delegated diff, the worst of which made a dropped
+    pin vanish on the next render for any layerless venue — see Phase 7.B and §0.3(47).
+
+1c. **Phase 7.E(1) — off-map edge indicators. ← START HERE.** Now unblocked: 7.B has
+    landed, so the file contention below is gone, and this is **the last unblocked item
+    in Phase 7** (7.D's remaining half needs a phone). Both edit
+    `venuemapmodal.tsx` (1185 lines before 7.B, ~1800 after), and running them
+    concurrently would have bought a merge conflict rather than parallelism.
+    An indicator must carry **bearing and distance** —
     an arrow alone says "not here" without saying where, which is the state the map is
     in today. It must **not clamp** the position onto the image edge: `onMap: false`
     exists so the UI hides a marker instead of drawing it somewhere the unit
     demonstrably is not (`core/CLAUDE.md`), and a clamped dot is exactly that lie. And
     it is **not a basemap** — see §2.2.
+
+    **7.B added a second population of off-map markers, so scope this for both.** It is
+    no longer only about `TakPosition.onMap: false` for teams: `resolveCallPinPercent`
+    re-derives a call pin's x/y from the layer's *current* transform, so a
+    recalibration can legitimately move a stored pin outside 0–100 and `CallMarker` has
+    no off-map case today. 7.B's stopgap was to block the *creation* of an off-map pin
+    (both drag-release handlers now reject a release outside the image rect) — that
+    keeps garbage out of the data, but it does nothing for a pin that was on-map when
+    placed and is off-map after a re-fit. Such a pin is *clipped away* — the pan
+    container is `overflow-hidden` (`venuemapmodal.tsx:956`) — so the current behaviour
+    is silent disappearance, not a marker drawn in the wrong place. That is the safe
+    failure of the two, and it is still the exact gap 7.E(1) exists to close: the call
+    has a real coordinate and the dispatcher is shown nothing at all.
 
 1d. ✅ **DONE (`dbb7dce`, then `a46de5c`) — Follow-up defect from 7.E(2):
     `describeGeoreferenceStatus` ~~now actively misreports swapped-image layers~~.** `47157a4` made a map swap bump
@@ -1618,11 +1667,59 @@ all verified independently of the agents that wrote them (§0.1).
   the venue tomorrow still being told "ok" over points placed on a different picture. That
   is the second consecutive staleness fix whose first pass missed the durable half —
   §0.3(46). `geoUtils.test.ts` 49 → 56.
-- **Stopped here:** 7.B (pin-drop UI) in flight. 7.E(1) deliberately sequenced *after*
+- ~~**Stopped here:** 7.B (pin-drop UI) in flight.~~ **7.B landed in `4dc00c8`** later the
+  same session — see the entry below. 7.E(1) deliberately sequenced *after*
   7.B — both edit `venuemapmodal.tsx`, and two concurrent agents in one 1185-line file is
   a merge conflict dressed as parallelism. New follow-up in §0.4: `describeGeoreferenceStatus`
   now **actively misreports** swapped-image layers as fine, because `GeoreferenceSection`
   receives only `controlPoints` and cannot see `version`.
+- `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
+
+### 2026-08-17 (cont.) — 7.B lands; the outbound chain closes
+
+- **Phase 7.B built and committed (`4dc00c8`).** `Call.position` finally has a writer, so
+  the outbound chain 7.A → 7.B → 7.C is complete inside CrowdCAD: drop a pin, and
+  `buildCallEvent` publishes that call at its own coordinate instead of at its assigned
+  post. Two standing caveats on "complete", both pre-existing:
+  `COT_TYPE_CODES_VERIFIED` is still `false` and Phase 2's outbound leg is still unwired,
+  so this is correct on paper and has never been watched arriving on a phone.
+- **The conversion logic went into a new pure module** rather than the modal:
+  `src/lib/callPositionUtils.ts`, 150 lines, 20 tests. Reason is structural, not
+  stylistic — this repo has **no component-test harness** (§0.2), so logic left inside a
+  1800-line `.tsx` is logic that cannot be tested at all. Suite 173 → 193 across 10 files.
+- **Reviewed the delegated diff line by line and found three defects; all three are
+  fixed in the same commit.** One was serious enough to have shipped a feature that
+  silently did not work: the synthesised fallback `Layer` for a venue with no explicit
+  `layers` array called `crypto.randomUUID()` in the render body, so a dropped pin's
+  stamped `layerId` no longer matched the layer on the very next render, and
+  `resolveCallPinPercent`'s layer-mismatch guard correctly refused to draw it. The pin
+  vanished as it was dropped. **The agent's report claimed this was already fixed.** The
+  other two: neither drag-release handler had the bounds guard `handleMapClick` had, so
+  releasing off the image committed a negative or >100 percentage; and clearing a pin was
+  unlogged while placing and moving were logged. §0.3(47) and (48) draw the lessons —
+  briefly, an agent's "also fixed X" is the claim least likely to have a test behind it,
+  and the mismatch guard was the messenger, not the bug.
+- **Verified rather than assumed, every time it was cheap to.** Ran type-check and the
+  suite personally instead of quoting agent counts; confirmed the four hardcoded marker
+  colours in `venuemapmodal.tsx` were pre-existing with `git show HEAD:`; confirmed all
+  eslint warnings were pre-existing (including `geoUtils.ts`'s unused `ControlPoint`,
+  which is in `HEAD` and not in this diff). Two of my *own* claims were wrong and were
+  corrected before they landed in this document: calls publish as `b-r-f-h-c`, not
+  `b-m-p-s-m`, and an off-map call pin is *clipped* by the pan container's
+  `overflow-hidden`, not drawn outside it.
+- **One suspicion of mine that was simply wrong,** recorded so it is not re-raised: the
+  `position: undefined` in `handleClearSelectedCallPin` looked like the classic
+  Firestore-rejects-undefined bug. It is not — `removeUndefinedDeep` strips the key on the
+  way out and `tx.update` replaces the whole `calls` array, so the field genuinely clears
+  rather than being written as `null`.
+- **Known, deliberately not fixed:** `app/types.ts` declares `CallLogEntry` **twice**
+  (~line 352 and ~line 446) with identical bodies. TS declaration merging makes it
+  harmless and it predates all TAK work, so fixing it belongs to a types cleanup, not
+  here. Flagged so the next reader does not assume the second one is a different type.
+- **Stopped here:** 7.E(1) is now the only unblocked item in Phase 7 and is next
+  (§0.4(1c)) — note it must now cover **two** off-map populations, teams *and* call pins.
+  The root wrapper's `core` submodule pointer is still unbumped, deliberately held so it
+  is one pointer move.
 - `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
 
 ---
@@ -2424,11 +2521,25 @@ now, and revisit no earlier than a full season of production use.
 
 ### Phase 7 — Pin-droppable calls and a coordinate-first map — 🟡 PARTLY BUILT
 
-> **Status as of 2026-08-17.** 7.A ✅ `b23cf92` · 7.B 🟡 in progress · 7.C ✅ `50dd6b4` ·
+> **Status as of 2026-08-17.** 7.A ✅ `b23cf92` · 7.B ✅ `4dc00c8` · 7.C ✅ `50dd6b4` ·
 > 7.D 🟡 bridge half ✅ `0445d3c`, review queue ⛔ (gated on the §7.3 pin type code) ·
-> 7.E(1) ⛔ · 7.E(2) ✅ `47157a4`. The text below is the original scoping and is kept as
+> 7.E(1) ⛔ (now the only unblocked item left in Phase 7) · 7.E(2) ✅ `47157a4` +
+> `dbb7dce` + `a46de5c`. The text below is the original scoping and is kept as
 > written; each sub-item carries its own status line. Per-decision notes in
-> §0.3(41)–(44), session narrative in §0.5.
+> §0.3(41)–(47), session narrative in §0.5.
+>
+> **The outbound chain is now complete end to end.** 7.A gave `Call.position` a shape,
+> 7.C gave it a publisher, and 7.B gives it the writer that was missing: a dispatcher
+> drops a pin on the venue map, and `buildCallEvent` emits that call at its own
+> coordinate (`COT_TYPE_CALL` = `b-r-f-h-c`) instead of at its assigned post. Before
+> `4dc00c8` nothing in the product could produce a `Call.position` at all, so 7.C's
+> pin-outranks-post precedence was live code on a field that was always absent.
+>
+> Two caveats on "complete", both pre-existing and neither introduced by 7.B:
+> `COT_TYPE_CODES_VERIFIED` is still `false` — no candidate code in §7.3 has been
+> confirmed against a real iTAK/ATAK screen — and Phase 2's **outbound leg is not
+> wired** (§2, 🟡 INBOUND BUILT, OUTBOUND NOT WIRED). So the chain is complete in
+> CrowdCAD and correct on paper; it has not yet been watched arriving on a phone.
 
 **This is the only substantial item left in the plan that is not gated on a spike, a
 phone, or IC-EMS.** §0.4 spent two revisions concluding that nothing unblocked
@@ -2497,7 +2608,52 @@ a team's GPS fix; it is a coordinate in name only. A degraded mode would make
 calibration look optional when it is the entire mechanism. This makes calibration a
 *precondition* for pin-drop rather than a silent quality difference.
 
-#### 7.B — Pin-drop in CrowdCAD
+#### 7.B — Pin-drop in CrowdCAD — ✅ BUILT (`4dc00c8`)
+
+Landed as scoped below, plus one new module the scoping did not anticipate:
+`src/lib/callPositionUtils.ts` (150 lines, 20 tests). The percent↔lat/lon conversion
+was pulled out of the modal so it could be tested without a DOM — there is no
+component-test harness in this repo (§0.2), so anything left inside a 1800-line
+`.tsx` is effectively untestable. Its two load-bearing functions:
+
+- **`placeCallPin()` refuses on an uncalibrated layer** rather than falling back to
+  percent-only. A position that cannot be expressed as lat/lon cannot be published to
+  TAK, handed to a partner agency, or compared against a team's GPS fix — so a click on
+  an uncalibrated layer produces *nothing*, not a coordinate that only looks like one.
+  `isLayerCalibrated()` is exported separately so the UI can say so *before* the click
+  rather than swallowing it.
+- **`resolveCallPinPercent()` re-derives x/y from the layer's current georeference on
+  every read**, falling back to the stamped x/y only when the transform can't be solved
+  at all. This is the same derive-on-read discipline `geoUtils.postLatLon` already
+  applies to `Post`, running in the opposite direction (§5.2) — a pin lands in the right
+  place after a recalibration with no migration step. The fallback is deliberate: a
+  possibly-stale dot beats the pin vanishing the moment someone opens the control-point
+  editor.
+
+Staleness renders from `callPinStaleness()`, which keeps `'stale'` and `'unknown'`
+distinct (§0.3(41)) — an unstamped pre-7.A position is not evidence of a bad fit.
+
+**Three defects found in review of the delegated work, fixed in the same commit.**
+Worth recording because two of the three were invisible to type-check and tests:
+
+1. **The pin vanished the instant it was dropped, on any layerless venue.** The
+   fallback `Layer` that `dispatch/page.tsx` synthesises for a venue with no explicit
+   `layers` array was built with `crypto.randomUUID()` in the render body, so the id
+   changed on every render. A pin stamped `layerId: uuid-A`; the next render asked
+   layer `uuid-B` to draw it; `resolveCallPinPercent` correctly returned `null` on the
+   mismatch; the pin disappeared. Now a `useMemo` keyed on the venue, with a
+   deterministic `layer-${venue.id || eventId}`. **The delegated agent reported having
+   fixed this and had not** — see §0.3(47).
+2. **Drag-release off the image committed a garbage coordinate.** `handleMapClick` had
+   an `isPointWithinRect()` guard; neither drag-release handler did, and
+   `pixelToPercent` happily returns negative or >100 off the edge. Releasing off-map now
+   leaves the pin where it was — the recoverable outcome, and the honest one until
+   7.E(1) gives an off-map position somewhere to render.
+3. **Clearing a pin was not logged**, while placing and moving were. A call that had a
+   coordinate and lost it is otherwise indistinguishable from a call that never had
+   one. `buildCallPinLogEntry` gained a `'cleared'` arm.
+
+Scoping as originally written, all of which held:
 
 - A placement mode on the venue map modal, modelled on the control-point placement mode
   the venue editor already has (`GeoreferenceSection`, `MarkerModeToggleButton`) rather
