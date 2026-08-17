@@ -284,8 +284,39 @@ function buildCallEvent(
   now: number,
   staleAt: number
 ): CotEvent | null {
-  const post = posts.get(slugify(call.location));
-  if (!post) return null;
+  // Resolve the call's position using this precedence order:
+  // 1. A dispatcher-placed pin (call.position) — use lat/lon directly.
+  // 2. Otherwise match the call's location string against a named post.
+  // 3. Otherwise no position is available.
+  //
+  // This means a call with a pin publishes even if its location doesn't match
+  // any post, and the pin coordinate takes precedence if both exist.
+  let position: { lat: number; lon: number; ce: number } | null = null;
+
+  if (call.position) {
+    // A placed pin has no accuracy radius to report. It came from somebody
+    // clicking a map, so its error is real but unquantified — unlike a GPS fix,
+    // which arrives with a circular error the device actually measured.
+    // COT_UNKNOWN says "not known", which is the truth; a 0 would claim
+    // certainty the pin has not earned, and inventing a radius would be a
+    // precision claim with nothing behind it.
+    position = {
+      lat: call.position.lat,
+      lon: call.position.lon,
+      ce: COT_UNKNOWN,
+    };
+  } else {
+    const post = posts.get(slugify(call.location));
+    if (post) {
+      position = {
+        lat: post.lat,
+        lon: post.lon,
+        ce: post.ce,
+      };
+    }
+  }
+
+  if (!position) return null;
 
   // Built pre-redaction, then handed to applyRedaction, which rebuilds the
   // output from its own allowlist. chiefComplaint is set here because that is
@@ -299,10 +330,10 @@ function buildCallEvent(
     start: now,
     stale: staleAt,
     point: {
-      lat: post.lat,
-      lon: post.lon,
+      lat: position.lat,
+      lon: position.lon,
       hae: COT_UNKNOWN,
-      ce: post.ce,
+      ce: position.ce,
       le: COT_UNKNOWN,
     },
     detail: {
@@ -454,7 +485,7 @@ export function eventToCotEvents(
       skipped.push({
         reason: 'position-unresolved',
         subject: call.id,
-        detail: `Call location "${call.location}" is not a placed post on a georeferenced layer.`,
+        detail: `Call has no placed pin and location "${call.location}" is not a placed post on a georeferenced layer.`,
       });
     }
   }

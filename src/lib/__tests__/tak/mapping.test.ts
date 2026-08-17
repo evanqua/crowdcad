@@ -412,6 +412,129 @@ describe('eventToCotEvents — calls and PHI', () => {
   });
 });
 
+describe('eventToCotEvents — call positions', () => {
+  it("publishes a call with a placed pin at that pin's lat/lon, not at a matching post", () => {
+    // Deliberately make the post coordinates different from the pin to verify
+    // precedence. If the test passes with position being ignored, this would
+    // fail because the post is at (39.18, -86.53) and we assert the call is
+    // published at (39.19, -86.52).
+    const callWithPin: Call = {
+      id: 'call-with-pin',
+      order: 1,
+      status: 'Open',
+      location: 'Gate 4',
+      assignedTeam: [],
+      chiefComplaint: 'Test Call',
+      position: {
+        lat: 39.19,
+        lon: -86.52,
+        x: 50,
+        y: 50,
+        source: 'manual',
+        placedAt: NOW,
+      },
+    };
+
+    const result = eventToCotEvents(
+      event({ calls: [callWithPin] }),
+      venue([georeferencedLayer()]),
+      settings({ publishPosts: false, publishTeams: false, publishCalls: 'full' }),
+      NOW
+    );
+
+    expect(result.events).toHaveLength(1);
+    const cot = result.events[0];
+    expect(cot.point.lat).toBeCloseTo(39.19, 6);
+    expect(cot.point.lon).toBeCloseTo(-86.52, 6);
+    // Dispatcher-placed pins have no meaningful accuracy, so ce should be unknown.
+    expect(cot.point.ce).toBe(COT_UNKNOWN);
+  });
+
+  it('publishes a call with a placed pin even when location matches no post', () => {
+    const callWithPinNoPost: Call = {
+      id: 'call-pin-no-post',
+      order: 2,
+      status: 'Open',
+      location: 'Nowhere In Particular',
+      assignedTeam: [],
+      chiefComplaint: 'Test Call',
+      position: {
+        lat: 39.185,
+        lon: -86.525,
+        x: 50,
+        y: 50,
+        source: 'manual',
+        placedAt: NOW,
+      },
+    };
+
+    const result = eventToCotEvents(
+      event({ calls: [callWithPinNoPost] }),
+      venue([georeferencedLayer()]),
+      settings({ publishPosts: false, publishTeams: false, publishCalls: 'full' }),
+      NOW
+    );
+
+    expect(result.events).toHaveLength(1);
+    // The call should publish; no position-unresolved skip for this call.
+    expect(result.skipped.find((s) => s.reason === 'position-unresolved' && s.subject === 'call-pin-no-post')).toBeUndefined();
+    const cot = result.events[0];
+    expect(cot.point.lat).toBeCloseTo(39.185, 6);
+    expect(cot.point.lon).toBeCloseTo(-86.525, 6);
+  });
+
+  it('still resolves a call with no pin by matching its location to a post (regression)', () => {
+    const callNoPin: Call = {
+      id: 'call-no-pin',
+      order: 3,
+      status: 'Open',
+      location: 'Gate 4',
+      assignedTeam: [],
+      chiefComplaint: 'Test Call',
+    };
+
+    const result = eventToCotEvents(
+      event({ calls: [callNoPin] }),
+      venue([georeferencedLayer()]),
+      settings({ publishPosts: false, publishTeams: false, publishCalls: 'full' }),
+      NOW
+    );
+
+    expect(result.events).toHaveLength(1);
+    const cot = result.events[0];
+    // Should resolve to Gate 4's position from the georeference.
+    expect(cot.point.lat).toBeCloseTo(39.18, 4);
+    expect(cot.point.lon).toBeCloseTo(-86.53, 4);
+    // Post-derived positions carry the georeference fit's accuracy.
+    expect(cot.point.ce).toBeGreaterThanOrEqual(0);
+    expect(cot.point.ce).toBeLessThanOrEqual(1);
+  });
+
+  it('skips a call with neither a pin nor a matching post', () => {
+    const callNoPinNoPost: Call = {
+      id: 'call-no-pin-no-post',
+      order: 4,
+      status: 'Open',
+      location: 'Nowhere',
+      assignedTeam: [],
+      chiefComplaint: 'Test Call',
+    };
+
+    const result = eventToCotEvents(
+      event({ calls: [callNoPinNoPost] }),
+      venue([georeferencedLayer()]),
+      settings({ publishPosts: false, publishTeams: false, publishCalls: 'full' }),
+      NOW
+    );
+
+    expect(result.events).toEqual([]);
+    const skip = result.skipped.find((s) => s.reason === 'position-unresolved');
+    expect(skip).toBeDefined();
+    expect(skip?.subject).toBe('call-no-pin-no-post');
+    expect(skip?.detail).toContain('no placed pin');
+  });
+});
+
 describe('eventToCotEvents — determinism and staleness', () => {
   it('is a pure function of its inputs', () => {
     const e = event({ staff: [team()] });
