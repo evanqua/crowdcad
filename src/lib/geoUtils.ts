@@ -350,6 +350,34 @@ export function latLonToPixel(t: GeoTransform, lat: number, lon: number): { x: n
 export const METRES_PER_DEGREE_LATITUDE = 111320;
 
 /**
+ * Ground distance, in metres, between two lat/lon points, measured in the
+ * SAME local tangent-plane frame `t` was solved in (see toLocalPlane and the
+ * module doc comment above) rather than via haversine or any other
+ * great-circle formula. This is deliberate, not an oversight: every other
+ * distance this module produces (georeferenceResiduals) is computed this
+ * way, and a caller mixing a great-circle distance with tangent-plane-derived
+ * positions would be comparing two different notions of "distance" that
+ * happen to look alike at venue scale. Both points are projected relative to
+ * `t`'s own (lat0, lon0, cosLat0) origin, so this is only as accurate as that
+ * projection — fine at venue scale, per the module doc comment, and
+ * degrading the same way it does everywhere else in this file at larger
+ * scales.
+ */
+export function metresBetween(
+  t: GeoTransform,
+  latA: number,
+  lonA: number,
+  latB: number,
+  lonB: number
+): number {
+  const a = toLocalPlane(latA, lonA, t.lat0, t.lon0, t.cosLat0);
+  const b = toLocalPlane(latB, lonB, t.lat0, t.lon0, t.cosLat0);
+  const du = b.u - a.u;
+  const dv = b.v - a.v;
+  return Math.sqrt(du * du + dv * dv) * METRES_PER_DEGREE_LATITUDE;
+}
+
+/**
  * The largest georeferenceResiduals().maxMetres considered acceptable for
  * publishing geospatial data (post locations, exports, etc.) derived from a
  * georeference. Beyond this threshold, a "successfully georeferenced" UI
@@ -412,17 +440,7 @@ export function georeferenceResiduals(
 
   const perPoint = georef.controlPoints.map((p) => {
     const fitted = pixelToLatLon(transform, p.x, p.y);
-    const entered = toLocalPlane(p.lat, p.lon, transform.lat0, transform.lon0, transform.cosLat0);
-    const fittedLocal = toLocalPlane(
-      fitted.lat,
-      fitted.lon,
-      transform.lat0,
-      transform.lon0,
-      transform.cosLat0
-    );
-    const du = fittedLocal.u - entered.u;
-    const dv = fittedLocal.v - entered.v;
-    return Math.sqrt(du * du + dv * dv) * METRES_PER_DEGREE_LATITUDE;
+    return metresBetween(transform, fitted.lat, fitted.lon, p.lat, p.lon);
   });
 
   const maxMetres = perPoint.reduce((max, d) => Math.max(max, d), 0);

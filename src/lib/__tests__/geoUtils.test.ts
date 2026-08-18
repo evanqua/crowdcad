@@ -8,6 +8,7 @@ import {
   latLonToPixel,
   layerPostsLatLon,
   MAX_ACCEPTABLE_RESIDUAL_METRES,
+  metresBetween,
   METRES_PER_DEGREE_LATITUDE,
   pixelToLatLon,
   postLatLon,
@@ -738,6 +739,75 @@ describe('georeferenceResiduals', () => {
       expect(result.perPoint[3]).toBeCloseTo(expectedMetres, 4);
       expect(result.maxMetres).toBeCloseTo(expectedMetres, 4);
     });
+  });
+});
+
+describe('metresBetween', () => {
+  const controlPoints: ControlPoint[] = [
+    { x: 10, y: 20, lat: BASE_LAT, lon: BASE_LON, label: 'NW' },
+    { x: 90, y: 80, lat: BASE_LAT - 0.002, lon: BASE_LON + 0.002, label: 'SE' },
+  ];
+  const t = solveGeoreference(makeGeoref(controlPoints));
+
+  it('returns 0 for the same point', () => {
+    expect(t).not.toBeNull();
+    if (!t) return;
+    expect(metresBetween(t, BASE_LAT, BASE_LON, BASE_LAT, BASE_LON)).toBeCloseTo(0, 9);
+  });
+
+  it('matches latOffset * METRES_PER_DEGREE_LATITUDE for a pure-latitude delta (no cosLat0 involved)', () => {
+    expect(t).not.toBeNull();
+    if (!t) return;
+    const latOffset = 0.001;
+    const d = metresBetween(t, BASE_LAT, BASE_LON, BASE_LAT + latOffset, BASE_LON);
+    expect(d).toBeCloseTo(latOffset * METRES_PER_DEGREE_LATITUDE, 6);
+    expect(d).toBeCloseTo(111.32, 2);
+  });
+
+  it('matches lonOffset * cosLat0 * METRES_PER_DEGREE_LATITUDE for a pure-longitude delta', () => {
+    expect(t).not.toBeNull();
+    if (!t) return;
+    const lonOffset = 0.001;
+    const d = metresBetween(t, BASE_LAT, BASE_LON, BASE_LAT, BASE_LON + lonOffset);
+    expect(d).toBeCloseTo(lonOffset * t.cosLat0 * METRES_PER_DEGREE_LATITUDE, 6);
+  });
+
+  it('is symmetric: swapping A and B gives the same distance', () => {
+    expect(t).not.toBeNull();
+    if (!t) return;
+    const a = metresBetween(t, BASE_LAT, BASE_LON, BASE_LAT + 0.002, BASE_LON - 0.001);
+    const b = metresBetween(t, BASE_LAT + 0.002, BASE_LON - 0.001, BASE_LAT, BASE_LON);
+    expect(a).toBeCloseTo(b, 9);
+  });
+
+  it('combines lat and lon deltas via Pythagoras in the local tangent-plane frame', () => {
+    expect(t).not.toBeNull();
+    if (!t) return;
+    // Pick a lat delta and a lon delta whose local-plane (v, u) components
+    // form an exact 3-4-5 triangle in degree-equivalent units, so the
+    // expected distance is hand-computable: 5 * METRES_PER_DEGREE_LATITUDE.
+    const dv = 0.0003; // latitude delta directly in v-units
+    const du = 0.0004; // desired u-units; back out the lon delta via cosLat0
+    const lonOffset = du / t.cosLat0;
+    const d = metresBetween(t, BASE_LAT, BASE_LON, BASE_LAT + dv, BASE_LON + lonOffset);
+    expect(d).toBeCloseTo(0.0005 * METRES_PER_DEGREE_LATITUDE, 4);
+  });
+
+  it('reproduces georeferenceResiduals\' per-point figures (residuals is now built on top of this)', () => {
+    // Regression guard for the georeferenceResiduals refactor: its perPoint
+    // values must be unchanged now that they're computed via metresBetween
+    // instead of an inline toLocalPlane diff.
+    const georef = makeGeoref(controlPoints);
+    const residuals = georeferenceResiduals(georef);
+    expect(residuals).not.toBeNull();
+    if (!residuals || !t) return;
+    // 2-point anti-similarity fit passes through both control points
+    // exactly, so residuals should be ~0 — confirmed already by the
+    // dedicated georeferenceResiduals describe block above; this just
+    // checks metresBetween agrees when fed the same fitted/entered pair.
+    const fitted = pixelToLatLon(t, controlPoints[0].x, controlPoints[0].y);
+    const d = metresBetween(t, fitted.lat, fitted.lon, controlPoints[0].lat, controlPoints[0].lon);
+    expect(d).toBeCloseTo(residuals.perPoint[0], 9);
   });
 });
 
