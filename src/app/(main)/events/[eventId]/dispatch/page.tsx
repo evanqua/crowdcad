@@ -2697,6 +2697,47 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     }
   }, [user, ready, router, eventId, isLiteMode]);
 
+  // Shared by both VenueMapModal instances below (the normal read/edit-pins
+  // map and Quick Call's draft-pin picker), and memoized so the array identity
+  // is stable across renders.
+  //
+  // MUST stay above EVERY early return in this component — there are three
+  // (`!ready`, `!user`, and `!event`), and it is the first of them that
+  // matters, not the last. It is a hook, so a render that bails out before
+  // reaching it registers one fewer hook than a render that doesn't; React
+  // counts hooks by call order, so it trips "change in the order of Hooks
+  // called by DispatchPage" and the page dies on load. Hence the `event?.`
+  // guards below: this genuinely runs before the event (or the user) exists,
+  // rather than being defensive about a case the early returns already
+  // handled. If you add an early return above this line, move this with it.
+  //
+  // The synthetic layer's id MUST be deterministic. A venue with no explicit
+  // `layers` still needs one to hang its map and posts on, and this is it —
+  // but a `CallPosition` stamps the id of the layer it was placed on, and
+  // resolveCallPinPercent refuses to draw a pin whose layerId doesn't match
+  // the layer being viewed (correctly: that pin belongs somewhere else). A
+  // freshly-random id would therefore not survive the render that follows
+  // placing a pin, and the pin would silently vanish the instant it was
+  // dropped. This previously used crypto.randomUUID(), which is right for
+  // "make me a new layer" and wrong for "name the one implicit layer this
+  // venue has always had" — the venue's own id is stable and already unique.
+  const venueLayers = useMemo(
+    () =>
+      event?.venue
+        ? event.venue.layers && event.venue.layers.length
+          ? event.venue.layers
+          : [
+              {
+                id: `layer-${event.venue.id || eventId}`,
+                name: event.venue.name || 'Main Floor',
+                posts: event.eventPosts || [],
+                mapUrl: event.venue.mapUrl,
+              },
+            ]
+        : [],
+    [event?.venue, event?.eventPosts, eventId]
+  );
+
   // Return early if auth is not ready or user is not authenticated
   if (!isLiteMode && !ready) {
     return <LoadingScreen label="Loading…" />;
@@ -2780,44 +2821,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       eventPosts: updatedPosts
     });
   };
-
-  // Shared by both VenueMapModal instances below (the normal read/edit-pins
-  // map and Quick Call's draft-pin picker), and memoized so the array identity
-  // is stable across renders.
-  //
-  // MUST stay above the `if (!event)` early return below. It is a hook, and
-  // the early return means the hooks after it do not run on a render where the
-  // event has not loaded yet — React counts hooks by call order, so a hook
-  // below that line appears and disappears between renders and trips "change
-  // in the order of Hooks called by DispatchPage". Hence the `event?.` guards
-  // here rather than relying on the early return to have run.
-  //
-  // The synthetic layer's id MUST be deterministic. A venue with no explicit
-  // `layers` still needs one to hang its map and posts on, and this is it —
-  // but a `CallPosition` stamps the id of the layer it was placed on, and
-  // resolveCallPinPercent refuses to draw a pin whose layerId doesn't match
-  // the layer being viewed (correctly: that pin belongs somewhere else). A
-  // freshly-random id would therefore not survive the render that follows
-  // placing a pin, and the pin would silently vanish the instant it was
-  // dropped. This previously used crypto.randomUUID(), which is right for
-  // "make me a new layer" and wrong for "name the one implicit layer this
-  // venue has always had" — the venue's own id is stable and already unique.
-  const venueLayers = useMemo(
-    () =>
-      event?.venue
-        ? event.venue.layers && event.venue.layers.length
-          ? event.venue.layers
-          : [
-              {
-                id: `layer-${event.venue.id || eventId}`,
-                name: event.venue.name || 'Main Floor',
-                posts: event.eventPosts || [],
-                mapUrl: event.venue.mapUrl,
-              },
-            ]
-        : [],
-    [event?.venue, event?.eventPosts, eventId]
-  );
 
   if (!event) return <LoadingScreen label="Loading event…" />;
 
