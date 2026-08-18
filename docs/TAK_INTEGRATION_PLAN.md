@@ -1,9 +1,9 @@
 # TAK Integration — Implementation Plan
 
-**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 and 1.4 complete, inbound bridge complete, 1.3/1.5 blocked, **Phase 7 (call pins + coordinate-first map) newly scoped and mostly unblocked** (see §0)
+**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 and 1.4 complete, inbound bridge complete, 1.3/1.5 blocked, Phase 7 complete except 7.D and the new 7.E(3). **A 2026-08-18 field report reopened the plan: a real basemap (new Phase 8) and multi-level venues (new Phase 9) are now in scope, and the app has been run from a checkout containing no TAK work at all — read §0.6 first.**
 **Target:** CrowdCAD (`core/`), general-purpose capability; IC-EMS is the first deployer
 **Author:** drafted 2026-08-11
-**Last updated:** 2026-08-17
+**Last updated:** 2026-08-18
 **Branch:** `feature/tak-integration` — **the single branch for all TAK work**
 **Latest code:** the merge of `feature/tak-phase0` into `feature/tak-integration` (2026-08-16)
 
@@ -24,6 +24,9 @@ up cold, in a fresh session, with no other context.**
   ✅ (done) / 🟡 (partial) / ⛔ (not started, and why). The plan itself is settled —
   don't re-plan it. What changes between sessions is §0.
 - **§0.5 is the session log.** Append to it.
+- **§0.6 is the 2026-08-18 field report** — three problems reported from the running
+  app, each traced to code. It reopens decisions §2.2 and §7.E had closed, and it is
+  where to look before trusting any ✅ in §0.1.
 
 **If you are starting a session:** read §0.1–§0.3, then §0.4 for the next action,
 then only the phase section you are about to touch.
@@ -203,6 +206,7 @@ from the phase section it affects.
 | **7.E(2) f/u** | **`describeGeoreferenceStatus` stops reporting a stale fit as "ok" — residuals suppressed rather than shown beside a warning, because a fit measured against the wrong image is meaningless, not merely worse** | **Done** | `dbb7dce` |
 | **7.E(2) f/u** | **…and it now survives a save: `Georeference.calibratedForMapUrl` + `georeferenceMapMatch()` derive staleness from the image identity, so reopening the venue tomorrow no longer shows a confident "ok". `geoUtils.test.ts` 49 → 56** | **Done** | `a46de5c` |
 | **7.E(1)** | **Off-map edge indicators. New pure `src/lib/offMapUtils.ts` (`offMapIndicator` → badge edge point, arrow angle, true bearing + distance) and `geoUtils.metresBetween()`; wired into `venuemapmodal.tsx` for both off-map call pins and `tak.onMap: false` teams. `geoUtils.test.ts` 56 → 63, new `offMapUtils.test.ts` 15. Suite 193 → 215** | **Done** | `a094350` + `67f8804` |
+| — | **2026-08-18 field report investigated and recorded: §0.6, §0.3(51)–(54), revised §0.4, Phase 7.E(3) scoped, Phases 8 (basemap) and 9 (multi-level) newly written. No code.** | **Done** | 2026-08-18 |
 | **7.B** | **Pin-drop UI: placement mode + drag-to-correct + clear on `venuemapmodal.tsx`, a `CallMarker` coloured through `getStatusColor()`, an optional draft-pin affordance on Quick Call, and the new pure `src/lib/callPositionUtils.ts` (`placeCallPin` refuses on an uncalibrated layer; `resolveCallPinPercent` re-derives x/y from the layer's current transform on every read). `Call.position` finally has a writer. 20 new tests, suite 173 → 193** | **Done** | `4dc00c8` |
 
 Everything in the first block above (rows through the vitest harness) was built in
@@ -1091,6 +1095,50 @@ writing pins somewhere with no consumer.
     `DispatchPage` has three. The fixed code carries a comment saying so, because the
     next person to add a guard will otherwise reintroduce it.
 
+51. **A settings switch for a capability that does not exist must say so on the
+    switch.** §1.4's TAK panel offers "Enable TAK publishing" and a live diagnostics
+    preview that enumerates exactly which markers would be sent. Everything about that
+    surface reads as a working feature; nothing about it transmits (§0.6.4). This
+    document has recorded "nothing transmits" since 2026-08-16 and that was judged
+    sufficient — it was not, because the person operating the product does not read this
+    document. The rule: **the honest place to disclose a stub is the control, not the
+    plan.** Until Phase 2's outbound leg lands, the switch and the preview both need
+    wording that says publishing is not yet wired. This is the same failure shape as
+    §0.2's warning not to read the diagnostics preview as evidence that publishing works
+    — restated once as a note to future readers of this file, and once, now, where it
+    belongs.
+
+52. **"Verified" in §0.1 has only ever meant the tests pass.** Not one ✅ in this
+    document has ever meant a human watched the feature work, and §0.6.1 shows why that
+    was not merely a gap but an *impossibility*: the checkout being run had none of the
+    code. Two consequences. **(a)** Verification claims in §0.1 should say which kind
+    they are — `type-check + suite` is a different and weaker claim than `seen working`,
+    and conflating them is how six phases got marked done without anyone looking at
+    them. **(b)** The cheapest fix is not a testing-strategy change, it is making the
+    branch runnable in the checkout the operator actually opens. §0.6.1.
+
+53. **A basemap is now in scope, and the reasons it was out of scope are now
+    requirements.** §2.2 and §7.E declined a real basemap on three grounds; the deployer
+    has overridden that (§0.6.2). The correct response to an overridden objection is not
+    to delete it but to convert it into an acceptance criterion — so §8.B carries the
+    offline objection forward as a hard requirement (**the basemap must degrade to
+    nothing, leaving the raster and every marker rendering exactly as they do today**),
+    and §8.C carries the projection objection forward as a one-way boundary rather than
+    a reconciliation. An objection that is answered is worth more than an objection that
+    is forgotten.
+
+54. **Label behaviour is a product decision, and it had been made twice, in opposite
+    directions, by accident.** The dispatch map counter-scales every label to a constant
+    on-screen size; the venue editor lets labels scale and blur with the raster
+    (§0.6.3). Neither was written down and neither was chosen — one is the consequence
+    of a `scale(1/mapScale)` copied across six marker components, the other of its
+    absence. Before 7.E(3) changes either, the intended behaviour has to be stated as a
+    decision: constant-size, scale-with-map, or the sub-linear-plus-declutter behaviour
+    the report is actually asking for. **The two surfaces must then agree**, because a
+    dispatcher who calibrates in the editor and works in the dispatch map is entitled to
+    assume they are looking at the same map.
+
+
 ### 0.4 Recommended next steps, in order
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
@@ -1281,6 +1329,45 @@ highest-value things left are not code:
   rewrite: the spike may return "network links are unreliable on the target
   release", which changes what the feed route *is*. Writing it first means writing
   it twice.
+
+**Amended 2026-08-18 — a field report reopened the list, and one item on it is not
+engineering.** Three problems were reported from the running app and investigated
+(§0.6). The revised order, ahead of everything above that needs hardware:
+
+**0a. Make the branch runnable in the checkout the operator actually opens.** This
+outranks all code. The app has been run from a checkout whose `core` is pinned at
+`9fe8de6` and contains no TAK work at all — it cannot even resolve `d233438` as an
+object (§0.6.1). Six ✅ phases have therefore never been seen by anybody. Consolidate
+onto one checkout; do not create a third. Note also that the bridge is PocketBase-only,
+so a Firebase-backed app shares no database with it regardless.
+
+**0b. Say on the switch that publishing is not wired.** §1.4's TAK panel presents an
+enable toggle and a live "what would publish" preview for a transport that does not
+exist (§0.6.4, §0.3(51)). Small, and it stops the product from misrepresenting itself
+in the meantime.
+
+**1a′. Phase 7.E(3) — label behaviour.** Self-contained, needs nothing, and closes the
+second field report. Requires a stated decision first (§0.3(54)), because the dispatch
+map and the venue editor currently behave in opposite ways and both are accidents.
+
+**1b′. Phase 8 — a real basemap.** Newly in scope; §2.2 and §7.E's refusal is overridden
+(§0.6.2, §0.3(53)). Needs no phone, no spike and no IC-EMS answer. The offline
+requirement in §8.B is the part to get right, not the library choice in §8.A.
+
+**1c′. Phase 9.A — model the level on `Layer`.** The true blocker behind IC-EMS's
+multi-level ask, and it contains no TAK content at all (§0.6.5). Nothing about floors can
+be published until CrowdCAD knows what a floor is.
+
+**1d′. Phase 2, outbound leg — the transport.** The largest single gap in the project and
+the one the field report names most directly: CrowdCAD can build correct CoT for every
+marker it owns and has nowhere to send it (§0.6.4). Partly gated — what is *published*
+should wait on §7.3's type codes — but the transport itself is not: a socket, a retry
+policy and a rate limit are the same work whatever the four type-code strings turn out
+to be. See §6.2's write-rate constraint before starting.
+
+Items 1–5 below are unchanged and still stand; they remain the only path to
+`COT_TYPE_CODES_VERIFIED = true`.
+
 
 ### 0.45 The second TAK effort, and the merge that ended the split
 
@@ -1797,6 +1884,250 @@ all verified independently of the agents that wrote them (§0.1).
   §7.3 type-code spike — one person, one phone, an afternoon.
 - `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
 
+### 2026-08-18 — a field report, three reports, and one of them was the checkout
+
+- **No code was written this session.** The session's output is §0.6, §0.3(51)–(54),
+  the revised §0.4, Phase 7.E(3), and the new Phases 8 and 9. Three problems were
+  reported from the running app; all three were investigated against the tree before
+  anything was written down.
+- **The most important finding is not a feature gap.** The app is being run from a
+  checkout whose `core` is pinned at `9fe8de6` — no `src/lib/tak/`, no
+  `callPositionUtils.ts`, no `CallMarker` — and whose `core` module cannot even resolve
+  `d233438` as a git object. **Six phases marked ✅ in §0.1 have never been present in the
+  binary anybody actually ran.** §0.6.1. The worktree that *does* have the code has no
+  root `node_modules` and no `.env.local`, so it does not run either. This is the
+  two-checkout trap from §0.45 recurring in a new form: last time it split the work, this
+  time it hid it.
+- **That reframes "verified".** Every ✅ in this document rests on `type-check` plus a
+  passing suite. None has ever rested on a human seeing the feature work, and §0.6.1
+  explains why that was not possible rather than merely neglected. §0.3(52).
+- **Report 1 (the PNG map) is literal and §2.2's refusal is overridden.** No mapping
+  library is installed anywhere in the repo and the map is an `<img>` under a CSS
+  `scale()`. The three objections §7.E raised against a basemap all still hold; they are
+  now acceptance criteria rather than reasons to decline — §0.3(53). The encouraging
+  half: `pixelToLatLon` at the four percent corners already yields what a MapLibre
+  `ImageSource` wants, so no new mathematics is needed.
+- **Report 2 (labels) is not caused by the PNG**, which is how it was framed. It is
+  `scale(${1 / mapScale})` on six marker components in `venuemapmodal.tsx`, exactly
+  cancelling the container zoom. The venue editor does the *opposite* — no counter-scale
+  at all. Two surfaces, opposite behaviour, neither one chosen deliberately. §0.3(54).
+- **Report 3 (markers both ways) is three separate things** and it was worth taking them
+  apart: the pin-drop UI exists and is reachable but is absent from the checkout being
+  run; the outbound transport does not exist at all, in the app or in the bridge; and
+  inbound pins are parsed and then deliberately dropped pending 7.D. Only the middle one
+  is a true absence.
+- **§1.4's TAK panel is now the product misrepresenting itself.** An enable switch and a
+  live "what would publish" preview, for a transport that does not exist. §0.2 has warned
+  about this in prose since 2026-08-16; the warning belongs on the control, not in the
+  plan. §0.3(51).
+- **Delegation.** Two Sonnet investigations (map rendering; TAK round-trip) and one
+  Sonnet spec draft (Phases 8 and 9). Both investigations were checked against the tree
+  on the points this document now asserts. The checkout finding was not in either brief —
+  it came from running `git -C core cat-file -t d233438` before trusting anything else,
+  which is the practice §0.1 already recommends and which paid for itself immediately.
+- **Baseline re-run personally, not quoted:** `npm run test:unit` **215 passed across 11
+  files**, `npm run type-check` clean, both in `.claude/worktrees/fts-local-dev/core`.
+  Matches §0.1's figure.
+- `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
+
+---
+
+### 0.6 The 2026-08-18 field report — three reports from the running app
+
+Three problems were reported from the running app on 2026-08-18. Each was investigated
+against the code before anything was written here; every citation below is from
+`feature/tak-integration` at `d233438`. **Two of the three are real gaps in the
+product. One is substantially an artifact of which checkout the app is being run
+from** — and that one is the most urgent, because it has been silently distorting this
+document's picture of what the operator can actually see.
+
+The reports, verbatim:
+
+1. *"the map still uses a png and isn't a dynamic map like on my iphone"* — and IC-EMS
+   wants **3D maps inside TAK for things which need multiple levels**.
+2. *"the map names are restricted since it's just a screenshot so the words just stay
+   the same size when zooming in and out instead of changing size along with movement"*.
+3. *"still no option to put down markers on crowdcad which should reflect on iTAK, and
+   vice versa"*.
+
+#### 0.6.1 The checkout first, because it changes how to read report 3
+
+**The TAK work is invisible from the checkout the app is being run in.** This is the
+two-checkout trap described under "Where the code is", firing a second time in a new
+way: not splitting the work as it did in §0.45, but hiding it.
+
+| | |
+|---|---|
+| Main checkout `/Users/…/Dispatch/dispatch` | root on `feature/tak-georeference`, `core` pinned at `9fe8de6` |
+| What that `core` contains | no `src/lib/tak/`, no `callPositionUtils.ts`, no `CallMarker` — **no TAK work at all** |
+| What its `core` module cannot even resolve | `git -C core cat-file -t d233438` → `fatal: Not a valid object name` |
+| Its stale `feature/tak-integration` | `8c51029`, well behind `d233438` |
+| The checkout that has the work | `.claude/worktrees/fts-local-dev/` — root `13413f4`, `core` `d233438` |
+| …but that checkout has | **no root `node_modules` and no `.env.local`**, so `npm run dev` does not run there either |
+
+So the first half of report 3 — *"still no option to put down markers on crowdcad"* —
+is substantially **"the feature is not in the binary being run."** 7.B's pin-drop UI is
+real, reachable and wired (§0.6.4); it is simply absent from `9fe8de6`.
+
+**This is not a footnote, it is a process failure worth naming.** Six phases have been
+built, verified by test count and type-check, and marked ✅ in §0.1 — while the person
+who reports what the product does has been running a tree containing none of it. Every
+"verified" in §0.1 has meant *the tests pass*. Not one of them has ever meant *a human
+saw it work*. §0.5's 7.E(1) entry already concedes "not verified visually"; this is the
+structural reason why, and it applies retroactively to 7.B and 7.E(2) as well.
+
+**The fix is consolidation, not a third checkout.** Either bring the main checkout onto
+`feature/tak-integration` — its `core` module must first fetch the worktree's module
+directory by local path, per "Where the code is" — or make the worktree runnable
+(`npm install` at its root, plus an `.env.local`). Consolidating is the better of the
+two: this document already contains a long section on what having two checkouts cost
+(§0.45), and the correct number of TAK checkouts is one.
+
+⚠️ **A second, independent reason report 3 could not have worked even from the right
+tree:** the bridge is **PocketBase-only** (§0.6.4). An app running the default
+`NEXT_PUBLIC_BACKEND=firebase` shares no database with it.
+
+#### 0.6.2 Report 1 — the raster map. §2.2's "not a basemap" is now overridden
+
+The finding is literal and there is nothing to argue with. The venue map is a
+`next/image` `<img>` with `unoptimized`, and zoom is a CSS
+`transform: translate(…) scale(…)` on the `div` wrapping it and every marker
+(`venuemapmodal.tsx:1214-1241`), `transformOrigin: 'center center'`, scale clamped to
+0.5–8 (`venuemapmodal.tsx:28-30`). There is no canvas, no WebGL, no tile renderer.
+**No mapping library is a dependency anywhere in the repo** — maplibre-gl, mapbox-gl,
+leaflet, react-map-gl, ol and deck.gl are all absent from both `package.json` files —
+and no tile URL appears anywhere in the tree.
+
+**§2.2 and the closing paragraph of §7.E both declare a real basemap explicitly out of
+scope. That decision is overridden by the deployer as of 2026-08-18.** Recording *why*
+it was made still matters, because the reasons did not evaporate — they turned from
+grounds for declining into costs to be paid:
+
+| Original objection (§7.E) | Still true? | What it becomes |
+|---|---|---|
+| A tile source and its licensing | Yes | A provider decision — §8.B |
+| An offline story — "stadium connectivity is a premise of this project, not an edge case" | Yes, and it is the hard one | Pre-packaged offline tiles, and a basemap that degrades to nothing — §8.B. **This is the objection that must not be waved through.** |
+| Reconciling a projection with `geoUtils`'s flat tangent-plane model | Yes, but smaller than stated | A one-way boundary, not a rewrite — §8.C |
+
+What the objection got right, and what must survive the reversal: **coordinates, not
+tiles, are what made Phase 0 valuable.** A basemap adds context underneath the venue
+image; it does not change what a post or a call *is*. Phase 8 is scoped so that ripping
+the basemap back out leaves the coordinate model untouched.
+
+The one genuinely encouraging finding: `geoUtils` already has everything needed to
+place the raster as a georeferenced overlay. `pixelToLatLon(t, x, y)`
+(`geoUtils.ts:309`), evaluated at the four percent corners, yields exactly the corner
+lat/lons a MapLibre `ImageSource` takes. No new mathematics is required — only a helper
+that packages it.
+
+#### 0.6.3 Report 2 — the labels. Deliberate, written down nowhere, and inconsistent between two surfaces
+
+**This is not a consequence of the map being a PNG**, which is how the report frames
+it, and the distinction matters because fixing it does not require Phase 8. It is one
+line, repeated six times:
+
+```tsx
+transform: `translate(-50%, -50%) scale(${1 / mapScale})`
+```
+
+`OffMapBadge:243`, `PostMarker:313`, `EquipmentMarker:460`, `TeamMarker:597`,
+`TakMarker:721`, `CallMarker:839` — all in `venuemapmodal.tsx`. The marker's ancestor is
+scaled by `scale(mapScale)`; the marker applies `scale(1/mapScale)`; the product is
+exactly 1. Labels are pixel-constant by construction, at every zoom, permanently.
+Several tooltips additionally hardcode `fontSize: '15px'` (`:507`, `:636`, `:760`,
+`:874`).
+
+**And the venue editor does the opposite.** `renderMarkers()` and
+`renderControlPointMarkers()` (`venues/management/page.client.tsx:797-876`) place
+markers with plain percent `left`/`top` inside the *same* scaled div as the image, with
+no counter-scale — so there, labels grow and blur along with the raster. Two map
+surfaces in one product, with opposite label behaviour, and neither behaviour recorded
+anywhere until now.
+
+**Neither extreme is what a map does.** Constant-size is defensible and is what most
+GIS clients do; scale-with-raster is what the editor does by accident and is
+indefensible at 8×. What an iPhone map actually does — which is the comparison the
+report is making — is neither: labels grow **sub-linearly** with zoom, are
+**decluttered** by collision, and **appear and disappear by zoom level**, so that
+zooming in reveals detail rather than magnifying it. That last property is the real
+content of the complaint, and no amount of font scaling delivers it on its own. Scoped
+as **7.E(3)**.
+
+#### 0.6.4 Report 3 — the round trip. The CrowdCAD half exists; the transport does not
+
+The two directions are in completely different states and have to be taken separately.
+
+**CrowdCAD → iTAK: the chain is complete right up to the wire, and there is no wire.**
+`eventToCotEvents` (`mapping.ts:359`) has exactly **one** non-test caller —
+`TakSection.tsx:152`, a `useMemo` feeding the "What would publish" diagnostics card
+(`TakSection.tsx:338-408`). The result never leaves the component. There is no
+`/api/tak` string anywhere in the repository; `core/src/app/api/` contains only
+`contact/route.ts`. No `net.Socket`, no `dgram`, no CoT port constant exists anywhere in
+`core/src`. The "Enable TAK publishing" switch (`TakSection.tsx:187-199`) writes
+`TakPublishSettings` onto the event, and **nothing consumes that setting.**
+
+The bridge does not close the gap from its side either: `bridge.js` contains **no
+outbound code at all** — no reference to `eventToCotEvents` or any `COT_TYPE` — and its
+only socket write is a hardcoded self-announce on connect (uid `CROWDCAD-BRIDGE`,
+`bridge.js:667-681`) built for echo-suppression testing. Comments at `bridge.js:715` and
+`:722` say "once outbound publishing is live", which is an accurate description of the
+present tense.
+
+§0.2 has said "nothing transmits" since 2026-08-16 and it has been true the entire
+time. What is new here is the **operator-facing consequence**: a dispatcher can now
+enable TAK publishing in the UI, watch a diagnostics panel enumerate the markers that
+would be sent, and reasonably conclude the system is publishing. §1.4 built an interface
+for a capability that does not exist. That is not an argument against having built it —
+but the switch has to say so. §0.3(51).
+
+**iTAK → CrowdCAD: parsed correctly, then deliberately discarded.** `cot.js:186-198`
+classifies `b-m-p-*` as `kind: 'pin'`; `bridge.js:165-167` is
+`shouldWritePosition(ev) { return ev.kind === 'position'; }`; `bridge.js:693-705` logs
+pins under `--verbose` and `continue`s. Nothing is written anywhere. The
+`tak_pin_reports` collection has no writer, and `TakPinReport` (`types.ts:403-430`) is a
+type with no implementation. This is exactly the interim behaviour §0.2 chose on
+purpose, and it is still the right one — but it means the "vice versa" half of report 3
+is not merely unwired, it is *intentionally dropping the data* until 7.D lands.
+
+**The pin-drop UI itself is sound, and is buried.** Verified reachable: the dispatch
+page renders `venuemapmodal` twice (`dispatch/page.tsx:3845` normal, `:3861` draft-pin
+mode); Quick Call has a **"Drop pin on map"** button (`quickcallmodal.tsx:266`); an
+existing call is pinned through a `Select` of calls plus `MarkerModeToggleButton`
+(`venuemapmodal.tsx:1947-1972`), rendered only when `updateEvent && calls.length > 0`.
+It is gated on calibration via `isLayerCalibrated` (`venuemapmodal.tsx:1567`), which is
+correct and was decided in 7.A. Two discoverability facts worth keeping: it is
+**cloud-only** (`dispatch/page.tsx:3058` passes `onRequestDropPin` as `undefined` in
+Lite Mode), and for an existing call it is a two-step arm-then-click flow inside a modal
+that has to be opened first. A user who has not been told it exists can miss it. But
+*"no option to put down markers"* is, from the right checkout, no longer accurate.
+
+#### 0.6.5 What IC-EMS asked for, and what is actually deliverable
+
+The request is *"3D maps inside TAK for things which need multiple levels."* §2.2's
+answer — that TAK cannot disambiguate floors because DTED is outdoor terrain data — is
+**still technically correct and is no longer a sufficient answer**, because it stops at
+what TAK cannot do without saying what it can.
+
+- **CrowdCAD has no level data to send.** `Layer` is
+  `{ id, name, mapUrl?, posts, georeference? }` (`types.ts:54-60`) — **no elevation, no
+  floor number, no ordering field.** Order is array index, and `LayerControlBar` shows
+  exactly one layer at a time with no z-stacking. Any TAK-side multi-level story is
+  blocked on modelling this first, which is a CrowdCAD change containing no TAK content
+  whatsoever. That is Phase 9.A, and it needs no hardware.
+- **A TAK client can filter and label by level even though it cannot compute one.**
+  Carrying a real floor value in CoT `<detail>`, in the callsign suffix, and as a
+  distinct group/channel per level lets an operator *choose* a level. That is not 3D and
+  must not be sold as 3D, but it is the difference between an unreadable pile of stacked
+  markers and a usable picture — Phase 9.B.
+- **"3D seating with wireframes" remains a surveying procurement**, exactly as §2.2
+  says. Nothing in Phase 8 or Phase 9 moves toward it, and Phase 8 must not be allowed
+  to imply otherwise: putting tiles under the venue image will make the map look far
+  more capable without making it know anything at all about floors. §9.C separates the
+  three different things "3D" is being used to mean here.
+
+The honest sentence for IC-EMS: *multi-level awareness will be correct and filterable in
+both CrowdCAD and TAK; it will not be a 3D model, and no software change produces one.*
+
 ---
 
 ## 1. Executive summary
@@ -1870,6 +2201,15 @@ the work; it is the honest framing to put in front of IC-EMS.
   carries the layer name in the CoT `<remarks>` and as a group/channel suffix so a
   TAK operator can at least *read* which level a team is on, but the map will show
   every level stacked at one lat/lon. **Say this out loud to IC-EMS.**
+
+  > **Superseded in part, 2026-08-18.** The paragraph above remains the honest technical
+  > statement — TAK cannot compute a floor, and nothing changes that. What it got wrong
+  > was stopping there. It does not mention that **CrowdCAD has no level data to send in
+  > the first place**: `Layer` carries no floor number, no elevation and no ordering
+  > field (§0.6.5), so the "carry the layer name in `<remarks>`" plan above is the
+  > *entire* multi-level story that currently exists, and it is a string. Phase 9 models
+  > the level properly, then says exactly what TAK can and cannot do with it.
+
 - **"3D seating with wireframes."** That is a LiDAR/photogrammetry surveying
   engagement producing a georeferenced digital twin. It is a vendor procurement,
   not a software feature, and nothing in this plan moves toward it. TAK's 3D model
@@ -1881,6 +2221,13 @@ the work; it is the honest framing to put in front of IC-EMS.
   backdrop; what changes is that coordinates — not pixels — become the system of record.
   Anyone who hears "the map is dynamic now" and pictures Google Maps has the wrong
   picture. Phase 7.E says what it would actually take.
+
+  > **Overridden 2026-08-18.** The deployer has asked for a real basemap and the refusal
+  > above no longer holds — see §0.6.2 and Phase 8. Everything the paragraph says about
+  > what georeferencing does and does not buy is still correct, and the warning in its
+  > last two sentences is *more* important now, not less: a basemap makes the map look
+  > like a GIS without making it one. §8.E.
+
 - **The actual stated operational need.** IC-EMS wants field providers to press
   *arrived / clear from patient / moving patient* because radio fails in a loud
   stadium. ATAK is a poor UI for that: it is a dense tactical map app on a
@@ -2599,10 +2946,15 @@ now, and revisit no earlier than a full season of production use.
 > **Status as of 2026-08-17.** 7.A ✅ `b23cf92` · 7.B ✅ `4dc00c8` · 7.C ✅ `50dd6b4` ·
 > 7.D 🟡 bridge half ✅ `0445d3c`, review queue ⛔ (gated on the §7.3 pin type code) ·
 > 7.E(1) ✅ `a094350` (geometry) + `67f8804` (UI) · 7.E(2) ✅ `47157a4` +
-> `dbb7dce` + `a46de5c`. **Everything in Phase 7 that does not need a phone is now
-> done**; the only remaining item is 7.D's review queue, gated on the §7.3 type-code
-> spike. The text below is the original scoping and is kept as
-> written; each sub-item carries its own status line. Per-decision notes in
+> `dbb7dce` + `a46de5c` · **7.E(3) 🟡 SCOPED 2026-08-18, not started.** The text below is
+> the original scoping and is kept as written; each sub-item carries its own status line.
+>
+> ⚠️ **This block used to read "everything in Phase 7 that does not need a phone is now
+> done." That was true when written and is now false**, and how it became false is the
+> useful part: 7.E(3) was not deferred, it was *invisible*, exactly as Phase 7 itself was
+> before 2026-08-17 (§0.3(36)). Both were found by someone using the running app, not by
+> re-reading this plan. Two remaining items: **7.E(3)** (label behaviour — needs nothing)
+> and **7.D's review queue** (gated on the §7.3 type-code spike). Per-decision notes in
 > §0.3(41)–(47), session narrative in §0.5.
 >
 > **The outbound chain is now complete end to end.** 7.A gave `Call.position` a shape,
@@ -2884,6 +3236,65 @@ a coordinate space rather than an image with dots on it. Three concrete gaps:
    by dispatch**, not merely advisory, because it is durable call state rather than a
    transient fix.
 
+4. **Labels do not behave like map labels, and the two map surfaces disagree about how
+   they should.** Added 2026-08-18 from the field report (§0.6.3). Every marker on the
+   dispatch map applies `transform: translate(-50%, -50%) scale(${1 / mapScale})` —
+   `OffMapBadge:243`, `PostMarker:313`, `EquipmentMarker:460`, `TeamMarker:597`,
+   `TakMarker:721`, `CallMarker:839` in `venuemapmodal.tsx` — exactly cancelling the
+   container's `scale(mapScale)`, so a label is pixel-constant at every zoom. The venue
+   editor does the **opposite**: `renderMarkers()` and `renderControlPointMarkers()`
+   (`venues/management/page.client.tsx:797-876`) sit inside the scaled div with no
+   counter-scale, so labels there grow and blur with the raster. Neither behaviour was
+   chosen; one is a line copied six times, the other is its absence.
+
+   🟡 **7.E(3) — SCOPED, NOT STARTED.** The report frames this as a consequence of the
+   map being a PNG. It is not, and that matters: **it is fixable without Phase 8.**
+
+   The decision comes before the code (§0.3(54)). Three candidate behaviours, and the
+   third is what the report is actually describing:
+
+   | Behaviour | What it is | Where it is right |
+   |---|---|---|
+   | Constant size | today's dispatch map | defensible, and what most GIS clients do; but at 0.5× the labels crowd and at 8× they look detached from a map that has grown 16× under them |
+   | Scale with the raster | today's venue editor | wrong at 8×, where a post name becomes a banner; it is not a considered choice, it is a missing transform |
+   | **Sub-linear, decluttered, zoom-gated** | what a phone map does | **recommended** |
+
+   The third is three separate mechanisms and they should be built and judged
+   separately, because only the first is trivial: (a) **replace the counter-scale
+   `1 / mapScale` with `mapScale ** -k`** for some `k` between 0 and 1, so the label's
+   *net* on-screen size becomes `mapScale ** (1 - k)` — `k = 1` is today's constant
+   size, `k = 0` is the editor's scale-with-raster, and `k = 0.5` (net √zoom) is the
+   usual starting point — clamped to a legible minimum and a sane maximum. Writing it
+   this way matters: the two behaviours the product has today are the two endpoints of
+   one parameter, which is why they were never noticed as a choice; (b) **declutter by collision**, hiding or
+   offsetting a label that overlaps one already placed, which is the mechanism that
+   makes a real map legible at low zoom and which nothing here has today; (c) **gate by
+   zoom level**, so that secondary labels — equipment staggers, off-map distance
+   readouts — appear only above a threshold. **(c) is what "zooming in reveals detail"
+   actually means**, and it is the half of the complaint that no font-scaling curve
+   delivers on its own.
+
+   Two constraints carried over from work already done. The **off-map badges from
+   7.E(1) must keep their bearing and distance readable at every zoom** — they are the
+   only thing standing between a dispatcher and silence about a unit outside the mapped
+   area, so if anything stays constant-size it is these. And **`layoutOffMapBadges`
+   already does a fan-out declutter along an edge** (`venuemapmodal.tsx:144`); a general
+   collision declutterer should subsume it rather than run beside it, or the two will
+   fight along the image border.
+
+   Do the geometry in a pure module, as 7.B and 7.E(1) both did and for the same reason
+   — there is no component-test harness here (§0.2), so anything left inside
+   `venuemapmodal.tsx` is untestable. A `src/lib/labelScale.ts` with the curve, the
+   clamp, and the collision test is testable; the `.tsx` wiring is not.
+
+   **Whatever is chosen, the venue editor and the dispatch map must then agree.** A
+   dispatcher who calibrates control points in one and works calls in the other is
+   entitled to assume they are looking at the same map, and today they are not.
+
+   **Effort:** (a) S, (b) M, (c) S once (b) exists. Needs no phone, no spike, no
+   IC-EMS.
+
+
 **Explicitly not in scope: a real basemap.** No OSM/satellite tiles, no vector layers,
 no panning beyond the image. Georeferencing yields coordinates, not a GIS. Tiles would
 mean a tile source and its licensing, an offline story (stadium connectivity is a
@@ -2893,9 +3304,225 @@ documented at `METRES_PER_DEGREE_LATITUDE`. That is its own project. Recorded he
 nobody reads "coordinate-first map" as a promise of one — §2.2 exists for exactly this
 kind of expectation-setting.
 
-**Effort:** 7.A S, 7.B M, 7.C S, 7.D M (behaviour change plus a review-queue UI), 7.E M.
-7.E(1) and 7.E(2) are independently shippable and improve the map whether or not calls
-ever get pins.
+> ⛔→✅ **Overridden 2026-08-18 by the deployer.** The paragraph above stands as the
+> record of why a basemap was declined; it is no longer the decision. IC-EMS asked for
+> a dynamic, multi-level map, and the raster-with-dots behaviour was reported directly
+> from the running app (§0.6.2). **The three objections were not wrong and have not been
+> dropped — they have become acceptance criteria** in the new Phase 8: the licensing
+> objection becomes the provider choice (§8.A/§8.B), the offline objection becomes a
+> hard requirement that the basemap *degrade to nothing* rather than break the map
+> (§8.B), and the projection objection becomes an explicit one-way boundary with a
+> conformance test rather than a reconciliation (§8.C). §0.3(53).
+
+
+**Effort:** 7.A S, 7.B M, 7.C S, 7.D M (behaviour change plus a review-queue UI), 7.E M
+— of which 7.E(3) is S for the scaling curve, M for the declutterer, S for zoom-gating.
+7.E(1), 7.E(2) and 7.E(3) are independently shippable and improve the map whether or not
+calls ever get pins; 7.E(3) is the only one of the three that closes a complaint made by
+somebody using the product.
+
+---
+
+### Phase 8 — A real basemap under the venue raster — ⛔ NOT STARTED
+
+This phase **reverses** a decision this document already made twice — explicitly out of
+scope in §2.2 and again at the end of §7.E, on three stated grounds: a tile source and
+its licensing, the offline story (a stadium premise, not an edge case), and reconciling
+a real projection with `geoUtils`'s deliberately flat tangent-plane model. IC-EMS has
+now asked for "3D maps inside TAK for things which need multiple levels," and the
+deployer has overridden the earlier call (§0.6.2). The objections did not evaporate when
+the decision reversed — they became costs this phase has to pay, itemised below rather
+than absorbed silently. **One thing must survive the reversal:** coordinates, not tiles,
+are what made Phase 0 and Phase 7 valuable. Every marker on the new map must still be
+derived from lat/lon via `geoUtils`, never from anything the map library owns, so that
+ripping the basemap back out — if IC-EMS decides it is not worth the cost — leaves the
+coordinate model completely untouched.
+
+#### 8.A — Library choice
+
+**Recommend MapLibre GL JS.** It is BSD-3, has no account or API-key requirement to run
+the renderer itself, supports `ImageSource` for exactly the four-corner georeferenced
+raster overlay this project needs, and supports pitch and bearing — which matters
+honestly, not decoratively, for the "3D" part of the ask (see §9.C). It has a maintained
+first-party React binding, which matters in a codebase that is otherwise
+React-component-shaped throughout.
+
+The alternatives were considered and rejected for specific reasons, not generically:
+
+| Library | Rejected because |
+|---|---|
+| Leaflet | No vector tiles, no tilt/rotate, no GPU rendering — it would solve the tile-under-raster problem and nothing else IC-EMS asked for |
+| Mapbox GL JS | Licence terms and a mandatory Mapbox account/token, which this project has no institutional relationship with and no reason to acquire |
+| OpenLayers | Heavier API surface, weaker vector-tile ergonomics, no meaningful advantage over MapLibre for this use case |
+
+State the cost honestly: MapLibre is roughly a 200KB-gzipped class of dependency, and it
+is **the first heavy client dependency this project has taken on**. Every prior phase has
+been pure TypeScript or thin wrappers around browser/Firebase/PocketBase APIs already in
+the bundle. This is a different kind of commitment and should be reviewed as one.
+
+#### 8.B — Tiles and the offline story. This is the hard part and must not be waved through
+
+**Recommend PMTiles (Protomaps) as the default tile source.** A PMTiles archive is a
+single file served over HTTP range requests — no tile server process, no per-request
+billing, no API key — and it has a genuine offline/self-hosted story: the archive can be
+copied onto whatever machine runs the venue's local network segment and served as a
+static file, which is the only story that survives a stadium's connectivity being
+unreliable by design rather than by accident.
+
+The alternatives, and why each fails the same test differently:
+
+| Option | Why not |
+|---|---|
+| Raw OSM tile servers (`tile.openstreetmap.org`) | Usage policy explicitly forbids production/bulk use; this would get the deployer's IP blocked, not degraded |
+| MapTiler / Stadia Maps | Require an API key, bill per request, and are online-only unless a paid offline-pack tier is purchased — reintroduces a vendor dependency this project has otherwise avoided |
+| Self-hosted raster tile pyramid | Storage-heavy — an order of magnitude larger than a vector PMTiles archive for the same coverage — and gives up vector styling entirely |
+
+**Requirement, not a suggestion: the basemap must degrade to nothing.** If the tile
+archive fails to load — network down, file missing, range requests unsupported by
+whatever is serving it — the venue raster and every marker on it must render exactly as
+they do today, with no error state blocking them. A basemap that breaks the existing map
+when the network dies is strictly worse than no basemap at all, given that offline
+operation is the whole premise this project is built on. This is the same discipline
+§7.E(1) already applied to off-map markers: silence and honest degradation over a broken
+or invented display.
+
+#### 8.C — The coordinate boundary
+
+Define precisely what changes and what stays put. The venue raster becomes a MapLibre
+`ImageSource`, positioned by four corner lat/lons. There is no packaged helper for this
+today; propose `geoUtils.layerImageCorners(transform)`, evaluating the existing
+`pixelToLatLon` at the four percent corners `(0,0)`/`(100,0)`/`(0,100)`/`(100,100)` and
+returning them in the `[[tl],[tr],[br],[bl]]` order MapLibre's `ImageSource` expects.
+Markers — posts, calls, TAK positions — become MapLibre `Marker`s or a GeoJSON symbol
+layer, positioned by lat/lon read the same way every other coordinate consumer in this
+codebase already reads it.
+
+The projection concern from §2.2/§7.E is real and must be addressed honestly rather than
+assumed away: MapLibre renders in Web Mercator, and `geoUtils` uses a flat tangent-plane
+approximation. At venue scale — hundreds of metres, not kilometres — the disagreement
+between the two is sub-metre, small enough to ignore operationally. But the boundary
+between them must be **one-way and explicit**: `geoUtils` stays the sole authority for
+pixel↔latlon conversion, and MapLibre is only ever *handed* a lat/lon, never asked to
+compute one. There is already a conformance test proving the affine solver agrees with
+the bridge's `georef.js` (§0.3(27)); Phase 8 needs the equivalent test proving
+`layerImageCorners` output, rendered through MapLibre's Mercator projection, lands within
+tolerance of what `geoUtils` itself would place there.
+
+#### 8.D — Migration path, and why it must be incremental
+
+Roughly eight files are coupled to percent-of-image coordinates (`venuemapmodal.tsx`'s
+marker components and `getContainedImageRect`, `venues/management/page.client.tsx`'s
+render and drag math, `markerUtils.ts`, `offMapUtils.ts`, `callPositionUtils.ts`,
+`takInterpolation.ts` / `useTakTween.ts`). A big-bang replacement of the existing map is
+the wrong shape for this migration: it is the only map dispatch has on game day, and 7.B
+and 7.E(1) just landed real, tested behaviour in it. **Add the basemap as a second,
+selectable view** — a toggle or tab alongside the existing raster-only map — rather than
+replacing the raster map's rendering path outright. This lets the basemap ship, get
+evaluated, and be reverted without touching code the dispatch board depends on today.
+
+The venue *editor* legitimately stays percent-native regardless of how this phase
+resolves: control points are placed against image pixels by definition, and there is no
+basemap-relative way to ask "where on this raster is this control point" that makes more
+sense than the current pixel-click interaction.
+
+#### 8.E — What a basemap does not give you
+
+It does not give floors. It does not give 3D in the sense most people picture when they
+hear the word. And it will make the map *look* far more capable than it is — the single
+change in this entire plan most likely to be misread as "we have a GIS now" (§2.2). Ship
+it with that framing stated out loud, not left implicit.
+
+**Effort:** 8.A S (library selection and wiring is mechanical once chosen), 8.B M–L (the
+PMTiles pipeline and the offline-serving story are the real work), 8.C M (the new
+`geoUtils` helper plus the Mercator-conformance test), 8.D M (dual-view scaffolding, no
+data-model change). None of it needs a phone, a spike, or IC-EMS — it is unblocked
+today, unlike most of what remains in §7.D and §9.B.
+
+---
+
+### Phase 9 — Multi-level venues, and what TAK can honestly carry — ⛔ NOT STARTED
+
+#### 9.A — Model the level in CrowdCAD first
+
+This is the true blocker, and it contains no TAK content at all. `Layer`
+(`core/src/app/types.ts:54-60`) is `{ id, name, mapUrl?, posts, georeference? }` — no
+elevation, no floor number, no ordering field beyond array index. Nothing downstream can
+carry level information that CrowdCAD's own model does not have.
+
+Propose adding an explicit, optional level descriptor:
+`level?: { ordinal: number; label: string; elevationMetresAgl?: number }`. **`ordinal` is
+the load-bearing field**, not `label` — it must be a sortable integer where ground level
+is `0` and mezzanines or basements are representable, because everything that needs to
+*order* or *filter* levels (a layer switcher, a CoT `<detail>` extension, a stacked-plate
+renderer in §9.C(ii)) needs a comparable value, not a string a human typed. `label` stays
+free text for what a person reads ("Main Concourse", "Suite Level").
+`elevationMetresAgl` is optional and explicitly **advisory**: it is a building fact
+someone enters once, not a GPS measurement, and it must never be compared against a
+device's `hae` — the same discipline §2.2 already applies to TAK's DTED elevation model,
+which has no idea what a building floor is.
+
+Migration: existing layers have no `level`. The array index is the only ordering that
+currently exists, and inferring `ordinal` from it is a reasonable default — but it must
+be **surfaced for confirmation**, not silently written, because array order was never
+intentionally a floor order and a venue with layers added out of sequence would get a
+wrong ordinal nobody asked to check.
+
+#### 9.B — What TAK can carry, stated without overselling
+
+§2.2's claim stands unchanged: TAK cannot *compute* a floor. GPS altitude cannot separate
+stadium concourse levels, and DTED has no concept of one. But a CoT event can *carry* a
+level, and a TAK operator can *filter* on one, which is a materially smaller claim than
+"TAK shows floors." Concretely, once 9.A exists: the level label already belongs in
+`<remarks>` per the existing plan; a callsign suffix; a per-level group/channel so an
+operator can select a level the way channels already gate teams today; and a CoT
+`<detail>` extension carrying the numeric `ordinal` for any client sophisticated enough
+to read it. **A receiving client will still stack every level at one lat/lon unless the
+operator actively filters** — this is a client-side selection story, not a rendering one,
+and no CoT payload changes that. The sentence to say to IC-EMS out loud: *"TAK can tell
+your operator which floor a team is on if they filter for it; it cannot show them a floor
+plan."*
+
+#### 9.C — What "3D" would actually mean, three different things
+
+The request conflates three distinct things, and they need to be separated because only
+one of them is what this plan can honestly deliver:
+
+- **(i) Map pitch/tilt.** Free with MapLibre once Phase 8 lands — tilting the camera
+  looks three-dimensional and costs nothing extra. It carries **zero floor information**;
+  it is a camera angle, not a data model.
+- **(ii) Stacked or extruded floor plates.** Genuinely achievable: each `Layer`'s raster,
+  once 9.A gives it an `elevationMetresAgl`, can be extruded to that height and rendered
+  as a plate in MapLibre's 3D scene. **This is the honest interpretation of "3D maps for
+  multiple levels" that software can actually deliver**, and it depends on both 9.A (the
+  elevation field) and Phase 8 (a 3D-capable renderer).
+- **(iii) A 3D digital twin with seating wireframes.** Unchanged from §2.2: a
+  LiDAR/photogrammetry surveying engagement producing a georeferenced model, a vendor
+  procurement rather than a software feature. Nothing in Phase 8 or Phase 9 moves toward
+  it.
+
+**Recommend (ii) as the deliverable**, and say plainly to IC-EMS that (iii) is what most
+people picture when they hear "3D maps" — the gap between what gets built and what gets
+imagined is the same gap §2.2 already warned about for the basemap generally (§8.E), and
+it is sharper here because "3D" is the literal word in the request.
+
+#### 9.D — Multi-level in CrowdCAD's own map
+
+Independent of TAK entirely: showing more than one `Layer` at once, z-stacked with the
+active layer opaque and the others dimmed, is something `LayerControlBar` cannot do today
+— it offers only prev/next chevrons and exactly one layer renders at a time
+(`venuemapmodal.tsx:1011-1013`). This is valuable to dispatch on its own terms — a
+supervisor glancing at "who is above or below this incident" — regardless of whether TAK
+ever sees a level.
+
+**Effort and ordering:** 9.A is S–M and **gates everything else in this phase** — no
+ordinal, no filtering, no extrusion, no confirmation UI. 9.B is S once 9.A exists (it is
+threading an already-modelled value through mapping code that already threads the layer
+name). 9.C(ii) is M–L and **depends on Phase 8** for the 3D renderer; 9.C(i) is free with
+Phase 8 and needs no 9.A. 9.D is M and depends on 9.A for a meaningful stacking order but
+not on TAK or Phase 8 at all. None of Phase 9 needs hardware — the entire phase is data
+modelling and rendering; only §7.D's pin-type spike and any future device testing of the
+`<detail>` extension in TAK clients would need a phone, and that testing is optional
+confirmation rather than a blocker to shipping 9.A–9.D.
 
 ---
 
@@ -3250,13 +3877,22 @@ rendering per type code, stale behavior, network-link refresh, callsign display.
 | 4 — field PWA | ⛔ | L | 3 (schema only) | **The thing IC-EMS actually needs** |
 | 5 — ops docs | ⛔ | S | 2 | Deployers can self-serve |
 | 6 — ATAK plugin | ⛔ deferred | XL | — | Revisit after a full season |
-| **7 — call pins + coordinate-first map** | ⛔ | **M** | **0 only** (7.D also on spike b) | **Calls have real positions, in both directions** |
+| **7 — call pins + coordinate-first map** | 🟡 7.A–7.C, 7.E(1), 7.E(2) ✅ | **M** | **0 only** (7.D also on spike b) | **Calls have real positions, in both directions** |
+| **8 — a real basemap** | ⛔ NOT STARTED | **M–L** | **nothing** | A map with context under the venue raster, offline-capable |
+| **9 — multi-level venues** | ⛔ NOT STARTED | **M** | 9.A nothing; 9.C(ii) on 8 | Floors modelled, filterable in TAK, stackable in CrowdCAD |
 
-**Phase 7 is the exception to the "everything is gated" reading of this table.** 7.A–7.C
-and 7.E depend on Phase 0, which is done; only 7.D waits on spike (b). It is therefore
-the one place where a session with no phone and no IC-EMS response can do substantial
-work — and 7.E(2) is a latent data-integrity bug (swapping a venue image silently moves
-every post), not a feature, which argues for doing it regardless of the TAK schedule.
+**Phases 7, 8 and 9 are the exception to the "everything is gated" reading of this
+table.** 7.A–7.C and 7.E depend on Phase 0, which is done; only 7.D waits on spike (b).
+**Phases 8 and 9, added 2026-08-18, depend on nothing at all** — no phone, no spike, no
+IC-EMS answer — which makes them, together with 7.E(3), the entire unblocked surface of
+this project. 7.E(2) was a latent data-integrity bug rather than a feature (swapping a
+venue image silently moved every post), which is why it was done regardless of the TAK
+schedule; the same argument does not apply to 8 and 9, which are genuinely new
+capability and should be sequenced against IC-EMS's priorities rather than the plan's.
+
+⚠️ **Phase 8 reverses a decision §2.2 and §7.E both recorded.** The table above is not
+the place to argue it — see §0.6.2 and §0.3(53) — but a reader working from this table
+alone should know the refusal exists and has been overridden, not overlooked.
 
 **Spike status — both still outstanding, and they are now the critical path:**
 
