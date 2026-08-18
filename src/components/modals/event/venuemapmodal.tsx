@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Modal, ModalContent, ModalBody, Button, Card, Select, SelectItem } from '@heroui/react';
-import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus, PhoneCall, AlertTriangle, X } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus, PhoneCall, AlertTriangle, X, ArrowUp } from 'lucide-react';
 import { Post, Staff, Equipment, Layer, TakPosition, Call, CallPosition, Event } from '@/app/types';
 import { getStatusColor } from '@/lib/statusColors';
 import { useTakTween } from '@/hooks/useTakTween';
@@ -16,6 +16,7 @@ import {
   resolveCallPinPercent,
   type PercentPoint,
 } from '@/lib/callPositionUtils';
+import { offMapIndicator, type OffMapIndicator } from '@/lib/offMapUtils';
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
 import { cn } from '@/lib/utils';
 import MarkerModeToggleButton from '@/components/venue-management/MarkerModeToggleButton';
@@ -96,6 +97,178 @@ function formatTakAge(ms: number): string {
   if (totalMinutes < 60) return `${totalMinutes}m`;
   const totalHours = Math.floor(totalMinutes / 60);
   return `${totalHours}h`;
+}
+
+// Whole metres below 1km ("420 m") and one decimal km above ("1.4 km") -- the
+// same threshold most map UIs use, and precise enough to be actionable on
+// foot without implying GPS accuracy this system doesn't have.
+function formatOffMapDistance(metres: number): string {
+  if (metres < 1000) return `${Math.round(metres)} m`;
+  return `${(metres / 1000).toFixed(1)} km`;
+}
+
+// One off-map badge's rendering inputs, independent of whether it came from
+// a Call pin or a team's TAK fix -- see layoutOffMapBadges below for why the
+// two populations share one layout pass.
+interface OffMapBadgeSpec {
+  id: string;
+  indicator: OffMapIndicator;
+  labelText: string;
+  ariaLabel: string;
+  colorHex?: string;
+  borderClassName?: string;
+  fillClassName?: string;
+  textClassName?: string;
+}
+
+// How close two badges' centres can land (in screen pixels, pre-zoom-scale)
+// before they're considered "overlapping" and get nudged apart. Sized a bit
+// larger than the badge's own ~24px circle so the fanned-out result still
+// has a visible gap.
+const OFF_MAP_BADGE_MIN_SPACING_PX = 30;
+
+/**
+ * Lays out every off-map badge's screen position for the current rect,
+ * spreading out any that would otherwise land on top of each other.
+ *
+ * Deliberately does NOT collapse crowded badges into a single "+N" count
+ * marker: an off-map call or team is exactly the piece of information a
+ * count summary would hide, and unlike a cluster on a normal map there is no
+ * click-to-expand affordance here to recover it. Instead, badges landing on
+ * the same edge of the image are sorted along that edge and pushed apart
+ * just enough to stay legible -- every target keeps its own colour, label,
+ * and aria-label; only their on-screen position moves. This runs on however
+ * many off-map targets exist at once (typically a handful), so an O(n log n)
+ * sort per edge is not a concern.
+ */
+function layoutOffMapBadges(
+  specs: OffMapBadgeSpec[],
+  rect: ImageRect
+): Map<string, { left: number; top: number }> {
+  const positions = new Map<string, { left: number; top: number }>();
+
+  type Side = 'top' | 'bottom' | 'left' | 'right';
+  const bySide: Record<Side, { id: string; left: number; top: number; along: number }[]> = {
+    top: [],
+    bottom: [],
+    left: [],
+    right: [],
+  };
+
+  for (const spec of specs) {
+    const { x, y } = spec.indicator.edge;
+    const left = rect.x + (x / 100) * rect.width;
+    const top = rect.y + (y / 100) * rect.height;
+
+    // Classify by which boundary this edge point sits on. A corner (x and y
+    // both on a boundary) resolves to the vertical edge -- an arbitrary but
+    // consistent tie-break that only affects which axis that one badge fans
+    // out along.
+    let side: Side;
+    if (y <= 0.01) side = 'top';
+    else if (y >= 99.99) side = 'bottom';
+    else if (x <= 0.01) side = 'left';
+    else side = 'right';
+
+    const along = side === 'top' || side === 'bottom' ? left : top;
+    bySide[side].push({ id: spec.id, left, top, along });
+  }
+
+  (Object.keys(bySide) as Side[]).forEach((side) => {
+    const items = bySide[side].sort((a, b) => a.along - b.along);
+    let lastAlong = -Infinity;
+    for (const item of items) {
+      const along = Math.max(item.along, lastAlong + OFF_MAP_BADGE_MIN_SPACING_PX);
+      lastAlong = along;
+      const left = side === 'top' || side === 'bottom' ? along : item.left;
+      const top = side === 'top' || side === 'bottom' ? item.top : along;
+      positions.set(item.id, { left, top });
+    }
+  });
+
+  return positions;
+}
+
+// Draws one "this way, N metres" badge at the venue image's boundary. Never
+// receives or writes a real CallPosition/TakPosition -- `indicator.edge` is
+// pure drawing data from offMapUtils.offMapIndicator, computed fresh every
+// render (see that module's doc comment on why clamping the real position
+// would be exactly the lie `onMap: false` exists to avoid).
+//
+// Colour is either a status-derived Tailwind class triple (calls, via
+// getStatusColor -- see core/CLAUDE.md on not hardcoding status colour) or
+// the existing TAK_LIVE_COLOR hex constant (teams), never a new colour
+// invented for this feature.
+interface OffMapBadgeProps {
+  left: number;
+  top: number;
+  screenAngleDeg: number;
+  mapScale: number;
+  labelText: string;
+  ariaLabel: string;
+  colorHex?: string;
+  borderClassName?: string;
+  fillClassName?: string;
+  textClassName?: string;
+}
+
+function OffMapBadge({
+  left,
+  top,
+  screenAngleDeg,
+  mapScale,
+  labelText,
+  ariaLabel,
+  colorHex,
+  borderClassName,
+  fillClassName,
+  textClassName,
+}: OffMapBadgeProps) {
+  const ringStyle: React.CSSProperties | undefined = colorHex
+    ? {
+        borderColor: colorHex,
+        backgroundColor: `${colorHex}33`,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.5)',
+      }
+    : undefined;
+  const iconStyle: React.CSSProperties = { transform: `rotate(${screenAngleDeg}deg)` };
+  if (colorHex) iconStyle.color = colorHex;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: `${left}px`,
+        top: `${top}px`,
+        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
+        zIndex: 26,
+        pointerEvents: 'none',
+      }}
+      className="flex flex-col items-center gap-0.5"
+      role="img"
+      aria-label={ariaLabel}
+    >
+      <div
+        className={cn(
+          'flex h-6 w-6 items-center justify-center rounded-full border-2',
+          !colorHex && borderClassName,
+          !colorHex && fillClassName
+        )}
+        style={ringStyle}
+      >
+        <ArrowUp className={cn('h-3.5 w-3.5', !colorHex && textClassName)} style={iconStyle} strokeWidth={2.5} />
+      </div>
+      <span
+        className={cn(
+          'rounded bg-surface-deepest/90 px-1 py-0.5 text-[10px] font-medium leading-none whitespace-nowrap',
+          !colorHex && textClassName
+        )}
+        style={colorHex ? { color: colorHex } : undefined}
+      >
+        {labelText}
+      </span>
+    </div>
+  );
 }
 
 interface PostMarkerProps {
@@ -837,6 +1010,7 @@ function VenueMapWithPosts({
 
   const mapUrl = layers[currentLayer]?.mapUrl || '';
   const posts = layers[currentLayer]?.posts || [];
+  const activeLayer = layers[currentLayer];
 
   // Update container size when component mounts and on resize
   useEffect(() => {
@@ -943,6 +1117,83 @@ function VenueMapWithPosts({
     }
   }, [shouldRenderMarkers]);
 
+  // Off-map edge indicators (Phase 7.E(1)). `imageAspect` needs the real
+  // rendered image's natural size -- before it loads naturalWidth is 0, so
+  // this whole block (and offMapIndicator's aspect-dependent math) is gated
+  // on shouldRenderMarkers, which already requires naturalSize.width/height
+  // > 0. Nothing here reads or writes a CallPosition/TakPosition; it only
+  // decides which already-resolved percent points to draw as a badge
+  // instead of a marker.
+  let onMapCallPins = callPins;
+  const offMapBadgeSpecs: OffMapBadgeSpec[] = [];
+  if (shouldRenderMarkers && activeLayer) {
+    const imageAspect = naturalSize.width / naturalSize.height;
+    onMapCallPins = [];
+
+    for (const pin of callPins) {
+      // The pin actively being dragged keeps its live CallMarker regardless
+      // of where it currently sits -- that marker IS the drag handle
+      // (mousedown/mousemove/mouseup all target it), and swapping it for a
+      // non-interactive badge mid-drag would strand the interaction added
+      // in 4dc00c8. offMapIndicator is only consulted once the drag ends.
+      if (draggingCallId === pin.call.id) {
+        onMapCallPins.push(pin);
+        continue;
+      }
+      const indicator = offMapIndicator(activeLayer, pin.percent, imageAspect);
+      if (!indicator) {
+        onMapCallPins.push(pin);
+        continue;
+      }
+      const statusColor = getStatusColor(pin.call.status);
+      const geoText = indicator.geo
+        ? `${indicator.geo.compass} ${formatOffMapDistance(indicator.geo.distanceMetres)}`
+        : null;
+      // Identity only -- Call #<order>, the same thing CallMarker's own
+      // tooltip leads with -- never chief complaint/age/gender (no PHI in
+      // anything drawn or loggable here).
+      const identity = `Call #${pin.call.order}`;
+      offMapBadgeSpecs.push({
+        id: `call-${pin.call.id}`,
+        indicator,
+        labelText: geoText ? `${identity} ${geoText}` : identity,
+        ariaLabel: geoText
+          ? `${identity} is off the map, ${geoText}${pin.isStale ? ' (position may be stale after recalibration)' : ''}`
+          : `${identity} is off the map, direction shown only -- layer is not calibrated for a distance`,
+        borderClassName: statusColor.borderClass,
+        fillClassName: statusColor.fillClass,
+        textClassName: statusColor.textClass,
+      });
+    }
+
+    for (const team of staff) {
+      const tak = team.tak;
+      if (!tak || tak.x == null || tak.y == null || tak.onMap !== false) continue;
+      const indicator = offMapIndicator(activeLayer, { x: tak.x, y: tak.y }, imageAspect);
+      // onMap: false is the bridge's own call; offMapIndicator re-derives
+      // the same fact from the percent it stored. If the two disagree (a
+      // stale onMap flag on an otherwise on-image fix), trust the geometry
+      // and draw nothing rather than a badge pointing at the image centre.
+      if (!indicator) continue;
+      const geoText = indicator.geo
+        ? `${indicator.geo.compass} ${formatOffMapDistance(indicator.geo.distanceMetres)}`
+        : null;
+      const identity = team.team;
+      offMapBadgeSpecs.push({
+        id: `tak-${team.team}`,
+        indicator,
+        labelText: geoText ? `${identity} ${geoText}` : identity,
+        ariaLabel: geoText
+          ? `${identity} is off the map, ${geoText}`
+          : `${identity} is off the map, direction shown only -- layer is not calibrated for a distance`,
+        // Reuses the same TAK_LIVE_COLOR every live GPS dot already uses --
+        // this is still "where the unit actually is", just off the image.
+        colorHex: TAK_LIVE_COLOR,
+      });
+    }
+  }
+  const offMapBadgePositions = layoutOffMapBadges(offMapBadgeSpecs, rect);
+
   return (
     <div 
       className="relative h-full w-full"
@@ -1035,7 +1286,7 @@ function VenueMapWithPosts({
               .map((team) => (
                 <TakMarker key={`tak-${team.team}`} team={team} rect={rect} mapScale={scale} />
               ))}
-            {callPins.map(({ call, percent, isStale }) => (
+            {onMapCallPins.map(({ call, percent, isStale }) => (
               <CallMarker
                 key={call.id}
                 call={call}
@@ -1052,6 +1303,25 @@ function VenueMapWithPosts({
                 }
               />
             ))}
+            {offMapBadgeSpecs.map((spec) => {
+              const pos = offMapBadgePositions.get(spec.id);
+              if (!pos) return null;
+              return (
+                <OffMapBadge
+                  key={spec.id}
+                  left={pos.left}
+                  top={pos.top}
+                  screenAngleDeg={spec.indicator.screenAngleDeg}
+                  mapScale={scale}
+                  labelText={spec.labelText}
+                  ariaLabel={spec.ariaLabel}
+                  colorHex={spec.colorHex}
+                  borderClassName={spec.borderClassName}
+                  fillClassName={spec.fillClassName}
+                  textClassName={spec.textClassName}
+                />
+              );
+            })}
             {draftPin && (
               <CallMarker
                 call={null}
