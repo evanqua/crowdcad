@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
 import { dbService, storageService } from '@/lib/services';
+import { markerCounterScale } from '@/lib/labelScale';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer, ControlPoint, Georeference } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
@@ -794,6 +795,26 @@ export default function VenueManagementPageClient() {
       window.addEventListener('mouseup', onUp);
     };
 
+  // Markers here used to carry no counter-scale at all, so they grew in
+  // lockstep with the raster: a 24px pin became a 192px pin at 8x. The
+  // dispatch map did the exact opposite. Both surfaces now share one law
+  // (labelScale.ts): net on-screen size grows as the square root of zoom.
+  //
+  // Only mechanism (a) of Phase 7.E(3) applies here. Collision declutter and
+  // zoom-gating are dispatch-map-only on purpose -- this editor is a
+  // placement tool working on a handful of posts at a time, where seeing
+  // every marker you have placed matters more than a tidy label layout, and
+  // it has no measured pixel rect to do collision in.
+  //
+  // transformOrigin 'top left' with scale() BEFORE translate() is what keeps
+  // the marker centred on its percentage point at any scale: the translate
+  // is then expressed in pre-scale units and shrinks with the marker.
+  const markerCounter = markerCounterScale(scale);
+  const markerScaleStyle: React.CSSProperties = {
+    transformOrigin: 'top left',
+    transform: `scale(${markerCounter}) translate(-50%, -50%)`,
+  };
+
   const renderMarkers = () => {
     type CoordinatedPost = {
       name: string;
@@ -812,37 +833,44 @@ export default function VenueManagementPageClient() {
         post.y !== null
       )
       .map((post, idx) => {
-        const left = `calc(${post.x}% - 12px)`;
-        const top = `calc(${post.y}% - 12px)`;
         const isHover = hoverId === idx;
         const isPending = pendingMarker?.layerIdx === currentLayer && pendingMarker?.postIdx === idx;
 
         return (
           <React.Fragment key={idx}>
             <div
-              style={{ left, top }}
-              className={`absolute z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-full border-2 transition-all ${
-                isPending
-                  ? 'border-status-blue bg-status-blue/20 scale-125'
-                  : isHover || draggingIdx === idx
-                  ? 'border-accent bg-accent/30 scale-110'
-                  : 'border-accent bg-accent/20 hover:scale-110'
-              } ${draggingIdx === idx ? 'cursor-grabbing scale-110' : ''}`}
-              onMouseEnter={() => setHoverId(idx)}
-              onMouseLeave={() => setHoverId((cur) => (cur === idx ? null : cur))}
-              onMouseDown={onMarkerMouseDown(idx)}
-              onClick={(e) => {
-                if (isPending) return;
-                e.preventDefault();
-                e.stopPropagation();
-                renamePost(currentLayer, idx);
-              }}
+              style={{ left: `${post.x}%`, top: `${post.y}%`, ...markerScaleStyle }}
+              className="absolute z-10"
             >
-              <MapPin className="h-4 w-4 text-accent" strokeWidth={2.5} />
+              <div
+                className={`flex h-6 w-6 cursor-grab items-center justify-center rounded-full border-2 transition-all ${
+                  isPending
+                    ? 'border-status-blue bg-status-blue/20 scale-125'
+                    : isHover || draggingIdx === idx
+                    ? 'border-accent bg-accent/30 scale-110'
+                    : 'border-accent bg-accent/20 hover:scale-110'
+                } ${draggingIdx === idx ? 'cursor-grabbing scale-110' : ''}`}
+                onMouseEnter={() => setHoverId(idx)}
+                onMouseLeave={() => setHoverId((cur) => (cur === idx ? null : cur))}
+                onMouseDown={onMarkerMouseDown(idx)}
+                onClick={(e) => {
+                  if (isPending) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  renamePost(currentLayer, idx);
+                }}
+              >
+                <MapPin className="h-4 w-4 text-accent" strokeWidth={2.5} />
+              </div>
             </div>
             {isHover && !isPending && post.name && (
               <div
-                style={{ left: `calc(${post.x}% - 50px)`, top: `calc(${post.y}% - 40px)` }}
+                style={{
+                  left: `${post.x}%`,
+                  top: `${post.y}%`,
+                  transformOrigin: 'top left',
+                  transform: `scale(${markerCounter}) translate(-50%, calc(-100% - 14px))`,
+                }}
                 className="pointer-events-none absolute z-20 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
               >
                 {post.name}
@@ -858,21 +886,16 @@ export default function VenueManagementPageClient() {
   const renderControlPointMarkers = () => {
     const controlPoints = venueData.layers[currentLayer]?.georeference?.controlPoints ?? [];
 
-    return controlPoints.map((cp, idx) => {
-      const left = `calc(${cp.x}% - 12px)`;
-      const top = `calc(${cp.y}% - 12px)`;
-
-      return (
-        <div
-          key={idx}
-          style={{ left, top }}
-          className="absolute z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-status-orange bg-status-orange/20 text-[10px] font-semibold text-status-orange shadow-sm pointer-events-none"
-          title={cp.label ? `Control point ${idx + 1}: ${cp.label}` : `Control point ${idx + 1}`}
-        >
-          {idx + 1}
-        </div>
-      );
-    });
+    return controlPoints.map((cp, idx) => (
+      <div
+        key={idx}
+        style={{ left: `${cp.x}%`, top: `${cp.y}%`, ...markerScaleStyle }}
+        className="absolute z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-status-orange bg-status-orange/20 text-[10px] font-semibold text-status-orange shadow-sm pointer-events-none"
+        title={cp.label ? `Control point ${idx + 1}: ${cp.label}` : `Control point ${idx + 1}`}
+      >
+        {idx + 1}
+      </div>
+    ));
   };
 
   // Create venue

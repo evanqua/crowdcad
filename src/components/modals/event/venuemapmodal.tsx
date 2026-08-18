@@ -17,6 +17,16 @@ import {
   type PercentPoint,
 } from '@/lib/callPositionUtils';
 import { offMapIndicator, type OffMapIndicator } from '@/lib/offMapUtils';
+import {
+  declutterLabels,
+  edgeBadgeObstacles,
+  estimateLabelBox,
+  layoutEdgeBadges,
+  markerCounterScale,
+  staggerOffsetPx,
+  SECONDARY_LABEL_MIN_SCALE,
+  type LabelBox,
+} from '@/lib/labelScale';
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
 import { cn } from '@/lib/utils';
 import MarkerModeToggleButton from '@/components/venue-management/MarkerModeToggleButton';
@@ -46,6 +56,65 @@ function StatusTimer({ since }: { since: number }) {
     <span>
       {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
     </span>
+  );
+}
+
+// Base font size of a persistent map label, in the marker's OWN pixels. Every
+// marker wrapper is already scaled by markerCounterScale(mapScale), so a label
+// drawn at this size inside one lands on screen at
+// LABEL_FONT_BASE_PX * labelScreenScale(mapScale) -- square-root-of-zoom
+// growth, without this component having to know the zoom at all.
+const LABEL_FONT_BASE_PX = 12;
+
+// Half-heights of each marker's own box, in the same pre-zoom pixels. Used by
+// the parent to predict where a label will land so it can decide collisions
+// before the label exists to measure. Kept next to the markers themselves
+// because they are the thing that changes if a marker is resized.
+const POST_MARKER_HALF_PX = 12;
+const CLINIC_MARKER_HALF_PX = 14;
+const TAK_MARKER_HALF_PX = 8;
+const CALL_MARKER_HALF_PX = 14;
+const LABEL_GAP_PX = 3;
+
+/**
+ * A persistent name drawn under a marker, as distinct from the hover tooltip
+ * next to it. The tooltip answers "what is this, in detail, right now"; the
+ * label answers "what am I looking at" without requiring a hover, which is
+ * what a map is supposed to do and what a screenshot's baked-in names cannot
+ * do once you zoom.
+ *
+ * aria-hidden on purpose: whether this draws is a *visual* decluttering
+ * decision that changes with zoom, and a screen reader must not lose a post's
+ * name because two labels happened to overlap. The marker itself carries the
+ * name in an aria-label at every zoom instead.
+ */
+function MapLabel({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'absolute',
+        left: '50%',
+        top: '100%',
+        transform: `translate(-50%, ${LABEL_GAP_PX}px)`,
+        fontSize: `${LABEL_FONT_BASE_PX}px`,
+        lineHeight: 1.35,
+        pointerEvents: 'none',
+        whiteSpace: 'nowrap',
+      }}
+      className={cn(
+        'rounded bg-surface-deepest/80 px-1.5 py-0.5 font-semibold text-surface-light shadow-sm',
+        className
+      )}
+    >
+      {text}
+    </div>
   );
 }
 
@@ -108,8 +177,8 @@ function formatOffMapDistance(metres: number): string {
 }
 
 // One off-map badge's rendering inputs, independent of whether it came from
-// a Call pin or a team's TAK fix -- see layoutOffMapBadges below for why the
-// two populations share one layout pass.
+// a Call pin or a team's TAK fix -- see labelScale.layoutEdgeBadges for why
+// the two populations share one layout pass.
 interface OffMapBadgeSpec {
   id: string;
   indicator: OffMapIndicator;
@@ -119,74 +188,6 @@ interface OffMapBadgeSpec {
   borderClassName?: string;
   fillClassName?: string;
   textClassName?: string;
-}
-
-// How close two badges' centres can land (in screen pixels, pre-zoom-scale)
-// before they're considered "overlapping" and get nudged apart. Sized a bit
-// larger than the badge's own ~24px circle so the fanned-out result still
-// has a visible gap.
-const OFF_MAP_BADGE_MIN_SPACING_PX = 30;
-
-/**
- * Lays out every off-map badge's screen position for the current rect,
- * spreading out any that would otherwise land on top of each other.
- *
- * Deliberately does NOT collapse crowded badges into a single "+N" count
- * marker: an off-map call or team is exactly the piece of information a
- * count summary would hide, and unlike a cluster on a normal map there is no
- * click-to-expand affordance here to recover it. Instead, badges landing on
- * the same edge of the image are sorted along that edge and pushed apart
- * just enough to stay legible -- every target keeps its own colour, label,
- * and aria-label; only their on-screen position moves. This runs on however
- * many off-map targets exist at once (typically a handful), so an O(n log n)
- * sort per edge is not a concern.
- */
-function layoutOffMapBadges(
-  specs: OffMapBadgeSpec[],
-  rect: ImageRect
-): Map<string, { left: number; top: number }> {
-  const positions = new Map<string, { left: number; top: number }>();
-
-  type Side = 'top' | 'bottom' | 'left' | 'right';
-  const bySide: Record<Side, { id: string; left: number; top: number; along: number }[]> = {
-    top: [],
-    bottom: [],
-    left: [],
-    right: [],
-  };
-
-  for (const spec of specs) {
-    const { x, y } = spec.indicator.edge;
-    const left = rect.x + (x / 100) * rect.width;
-    const top = rect.y + (y / 100) * rect.height;
-
-    // Classify by which boundary this edge point sits on. A corner (x and y
-    // both on a boundary) resolves to the vertical edge -- an arbitrary but
-    // consistent tie-break that only affects which axis that one badge fans
-    // out along.
-    let side: Side;
-    if (y <= 0.01) side = 'top';
-    else if (y >= 99.99) side = 'bottom';
-    else if (x <= 0.01) side = 'left';
-    else side = 'right';
-
-    const along = side === 'top' || side === 'bottom' ? left : top;
-    bySide[side].push({ id: spec.id, left, top, along });
-  }
-
-  (Object.keys(bySide) as Side[]).forEach((side) => {
-    const items = bySide[side].sort((a, b) => a.along - b.along);
-    let lastAlong = -Infinity;
-    for (const item of items) {
-      const along = Math.max(item.along, lastAlong + OFF_MAP_BADGE_MIN_SPACING_PX);
-      lastAlong = along;
-      const left = side === 'top' || side === 'bottom' ? along : item.left;
-      const top = side === 'top' || side === 'bottom' ? item.top : along;
-      positions.set(item.id, { left, top });
-    }
-  });
-
-  return positions;
 }
 
 // Draws one "this way, N metres" badge at the venue image's boundary. Never
@@ -240,6 +241,11 @@ function OffMapBadge({
         position: 'absolute',
         left: `${left}px`,
         top: `${top}px`,
+        // Constant on-screen size, unlike the sub-linear map markers below:
+        // this badge is viewport chrome pinned to the image boundary, and its
+        // bearing arrow and distance readout have to stay legible at 0.5x and
+        // at 8x alike. That is the k = 1 endpoint described in labelScale.ts,
+        // and it is the one place where it is still the right answer.
         transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
         zIndex: 26,
         pointerEvents: 'none',
@@ -276,9 +282,15 @@ interface PostMarkerProps {
   rect: ImageRect;
   staff: Staff[];
   mapScale: number;
+  /**
+   * Decided by the parent's declutter pass, not here: whether this label
+   * draws depends on every OTHER label on the map, which a single marker
+   * cannot see. See labelScale.declutterLabels.
+   */
+  showLabel?: boolean;
 }
 
-function PostMarker({ post, rect, mapScale }: PostMarkerProps) {
+function PostMarker({ post, rect, mapScale, showLabel }: PostMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
@@ -310,15 +322,18 @@ function PostMarker({ post, rect, mapScale }: PostMarkerProps) {
         position: "absolute",
         left: `${left}px`,
         top: `${top}px`,
-        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
+        transform: `translate(-50%, -50%) scale(${markerCounterScale(mapScale)})`,
         zIndex: 12,
         cursor: "pointer",
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
+      role="img"
+      aria-label={post.name}
       className={`flex ${containerSize} items-center justify-center rounded-full border-2 transition-all border-accent bg-accent/20 hover:scale-110`}
     >
       <Icon className={`${size} text-accent`} strokeWidth={2.5} />
+      {showLabel && <MapLabel text={post.name} />}
 
       {/* Hover tooltip with fixed positioning using portal */}
       {hovered && typeof window !== 'undefined' && createPortal(
@@ -436,8 +451,8 @@ function EquipmentMarker({
   // Position equipment marker
   // The stagger offset is applied in map-container pixels, so it has to shrink
   // with zoom to keep a constant on-screen gap from the post marker.
-  const left = rect.x + (post.x / 100) * rect.width - 15 / mapScale;
-  const top = rect.y + (post.y / 100) * rect.height + 15 / mapScale;
+  const left = rect.x + (post.x / 100) * rect.width - staggerOffsetPx(15, mapScale);
+  const top = rect.y + (post.y / 100) * rect.height + staggerOffsetPx(15, mapScale);
 
   const iconType = getEquipmentIcon(equipment);
 
@@ -457,7 +472,7 @@ function EquipmentMarker({
         position: 'absolute',
         left: `${left}px`,
         top: `${top}px`,
-        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
+        transform: `translate(-50%, -50%) scale(${markerCounterScale(mapScale)})`,
         zIndex: 15,
         cursor: 'pointer',
         display: 'flex',
@@ -572,8 +587,8 @@ function TeamMarker({
   if (!postIsValid) return null;
 
   // Stagger team marker 8px right and 8px up from post center
-  const left = rect.x + (post.x / 100) * rect.width + 16 / mapScale;
-  const top = rect.y + (post.y / 100) * rect.height - 16 / mapScale;
+  const left = rect.x + (post.x / 100) * rect.width + staggerOffsetPx(16, mapScale);
+  const top = rect.y + (post.y / 100) * rect.height - staggerOffsetPx(16, mapScale);
 
   const { color } = getTeamMarkerColors(team);
 
@@ -594,7 +609,7 @@ function TeamMarker({
         position: 'absolute',
         left: `${left}px`,
         top: `${top}px`,
-        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
+        transform: `translate(-50%, -50%) scale(${markerCounterScale(mapScale)})`,
         zIndex: 25,
         cursor: 'pointer',
         display: 'flex',
@@ -658,9 +673,10 @@ interface TakMarkerProps {
   team: Staff;
   rect: ImageRect;
   mapScale: number;
+  showLabel?: boolean;
 }
 
-function TakMarker({ team, rect, mapScale }: TakMarkerProps) {
+function TakMarker({ team, rect, mapScale, showLabel }: TakMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
@@ -718,15 +734,23 @@ function TakMarker({ team, rect, mapScale }: TakMarkerProps) {
         position: 'absolute',
         left: `${left}px`,
         top: `${top}px`,
-        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
+        transform: `translate(-50%, -50%) scale(${markerCounterScale(mapScale)})`,
         zIndex: 30,
         cursor: 'pointer',
         opacity: isStale ? 0.35 : 1,
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
+      role="img"
+      aria-label={`${team.team} live position`}
       className="flex items-center justify-center"
     >
+      {/* The live callsign outranks every other label on the map: it is the
+          one that answers "where is my unit", which is the question the map
+          is open to answer. */}
+      {showLabel && (
+        <MapLabel text={team.team} className={isStale ? 'opacity-70' : undefined} />
+      )}
       {/* Pulsing halo signals "live"; a stale fix drops opacity and stops pulsing above */}
       {!isStale && (
         <div className="cc-tak-pulse-ring" style={{ backgroundColor: TAK_LIVE_COLOR }} />
@@ -798,6 +822,7 @@ interface CallMarkerProps {
   isDraggable: boolean;
   isDragging: boolean;
   onDragStart?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  showLabel?: boolean;
 }
 
 function CallMarker({
@@ -809,6 +834,7 @@ function CallMarker({
   isDraggable,
   isDragging,
   onDragStart,
+  showLabel,
 }: CallMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -836,7 +862,7 @@ function CallMarker({
         position: 'absolute',
         left: `${left}px`,
         top: `${top}px`,
-        transform: `translate(-50%, -50%) scale(${1 / mapScale})`,
+        transform: `translate(-50%, -50%) scale(${markerCounterScale(mapScale)})`,
         zIndex: isDragging ? 40 : 20,
         cursor: isDraggable ? (isDragging ? 'grabbing' : 'grab') : 'default',
       }}
@@ -850,6 +876,8 @@ function CallMarker({
       // the pin it was just dragged to, at the same spot, as a spurious
       // no-op "moved" log entry.
       onClick={(e) => e.stopPropagation()}
+      role="img"
+      aria-label={call ? `Call #${call.order}` : 'New call pin'}
       className={cn(
         'flex h-7 w-7 items-center justify-center rounded-full border-2 transition-transform hover:scale-110',
         statusColor.borderClass,
@@ -857,6 +885,11 @@ function CallMarker({
       )}
     >
       <PhoneCall className={cn('h-4 w-4', statusColor.textClass)} strokeWidth={2.5} />
+      {/* Zoom-gated: a call number is detail, and at 1x a campus map crowded
+          with them reads as a word cloud. It appears one zoom step in. */}
+      {showLabel && call && (
+        <MapLabel text={`#${call.order}`} className={statusColor.textClass} />
+      )}
 
       {hovered && typeof window !== 'undefined' && createPortal(
         <div
@@ -1192,7 +1225,97 @@ function VenueMapWithPosts({
       });
     }
   }
-  const offMapBadgePositions = layoutOffMapBadges(offMapBadgeSpecs, rect);
+  // Badges are laid out first and then enter the label declutter pass below
+  // as immovable obstacles, so an off-map call never loses its badge to an
+  // ordinary post label. See labelScale.declutterLabels.
+  const offMapBadgePositions = layoutEdgeBadges(
+    offMapBadgeSpecs.map((spec) => ({ id: spec.id, edge: spec.indicator.edge })),
+    rect,
+    scale
+  );
+
+  // ---- Phase 7.E(3): who gets a label at this zoom -------------------------
+  //
+  // Three mechanisms, all of them in labelScale.ts so they are unit-testable
+  // (this file has no component-test harness):
+  //
+  //   (a) size    -- every marker is scaled by markerCounterScale(scale), so
+  //                  its net on-screen size grows as sqrt(zoom) instead of
+  //                  staying frozen (what this map used to do) or growing
+  //                  1:1 with the raster (what the venue editor used to do);
+  //   (b) collide -- overlapping labels are hidden rather than nudged, so a
+  //                  label never ends up pointing at the wrong post;
+  //   (c) gate    -- call numbers are secondary detail and only appear above
+  //                  SECONDARY_LABEL_MIN_SCALE, so zooming in reveals more of
+  //                  the map instead of just magnifying it.
+  //
+  // Computed here, in the one place that can see every marker at once. A
+  // marker cannot decide its own visibility: that depends on its neighbours.
+  const labelCounter = markerCounterScale(scale);
+  const labelBoxes: LabelBox[] = [];
+  if (shouldRenderMarkers) {
+    posts.forEach((post, i) => {
+      if (!isPostObject(post) || !post.name) return;
+      const box = estimateLabelBox(post.name, LABEL_FONT_BASE_PX);
+      const halfPx = post.name.toLowerCase().includes('clinic')
+        ? CLINIC_MARKER_HALF_PX
+        : POST_MARKER_HALF_PX;
+      labelBoxes.push({
+        id: `post-${i}`,
+        centerX: rect.x + (post.x / 100) * rect.width,
+        centerY:
+          rect.y +
+          (post.y / 100) * rect.height +
+          (halfPx + LABEL_GAP_PX + box.height / 2) * labelCounter,
+        width: box.width * labelCounter,
+        height: box.height * labelCounter,
+        priority: 10,
+      });
+    });
+
+    staff.forEach((team) => {
+      const t = team.tak;
+      if (!t || t.x == null || t.y == null || t.onMap === false) return;
+      const box = estimateLabelBox(team.team, LABEL_FONT_BASE_PX);
+      labelBoxes.push({
+        id: `tak-${team.team}`,
+        // The reported fix, not the tweened one: the tween lives inside
+        // TakMarker's own hook and is at most a second of travel away. Reading
+        // it here would mean re-running the collision pass on every animation
+        // frame, and a label that blinks off mid-stride is worse than one
+        // that is briefly a few pixels behind its dot.
+        centerX: rect.x + (t.x / 100) * rect.width,
+        centerY:
+          rect.y +
+          (t.y / 100) * rect.height +
+          (TAK_MARKER_HALF_PX + LABEL_GAP_PX + box.height / 2) * labelCounter,
+        width: box.width * labelCounter,
+        height: box.height * labelCounter,
+        // Outranks posts and calls: a post is where something is defined to
+        // be, a live fix is where a responder actually is.
+        priority: 30,
+      });
+    });
+
+    onMapCallPins.forEach(({ call, percent }) => {
+      const box = estimateLabelBox(`#${call.order}`, LABEL_FONT_BASE_PX);
+      labelBoxes.push({
+        id: `call-${call.id}`,
+        centerX: rect.x + (percent.x / 100) * rect.width,
+        centerY:
+          rect.y +
+          (percent.y / 100) * rect.height +
+          (CALL_MARKER_HALF_PX + LABEL_GAP_PX + box.height / 2) * labelCounter,
+        width: box.width * labelCounter,
+        height: box.height * labelCounter,
+        priority: 20,
+        minScale: SECONDARY_LABEL_MIN_SCALE,
+      });
+    });
+  }
+  const labelVisible = declutterLabels(labelBoxes, scale, {
+    obstacles: edgeBadgeObstacles(offMapBadgePositions, scale),
+  });
 
   return (
     <div 
@@ -1248,6 +1371,7 @@ function VenueMapWithPosts({
                 rect={rect}
                 staff={staff}
                 mapScale={scale}
+                showLabel={labelVisible.get(`post-${i}`) === true}
               />
             ))}
             {equipment.map((equip) => {
@@ -1284,7 +1408,13 @@ function VenueMapWithPosts({
             {staff
               .filter((team) => team.tak && team.tak.x != null && team.tak.y != null && team.tak.onMap !== false)
               .map((team) => (
-                <TakMarker key={`tak-${team.team}`} team={team} rect={rect} mapScale={scale} />
+                <TakMarker
+                  key={`tak-${team.team}`}
+                  team={team}
+                  rect={rect}
+                  mapScale={scale}
+                  showLabel={labelVisible.get(`tak-${team.team}`) === true}
+                />
               ))}
             {onMapCallPins.map(({ call, percent, isStale }) => (
               <CallMarker
@@ -1293,6 +1423,7 @@ function VenueMapWithPosts({
                 percent={percent}
                 rect={rect}
                 mapScale={scale}
+                showLabel={labelVisible.get(`call-${call.id}`) === true}
                 isStale={isStale}
                 isDraggable={!!onCallMarkerMouseDown}
                 isDragging={draggingCallId === call.id}
