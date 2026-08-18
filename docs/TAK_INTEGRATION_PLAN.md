@@ -202,6 +202,7 @@ from the phase section it affects.
 | **7.E(2)** | **Root cause behind it: replacing a layer's map image never invalidated that layer's georeference, so every post silently relocated. `handleSubmit` now treats a map swap on a layer that has control points as georeference-dirty (bumping `version`) without discarding the points** | **Done** | `47157a4` |
 | **7.E(2) f/u** | **`describeGeoreferenceStatus` stops reporting a stale fit as "ok" — residuals suppressed rather than shown beside a warning, because a fit measured against the wrong image is meaningless, not merely worse** | **Done** | `dbb7dce` |
 | **7.E(2) f/u** | **…and it now survives a save: `Georeference.calibratedForMapUrl` + `georeferenceMapMatch()` derive staleness from the image identity, so reopening the venue tomorrow no longer shows a confident "ok". `geoUtils.test.ts` 49 → 56** | **Done** | `a46de5c` |
+| **7.E(1)** | **Off-map edge indicators. New pure `src/lib/offMapUtils.ts` (`offMapIndicator` → badge edge point, arrow angle, true bearing + distance) and `geoUtils.metresBetween()`; wired into `venuemapmodal.tsx` for both off-map call pins and `tak.onMap: false` teams. `geoUtils.test.ts` 56 → 63, new `offMapUtils.test.ts` 15. Suite 193 → 215** | **Done** | `a094350` + `67f8804` |
 | **7.B** | **Pin-drop UI: placement mode + drag-to-correct + clear on `venuemapmodal.tsx`, a `CallMarker` coloured through `getStatusColor()`, an optional draft-pin affordance on Quick Call, and the new pure `src/lib/callPositionUtils.ts` (`placeCallPin` refuses on an uncalibrated layer; `resolveCallPinPercent` re-derives x/y from the layer's current transform on every read). `Call.position` finally has a writer. 20 new tests, suite 173 → 193** | **Done** | `4dc00c8` |
 
 Everything in the first block above (rows through the vitest harness) was built in
@@ -1066,6 +1067,30 @@ writing pins somewhere with no consumer.
     "never write `nearestPost` to `Staff.location`" in `core/CLAUDE.md`. The guard was
     the messenger; the unstable id was the bug.
 
+49. **`npm run lint` output must be checked for errors across the WHOLE output, never
+    through `tail`.** A `useMemo` added in `4dc00c8` landed below an early return in
+    `dispatch/page.tsx`, producing "React has detected a change in the order of Hooks
+    called by DispatchPage" on **every** dispatch page load. `react-hooks/rules-of-hooks`
+    is enabled here (via `next/core-web-vitals`), is an **error** not a warning, and
+    flagged it correctly — both times it shipped. It went unseen because lint was being
+    read through `tail -20`, and `src/app/(main)/events/...` sorts first, so this file's
+    errors were above the cut while the surviving warnings all came from later files.
+    The tool was working; the pipe was hiding it. Two consequences worth keeping:
+    **(a)** grep the full output for `Error:` (`npm run lint | grep -c "Error:"` after
+    stripping ANSI codes), because a nonzero error count is the only thing that
+    distinguishes a broken build from a noisy one — this repo has 21 standing warnings,
+    so "lint printed some stuff" is not signal. **(b)** The stated warning baseline in
+    earlier sessions (7 warnings) was itself an artifact of the same truncation; the
+    real figure is 21.
+
+50. **A hook must go above EVERY early return, not the one named in the crash.** The
+    first fix for (49) moved the `useMemo` above `if (!event) return` — the return
+    quoted in the error — and missed two auth guards above it (`!ready`, `!user`), so
+    the crash was still live for any render that bailed out at the auth stage. React
+    counts hooks by call order, so the *first* early return is the binding constraint.
+    `DispatchPage` has three. The fixed code carries a comment saying so, because the
+    next person to add a guard will otherwise reintroduce it.
+
 ### 0.4 Recommended next steps, in order
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
@@ -1142,9 +1167,20 @@ item on this list that was already hurting somebody with a phone in the field.
     defects were found reviewing the delegated diff, the worst of which made a dropped
     pin vanish on the next render for any layerless venue — see Phase 7.B and §0.3(47).
 
-1c. **Phase 7.E(1) — off-map edge indicators. ← START HERE.** Now unblocked: 7.B has
-    landed, so the file contention below is gone, and this is **the last unblocked item
-    in Phase 7** (7.D's remaining half needs a phone). Both edit
+1c. ✅ **DONE (`a094350` geometry, `67f8804` UI) — Phase 7.E(1), off-map edge
+    indicators.** ~~← START HERE.~~ Split in two so the geometry could be tested at all:
+    `src/lib/offMapUtils.ts` is pure and has 15 tests, the `.tsx` half has none because
+    this repo has no component-test harness (§0.2). Both requirements below held —
+    bearing *and* distance, and no clamping. Two traps were called out in the spec up
+    front and both were real: percent space is not isotropic, so the arrow angle needs
+    an aspect correction or it points visibly wrong on any non-square map; and the
+    screen-plane angle and the true-north bearing are different numbers that only
+    coincide on a north-up map, so neither may be derived from the other. Tests pin
+    both. **Not verified visually** — no browser in the session — so arrow orientation
+    and badge placement still want a human eye. Known limit: with many badges on one
+    edge the declutter fan-out can push the last ones past the image bounds, where the
+    container clips them again; fine for the handful of off-map targets this
+    realistically sees. Both edit
     `venuemapmodal.tsx` (1185 lines before 7.B, ~1800 after), and running them
     concurrently would have bought a merge conflict rather than parallelism.
     An indicator must carry **bearing and distance** —
@@ -1716,10 +1752,49 @@ all verified independently of the agents that wrote them (§0.1).
   (~line 352 and ~line 446) with identical bodies. TS declaration merging makes it
   harmless and it predates all TAK work, so fixing it belongs to a types cleanup, not
   here. Flagged so the next reader does not assume the second one is a different type.
-- **Stopped here:** 7.E(1) is now the only unblocked item in Phase 7 and is next
-  (§0.4(1c)) — note it must now cover **two** off-map populations, teams *and* call pins.
-  The root wrapper's `core` submodule pointer is still unbumped, deliberately held so it
-  is one pointer move.
+- ~~**Stopped here:** 7.E(1) is now the only unblocked item in Phase 7 and is next.~~
+  **7.E(1) landed too** — see below. The root wrapper's `core` submodule pointer bump
+  went in as `7d70d63`.
+- `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
+
+### 2026-08-17 (cont.) — 7.E(1) lands; a hooks crash, and why lint didn't stop it
+
+- **Phase 7.E(1) built (`a094350` geometry, `67f8804` UI).** Split deliberately: the
+  geometry went into a pure `src/lib/offMapUtils.ts` with 15 tests, because the `.tsx`
+  half cannot be tested at all here (§0.2, no component harness). Suite 193 → 215.
+  **With this, every Phase 7 item that does not require a phone is done.**
+- **The user hit a hooks-order crash on the dispatch page, and it was mine.** `4dc00c8`
+  wrapped `venueLayers` in `useMemo` to stabilise the synthetic layer id, but left it
+  where the old plain `const` sat — below an early return. A `const` there is fine; a
+  hook is not. It crashed on every dispatch page load, because `event` is always null on
+  the first render.
+- **It then took two passes to fix, which is the part worth remembering.** The first
+  pass (`9d3239b`) moved the hook above the early return *named in the crash report* and
+  missed two auth guards above that one. §0.3(50).
+- **The deeper miss: lint had caught it, twice, and I wasn't reading lint properly.**
+  `react-hooks/rules-of-hooks` is enabled and is an error, not a warning. It was invisible
+  because lint was being read through `tail -20` and this file sorts first. Confirmed the
+  rule genuinely fires by linting a throwaway component with the same shape, then fixed
+  the habit: grep the whole output for `Error:`. §0.3(49). This also corrected the
+  warning baseline recorded in earlier sessions — 21, not 7.
+- **Delegation notes.** Two Sonnet agents (7.E(1) geometry, 7.E(1) UI) and one Haiku
+  audit. The geometry and UI work were both good and both had their spec's traps handled;
+  I hardened four tests in the geometry that narrowed `result.geo` behind an early
+  `return` without asserting it first, which would have let them pass vacuously. The
+  Haiku hooks audit returned "no violations found" — wrong, but **my** fault: I told it
+  the dispatch page was already fixed, so it skipped the one file that still had the bug.
+  A clean audit result is the cheapest kind to get wrong; the durable check was never the
+  audit, it was the linter I had been truncating.
+- The UI agent independently flagged that my stated lint baseline was wrong and that it
+  had seen a `rules-of-hooks` error, which it guessed was a stale-cache artifact. It was
+  not an artifact — it was the real bug, disappearing mid-run because I fixed it
+  concurrently. Both halves of its report were more right than the explanation it
+  attached to them.
+- **Not verified visually.** No browser in the session, so arrow orientation, badge
+  placement and fan-out spacing on the new indicators are reasoned from code only and
+  want a human eye.
+- **Stopped here:** nothing unblocked remains in Phase 7. Everything further needs the
+  §7.3 type-code spike — one person, one phone, an afternoon.
 - `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
 
 ---
@@ -2523,8 +2598,10 @@ now, and revisit no earlier than a full season of production use.
 
 > **Status as of 2026-08-17.** 7.A ✅ `b23cf92` · 7.B ✅ `4dc00c8` · 7.C ✅ `50dd6b4` ·
 > 7.D 🟡 bridge half ✅ `0445d3c`, review queue ⛔ (gated on the §7.3 pin type code) ·
-> 7.E(1) ⛔ (now the only unblocked item left in Phase 7) · 7.E(2) ✅ `47157a4` +
-> `dbb7dce` + `a46de5c`. The text below is the original scoping and is kept as
+> 7.E(1) ✅ `a094350` (geometry) + `67f8804` (UI) · 7.E(2) ✅ `47157a4` +
+> `dbb7dce` + `a46de5c`. **Everything in Phase 7 that does not need a phone is now
+> done**; the only remaining item is 7.D's review queue, gated on the §7.3 type-code
+> spike. The text below is the original scoping and is kept as
 > written; each sub-item carries its own status line. Per-decision notes in
 > §0.3(41)–(47), session narrative in §0.5.
 >
@@ -2761,11 +2838,18 @@ a coordinate space rather than an image with dots on it. Three concrete gaps:
    position nor silence. A team or a call just outside the mapped area is exactly the
    case where dispatch most needs to know a direction.
 
-   ⛔ **Still open (7.E(1)).** Sequenced after 7.B — both edit `venuemapmodal.tsx`. Two
-   constraints when it is picked up: the indicator must carry **bearing *and* distance**
-   (an arrow alone says "not here" without saying where, which is today's state), and it
-   must **not clamp** the marker onto the image edge — a clamped dot is precisely the lie
-   `onMap: false` exists to prevent.
+   ✅ **BUILT (7.E(1)) — `a094350` (geometry) + `67f8804` (UI).** Both constraints held:
+   the badge carries **bearing *and* distance** (`"Call #12 NE 420 m"`), and nothing
+   clamps — `offMapIndicator` returns an `edge` point that is where the *badge* draws,
+   explicitly never written back to a `CallPosition` or `TakPosition`. Covers both
+   populations that can go off-image: `tak.onMap: false` teams, and call pins whose
+   percent, re-derived from the layer's current transform, falls outside 0–100 after a
+   recalibration. On an uncalibrated layer the arrow still points (direction on the image
+   plane needs no georeference) but no distance is shown, rather than inventing one from
+   percentages. Two subtleties that were nearly bugs are recorded in `offMapUtils.ts`'s
+   doc comments: the arrow angle needs an **aspect correction** because percent space is
+   not isotropic, and the screen-plane angle is **not** the true-north bearing on any
+   rotated georeference.
 2. **Swapping the PNG silently moves every post.** Percent coordinates are meaningful
    only against one image; re-crop or replace it and every post shifts with no signal.
    `Georeference.version` exists to be bumped on recalibration and **nothing consumes
