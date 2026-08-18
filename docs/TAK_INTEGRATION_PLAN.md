@@ -1,6 +1,6 @@
 # TAK Integration — Implementation Plan
 
-**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 and 1.4 complete, inbound bridge complete, 1.3/1.5 blocked, Phase 7 complete except 7.D and the new 7.E(3). **A 2026-08-18 field report reopened the plan: a real basemap (new Phase 8) and multi-level venues (new Phase 9) are now in scope, and the app has been run from a checkout containing no TAK work at all — read §0.6 first.**
+**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 and 1.4 complete, inbound bridge complete, 1.3/1.5 blocked, Phase 7 complete except 7.D. **A 2026-08-18 field report reopened the plan: a real basemap (new Phase 8) and multi-level venues (new Phase 9) are now in scope — read §0.6 first. Two of the three reports are now closed: the checkout split (§0.6.1) and label behaviour (7.E(3), §0.6.3). The third — the round trip (§0.6.4) — is still open and is the largest gap in the project.**
 **Target:** CrowdCAD (`core/`), general-purpose capability; IC-EMS is the first deployer
 **Author:** drafted 2026-08-11
 **Last updated:** 2026-08-18
@@ -207,6 +207,8 @@ from the phase section it affects.
 | **7.E(2) f/u** | **…and it now survives a save: `Georeference.calibratedForMapUrl` + `georeferenceMapMatch()` derive staleness from the image identity, so reopening the venue tomorrow no longer shows a confident "ok". `geoUtils.test.ts` 49 → 56** | **Done** | `a46de5c` |
 | **7.E(1)** | **Off-map edge indicators. New pure `src/lib/offMapUtils.ts` (`offMapIndicator` → badge edge point, arrow angle, true bearing + distance) and `geoUtils.metresBetween()`; wired into `venuemapmodal.tsx` for both off-map call pins and `tak.onMap: false` teams. `geoUtils.test.ts` 56 → 63, new `offMapUtils.test.ts` 15. Suite 193 → 215** | **Done** | `a094350` + `67f8804` |
 | — | **2026-08-18 field report investigated and recorded: §0.6, §0.3(51)–(54), revised §0.4, Phase 7.E(3) scoped, Phases 8 (basemap) and 9 (multi-level) newly written. No code.** | **Done** | 2026-08-18 |
+| **0.4(0a)** | **Checkout consolidation. `feature/tak-georeference` merged into `feature/tak-integration` in the main checkout, whose `core` was pinned at `9fe8de6` and could not resolve any TAK commit. The two submodule object databases were bridged by a local remote rather than a re-clone, and the fts-local-dev worktree was detached rather than deleted so its gitignored TLS material survived. Six ✅ phases are now in a binary someone can actually run** | **Done** | `b8d24df` |
+| **7.E(3)** | **Label behaviour. New pure `src/lib/labelScale.ts`: sub-linear scaling (`markerCounterScale` = `mapScale ** -k`, net size `mapScale ** (1 - k)`, `k = 0.5`), collision declutter (`declutterLabels`, hides rather than nudges), zoom-gated secondary detail (`minScale`). `layoutOffMapBadges` moved in as `layoutEdgeBadges` and subsumed as an obstacle set rather than left to run beside the new pass. Wired into BOTH `venuemapmodal.tsx` and the venue editor, which had opposite behaviours. New `labelScale.test.ts` 45. Suite 215 → 260** | **Done** | `3ea888f` |
 | **7.B** | **Pin-drop UI: placement mode + drag-to-correct + clear on `venuemapmodal.tsx`, a `CallMarker` coloured through `getStatusColor()`, an optional draft-pin affordance on Quick Call, and the new pure `src/lib/callPositionUtils.ts` (`placeCallPin` refuses on an uncalibrated layer; `resolveCallPinPercent` re-derives x/y from the layer's current transform on every read). `Call.position` finally has a writer. 20 new tests, suite 173 → 193** | **Done** | `4dc00c8` |
 
 Everything in the first block above (rows through the vitest harness) was built in
@@ -1334,7 +1336,8 @@ highest-value things left are not code:
 engineering.** Three problems were reported from the running app and investigated
 (§0.6). The revised order, ahead of everything above that needs hardware:
 
-**0a. Make the branch runnable in the checkout the operator actually opens.** This
+**0a. ✅ DONE (`b8d24df`) — Make the branch runnable in the checkout the operator
+actually opens.** This
 outranks all code. The app has been run from a checkout whose `core` is pinned at
 `9fe8de6` and contains no TAK work at all — it cannot even resolve `d233438` as an
 object (§0.6.1). Six ✅ phases have therefore never been seen by anybody. Consolidate
@@ -1346,9 +1349,10 @@ enable toggle and a live "what would publish" preview for a transport that does 
 exist (§0.6.4, §0.3(51)). Small, and it stops the product from misrepresenting itself
 in the meantime.
 
-**1a′. Phase 7.E(3) — label behaviour.** Self-contained, needs nothing, and closes the
-second field report. Requires a stated decision first (§0.3(54)), because the dispatch
-map and the venue editor currently behave in opposite ways and both are accidents.
+**1a′. ✅ DONE (`3ea888f`) — Phase 7.E(3), label behaviour.** Self-contained, needed
+nothing, and closes the second field report. The decision required first by §0.3(54)
+was taken by the deployer: sub-linear scaling with declutter and zoom-gating. Both
+surfaces now share one law. See the end of §7.E item 4.
 
 **1b′. Phase 8 — a real basemap.** Newly in scope; §2.2 and §7.E's refusal is overridden
 (§0.6.2, §0.3(53)). Needs no phone, no spike and no IC-EMS answer. The offline
@@ -1929,6 +1933,52 @@ all verified independently of the agents that wrote them (§0.1).
   files**, `npm run type-check` clean, both in `.claude/worktrees/fts-local-dev/core`.
   Matches §0.1's figure.
 - `COT_TYPE_CODES_VERIFIED` remains **false**. Nothing transmits. **Not pushed.**
+
+---
+
+### 2026-08-18 (cont.) — the checkout is consolidated, and 7.E(3) lands
+
+Two of the three field reports closed in one sitting. Neither needed a phone.
+
+**The checkout (0a, `b8d24df`).** The merge itself was the small part. What took care
+was everything around it: the main checkout's `core` and the fts-local-dev worktree's
+`core` are *different object databases* (`.git/modules/core` versus
+`.git/worktrees/fts-local-dev/modules/core`), so the main checkout could not resolve a
+single TAK commit — not a missing branch, a missing object store. Bridged with a local
+remote pointing at the worktree's module directory and a fetch, rather than re-cloning
+from `origin`, because `origin` is the public repo and none of this has been pushed.
+
+Three things were deliberately preserved rather than cleaned up. The fts-local-dev
+worktree was **detached, not deleted** — it holds gitignored TLS material (`Client.p12`,
+`ca.pem`, the FTS `.env`) that exists nowhere else and that §CLAUDE.md forbids
+committing; those artifacts were copied across first. The root `tsconfig.json`'s
+react/react-dom `@types` pin was backed up and restored on top of the merge, because
+removing it breaks the root build and the merge would have taken the other side. And
+the `core` pointer conflict was resolved to `b34ec6c` only after confirming it contains
+`7a82626`, the pointer the other branch recorded — so the resolution loses nothing
+rather than looking like it loses nothing.
+
+**7.E(3) (`3ea888f`).** Written up at the end of §7.E item 4. The part worth repeating
+here is the framing that made it small: the two behaviours the product already had were
+not two bugs, they were `k = 1` and `k = 0` of one parameter nobody had written down.
+Naming the parameter turned "pick a new label behaviour" into "pick a number between
+the two things we already do", and made the endpoints testable as regressions against
+the old behaviour rather than as prose.
+
+The declutterer is the piece that will need revisiting. It hides rather than nudges,
+which is the right default and is argued for in place, but it estimates label widths
+arithmetically instead of measuring them — layout has to be decided during render,
+before the label exists to measure, and measuring afterwards means a second render pass
+per zoom frame. The estimate is deliberately biased wide: over-estimating hides a label
+that would just have fit, under-estimating draws two labels on top of each other, and
+only the first is recoverable by zooming in.
+
+**What is still open from the field report.** The third report — the round trip
+(§0.6.4) — is untouched and is now the largest single gap in the project. CrowdCAD can
+build correct CoT for every marker it owns and has nowhere to send it; the bridge parses
+inbound pins and drops them pending 7.D. Also still standing: 0b, the enable-publishing
+switch that still does not say publishing is unwired (§0.3(51)) — small, and it is the
+product misrepresenting itself every day it waits.
 
 ---
 
@@ -3247,8 +3297,11 @@ a coordinate space rather than an image with dots on it. Three concrete gaps:
    counter-scale, so labels there grow and blur with the raster. Neither behaviour was
    chosen; one is a line copied six times, the other is its absence.
 
-   🟡 **7.E(3) — SCOPED, NOT STARTED.** The report frames this as a consequence of the
-   map being a PNG. It is not, and that matters: **it is fixable without Phase 8.**
+   ✅ **7.E(3) — BUILT 2026-08-18 (`3ea888f`).** The report frames this as a consequence
+   of the map being a PNG. It is not, and that mattered: **it was fixable without
+   Phase 8**, and it was fixed before Phase 8 was started. What shipped is recorded
+   under "What was built" at the end of this item; the analysis below is left as
+   written, because the decision it argues for is the one that was taken.
 
    The decision comes before the code (§0.3(54)). Three candidate behaviours, and the
    third is what the report is actually describing:
@@ -3293,6 +3346,81 @@ a coordinate space rather than an image with dots on it. Three concrete gaps:
 
    **Effort:** (a) S, (b) M, (c) S once (b) exists. Needs no phone, no spike, no
    IC-EMS.
+
+   ---
+
+   **What was built (`3ea888f`).** All three mechanisms, plus the two carried-over
+   constraints, plus the "both surfaces must agree" requirement. The geometry is
+   `core/src/lib/labelScale.ts` — pure, 45 tests in `labelScale.test.ts`, suite
+   215 → 260.
+
+   **(a) The curve.** `markerCounterScale(mapScale, k = 0.5)` returns the factor a
+   marker puts in its own `transform: scale(...)` while sitting inside a container
+   already scaled by `mapScale`; `labelScreenScale` returns the resulting net
+   on-screen size. They are not computed independently — the counter-scale is derived
+   as `labelScreenScale / mapScale`, which is what makes the clamps
+   (`MIN_LABEL_SCREEN_SCALE` 0.85, `MAX_LABEL_SCREEN_SCALE` 2.25) describe what is
+   actually on screen rather than an intermediate. The endpoints are pinned by test:
+   `markerCounterScale(s, 1) === 1 / s` is the old dispatch map, `markerCounterScale(s, 0) === 1`
+   is the old editor. A zero, negative or non-finite scale is treated as 1 rather than
+   dividing by zero, because the failure mode of that division is *every marker
+   disappearing from the map*.
+
+   Also from (a): the per-marker stagger offsets (`15 / mapScale`, `16 / mapScale`)
+   became `staggerOffsetPx(15, mapScale)`. They were correct only while markers were
+   `1 / mapScale`; once a marker grows sub-linearly, an offset that holds still on
+   screen lets the marker grow out from under it and re-overlap the post it was
+   staggered away from.
+
+   **(b) The declutterer.** `declutterLabels` is greedy by priority — live TAK
+   callsigns (30) outrank call numbers (20) outrank post names (10) — and **hides
+   rather than nudges**. A nudged label on a dispatch map is a label pointing at the
+   wrong place, and the operator can still hover the marker or zoom in, which is
+   exactly what brings the label back. Ties break on id so a label cannot flicker as
+   unrelated state changes. It returns a decision for every input id, so callers
+   render from the map with no fallback branch.
+
+   `layoutOffMapBadges` was **subsumed, not paralleled**, as the item above required:
+   it moved into the module as `layoutEdgeBadges`, and its output feeds
+   `edgeBadgeObstacles` into the same collision pass as immovable obstacles. The two
+   cannot fight along the image border because there is now one pass. Its fan spacing
+   also became zoom-aware — it was a screen-pixel constant applied in container
+   pixels, so badges fanned further and further apart the more you zoomed in.
+
+   **(c) The gate.** `minScale` on a label, with `SECONDARY_LABEL_MIN_SCALE = 1.6` —
+   just above the 1.5× first zoom step, so exactly one click reveals the second tier.
+   Call numbers are gated; post names and live callsigns are not.
+
+   **The 7.E(1) constraint held.** Off-map badges kept the old `1 / mapScale` constant
+   size, deliberately and with the reason written at the call site. They are viewport
+   chrome pinned to the image boundary, not map content: if anything on this map stays
+   pixel-constant it is the thing standing between a dispatcher and silence about a
+   unit outside the mapped area. This is the one place `k = 1` is still right.
+
+   **Both surfaces now agree.** The venue editor got mechanism (a) — markers there had
+   *no* counter-scale, so a 24px pin was a 192px pin at 8×. It did not get (b) or (c),
+   on purpose: it is a placement tool working on a handful of posts where seeing every
+   marker you have placed matters more than a tidy layout, and it has no measured pixel
+   rect to do collision in. That is a stated scope line, not an oversight.
+
+   **Two things changed that the item did not ask for.** Posts, live callsigns and call
+   numbers now carry *persistent* labels rather than hover-only tooltips — decluttering
+   labels nothing draws would have been a no-op, and "the words stay the same size" is
+   only answerable by a label that is always there. And each visual label is
+   `aria-hidden` while its marker carries an `aria-label` at every zoom: hiding a label
+   is a *visual* decision, and a screen-reader user must not lose a post's name because
+   two labels happened to overlap.
+
+   **One inherited comment was wrong.** `layoutOffMapBadges` claimed a corner resolves
+   to the vertical edge; its `y` checks run first, so it has always resolved to the
+   horizontal one. Behaviour kept (changing it would move existing badges for no
+   benefit, and a venue image is usually wider than tall), comment corrected, tie-break
+   pinned by a test. Found by the agent writing the test suite, which is the argument
+   for §0.2's "pure module or it is untestable" rule stated in miniature.
+
+   **Not closed by this.** The labels baked into the raster itself are still frozen —
+   they are pixels. Only CrowdCAD's own labels behave like map labels now. Making the
+   *map's* names dynamic is Phase 8, and remains Phase 8.
 
 
 **Explicitly not in scope: a real basemap.** No OSM/satellite tiles, no vector layers,
