@@ -7,12 +7,13 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
 import { dbService, storageService } from '@/lib/services';
-import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
+import type { Post, Venue, Equipment, EquipmentStatus, Layer, GeoBounds } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
 import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import NewLayerModal from '@/components/modals/venue/newlayer';
+import GeoJsonImportModal from '@/components/modals/venue/geojsonimport';
 import LocationEditModal from '@/components/modals/venue/locationedit';
 import EquipmentManagementSection from '@/components/venue-management/EquipmentManagementSection';
 import LayerControlBar from '@/components/venue-management/LayerControlBar';
@@ -29,15 +30,16 @@ import {
   Tab,
   ScrollShadow,
 } from '@heroui/react';
-import { 
-  MapPin, 
-  Plus,  
-  Upload, 
-  Trash2, 
+import {
+  MapPin,
+  Plus,
+  Upload,
+  Trash2,
   Edit2,
   MapPinned,
   ChevronLeft,
   ChevronRight,
+  Map as MapIcon,
 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
@@ -134,6 +136,9 @@ export default function VenueManagementPageClient() {
 
   // New layer modal
   const [isNewLayerModalOpen, setIsNewLayerModalOpen] = useState(false);
+
+  // GIS (GeoJSON) import modal
+  const [isGeoJsonImportModalOpen, setIsGeoJsonImportModalOpen] = useState(false);
 
   // Location edit modal
   const [isLocationEditModalOpen, setIsLocationEditModalOpen] = useState(false);
@@ -629,6 +634,38 @@ export default function VenueManagementPageClient() {
     setIsNewLayerModalOpen(false);
   };
 
+  // Handle importing a GIS-derived layer (pre-flattened background + GeoJSON points)
+  const handleImportGeoJsonLayer = async (
+    name: string,
+    imageFile: File,
+    posts: Post[],
+    geoBounds: GeoBounds
+  ) => {
+    setIsUploading(true);
+    try {
+      const mapUrl = await storageService.uploadFile(`venue_maps/${Date.now()}_${imageFile.name}`, imageFile);
+      const newLayer: Layer = {
+        id: crypto.randomUUID(),
+        name,
+        mapUrl,
+        posts,
+        geoBounds,
+      };
+      const newLayers = [...venueData.layers, newLayer];
+      setVenueData(prev => ({
+        ...prev,
+        layers: newLayers,
+      }));
+      setCurrentLayer(newLayers.length - 1);
+    } catch (error) {
+      console.error('Error importing GIS layer:', error);
+      alert('Failed to import GIS layer');
+    } finally {
+      setIsUploading(false);
+    }
+    setIsGeoJsonImportModalOpen(false);
+  };
+
   // Handle deleting layer
   const deleteLayer = () => {
     if (venueData.layers.length <= 1) {
@@ -998,6 +1035,16 @@ export default function VenueManagementPageClient() {
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            data-testid="import-geojson-layer-button"
+                            title="Import GIS map"
+                            onPress={() => setIsGeoJsonImportModalOpen(true)}
+                          >
+                            <MapIcon className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </Card>
@@ -1007,19 +1054,28 @@ export default function VenueManagementPageClient() {
                     isBlurred
                     className="border-2 border-default-200 bg-transparent w-full h-full px-3 py-2"
                   >
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex h-full w-full flex-col items-center justify-center gap-3 text-surface-light/70 transition hover:border-status-blue/50 hover:text-status-blue rounded-xl"
-                    >
-                      <Upload className="h-12 w-12" />
-                      <div className="text-center">
-                        <p className="text-sm font-medium">Upload Venue Map</p>
-                        <p className="mt-1 text-xs text-surface-light/50">
-                          Optional - Click to select an image
-                        </p>
-                      </div>
-                    </button>
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex flex-col items-center gap-3 text-surface-light/70 transition hover:text-status-blue"
+                      >
+                        <Upload className="h-12 w-12" />
+                        <div className="text-center">
+                          <p className="text-sm font-medium">Upload Venue Map</p>
+                          <p className="mt-1 text-xs text-surface-light/50">
+                            Optional - Click to select an image
+                          </p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsGeoJsonImportModalOpen(true)}
+                        className="text-xs text-surface-light/60 underline transition hover:text-status-blue"
+                      >
+                        Or import a GIS map with pre-placed points
+                      </button>
+                    </div>
                   </Card>
                 )}
               </div>
@@ -1034,6 +1090,12 @@ export default function VenueManagementPageClient() {
         isOpen={isNewLayerModalOpen}
         onClose={() => setIsNewLayerModalOpen(false)}
         onSubmit={handleAddLayer}
+      />
+
+      <GeoJsonImportModal
+        isOpen={isGeoJsonImportModalOpen}
+        onClose={() => setIsGeoJsonImportModalOpen(false)}
+        onSubmit={handleImportGeoJsonLayer}
       />
 
       <LocationEditModal
