@@ -60,6 +60,12 @@ import type { CornerCoordinates } from '@/lib/basemap/style';
 import { readBasemapConfig } from '@/lib/basemap/config';
 import { buildBasemapStyle } from '@/lib/basemap/style';
 import {
+  type ArchiveCoverage,
+  isOutsideCoverage,
+  parseArchiveCoverage,
+  resolveInitialCamera,
+} from '@/lib/basemap/camera';
+import {
   layerImageCorners,
   layerPostsLatLon,
   METRES_PER_DEGREE_LATITUDE,
@@ -124,6 +130,14 @@ export interface BasemapViewProps {
    *  renders `null` in this state; callers do not need to inspect the
    *  reason to decide whether to fall back, only to log/report it. */
   onUnavailable?: (reason: string) => void;
+  /** Fired once, at initial mount, when the resolved initial camera's venue
+   *  centre falls OUTSIDE the PMTiles archive's own coverage bounds -- e.g. a
+   *  venue whose raster/markers/saved camera sit nowhere near the deployed
+   *  extract. A venue outside the archive renders a blank map that looks
+   *  identical to a broken one, and this component cannot say so itself
+   *  (contract #1 -- it renders a map or `null`, never a banner). The caller
+   *  decides what to do with the hint; nothing here requires one. */
+  onCoverageWarning?: (info: { venueCentre?: { lat: number; lon: number }; coverage: ArchiveCoverage }) => void;
   className?: string;
 }
 
@@ -385,6 +399,7 @@ export default function BasemapView({
   staff,
   equipment,
   calls,
+  initialCamera,
   theme = 'dark',
   isPlacementArmed = false,
   onMapClick,
@@ -393,6 +408,7 @@ export default function BasemapView({
   onSelectCall,
   deviceLocation,
   onUnavailable,
+  onCoverageWarning,
   className,
 }: BasemapViewProps) {
   // Memoized so an omitted `calls`/`equipment` prop doesn't hand the marker
@@ -421,10 +437,12 @@ export default function BasemapView({
   const onMapClickRef = useRef(onMapClick);
   const onSelectCallRef = useRef(onSelectCall);
   const onUnavailableRef = useRef(onUnavailable);
+  const onCoverageWarningRef = useRef(onCoverageWarning);
   useEffect(() => {
     onMapClickRef.current = onMapClick;
     onSelectCallRef.current = onSelectCall;
     onUnavailableRef.current = onUnavailable;
+    onCoverageWarningRef.current = onCoverageWarning;
   });
 
   // First reason wins: once a mount attempt is known to be doomed, a second
@@ -529,6 +547,29 @@ export default function BasemapView({
       }
       lastStyleSigRef.current = styleSignature(theme, raster);
 
+      // Fourth-level fallback for the initial camera (see resolveInitialCamera
+      // below): the PMTiles archive's own coverage bounds, read from its
+      // header. Awaited HERE, before the Map is constructed, for the same
+      // reason bounds in general are passed to the constructor rather than
+      // fitted on `load` (see the big comment below) -- and it is cheap
+      // because it is a small ranged read of a file the pmtiles protocol is
+      // about to start requesting from anyway. Any failure -- offline, a
+      // 404, a header this pmtiles version can't parse -- degrades to `null`
+      // rather than to reportUnavailable: a missing fallback is not a reason
+      // to abandon the whole basemap when a raster, markers, or the caller's
+      // own saved camera might still supply one, or when passing no bounds
+      // at all (this component's original behaviour) is a legitimate
+      // outcome in its own right.
+      let archiveCoverage: ArchiveCoverage | null = null;
+      try {
+        const { PMTiles } = await import('pmtiles');
+        const header = await new PMTiles(config.pmtilesUrl).getHeader();
+        archiveCoverage = parseArchiveCoverage(header);
+      } catch {
+        archiveCoverage = null;
+      }
+      if (cancelled || !containerRef.current) return;
+
       // Initial camera only -- see prop doc comments and requirement #5.
       // Re-fitting on every data update would yank the view out from under a
       // dispatcher who has since panned/zoomed to look at something specific.
@@ -540,22 +581,55 @@ export default function BasemapView({
       // built-in world view, because the venue-sized pmtiles extract has no
       // tiles out there to finish loading. Fitting on `load` therefore
       // deadlocked: the camera needed the event, and the event needed a
-      // camera pointed somewhere the tiles exist. Bounds passed at
+      // camera pointed somewhere the tiles exist. Bounds/center passed at
       // construction are pure transform math that needs no tiles at all, so
       // the map opens already framed on the venue -- which also removes the
       // world-view flash the old path showed on every open.
       const initialPoints: [number, number][] = raster
         ? raster.coordinates
         : collectMarkerLngLats(layer, staff, safeCalls);
-      let initialBounds: InstanceType<MapLibreGlModule['LngLatBounds']> | undefined;
-      if (initialPoints.length > 0) {
-        const bounds = new loadedMgl.LngLatBounds();
-        for (const point of initialPoints) bounds.extend(point);
-        initialBounds = bounds;
+
+      const resolvedCamera = resolveInitialCamera({
+        initialCamera,
+        geometryPoints: initialPoints,
+        archiveCoverage,
+      });
+
+      // Out-of-coverage signal (§8.I) -- fired here rather than rendered,
+      // per contract #1. Only the two levels that describe an actual venue
+      // location carry a `venueCentre` to check; the archive-coverage level
+      // IS the coverage, so it is never "outside" itself.
+      if (archiveCoverage && 'venueCentre' in resolvedCamera) {
+        if (isOutsideCoverage(resolvedCamera.venueCentre, archiveCoverage)) {
+          onCoverageWarningRef.current?.({
+            venueCentre: resolvedCamera.venueCentre,
+            coverage: archiveCoverage,
+          });
+        }
       }
-      // Otherwise: no raster and no located markers at all -- leave MapLibre
-      // at its built-in default view rather than crash or invent a center. An
-      // empty venue is a legitimate state.
+
+      let cameraPropOptions:
+        | { center: [number, number]; zoom: number; bearing?: number; pitch?: number }
+        | undefined;
+      let cameraBounds: InstanceType<MapLibreGlModule['LngLatBounds']> | undefined;
+      if (resolvedCamera.source === 'prop') {
+        cameraPropOptions = {
+          center: resolvedCamera.center,
+          zoom: resolvedCamera.zoom,
+          ...(resolvedCamera.bearing !== undefined ? { bearing: resolvedCamera.bearing } : {}),
+          ...(resolvedCamera.pitch !== undefined ? { pitch: resolvedCamera.pitch } : {}),
+        };
+      } else if (resolvedCamera.source === 'geometry' || resolvedCamera.source === 'archiveCoverage') {
+        const bounds = new loadedMgl.LngLatBounds();
+        for (const point of resolvedCamera.points) bounds.extend(point);
+        cameraBounds = bounds;
+      }
+      // resolvedCamera.source === 'none': no saved camera, no raster, no
+      // located markers, and no readable archive coverage either -- leave
+      // MapLibre at its built-in default view rather than crash or invent a
+      // center. With the archive-coverage fallback above, this can now only
+      // happen when even the header read failed (offline on first load,
+      // most likely), which nothing left in this chain can fix.
 
       const createdMap = new loadedMgl.Map({
         container: containerRef.current,
@@ -564,9 +638,8 @@ export default function BasemapView({
         // it as a small collapsible control rather than a permanent banner,
         // but it must never be turned off entirely.
         attributionControl: { compact: true },
-        ...(initialBounds
-          ? { bounds: initialBounds, fitBoundsOptions: { padding: 48, maxZoom: 18 } }
-          : {}),
+        ...(cameraPropOptions ?? {}),
+        ...(cameraBounds ? { bounds: cameraBounds, fitBoundsOptions: { padding: 48, maxZoom: 18 } } : {}),
       });
 
       createdMap.addControl(new loadedMgl.NavigationControl({ visualizePitch: true }));
@@ -603,10 +676,11 @@ export default function BasemapView({
       teardown();
     };
     // Intentionally mount-once (keyed only on `config`, which is referentially
-    // stable): `theme`/`raster`/`layer`/`staff`/`calls` are read here only for
-    // the INITIAL style and INITIAL camera fit. Later changes to any of them
-    // are handled by the dedicated effects below, which react to `runtime`
-    // once it exists rather than re-running this whole mount sequence.
+    // stable): `theme`/`raster`/`layer`/`staff`/`calls`/`initialCamera` are
+    // read here only for the INITIAL style and INITIAL camera fit. Later
+    // changes to any of them are handled by the dedicated effects below,
+    // which react to `runtime` once it exists rather than re-running this
+    // whole mount sequence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config]);
 

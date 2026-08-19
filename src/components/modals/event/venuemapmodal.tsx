@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Modal, ModalContent, ModalBody, Button, Card, Select, SelectItem } from '@heroui/react';
 import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus, PhoneCall, AlertTriangle, X, ArrowUp } from 'lucide-react';
-import { Post, Staff, Equipment, Layer, TakPosition, Call, CallPosition, Event } from '@/app/types';
+import { Post, Staff, Equipment, Layer, TakPosition, Call, CallPosition, Event, BasemapCamera } from '@/app/types';
 import { getStatusColor } from '@/lib/statusColors';
 import { useTakTween } from '@/hooks/useTakTween';
 import { useAuth } from '@/hooks/useauth';
@@ -1521,6 +1521,9 @@ interface VenueMapModalProps {
   // the link and keeps the rest of the banner's explanation.
   venueId?: string;
   draftPick?: DraftPickConfig;
+  // Saved opening camera for basemap view (from event.venue.basemapCamera).
+  // Optional and may be missing for events created before the camera was saved.
+  basemapCamera?: BasemapCamera;
 }
 
 export default function VenueMapModal({
@@ -1534,6 +1537,7 @@ export default function VenueMapModal({
   updateEvent,
   venueId,
   draftPick,
+  basemapCamera,
 }: VenueMapModalProps) {
   const { user } = useAuth();
   const isDraftMode = !!draftPick;
@@ -2098,6 +2102,11 @@ export default function VenueMapModal({
                     draftPin={basemapDraftPin}
                     selectedCallId={selectedCallId}
                     onUnavailable={handleBasemapUnavailable}
+                    // Saved opening camera from the venue. This is read once at
+                    // construction and never re-applied, so re-framing the map
+                    // out from under a dispatcher who has deliberately panned
+                    // somewhere is avoided; the camera is an initial frame only.
+                    initialCamera={basemapCamera}
                     className="h-full w-full"
                   />
                 )

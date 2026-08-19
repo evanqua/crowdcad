@@ -3852,6 +3852,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 calls={event.calls || []}
                 updateEvent={updateEvent}
                 venueId={event.venue.id}
+                basemapCamera={event.venue.basemapCamera}
               />
               {/* Quick Call's optional drop-pin picker. Same component,
                   same layers, opened in draft mode: it hands a finished
@@ -3866,6 +3867,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 equipment={event.eventEquipment || []}
                 teamTimers={teamTimers}
                 venueId={event.venue.id}
+                basemapCamera={event.venue.basemapCamera}
                 draftPick={{
                   initial: quickCall.position ?? null,
                   onPick: (position) => setQuickCall((p) => ({ ...p, position })),
