@@ -68,7 +68,7 @@ import {
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
-import type { Call, Equipment, Event, Layer, Staff } from '@/app/types';
+import type { BasemapCamera, Call, Equipment, Event, Layer, Staff } from '@/app/types';
 
 /** The `maplibre-gl` module namespace, as returned by the dynamic import.
  *  Named separately from the `Map` class type above so call sites reading
@@ -90,6 +90,15 @@ export interface BasemapViewProps {
   equipment?: Equipment[];
   /** Drawn for calls with a `position` on this layer. */
   calls?: Call[];
+  /** The venue's saved opening camera, if an operator has set one
+   *  (`Venue.basemapCamera`). Highest-priority source for the INITIAL camera
+   *  only — like every other framing input here it is read once, at
+   *  construction, and never re-applied, because re-framing a map out from
+   *  under a dispatcher who has panned somewhere deliberate is worse than
+   *  opening in the wrong place. Null/undefined falls through to the raster
+   *  corners, then located markers, then the PMTiles archive's own coverage
+   *  bounds. */
+  initialCamera?: BasemapCamera | null;
   /** 'dark' matches the app's dark dispatch surfaces; 'light' matches most
    *  venue-map screenshots, which tend to be light. */
   theme?: 'light' | 'dark';

@@ -85,6 +85,40 @@ export interface Layer {
   georeference?: Georeference;
 }
 
+/**
+ * A saved opening camera for a venue's basemap view (TAK plan §8, Phase 8.I).
+ *
+ * This is VIEW state, not position state, and the distinction is the whole
+ * reason it is safe: §8.C requires every marker to derive from lat/lon via
+ * `geoUtils`, never from anything the map library owns. A camera never
+ * becomes a marker — nothing reads these numbers to place anything — so
+ * storing MapLibre's own view parameters here does not open the door §8.C
+ * closes.
+ *
+ * It exists because the alternative is inference. `BasemapView` otherwise
+ * frames itself from the venue raster's corners or from already-located
+ * markers, and a venue that has NEITHER — a campus-scale venue with no
+ * uploaded image and no georeference, which is the case that motivated this
+ * — leaves MapLibre at its built-in world view, where a venue-sized PMTiles
+ * extract has no tiles at all. An operator who has panned to the framing
+ * they want is a better authority on that framing than any bounds we could
+ * compute for them.
+ *
+ * Stored on `Venue` rather than `Layer` deliberately: layers are floors of
+ * one building and share a single real-world footprint, so a per-layer
+ * camera would be the same numbers repeated with an opportunity to disagree.
+ */
+export interface BasemapCamera {
+  center: { lat: number; lon: number };
+  zoom: number;
+  /** Map rotation, degrees clockwise from north. Omitted when north-up. */
+  bearing?: number;
+  /** Camera tilt, degrees from straight down. Omitted when flat. */
+  pitch?: number;
+  /** Epoch ms, so a stale framing can be told from a deliberate one. */
+  updatedAt?: number;
+}
+
 export interface Venue {
   id: string;
   name: string;
@@ -95,6 +129,8 @@ export interface Venue {
   userId: string;
   sharedWith?: string[]; // Array of emails
   isOrgVenue?: boolean; // Visible to all users on this instance, set by an admin
+  /** Saved opening camera for basemap view. See `BasemapCamera`. */
+  basemapCamera?: BasemapCamera;
 }
 
 export interface Event {
