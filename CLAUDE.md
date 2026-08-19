@@ -65,3 +65,8 @@ The app is backend-agnostic by design, selected at build time via `NEXT_PUBLIC_B
 - When touching auth/db/storage code, go through `src/lib/services` (backend-agnostic interfaces), not Firebase or PocketBase APIs directly, unless you're inside one of the two adapter implementations themselves.
 - HIPAA/PHI conventions (per `docs/FIREBASE_SETUP.md`, `docs/DEPLOYMENT.md`): no analytics/telemetry that could capture PHI, respect `DISABLE_TELEMETRY`, don't log call/patient details (`Call`/`Staff`/`Supervisor` fields) to `console.*`.
 - `docs/ARCHITECTURE.md` and `docs/COMPONENTS.md` are kept current with the actual component layout — trust them over guessing from folder names alone when planning cross-cutting changes.
+
+## Git workflow for new features
+
+- Every new feature starts with a GitHub issue (`gh issue create`) describing the feature and its plan/phasing, then a dedicated feature branch off `main` for that issue. Don't start feature work directly on `main` or on an unrelated branch.
+- Commit at each logical checkpoint as work progresses (e.g., per phase of a multi-phase feature), but don't push to the remote after every commit by default — push at natural checkpoints (a phase or the feature is complete) or when explicitly asked to push as you go for that session.
