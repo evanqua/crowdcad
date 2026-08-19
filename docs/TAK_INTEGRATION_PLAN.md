@@ -1,6 +1,6 @@
 # TAK Integration — Implementation Plan
 
-**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 and 1.4 complete, inbound bridge complete, 1.3/1.5 blocked, Phase 7 complete except 7.D. **A 2026-08-18 field report reopened the plan: a real basemap (new Phase 8) and multi-level venues (new Phase 9) are now in scope — read §0.6 first. Two of the three reports are now closed: the checkout split (§0.6.1) and label behaviour (7.E(3), §0.6.3). The third — the round trip (§0.6.4) — is still open and is the largest gap in the project.**
+**Status:** In progress — Phase 0 complete, Phase 1.1–1.2 and 1.4 complete, inbound bridge complete, 1.3/1.5 blocked, Phase 7 complete except 7.D. **A 2026-08-18 field report reopened the plan: a real basemap (new Phase 8) and multi-level venues (new Phase 9) are now in scope — read §0.6 first. Two of the three reports are now closed: the checkout split (§0.6.1) and label behaviour (7.E(3), §0.6.3). The third — the round trip (§0.6.4) — is still open and is the largest gap in the project.** **A second 2026-08-18 report confirmed Phase 8 was still unstarted at the time and surfaced a gap in how it was scoped — read §0.6.6. Later the same day, Phase 8 was implemented: 8.A–8.F are built (`maplibre-gl`/`pmtiles`/`@protomaps/basemaps` are now dependencies, `BasemapView.tsx` renders the second view, the raster/basemap toggle is wired into `venuemapmodal.tsx`), and 8.G is built for the control-point capture use ("Use my location" in `GeoreferenceSection`) but the basemap-view self-marker use is not wired to any caller. **Phase 8 has now been visually verified working in a browser** — the first time any of it has been looked at rather than merely type-checked — against the local Berkeley PMTiles extract: base map, venue raster, and labels all draw in the correct order, both post markers place correctly, and attribution is present (§8.H). Getting there found and fixed four real bugs, the first of which is load-bearing enough to have its own callout: **`maplibre-gl` must stay pinned to 5.x, not 6.x — §0.3(59), §8.A.** Phase 8 is still 🟡 IN PROGRESS for the reason it was before: the code is entirely uncommitted, and no basemap assets are checked in (a developer must run `scripts/fetch-basemap.sh` and set `NEXT_PUBLIC_BASEMAP_PMTILES_URL` to see anything render). See §0.5's "Phase 8 visually verified" entry, §8.H, and §0.1.**
 **Target:** CrowdCAD (`core/`), general-purpose capability; IC-EMS is the first deployer
 **Author:** drafted 2026-08-11
 **Last updated:** 2026-08-18
@@ -210,6 +210,15 @@ from the phase section it affects.
 | **0.4(0a)** | **Checkout consolidation. `feature/tak-georeference` merged into `feature/tak-integration` in the main checkout, whose `core` was pinned at `9fe8de6` and could not resolve any TAK commit. The two submodule object databases were bridged by a local remote rather than a re-clone, and the fts-local-dev worktree was detached rather than deleted so its gitignored TLS material survived. Six ✅ phases are now in a binary someone can actually run** | **Done** | `b8d24df` |
 | **7.E(3)** | **Label behaviour. New pure `src/lib/labelScale.ts`: sub-linear scaling (`markerCounterScale` = `mapScale ** -k`, net size `mapScale ** (1 - k)`, `k = 0.5`), collision declutter (`declutterLabels`, hides rather than nudges), zoom-gated secondary detail (`minScale`). `layoutOffMapBadges` moved in as `layoutEdgeBadges` and subsumed as an obstacle set rather than left to run beside the new pass. Wired into BOTH `venuemapmodal.tsx` and the venue editor, which had opposite behaviours. New `labelScale.test.ts` 45. Suite 215 → 260** | **Done** | `3ea888f` |
 | **7.B** | **Pin-drop UI: placement mode + drag-to-correct + clear on `venuemapmodal.tsx`, a `CallMarker` coloured through `getStatusColor()`, an optional draft-pin affordance on Quick Call, and the new pure `src/lib/callPositionUtils.ts` (`placeCallPin` refuses on an uncalibrated layer; `resolveCallPinPercent` re-derives x/y from the layer's current transform on every read). `Call.position` finally has a writer. 20 new tests, suite 173 → 193** | **Done** | `4dc00c8` |
+| — | **Second 2026-08-18 field report investigated and recorded: §0.6.6. Phases 8.F (georeference is not a precondition in basemap view) and 8.G (device GPS as a control-point source) newly scoped within Phase 8. No code.** | **Done** | 2026-08-18 |
+| **8.A** | **MapLibre GL JS chosen and wired, `maplibre-gl`/`pmtiles`/`@protomaps/basemaps` added to both root and core `package.json`, loaded only via dynamic `import()` inside `BasemapView.tsx` so a deployment with no basemap configured never pays for the ~200KB dependency. Initially shipped on `maplibre-gl@^6.4.1`; corrected to **`^5.24.0` and pinned** after visual verification showed 6.x silently drops all vector tile data (§0.3(59))** | **Done (uncommitted)** | this session |
+| **8** | **Phase 8 visually verified working in a browser for the first time (local Berkeley PMTiles extract) — base map, venue raster (0.85 opacity), and Protomaps labels all draw in the documented §8.A layer order; both post markers place correctly; `© OpenStreetMap` attribution present. Four real bugs found and fixed in the process: the maplibre-gl 6.x incompatibility (§0.3(59)), unabsolutised sprite/glyph URLs (§0.3(60)), the `absolute inset-0` container collapsing to zero height (§0.3(61)), and the camera-fit deadlock on `load` (§0.3(62)). Full accounting in §8.H** | **Done (uncommitted)** | this session |
+| **8.B** | **`src/lib/basemap/config.ts` — `readBasemapConfig()` / `isBasemapConfigured()`, `null` unless `NEXT_PUBLIC_BASEMAP_PMTILES_URL` is set (the degrade-to-nothing gate), 30 tests. `scripts/fetch-basemap.sh` builds the offline PMTiles/glyph/sprite bundle into `public/basemap/` (gitignored, mirrored into the root wrapper). No asset bundle is committed — a fresh clone has no basemap until the script is run and the env var is set** | **Done (uncommitted)** | this session |
+| **8.C** | **`geoUtils.layerImageCorners()` — the four percent-corners evaluated through `pixelToLatLon`, MapLibre `ImageSource` order. `src/lib/basemap/style.ts` builds the style: Protomaps base → venue raster (opacity 0.85) → Protomaps labels on top. `BasemapView` only ever hands MapLibre a lat/lon it was given; it never asks MapLibre to compute one** | **Done (uncommitted)** | this session |
+| **8.D** | **Second, selectable view. `MapViewMode = 'raster' \| 'basemap'` in `venuemapmodal.tsx`, persisted to `localStorage['crowdcad.venueMap.viewMode']`. Deviation from the plan text: defaults to basemap only when a basemap is configured AND the current layer is calibrated (not simply "when configured"), and the toggle sits bottom-left rather than an unstated default corner, because top-left is already claimed by the placement banners** | **Done (uncommitted)** | this session |
+| **8.E** | **No code — this subsection is a framing warning ("a basemap will make the map look like a GIS without making it one"), not a deliverable. Still applies; ship the toggle with that caveat stated to IC-EMS** | **N/A** | — |
+| **8.F** | **Basemap-view pin-dropping without control points — gate is `effectiveBasemap \|\| currentLayerCalibrated` (equivalent to the planned `viewMode === 'raster' && !currentLayerCalibrated`) guarding `UncalibratedLayerNotice` in `venuemapmodal.tsx`. `placeCallPinFromLatLon()` added to `callPositionUtils.ts` as the basemap-side writer; raster and basemap clicks share a new `writeCallPinPlacement` helper so `Call.position` cannot drift between the two paths** | **Done (uncommitted)** | this session |
+| **8.G** | **`useDeviceLocation` hook (`classifyPositionError`, `classifyAccuracyQuality`, `getGeolocationUnsupportedReason`, 11 tests) and "Use my location" per control-point row in `GeoreferenceSection` — **built and wired**, including a coarse-fix warning (never a disable) above `MAX_ACCEPTABLE_RESIDUAL_METRES`, and `ControlPoint.accuracy?: number` on `types.ts`. **Not wired:** the basemap-view "you are here" self-marker — `BasemapView.tsx` accepts a `deviceLocation` prop and draws it, but no caller in `venuemapmodal.tsx` ever passes one, so a dispatcher in basemap view never sees their own position. A pre-existing bug was found and fixed in the same change: `buildGeoreferenceForSave` (`page.client.tsx`) was silently stripping `accuracy` off every control point on save; it now carries it through** | **Partially done (uncommitted)** | this session |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -1140,6 +1149,133 @@ writing pins somewhere with no consumer.
     dispatcher who calibrates in the editor and works in the dispatch map is entitled to
     assume they are looking at the same map.
 
+55. **The view-mode default is calibration-gated, not configuration-gated.** §8.D as
+    drafted said "add the basemap as a second, selectable view" without specifying which
+    view opens by default. The shipped rule is `isBasemapConfigured() && currentLayerCalibrated`
+    — basemap only if a tile archive exists *and* the layer's raster can actually overlay
+    it. Defaulting to basemap whenever one is merely configured would silently drop the
+    venue raster (and every post/call plotted against it) the first time a dispatcher
+    opens an uncalibrated layer, which is a worse first impression than opening in raster
+    view and offering the toggle.
+
+56. **The view toggle went bottom-left, not top-left.** Undocumented in §8.D because the
+    plan never picked a corner. `MarkerPlacementInstruction` and `UncalibratedLayerNotice`
+    already render top-left whenever placement mode is armed, and can be on screen at the
+    same moment as the toggle; bottom-left is the one corner of the map shell nothing else
+    claims.
+
+57. **`buildGeoreferenceForSave` was silently dropping `ControlPoint.accuracy` on save.**
+    Found while wiring 8.G's "Use my location" through to persistence: the save path
+    stripped every field on a control point down to a fixed allowlist that predated
+    `accuracy`, so a GPS-seeded point's accuracy figure was captured at placement time and
+    then discarded before it ever reached Firestore/PocketBase — the residual readout
+    would have kept overstating the fit quality of exactly the points §8.G exists to
+    protect. Fixed by carrying `accuracy` through when present, in the same change that
+    added the field.
+
+58. **8.G's two use cases shipped unevenly, and that is recorded rather than glossed
+    over.** Use #2 (a "Use my location" affordance on control-point entry) is built and
+    wired into `GeoreferenceSection`. Use #1 (a basemap-view "you are here" self-marker)
+    is built at the component level — `BasemapView` accepts a `deviceLocation` prop and
+    draws the dot plus accuracy circle described in its own doc comment — but nothing in
+    `venuemapmodal.tsx` instantiates `useDeviceLocation()` and passes it in. The capability
+    exists; the wiring that would make a dispatcher see it does not yet.
+
+59. **`maplibre-gl` must stay on 5.x. Do not upgrade to 6.x.** Pinned to `^5.24.0` in
+    both `package.json` files (repo root and `core/`). This is not a preference, it is
+    load-bearing, and it is the most important thing found while visually verifying
+    Phase 8 for the first time: `pmtiles@4.5.0` registers its `pmtiles://` handler with
+    `maplibregl.addProtocol()`, which only writes to the **main thread's** protocol
+    registry. Vector tile requests are issued from MapLibre's **web worker**. In
+    maplibre-gl 5.x the worker falls back to `isWorker(self) && self.worker?.actor` and
+    forwards the request to the main thread, where the pmtiles handler lives — so it
+    works. maplibre-gl 6.x **removed that bridge**: there is no `getResource` message
+    type anywhere in the 6.4.1 bundle, and the worker has its own separate, empty
+    registry reached via `self.addProtocol`.
+
+    **The failure mode is what makes this dangerous: nothing reports an error.** The
+    PMTiles archive header still downloads and the TileJSON still resolves, because both
+    happen on the main thread. Only tile data never loads — tiles sit in state
+    `"loading"` forever, zero network requests are ever issued for them,
+    `map.on('error')` never fires, and the map shows a blank grey surface. Under 6.4.1
+    the style also never finishes loading, so `map.on('load')` never fires either — see
+    (62) below, which depends on this not happening.
+
+    **This is invisible to the degrade-to-nothing contract in §8.B.** `onUnavailable` is
+    only ever called from a MapLibre error path, and MapLibre never reports one here, so
+    the basemap does not degrade to the raster-only view §8.B promises — it just
+    silently renders nothing on top of a view that looks like it should have a basemap.
+    Anyone revisiting this version pin needs to know the safety net does not cover this
+    specific case: a routine `npm update` past 6.0 breaks the entire feature with a
+    clean `type-check`, a clean `build`, and no error anywhere in the browser console.
+
+60. **Sprite/glyph URLs must be absolutised in the browser, not in `config.ts`.**
+    MapLibre's style-spec validation rejects a root-relative sprite URL outright:
+    `Invalid sprite URL "/basemap/sprites/light", must be absolute`. `config.ts`'s
+    defaults stay relative on purpose, because that file is SSR-safe and must not touch
+    `window` — so a new `absoluteUrl()` helper in `src/lib/basemap/style.ts` does the
+    absolutising instead, applied to `glyphs`, `sprite`, and the `pmtiles://` source URL
+    just before they are handed to MapLibre.
+
+    **The sharp edge, worth writing down so it isn't rediscovered the hard way:**
+    `absoluteUrl()` uses plain string concatenation, deliberately **not** `new URL(url,
+    origin)`. The glyphs value is a template containing literal `{fontstack}` and
+    `{range}` placeholders, and `URL()` percent-encodes braces to `%7B`/`%7D`. MapLibre
+    substitutes into the raw template string at request time, so once those placeholders
+    are encoded they no longer match and every label silently fails to load — while the
+    map itself keeps rendering, so nothing about it looks broken.
+
+61. **The map container must be `h-full w-full`, not `absolute inset-0`.** MapLibre's own
+    stylesheet declares `.maplibregl-map { position: relative }`. That CSS arrives via a
+    dynamic `import(...)` inside `BasemapView.tsx`, so it is appended to the document
+    *after* Tailwind's stylesheet. At equal specificity the later rule wins: MapLibre's
+    `relative` beats Tailwind's `absolute`, `inset-0` stops applying, and the container
+    collapses to zero height. Observed directly as a 1480×0 container holding MapLibre's
+    own 1480×300 fallback canvas. MapLibre reports nothing wrong about being asked to
+    render into a 0px box — another failure in this phase with no error signal, fixed in
+    `BasemapView.tsx`.
+
+62. **The initial camera is passed to the `Map` constructor (`bounds` +
+    `fitBoundsOptions`), not fitted inside a `once('load')` handler.** MapLibre only
+    fires `load` once `style.loaded()` is true, which requires every source to report
+    loaded. That condition never arrived while the map sat at its built-in world view on
+    startup, because the venue-sized PMTiles extract has no tiles out there to finish
+    loading. The old code therefore deadlocked: the camera fit needed the `load` event,
+    and the `load` event needed a camera already pointed somewhere tiles exist. Bounds
+    passed at construction are pure transform math and need no tiles to resolve. Side
+    benefit: this also removes the world-view flash that used to appear on every open.
+    `reducedMotionEnabledRef`, which existed only to choose an animation duration for
+    that `load`-time fit, was deleted as dead code — the constructor path isn't animated
+    at all, which is also the correct reduced-motion behaviour by construction, not by a
+    check.
+
+63. **The Protomaps schema-version mismatch was investigated and cleared, not left as an
+    open question.** The PMTiles archive is Protomaps Basemap schema v4.15.2; the
+    installed `@protomaps/basemaps` package is 5.7.2. This looked like exactly the kind
+    of thing that silently breaks style resolution, so it was checked rather than
+    assumed: all nine source-layer names the archive ships (`boundaries`, `buildings`,
+    `earth`, `landcover`, `landuse`, `places`, `pois`, `roads`, `water`) are identical to
+    what the v5 package's style asks for, and tiles decode correctly against it. Recorded
+    here so the next person who notices the version skew does not re-spend the time
+    re-investigating it.
+
+64. **The extract's real max zoom is 15, not the 16 `scripts/fetch-basemap.sh` requests.**
+    The upstream Protomaps daily build this project pulls from tops out at 15 for this
+    region. The script's `--maxzoom 16` is a request, not a guarantee, and the archive
+    silently caps at what the upstream build actually has. Not a bug to fix — a fact
+    about the current data source worth knowing before someone spends time debugging
+    "missing" zoom-16 tiles that were never going to exist.
+
+65. **`core/.env.local` did not exist and had to be created before any of this could be
+    verified.** It is gitignored, so a fresh checkout — including the one this
+    verification ran from — simply doesn't have it; it was copied from the root
+    `.env.local`. Without it, `npm run dev` run from `core/` — which is the workflow
+    `core/CLAUDE.md` itself prescribes for TAK work, pinned to port 3004 — cannot start
+    at all, because the app throws at startup on a missing Firebase config. Worth a line
+    here because this is exactly the kind of environment gap that makes a phase
+    "impossible to verify" look like a code problem when it is a checkout-setup problem
+    — the same shape of issue §0.6.1 already documented once for a different missing
+    piece.
 
 ### 0.4 Recommended next steps, in order
 
@@ -1354,9 +1490,18 @@ nothing, and closes the second field report. The decision required first by §0.
 was taken by the deployer: sub-linear scaling with declutter and zoom-gating. Both
 surfaces now share one law. See the end of §7.E item 4.
 
-**1b′. Phase 8 — a real basemap.** Newly in scope; §2.2 and §7.E's refusal is overridden
-(§0.6.2, §0.3(53)). Needs no phone, no spike and no IC-EMS answer. The offline
-requirement in §8.B is the part to get right, not the library choice in §8.A.
+**1b′. ✅ DONE (uncommitted, this session) — Phase 8, a real basemap.** §2.2 and §7.E's
+refusal is overridden (§0.6.2, §0.3(53)). 8.A–8.F are built; 8.G is built for
+control-point capture and not yet wired for the basemap-view self-marker (§0.3(58)). The
+offline requirement in §8.B degrades correctly — no PMTiles archive is committed, so a
+fresh clone opens in raster view with no toggle offered at all. **What is left, in
+order:** (1) commit the working tree — nothing above is in git history yet; (2) run
+`scripts/fetch-basemap.sh` and set `NEXT_PUBLIC_BASEMAP_PMTILES_URL` against a real
+deployment and actually look at the rendered map — `type-check`/`test:unit`/`build`
+passing is not the same claim as a human having seen it; (3) wire `useDeviceLocation()`
+into `venuemapmodal.tsx` and pass it to `BasemapView`'s `deviceLocation` prop to close
+8.G's self-marker gap; (4) a component test for `BasemapView.tsx`, which currently has
+none.
 
 **1c′. Phase 9.A — model the level on `Layer`.** The true blocker behind IC-EMS's
 multi-level ask, and it contains no TAK content at all (§0.6.5). Nothing about floors can
@@ -1982,6 +2127,149 @@ product misrepresenting itself every day it waits.
 
 ---
 
+### 2026-08-18 (cont.) — Phase 8 implemented: 8.A–8.F built, 8.G partially built
+
+§0.6.6 (below) is the record of a report investigated *before* this work started, and it
+is left as written — at the time it was checked, Phase 8 genuinely had zero lines of
+code. Later the same session, Phase 8 was implemented. **Read §0.6.6 as history, not as
+current status.**
+
+**What shipped.** `src/lib/basemap/config.ts` (`readBasemapConfig`, `isBasemapConfigured`,
+the `NEXT_PUBLIC_BASEMAP_PMTILES_URL`-gated degrade-to-nothing check) and
+`src/lib/basemap/style.ts` (`buildBasemapStyle` — Protomaps base, then the venue raster at
+0.85 opacity, then Protomaps labels on top, so street names stay legible over the venue
+image). `src/components/dispatch/BasemapView.tsx` (~904 lines) is the MapLibre canvas:
+`maplibre-gl` is only ever reached through a dynamic `import()`, so a deployment with no
+basemap configured never pays for the ~200KB dependency; every failure path — missing
+config, a rejected import, a 404'd tile archive, any MapLibre `error` event — funnels
+into one `onUnavailable(reason)` and the component renders `null`, never an error UI, per
+§8.B's requirement. `src/hooks/useDeviceLocation.ts` wraps browser Geolocation.
+`scripts/fetch-basemap.sh` builds the offline PMTiles/glyph/sprite bundle. `venuemapmodal.tsx`
+gained the `MapViewMode` toggle (§8.D), `handleBasemapClick` writing through the new
+`placeCallPinFromLatLon()` (§8.F), and `UncalibratedLayerNotice` now gated correctly per
+view. `GeoreferenceSection.tsx` and `page.client.tsx` gained "Use my location" per
+control-point row (§8.G, control-point-capture half only — see below).
+`maplibre-gl@^6.4.1`, `pmtiles@^4.5.0`, and `@protomaps/basemaps@^5.7.2` are now
+dependencies in both root and core `package.json`. Full accounting in §0.1's new 8.A–8.G
+rows. **`maplibre-gl@^6.4.1` did not survive contact with a browser** — the next
+session-log entry, "Phase 8 visually verified in a browser," found it silently breaks
+vector tile loading and downgrades it to `^5.24.0`. Left as `^6.4.1` here because that is
+what this entry's session actually installed; read the version in this paragraph as
+history, the same way §0.6.6 is history.
+
+**Two things did not ship as scoped, and are recorded rather than smoothed over:**
+
+1. **8.G's self-marker use case is unwired.** `BasemapView` accepts and draws a
+   `deviceLocation` prop, but no caller ever supplies one — `venuemapmodal.tsx` never
+   instantiates `useDeviceLocation()`. Only the "Use my location" control-point capture
+   half of 8.G reached the UI. §0.3(58).
+2. **A latent bug in `buildGeoreferenceForSave` was found and fixed in the same change**:
+   it stripped `ControlPoint.accuracy` on every save, which would have quietly defeated
+   the point of 8.G's accuracy plumbing the first time anyone reopened a venue. §0.3(57).
+
+**Two deviations from the plan text, both deliberate:** the view toggle sits bottom-left,
+not an unstated default corner, because the placement banners already claim top-left
+(§0.3(56)); and the default view is `isBasemapConfigured() && currentLayerCalibrated`,
+not simply "basemap if configured" (§0.3(55)).
+
+**Verification state — read this precisely, because it is easy to overstate.**
+`npm run type-check` is clean in `core` and `npx tsc --noEmit` is clean at root.
+`npm run test:unit` is 320/320 across 14 files (up from 260 across fewer files at the
+7.E(3) checkpoint — the delta is `basemap/config.test.ts` (30), `deviceLocation.test.ts`
+(11), and additions to `geoUtils.test.ts` and `callPositionUtils.test.ts` for
+`layerImageCorners` and `placeCallPinFromLatLon`). The root `npm run build` succeeds with
+`maplibre-gl` confined to async chunks, confirming the zero-config bundle-size claim in
+§8.A holds. **None of that is a human looking at a rendered map.** No basemap asset
+bundle is committed (`public/basemap/` is gitignored, as designed), no Playwright
+coverage exists for either the basemap view or `useDeviceLocation`, and `BasemapView.tsx`
+itself has no dedicated unit test — its correctness rests on type-check plus the
+downstream tests of the pure modules it calls, not on tests of its own rendering. §0.3(52)
+already established that every ✅ in this document has only ever meant "the tests pass";
+that caveat applies to Phase 8 at least as much as anything before it, because this is
+the first phase where the untested surface (a canvas MapLibre draws into) is the entire
+point of the phase.
+
+**Not committed.** Every file listed above is uncommitted working-tree state, same as the
+rest of this session's work. `git status` in `core` shows it as modified/untracked;
+nothing has been pushed.
+
+---
+
+### 2026-08-18 (cont.) — Phase 8 visually verified in a browser; four bugs found and fixed
+
+The previous entry closed with "no human has looked at the rendered map." This entry is
+that verification, run against the local Berkeley PMTiles extract, and it did not pass
+cleanly on the first attempt — it found four real bugs, all now fixed. Full technical
+detail for each lives at §0.3(59)–(62); this entry is the narrative and the evidence.
+
+**Setup gap found first.** `core/.env.local` did not exist in this checkout — gitignored,
+so a fresh clone never has it — and without it `npm run dev` from `core/` (the workflow
+`core/CLAUDE.md` itself prescribes for TAK work, port 3004) cannot start at all. Copied
+from the root `.env.local`. §0.3(65).
+
+**Bug 1 — the map rendered nothing, silently.** Shipped on `maplibre-gl@^6.4.1` per §8.A
+as originally written. In the browser: archive header downloaded, TileJSON resolved,
+`map.on('load')` never fired, blank grey canvas, zero console errors. Root cause:
+`pmtiles@4.5.0`'s `addProtocol()` registration only reaches MapLibre's main thread;
+maplibre-gl 6.x removed the worker-to-main-thread resource bridge that 5.x has, so the
+web worker issuing tile requests has no pmtiles handler to call and simply never
+completes. **Fixed by pinning `maplibre-gl` to `^5.24.0` in both `package.json` files** —
+not upgrading past it until pmtiles (or MapLibre) closes the gap. §0.3(59). This is the
+most important of the four fixes: it fails with no error signal at all, and it will
+silently recur if anyone bumps the dependency without knowing why the pin is there.
+
+**Bug 2 — style rejected outright, then labels silently missing.** MapLibre's style-spec
+validation threw `Invalid sprite URL "/basemap/sprites/light", must be absolute` because
+`config.ts`'s defaults are deliberately relative (it's SSR-safe, no `window` access). Fix:
+a new `absoluteUrl()` helper in `style.ts`, applied to `glyphs`, `sprite`, and the
+`pmtiles://` source URL. First attempt used `new URL(url, origin)` and broke labels a
+different, quieter way — it percent-encodes the `{fontstack}`/`{range}` placeholders in
+the glyphs template, so MapLibre's later substitution no longer matches and every label
+fails to load with the map otherwise looking fine. Final fix uses string concatenation.
+§0.3(60).
+
+**Bug 3 — 1480×0 container.** `BasemapView.tsx` used `absolute inset-0`; MapLibre's own
+stylesheet ships `.maplibregl-map { position: relative }` and loads after Tailwind's
+(dynamic `import()`), so at equal specificity it wins and the container collapses to zero
+height. Fixed by switching the container to `h-full w-full`. §0.3(61).
+
+**Bug 4 — camera never settled, `load` never fired.** The camera fit ran inside a
+`once('load')` handler, but `load` requires every source to report loaded, and the
+venue-scale PMTiles extract has no tiles at the map's default world-view starting camera
+— deadlock. Fixed by passing `bounds`/`fitBoundsOptions` to the `Map` constructor instead,
+which is pure transform math needing no tiles. `reducedMotionEnabledRef`, which existed
+only to pick an animation duration for the old `load`-time fit, was removed as dead code.
+§0.3(62).
+
+**What rendered, once all four were fixed.** Streets, buildings, parks, POI icons, and
+place labels all draw from the local extract; the georeferenced venue raster composites
+on top at 0.85 opacity; Protomaps place labels correctly draw *over* the raster,
+confirming the §8.A layer order (base → venue raster → labels) works as designed in a
+real browser, not just on paper; both post markers place correctly; the `© OpenStreetMap`
+attribution control is present per §9. Tile decode confirmed at zoom 15: 659 road
+features, 10,530 buildings, 4,284 POIs, 30 render buckets built.
+
+**Two environment facts confirmed along the way, neither a bug:** the archive is
+Protomaps Basemap schema v4.15.2 against an installed `@protomaps/basemaps@5.7.2` — this
+was investigated as a suspected mismatch and cleared, all nine source-layer names match
+and tiles decode correctly (§0.3(63)); and the extract's actual max zoom is 15, not the 16
+`scripts/fetch-basemap.sh` requests — the upstream Protomaps daily build tops out there
+for this region (§0.3(64)).
+
+**Full verification suite, after all four fixes, all green:** core `npm run type-check`
+clean; root `npx tsc --noEmit` exit 0; `npm run test:unit` 320/320 across 14 files
+(unchanged from the previous entry — none of the four fixes touched a pure module a unit
+test covers); core `npm run lint` 0 errors, pre-existing warnings only; root `npm run
+build` succeeds with `maplibre-gl` confined to async chunks only — zero occurrences in the
+shared first-load chunks — which is the concrete evidence behind §8.B's requirement that a
+deployment with no basemap configured never pays for the renderer.
+
+**Still not committed.** Same working-tree state as the previous entry, now with these
+four fixes layered on top. §0.1's new Phase 8 row and Phase 8's new §8.H record the same
+material in the phase-status and phase-detail locations respectively.
+
+---
+
 ### 0.6 The 2026-08-18 field report — three reports from the running app
 
 Three problems were reported from the running app on 2026-08-18. Each was investigated
@@ -2177,6 +2465,78 @@ what TAK cannot do without saying what it can.
 
 The honest sentence for IC-EMS: *multi-level awareness will be correct and filterable in
 both CrowdCAD and TAK; it will not be a 3D model, and no software change produces one.*
+
+#### 0.6.6 The second 2026-08-18 report — the map is still a PNG, and control points are being demanded where they are not needed
+
+A second field report came in the same day, after the checkout was consolidated and
+7.E(3) landed. Two reports, verbatim:
+
+1. *"the map is still a png"*
+2. *"don't need geolocation control point if u alr know where my actual position is.
+   additionally, if the map is actually like apple or google maps or something a live
+   map u don't need control points as well."*
+
+**Report 1 is simply Phase 8 not started.** §0.6.2 scoped the basemap on 2026-08-18 at
+`b34ec6c`; Phase 8 was still marked ⛔ NOT STARTED, and nothing had shipped. The map
+surface is unchanged from what §0.6.2 described: `<Image src={mapUrl}>` at
+`venuemapmodal.tsx:1355` inside `VenueMapWithPosts`, CSS `transform: translate(...)
+scale(...)` at `venuemapmodal.tsx:1341`. Confirmed again today: maplibre-gl, mapbox-gl,
+leaflet, react-map-gl, ol and deck.gl are still absent from both `package.json` files.
+This is the **third** consecutive report about the same surface — report 1 of the first
+round (§0.6.2) and the label complaint that opened §0.6.3 were both about this same
+PNG-and-CSS-transform stack, and now a third report says the same thing a third time.
+§0.6.1 already made the process point once: scoping a phase is not shipping it, and
+every ✅ in §0.1 has only ever meant *the tests pass* — never that a human saw it work.
+Phase 8 does not even have a ✅ to be caught out on, so this report cost nothing to
+explain, but it is one more data point that the gap between "written down" and "in the
+operator's hands" is this project's recurring failure mode, not an incident.
+
+**Report 2 splits into two claims, and they are not the same claim.**
+
+The second half — *"if the map is actually like apple or google maps or something a
+live map u don't need control points as well"* — is **correct, and Phase 8 as drafted
+never said so.** §8.C scoped MapLibre placing the raster as an `ImageSource`; it never
+stated the consequence for pin-dropping that follows from a basemap being present at
+all: a click on a real map is natively `map.unproject(e.point)`, a lat/lon by
+construction, so there is nothing to calibrate before a pin can be placed. §8.F below
+closes that gap.
+
+The first half — *"don't need geolocation control point if u alr know where my actual
+position is"* — **rests on a premise that is false today.** `grep -rn
+"navigator.geolocation\|getCurrentPosition\|watchPosition"` over `core/src` and the
+root `src` returns **zero hits**, in both trees, confirmed again for this report. The
+app has no browser-geolocation code path anywhere. The blue dot the report is
+presumably referring to is `TakMarker` (`venuemapmodal.tsx:679-811`), drawn from
+`team.tak.x`/`team.tak.y` — a GPS fix relayed from a phone running ATAK/iTAK, through
+FreeTAKServer, the Node bridge, the `tak_positions` collection, and
+`useTakPositions.ts`. That is somebody else's phone on the venue network, not the
+browser's own position, and it is not available in the venue editor, which is the one
+place control points actually get placed. So the premise ("you already know where I
+am") is false as stated — but the expectation behind it is reasonable, not
+unreasonable to dismiss: the product could know where the person looking at the screen
+is standing, and it has simply never asked. §8.G below closes that gap, at a cost that
+has to be stated plainly rather than absorbed.
+
+**The current refusal, unchanged since §0.6.2:** `UncalibratedLayerNotice`
+(`venuemapmodal.tsx:935-957`) renders at `venuemapmodal.tsx:1990-1996`, gated
+`showPlacementUi && !currentLayerCalibrated`, where `currentLayerCalibrated =
+isLayerCalibrated(currentLayerObj)` (`venuemapmodal.tsx:1698`) and `isLayerCalibrated`
+(`callPositionUtils.ts:67`) is just `solveGeoreference(...) !== null` — ">= 2
+non-degenerate control points" (`geoUtils.ts:128-129`). §8.F changes *when* this gate
+applies. It does not remove it.
+
+| Half of report 2 | Claim | Status | Answered by |
+|---|---|---|---|
+| "if the map is actually like apple or google maps... u don't need control points" | A basemap click is already a coordinate | Correct, and never stated as a consequence in Phase 8 as drafted | §8.F |
+| "don't need geolocation control point if u alr know where my actual position is" | The app already knows the viewer's position | False today — no `navigator.geolocation` call exists anywhere in the repo | §8.G |
+
+> ⛔→✅ **Overridden by implementation, later the same session.** Everything above this
+> callout is the accurate record of what the investigation found *at the time it was
+> run* — Phase 8 really was zero lines of code when this was written. It no longer is:
+> 8.A–8.F shipped, and 8.G shipped for control-point capture (not yet for the basemap-view
+> self-marker). See the "2026-08-18 (cont.) — Phase 8 implemented" session-log entry
+> above and §0.1 for what actually exists now, and read the "confirmed again today"
+> language in §0.6.2 and above as a timestamp, not a current claim.
 
 ---
 
@@ -3451,7 +3811,22 @@ somebody using the product.
 
 ---
 
-### Phase 8 — A real basemap under the venue raster — ⛔ NOT STARTED
+### Phase 8 — A real basemap under the venue raster — 🟡 BUILT, UNCOMMITTED, VISUALLY VERIFIED
+
+**8.F and 8.G were scoped 2026-08-18** in response to the second field report (§0.6.6).
+**Implementation followed the same day, and visual verification followed later the same
+day (§8.H).** 8.A–8.F are built as described below; 8.G is built for its
+control-point-capture use case and not yet wired for its basemap-view self-marker use
+case (§0.3(58)). The 🟡 marker is honest for a narrower reason now than it was earlier
+the same session: the map has been looked at in a browser and works, but none of it is
+committed, and no basemap asset bundle exists in the repo (`scripts/fetch-basemap.sh`
+must be run and `NEXT_PUBLIC_BASEMAP_PMTILES_URL` set before any of it renders anything
+in a fresh checkout). Getting to a working render found four real bugs, fixed before
+anything below could be called verified — see §8.H and §0.3(59)–(62), and read §8.A's
+library-choice writeup with the correction folded in: **MapLibre shipped first on 6.x,
+then had to be pinned back to 5.x, and 6.x must not be reintroduced.** See the
+"Phase 8 visually verified in a browser" session-log entry and §0.1's Phase 8 rows for
+the full accounting.
 
 This phase **reverses** a decision this document already made twice — explicitly out of
 scope in §2.2 and again at the end of §7.E, on three stated grounds: a tile source and
@@ -3466,7 +3841,27 @@ derived from lat/lon via `geoUtils`, never from anything the map library owns, s
 ripping the basemap back out — if IC-EMS decides it is not worth the cost — leaves the
 coordinate model completely untouched.
 
-#### 8.A — Library choice
+#### 8.A — Library choice — ✅ built
+
+**Shipped as recommended: MapLibre GL JS**, added to both root and core `package.json`,
+imported only via dynamic `import()` inside `BasemapView.tsx` so the cost below is paid
+only by deployments that configure a basemap (§8.B). The reasoning that follows is
+recorded as drafted, because it is still the reasoning for the library itself — but the
+**version** it was shipped on is not what was originally recorded here, and the
+correction is load-bearing enough to state before anything else in this subsection.
+
+> ⚠️ **`maplibre-gl` must stay on `^5.24.0`. Do not upgrade to 6.x.** First shipped on
+> `maplibre-gl@^6.4.1`; downgraded and pinned to `^5.24.0` in both `package.json` files
+> after visual verification showed 6.x silently drops every vector tile — no error, no
+> failed request, no `map.on('error')`, just a blank grey map, because `pmtiles@4.5.0`'s
+> `addProtocol()` registration never reaches the web worker that actually issues tile
+> requests under 6.x (5.x has a worker→main-thread bridge for exactly this; 6.x removed
+> it). This also defeats §8.B's degrade-to-nothing contract, because `onUnavailable` is
+> never called — see §0.3(59) for the full mechanism. A routine `npm update` past 6.0
+> will reintroduce this with a clean build and no visible symptom until someone opens the
+> basemap view.
+
+The rest of the original reasoning:
 
 **Recommend MapLibre GL JS.** It is BSD-3, has no account or API-key requirement to run
 the renderer itself, supports `ImageSource` for exactly the four-corner georeferenced
@@ -3488,7 +3883,19 @@ is **the first heavy client dependency this project has taken on**. Every prior 
 been pure TypeScript or thin wrappers around browser/Firebase/PocketBase APIs already in
 the bundle. This is a different kind of commitment and should be reviewed as one.
 
-#### 8.B — Tiles and the offline story. This is the hard part and must not be waved through
+#### 8.B — Tiles and the offline story. This is the hard part and must not be waved through — ✅ built
+
+**Shipped as recommended: PMTiles (Protomaps).** `scripts/fetch-basemap.sh` builds the
+offline bundle — a PMTiles extract from the Protomaps daily planet build, glyph ranges,
+and sprites — into `public/basemap/` (gitignored, and mirrored into the root wrapper's
+`public/` because the app normally runs from there). `src/lib/basemap/config.ts` is the
+degrade-to-nothing gate itself: `readBasemapConfig()` returns `null` — synchronously,
+with no maplibre import at all — unless `NEXT_PUBLIC_BASEMAP_PMTILES_URL` is set, 30
+tests covering the empty/whitespace/configured cases. **No asset bundle is committed.** A
+fresh clone has run neither the script nor set the env var, so it opens in raster view
+with no toggle offered — exactly the degrade-to-nothing behaviour required below, now
+also the *default* behaviour rather than a fallback path that has to trigger. The
+reasoning that produced this design is recorded as drafted:
 
 **Recommend PMTiles (Protomaps) as the default tile source.** A PMTiles archive is a
 single file served over HTTP range requests — no tile server process, no per-request
@@ -3514,7 +3921,20 @@ operation is the whole premise this project is built on. This is the same discip
 §7.E(1) already applied to off-map markers: silence and honest degradation over a broken
 or invented display.
 
-#### 8.C — The coordinate boundary
+#### 8.C — The coordinate boundary — ✅ built
+
+**Shipped as proposed.** `geoUtils.layerImageCorners(transform)` evaluates
+`pixelToLatLon` at the four percent corners and returns them in MapLibre `ImageSource`
+order, with its own `describe('layerImageCorners', ...)` block added to `geoUtils.test.ts`.
+`src/lib/basemap/style.ts` hands that straight to `buildBasemapStyle()`'s raster source,
+and `BasemapView.tsx` states the boundary in its own file header: every marker is placed
+with `marker.setLngLat([lon, lat])` from a coordinate the component was *handed* — never
+from a pixel or percentage it derived itself. The Mercator-conformance test this section
+called for already existed before Phase 8 (`geoUtils.mercator-conformance.test.ts`,
+written for the bridge's `georef.js` reconciliation, §0.3(27)); it proves the affine
+solver agrees with a Mercator-exact computation to within 0.1 m at venue scale, which is
+the same claim `layerImageCorners`'s own tests now make for the four-corner case
+specifically. The original design reasoning:
 
 Define precisely what changes and what stays put. The venue raster becomes a MapLibre
 `ImageSource`, positioned by four corner lat/lons. There is no packaged helper for this
@@ -3536,7 +3956,19 @@ the bridge's `georef.js` (§0.3(27)); Phase 8 needs the equivalent test proving
 `layerImageCorners` output, rendered through MapLibre's Mercator projection, lands within
 tolerance of what `geoUtils` itself would place there.
 
-#### 8.D — Migration path, and why it must be incremental
+#### 8.D — Migration path, and why it must be incremental — ✅ built
+
+**Shipped as the plan required: a second, selectable view, not a replacement.**
+`venuemapmodal.tsx` gained `type MapViewMode = 'raster' | 'basemap'`, persisted to
+`localStorage['crowdcad.venueMap.viewMode']`, with a bottom-left toggle. Two deviations
+from the text below, both recorded in §0.3(55)–(56): the default view is
+`isBasemapConfigured() && currentLayerCalibrated`, not simply "basemap if configured" —
+opening an uncalibrated layer straight into a bare basemap with no venue raster would be
+a worse first impression than staying in raster view and offering the toggle; and the
+toggle sits bottom-left rather than an unstated corner, because `MarkerPlacementInstruction`
+and `UncalibratedLayerNotice` already claim top-left whenever placement mode is armed. The
+venue editor, as anticipated, stayed percent-native — no basemap-relative control-point
+UI was built, matching the reasoning below. The original migration reasoning:
 
 Roughly eight files are coupled to percent-of-image coordinates (`venuemapmodal.tsx`'s
 marker components and `getContainedImageRect`, `venues/management/page.client.tsx`'s
@@ -3555,16 +3987,218 @@ sense than the current pixel-click interaction.
 
 #### 8.E — What a basemap does not give you
 
+This subsection has no code to build — it is a framing warning, not a deliverable — and
+it applies unchanged now that Phase 8 has shipped. If anything it is more relevant: a
+toggle now exists that makes the venue map look, at a glance, exactly like Apple/Google
+Maps.
+
 It does not give floors. It does not give 3D in the sense most people picture when they
 hear the word. And it will make the map *look* far more capable than it is — the single
 change in this entire plan most likely to be misread as "we have a GIS now" (§2.2). Ship
 it with that framing stated out loud, not left implicit.
 
-**Effort:** 8.A S (library selection and wiring is mechanical once chosen), 8.B M–L (the
-PMTiles pipeline and the offline-serving story are the real work), 8.C M (the new
-`geoUtils` helper plus the Mercator-conformance test), 8.D M (dual-view scaffolding, no
-data-model change). None of it needs a phone, a spike, or IC-EMS — it is unblocked
-today, unlike most of what remains in §7.D and §9.B.
+#### 8.F — Georeference is not a precondition in basemap view — ✅ built
+
+**Shipped as specified, gate written as `effectiveBasemap || currentLayerCalibrated`
+rather than `viewMode === 'raster' && !currentLayerCalibrated`** — the two are
+equivalent (`effectiveBasemap` already encodes "in basemap view and a basemap is actually
+rendering"), guarding `UncalibratedLayerNotice` in `venuemapmodal.tsx`. The basemap-view
+click path is `placeCallPinFromLatLon()`, a new function in `callPositionUtils.ts` with
+11 tests, that — unlike `placeCallPin` — never refuses on an uncalibrated layer, because
+a `map.unproject()` result needs no calibration to be a real coordinate. A new
+`writeCallPinPlacement` helper is shared by both the raster and basemap click handlers so
+the two paths cannot silently diverge in what they write to `Call.position`. Sharpen a
+distinction §8.C's coordinate boundary implies but never states as a UI
+consequence. In **raster** view, a click is a percentage of an image and genuinely has
+no lat/lon without a solved `Georeference` — the refusal at `venuemapmodal.tsx:1990` is
+**correct and stays exactly as it is.** In **basemap** view (§8.D's second, selectable
+view), a click is `map.unproject(e.point)` — a real coordinate by construction,
+supplied by MapLibre's own projection, not by anything `geoUtils` or a control point
+produced. There is nothing to calibrate before that number can be trusted, and
+`UncalibratedLayerNotice` must not render there.
+
+**The precise consequence, because it is easy to overstate:** control points remain
+required to overlay the raster — that is what `layerImageCorners` (§8.C) consumes, and
+an ungeoreferenced layer still has no four corners to hand MapLibre's `ImageSource`.
+They are no longer required to drop a pin. An ungeoreferenced layer, viewed in basemap
+mode, shows the tile basemap with no raster overlay on top of it, and full
+pin-dropping against real map coordinates. Those are two different capabilities — "show
+my venue image here" and "let the dispatcher mark a point" — that today share one
+boolean (`currentLayerCalibrated`) gating both. 8.F is the change that stops conflating
+them.
+
+**The implementation boundary, stated so it cannot be built the easy-and-wrong way:**
+the gate becomes `viewMode === 'raster' && !currentLayerCalibrated`, not a deletion of
+the check. Deleting `isLayerCalibrated` outright would let a raster-view click fabricate
+a coordinate from a percentage that was never tied to a lat/lon — exactly the failure
+the "Consequence, accepted deliberately" paragraph on `CallPosition` in `app/types.ts`
+(`types.ts:299`) exists to prevent: *"There is no percent-only degraded mode. A call
+position that cannot be expressed as lat/lon cannot be published to TAK... Supporting it
+would make calibration look optional when calibration is the entire mechanism."* That
+paragraph is still correct for raster view. It was never true for basemap view — basemap
+view did not exist when it was written.
+
+**This is the first time the codebase has had two coordinate-acquisition paths for the
+same click**, and §8.C's one-way boundary is unaffected by having two: `geoUtils`
+remains the sole authority for pixel↔latlon conversion on the raster side, and MapLibre
+is still never asked to convert an image percentage — it is only ever handed a screen
+point it already owns, which is what `unproject` does natively. The two paths do not
+call into each other; a raster-view pin still goes through `placeCallPin`/`geoUtils`,
+a basemap-view pin goes through `map.unproject` directly, and both still write the same
+`CallPosition` lat/lon.
+
+#### 8.G — Device GPS as a control-point source, and why it is not a free win — 🟡 built for use #2, not wired for use #1
+
+**`useDeviceLocation` shipped** (`src/hooks/useDeviceLocation.ts`, 276 lines: the hook
+plus `classifyPositionError`, `classifyAccuracyQuality`, `getGeolocationUnsupportedReason`,
+11 tests). Of the two uses scoped below, only the second is actually reachable by a
+dispatcher today:
+
+1. **A "you are here" self-marker in basemap view — built at the component level, not
+   wired.** `BasemapView.tsx` accepts a `deviceLocation` prop and draws the dot plus a
+   to-scale accuracy circle its own doc comment describes. But `venuemapmodal.tsx` never
+   calls `useDeviceLocation()` and never passes the prop, so in practice no dispatcher
+   sees this today — the capability exists in the component and stops there (§0.3(58)).
+2. **A "Use my location" affordance on control-point entry — built and wired.**
+   `GeoreferenceSection.tsx` and `venues/management/page.client.tsx` gained one
+   `useDeviceLocation()` instance per control-point row. This is the part that answers
+   the first half of report 2.
+
+The gap this section originally opened with — no `navigator.geolocation` call anywhere in
+the codebase — is closed for use #2 and still effectively open for use #1 in the sense
+that matters to an operator: there is still no self-marker anyone can see.
+
+**The honest cost, addressed as required, not waved through:** `coords.accuracy` is
+surfaced at the moment of capture, and a fix worse than `MAX_ACCEPTABLE_RESIDUAL_METRES`
+(25 m, `geoUtils.ts:391`) shows a coarse-fix warning — **it warns and never disables**,
+which was a deliberate choice: a 30 m fix is still better than typing a guess, and
+refusing it outright would push the operator toward the worse alternative. `ControlPoint`
+gained `accuracy?: number` on `types.ts`, exactly as called for below. **One bug found and
+fixed while wiring this through:** `buildGeoreferenceForSave` (`page.client.tsx`) was
+silently stripping `accuracy` from every control point on save — the field survived
+placement and display but never reached the persisted record, which would have made the
+whole point of this section (a residual readout that stops overstating GPS-seeded points)
+false the moment anyone reloaded the venue editor. Fixed in the same change; see §0.3(57).
+
+The original scoping, recorded as drafted:
+
+The gap: no `navigator.geolocation` call exists anywhere in this codebase (`grep -rn
+"navigator.geolocation\|getCurrentPosition\|watchPosition"` over `core/src` and the root
+`src`, zero hits in both, confirmed 2026-08-18). Add a `useDeviceLocation` hook wrapping
+it.
+
+Two uses:
+
+1. **A "you are here" self-marker in basemap view** — the first position on the map
+   that belongs to the person looking at the screen, rather than to a phone somewhere
+   else on the venue network. This could not have existed before Phase 8: a raster
+   percent has no relationship to the browser's own GPS fix, so there was no coordinate
+   space to draw it in.
+2. **A "Use my location" affordance on control-point entry** in `GeoreferenceSection` —
+   calibration becomes "stand at a corner, tap it on the raster, tap Use my location"
+   instead of typing coordinates by hand. This is what the first half of report 2 is
+   actually asking for, even though it phrased it as a premise ("you already know where
+   I am") rather than a request.
+
+**The honest cost, which must not be waved through:** `GeolocationPosition.coords.
+accuracy` is in metres — typically ±5 m outdoors under open sky, and ±20–50 m in an
+urban canyon or indoors, which describes a stadium concourse under a roof or a stand's
+underside about as well as anything does. `MAX_ACCEPTABLE_RESIDUAL_METRES` is 25
+(`geoUtils.ts:391`). A control point seeded from a poor fix can therefore produce a
+georeference whose residual readout (§0.3, `GeoreferenceSection`) reports a fit that
+looks better than the input deserves — residuals measure the control points'
+self-consistency, not their agreement with the ground truth. Requirement, not a
+nice-to-have: `coords.accuracy` must be surfaced to the operator at the moment of
+capture, a fix worse than the residual threshold must warn before the point is
+accepted, and the accuracy has to be stored alongside the point so the fit-quality
+readout can stop overstating itself on GPS-seeded points. That needs a
+`ControlPoint.accuracy?: number` field addition to `types.ts:15-21` — record it as a
+§5-family data-model addition, alongside `CallPosition` and `TakPinReport` (§5.2).
+
+**This does not make control points obsolete in the raster editor.** GPS gives you
+*where you are standing*; it does not tell the app *which pixel of the raster that is*.
+The operator still has to click the raster to say "this GPS fix is this corner of the
+image" — GPS replaces typing the lat/lon, not the click. Only basemap view (§8.F)
+removes the need for a control point entirely, because there the click itself is
+already a coordinate.
+
+**Deployment consideration:** `navigator.geolocation` requires a secure context (HTTPS,
+or `localhost`). It will not work served over plain HTTP on a LAN address, which — given
+`core/CLAUDE.md`'s own note about running the dev server on a pinned port for TAK work,
+and the offline/stadium-network premise §8.B already had to take seriously — is a
+plausible deployment shape for this project. Flag it now rather than discover it
+on-site: whatever serves the venue's local network segment needs a certificate story, or
+`useDeviceLocation` degrades to unavailable, silently, the same way §8.B requires the
+basemap itself to degrade.
+
+**Effort (as estimated, and roughly borne out):** 8.A S (library selection and wiring was
+mechanical once chosen), 8.B M–L (the PMTiles pipeline and the offline-serving story were
+the real work), 8.C M (the new `geoUtils` helper plus the existing Mercator-conformance
+test), 8.D M (dual-view scaffolding, no data-model change), 8.F S (a gate condition and
+its addition to one render path), 8.G M (`useDeviceLocation` and the venue-editor
+affordance landed at that size; the self-marker did not — it stopped one prop-wire short
+of "M", which is a smaller gap than the estimate implies but a real one). None of it
+needed a phone, a spike, or IC-EMS — confirmed by it having shipped without any of the
+three. **What the effort estimate did not price in:** committing the work, running
+`scripts/fetch-basemap.sh` against a real deployment, and a human actually looking at the
+rendered map. The last of those has now happened — see §8.H — and cost four bug fixes
+that the estimate above did not anticipate either, because none of them were visible
+until a browser actually tried to render the thing.
+
+#### 8.H — Visual verification, and the four bugs it caught — ✅ done
+
+**The map has now been looked at in a browser, for the first time, against the local
+Berkeley PMTiles extract.** Everything in §8.A–§8.G above was type-checked and unit-tested
+but not one line of it had been visually confirmed to actually draw a map — §0.3(52)'s
+warning that "verified" in this document has only ever meant "the tests pass" applied to
+Phase 8 more than to anything before it, because a rendering canvas is exactly the kind of
+surface a type-checker and a unit-test suite cannot see. Getting to a working render found
+four real bugs, none of which any prior check caught, all now fixed:
+
+1. **`maplibre-gl` 6.x silently drops all vector tile data.** The most important of the
+   four — see the callout in §8.A and §0.3(59) for the full mechanism. Fixed by pinning
+   to `^5.24.0` in both `package.json` files. This is now a hard constraint on the
+   dependency, not a version that happened to be chosen first.
+2. **Sprite/glyph URLs must be absolutised in the browser, with string concatenation, not
+   `new URL()`.** §0.3(60). Fixed in `src/lib/basemap/style.ts`'s new `absoluteUrl()`
+   helper.
+3. **The map container must be `h-full w-full`, not `absolute inset-0`**, because
+   MapLibre's own stylesheet loads after Tailwind's and wins the specificity tie.
+   §0.3(61). Fixed in `src/components/dispatch/BasemapView.tsx`.
+4. **The initial camera must be passed to the `Map` constructor, not fitted inside
+   `once('load')`**, because `load` never fires while the camera sits somewhere the
+   PMTiles extract has no tiles. §0.3(62). Fixed in `BasemapView.tsx`; also removed
+   `reducedMotionEnabledRef` as dead code.
+
+**What rendered, once all four were fixed:** streets, buildings, parks, POI icons, and
+place labels drawing from the local extract; the georeferenced venue raster composited on
+top at 0.85 opacity; Protomaps place labels correctly drawing *over* the raster —
+confirming the §8.A base → raster → labels layer order holds in a real browser, not just
+in the style JSON; both post markers placed correctly; `© OpenStreetMap` attribution
+present per §9. Tile decode confirmed at zoom 15: 659 road features, 10,530 buildings,
+4,284 POIs, 30 render buckets built.
+
+**Two environment facts confirmed and cleared while doing this, recorded so they aren't
+re-investigated:** the PMTiles archive is Protomaps Basemap schema v4.15.2 against an
+installed `@protomaps/basemaps@5.7.2` — checked and confirmed to be a non-issue, all nine
+source-layer names match and tiles decode correctly (§0.3(63)); and the extract's real max
+zoom is 15, not the 16 `scripts/fetch-basemap.sh` requests — the upstream Protomaps daily
+build tops out there for this region (§0.3(64)). Separately, `core/.env.local` had to be
+created from the root copy before any of this could even be run — §0.3(65).
+
+**Full verification suite after all four fixes, all green:** core `npm run type-check`
+clean; root `npx tsc --noEmit` exit 0; `npm run test:unit` 320/320 across 14 files; core
+`npm run lint` 0 errors (pre-existing warnings only); root `npm run build` succeeds with
+`maplibre-gl` confined to async chunks only — zero occurrences in the shared first-load
+chunks — which is the concrete evidence behind §8.B's requirement that a deployment with
+no basemap configured never pays for the renderer.
+
+**What this does not close:** the code is still entirely uncommitted (§0.1), no basemap
+asset bundle is committed (`public/basemap/` stays gitignored by design, §8.B), there is
+still no Playwright coverage for the basemap view or `useDeviceLocation`, and 8.G's
+self-marker use case is still unwired (§0.3(58)). Visual verification closes the "does it
+actually render" question; it does not close the "is it committed" or "is it tested at the
+component level" questions, which remain open exactly as §0.1 states them.
 
 ---
 
@@ -4006,17 +4640,19 @@ rendering per type code, stale behavior, network-link refresh, callsign display.
 | 5 — ops docs | ⛔ | S | 2 | Deployers can self-serve |
 | 6 — ATAK plugin | ⛔ deferred | XL | — | Revisit after a full season |
 | **7 — call pins + coordinate-first map** | 🟡 7.A–7.C, 7.E(1), 7.E(2) ✅ | **M** | **0 only** (7.D also on spike b) | **Calls have real positions, in both directions** |
-| **8 — a real basemap** | ⛔ NOT STARTED | **M–L** | **nothing** | A map with context under the venue raster, offline-capable |
+| **8 — a real basemap** | 🟡 8.A–8.F ✅ + visually verified (uncommitted), 8.G partial | **M–L** | **nothing** | A map with context under the venue raster, offline-capable |
 | **9 — multi-level venues** | ⛔ NOT STARTED | **M** | 9.A nothing; 9.C(ii) on 8 | Floors modelled, filterable in TAK, stackable in CrowdCAD |
 
 **Phases 7, 8 and 9 are the exception to the "everything is gated" reading of this
 table.** 7.A–7.C and 7.E depend on Phase 0, which is done; only 7.D waits on spike (b).
-**Phases 8 and 9, added 2026-08-18, depend on nothing at all** — no phone, no spike, no
-IC-EMS answer — which makes them, together with 7.E(3), the entire unblocked surface of
-this project. 7.E(2) was a latent data-integrity bug rather than a feature (swapping a
-venue image silently moved every post), which is why it was done regardless of the TAK
-schedule; the same argument does not apply to 8 and 9, which are genuinely new
-capability and should be sequenced against IC-EMS's priorities rather than the plan's.
+**Phase 8, added and then largely built 2026-08-18, depended on nothing at all** — no
+phone, no spike, no IC-EMS answer — shipped the same day, and was visually verified
+working in a browser later the same day after four bugs were found and fixed (all still
+uncommitted; §0.1, §0.5, §8.H). Phase 9 still depends on nothing and is still unbuilt. 7.E(2) was a latent data-integrity
+bug rather than a feature (swapping a venue image silently moved every post), which is
+why it was done regardless of the TAK schedule; the same argument does not apply to 9,
+which is genuinely new capability and should be sequenced against IC-EMS's priorities
+rather than the plan's.
 
 ⚠️ **Phase 8 reverses a decision §2.2 and §7.E both recorded.** The table above is not
 the place to argue it — see §0.6.2 and §0.3(53) — but a reader working from this table
@@ -4117,6 +4753,62 @@ and it is a standalone Node sidecar rather than part of the Next.js app):
 **Never commit** `dev/freetakserver/certs-export/`, `fts-itak-tls.zip`, or
 `fts-local-tcp.zip` — they contain a private CA key that can mint client
 certificates the server will trust. They are gitignored; keep it that way.
+
+Phase 8 (basemap, §8.F/§8.G) — new. **✅ (uncommitted)** below means built and
+type-checked/tested this session per §0.1, but not yet `git add`-ed — distinct from
+the ✅ = "landed as of 2026-08-16" legend at the top of this section:
+
+```
+✅ (uncommitted) src/lib/basemap/config.ts                 PMTiles URL config, presence check, degrade-to-nothing gate — §8.B
+✅ (uncommitted) src/lib/basemap/style.ts                  buildBasemapStyle() — base/raster/labels layer order — §8.C.
+                                                            Also holds absoluteUrl(), added during §8.H verification to fix
+                                                            sprite/glyph URLs — §0.3(60)
+✅ (uncommitted) src/components/dispatch/BasemapView.tsx   the second, selectable map view — §8.D. Accepts an unwired
+                                                            `deviceLocation` prop for the §8.G self-marker — see below.
+                                                            Also fixed during §8.H verification: container sizing
+                                                            (§0.3(61)) and constructor-time camera bounds, which removed
+                                                            reducedMotionEnabledRef as dead code (§0.3(62))
+✅ (uncommitted) src/hooks/useDeviceLocation.ts            navigator.geolocation wrapper, exposes coords.accuracy — §8.G
+✅ (uncommitted) src/lib/__tests__/basemap/config.test.ts  30 tests
+✅ (uncommitted) src/lib/__tests__/deviceLocation.test.ts  11 tests
+   scripts/fetch-basemap.sh                                builds public/basemap/ (gitignored) — not a source file,
+                                                            listed here for completeness; nothing it produces is committed
+```
+
+Phase 8 — modified:
+
+```
+✅ (uncommitted) src/lib/geoUtils.ts                                      layerImageCorners(transform) — §8.C
+✅ (uncommitted) src/lib/__tests__/geoUtils.test.ts                       dedicated layerImageCorners tests — §8.C
+                                                                          (Mercator-conformance is covered separately by
+                                                                          the pre-existing geoUtils.mercator-conformance.test.ts)
+✅ (uncommitted) src/lib/callPositionUtils.ts                             placeCallPinFromLatLon() — §8.F basemap-side writer
+✅ (uncommitted) src/components/modals/event/venuemapmodal.tsx           raster/basemap view toggle; the 8.F gate,
+                                                                          `effectiveBasemap || currentLayerCalibrated`
+                                                                          (equivalent to the planned
+                                                                          `viewMode === 'raster' && !currentLayerCalibrated`).
+                                                                          Does NOT wire `deviceLocation` into BasemapView — §8.G gap
+✅ (uncommitted) src/components/venue-management/GeoreferenceSection.tsx  "Use my location" + accuracy display — §8.G
+✅ (uncommitted) src/app/(main)/venues/management/page.client.tsx         wiring for the above; also fixes a pre-existing bug
+                                                                          where buildGeoreferenceForSave silently dropped
+                                                                          ControlPoint.accuracy on save
+✅ (uncommitted) src/app/types.ts                                         ControlPoint.accuracy — §8.G
+✅ (uncommitted) package.json                                             BOTH root and core — maplibre-gl (pinned ^5.24.0,
+                                                                          NOT 6.x — §0.3(59)), pmtiles, @protomaps/basemaps
+✅ (uncommitted) .gitignore                                               BOTH root and core — public/basemap/, .cache/
+```
+
+**Dependency decision:** MapLibre GL JS, pmtiles 4.x, `@protomaps/basemaps` 5.x —
+**now actually installed in both `package.json` files, confirmed 2026-08-18** (see
+§0.1, §0.5), reversing the "absent, confirmed again today" finding in §0.6.6, which
+was accurate only as of when it was written earlier the same day. **`maplibre-gl` was
+first installed at `^6.4.1` and then downgraded to `^5.24.0` after visual verification
+found 6.x silently breaks vector tile loading (§0.3(59), §8.A, §8.H) — 6.x must not be
+reintroduced.** Tiles are a local
+PMTiles extract under `public/basemap/` (gitignored), configured by
+`NEXT_PUBLIC_BASEMAP_PMTILES_URL`, absent by default — per §8.B, the basemap degrades to
+nothing when that variable is unset, and no asset bundle is committed, so a fresh clone
+still renders nothing until `scripts/fetch-basemap.sh` is run and the env var is set.
 
 Modified:
 

@@ -5,7 +5,9 @@ import {
   georeferenceMapMatch,
   georeferenceResiduals,
   georeferenceStaleness,
+  ImageCorners,
   latLonToPixel,
+  layerImageCorners,
   layerPostsLatLon,
   MAX_ACCEPTABLE_RESIDUAL_METRES,
   metresBetween,
@@ -935,5 +937,246 @@ describe('georeferenceMapMatch', () => {
 
     expect(georeferenceStaleness(result.georeferenceVersion, layer.georeference)).toBe('fresh');
     expect(georeferenceMapMatch(layer.mapUrl, layer.georeference)).toBe('stale');
+  });
+});
+
+describe('layerImageCorners', () => {
+  describe('order and shape', () => {
+    it('returns exactly 4 corners', () => {
+      const controlPoints: ControlPoint[] = [
+        { x: 0, y: 0, lat: BASE_LAT + 0.001, lon: BASE_LON - 0.001, label: 'NW' },
+        { x: 100, y: 100, lat: BASE_LAT - 0.001, lon: BASE_LON + 0.001, label: 'SE' },
+      ];
+      const georef = makeGeoref(controlPoints);
+      const t = solveGeoreference(georef);
+      expect(t).not.toBeNull();
+      if (!t) return;
+
+      const result = layerImageCorners(t);
+      expect(result.coordinates).toHaveLength(4);
+    });
+
+    it('returns corners in tl/tr/br/bl order', () => {
+      // Axis-aligned, north-up map: top row (tl, tr) has highest lat,
+      // bottom row (bl, br) has lowest lat; left column (tl, bl) has lowest lon,
+      // right column (tr, br) has highest lon.
+      const latN = BASE_LAT + 0.001;
+      const latS = BASE_LAT - 0.001;
+      const lonW = BASE_LON - 0.001;
+      const lonE = BASE_LON + 0.001;
+
+      const controlPoints: ControlPoint[] = [
+        { x: 0, y: 0, lat: latN, lon: lonW, label: 'top-left' },
+        { x: 100, y: 0, lat: latN, lon: lonE, label: 'top-right' },
+        { x: 0, y: 100, lat: latS, lon: lonW, label: 'bottom-left' },
+        { x: 100, y: 100, lat: latS, lon: lonE, label: 'bottom-right' },
+      ];
+      const georef = makeGeoref(controlPoints);
+      const t = solveGeoreference(georef);
+      expect(t).not.toBeNull();
+      if (!t) return;
+
+      const result = layerImageCorners(t);
+      const [tl, tr, br, bl] = result.coordinates;
+
+      // Top row (tl, tr) has highest latitude
+      expect(tl[1]).toBeCloseTo(tr[1], 9); // tl.lat ≈ tr.lat (both at top)
+      expect(tl[1]).toBeGreaterThan(bl[1]); // top > bottom
+
+      // Bottom row (bl, br) has lowest latitude
+      expect(bl[1]).toBeCloseTo(br[1], 9); // bl.lat ≈ br.lat (both at bottom)
+      expect(br[1]).toBeLessThan(tr[1]); // bottom < top
+
+      // Left column (tl, bl) has lowest longitude
+      expect(tl[0]).toBeCloseTo(bl[0], 9); // tl.lon ≈ bl.lon (both on left)
+      expect(tl[0]).toBeLessThan(tr[0]); // left < right
+
+      // Right column (tr, br) has highest longitude
+      expect(tr[0]).toBeCloseTo(br[0], 9); // tr.lon ≈ br.lon (both on right)
+      expect(br[0]).toBeGreaterThan(bl[0]); // right > left
+    });
+  });
+
+  describe('lon-first order (most likely place to introduce a bug)', () => {
+    it('places longitude at index 0 and latitude at index 1, with clearly different ranges', () => {
+      // Axis-aligned map with intentionally different lat/lon ranges:
+      // latitude spans ~0.002 degrees, longitude spans ~0.004 degrees.
+      // If axes are swapped, the test will fail because [lon, lat] will
+      // have the wrong numeric order.
+      const latN = BASE_LAT + 0.001;
+      const latS = BASE_LAT - 0.001; // ~0.002 degrees span in latitude
+      const lonW = BASE_LON - 0.002;
+      const lonE = BASE_LON + 0.002; // ~0.004 degrees span in longitude
+
+      const controlPoints: ControlPoint[] = [
+        { x: 0, y: 0, lat: latN, lon: lonW, label: 'NW' },
+        { x: 100, y: 0, lat: latN, lon: lonE, label: 'NE' },
+        { x: 0, y: 100, lat: latS, lon: lonW, label: 'SW' },
+        { x: 100, y: 100, lat: latS, lon: lonE, label: 'SE' },
+      ];
+      const georef = makeGeoref(controlPoints);
+      const t = solveGeoreference(georef);
+      expect(t).not.toBeNull();
+      if (!t) return;
+
+      const result = layerImageCorners(t);
+      const [tl, tr, br, bl] = result.coordinates;
+
+      // Extract lon/lat explicitly for clarity
+      const [tlLon, tlLat] = tl;
+      const [trLon, trLat] = tr;
+      const [brLon, brLat] = br;
+      const [blLon, blLat] = bl;
+
+      // Longitude values should span ~0.004 (roughly)
+      const lonSpan = Math.max(trLon, brLon) - Math.min(tlLon, blLon);
+      expect(lonSpan).toBeCloseTo(0.004, 3);
+
+      // Latitude values should span ~0.002 (roughly)
+      const latSpan = Math.max(tlLat, trLat) - Math.min(blLat, brLat);
+      expect(latSpan).toBeCloseTo(0.002, 3);
+
+      // Critical: lon values are numerically larger than lat (BASE_LON ~ -122, BASE_LAT ~ 37)
+      // This will catch a swap: if lat and lon were reversed, all of these would fail
+      expect(tlLon).toBeLessThan(-122);
+      expect(trLon).toBeLessThan(-122);
+      expect(tlLat).toBeGreaterThan(37);
+      expect(trLat).toBeGreaterThan(37);
+    });
+  });
+
+  describe('agreement with pixelToLatLon', () => {
+    it('each corner equals pixelToLatLon at the corresponding percent corner', () => {
+      const controlPoints: ControlPoint[] = [
+        { x: 10, y: 20, lat: BASE_LAT, lon: BASE_LON, label: 'A' },
+        { x: 90, y: 80, lat: BASE_LAT - 0.002, lon: BASE_LON + 0.002, label: 'B' },
+      ];
+      const georef = makeGeoref(controlPoints);
+      const t = solveGeoreference(georef);
+      expect(t).not.toBeNull();
+      if (!t) return;
+
+      const result = layerImageCorners(t);
+      const [tl, tr, br, bl] = result.coordinates;
+
+      // Compute expected positions via pixelToLatLon
+      const expectedTL = pixelToLatLon(t, 0, 0);
+      const expectedTR = pixelToLatLon(t, 100, 0);
+      const expectedBR = pixelToLatLon(t, 100, 100);
+      const expectedBL = pixelToLatLon(t, 0, 100);
+
+      // Compare with floating-point tolerance (12 decimal places)
+      expect(tl[0]).toBeCloseTo(expectedTL.lon, 12);
+      expect(tl[1]).toBeCloseTo(expectedTL.lat, 12);
+
+      expect(tr[0]).toBeCloseTo(expectedTR.lon, 12);
+      expect(tr[1]).toBeCloseTo(expectedTR.lat, 12);
+
+      expect(br[0]).toBeCloseTo(expectedBR.lon, 12);
+      expect(br[1]).toBeCloseTo(expectedBR.lat, 12);
+
+      expect(bl[0]).toBeCloseTo(expectedBL.lon, 12);
+      expect(bl[1]).toBeCloseTo(expectedBL.lat, 12);
+    });
+  });
+
+  describe('round-trip via latLonToPixel', () => {
+    it('feeding each corner back through latLonToPixel returns the original percent corner', () => {
+      const controlPoints: ControlPoint[] = [
+        { x: 5, y: 15, lat: BASE_LAT + 0.001, lon: BASE_LON - 0.001, label: 'A' },
+        { x: 95, y: 85, lat: BASE_LAT - 0.001, lon: BASE_LON + 0.001, label: 'B' },
+      ];
+      const georef = makeGeoref(controlPoints);
+      const t = solveGeoreference(georef);
+      expect(t).not.toBeNull();
+      if (!t) return;
+
+      const result = layerImageCorners(t);
+      const corners = [
+        { coord: result.coordinates[0], expectedPercent: { x: 0, y: 0 } },
+        { coord: result.coordinates[1], expectedPercent: { x: 100, y: 0 } },
+        { coord: result.coordinates[2], expectedPercent: { x: 100, y: 100 } },
+        { coord: result.coordinates[3], expectedPercent: { x: 0, y: 100 } },
+      ];
+
+      for (const { coord, expectedPercent } of corners) {
+        const [lon, lat] = coord;
+        const back = latLonToPixel(t, lat, lon);
+        expect(back.x).toBeCloseTo(expectedPercent.x, 6);
+        expect(back.y).toBeCloseTo(expectedPercent.y, 6);
+      }
+    });
+  });
+
+  describe('rotation: non-axis-aligned maps', () => {
+    it('produces corners that form a non-degenerate quadrilateral when the image is rotated', () => {
+      // Two control points placed diagonally (not axis-aligned), implying rotation
+      const controlPoints: ControlPoint[] = [
+        { x: 20, y: 30, lat: BASE_LAT + 0.0015, lon: BASE_LON - 0.0005, label: 'NW-ish' },
+        { x: 80, y: 70, lat: BASE_LAT - 0.0015, lon: BASE_LON + 0.0005, label: 'SE-ish' },
+      ];
+      const georef = makeGeoref(controlPoints);
+      const t = solveGeoreference(georef);
+      expect(t).not.toBeNull();
+      if (!t) return;
+
+      const result = layerImageCorners(t);
+      const [tl, tr, br, bl] = result.coordinates;
+
+      // All four corners must be distinct
+      const allSame = (a: [number, number], b: [number, number]) =>
+        Math.abs(a[0] - b[0]) < 1e-10 && Math.abs(a[1] - b[1]) < 1e-10;
+
+      expect(allSame(tl, tr)).toBe(false);
+      expect(allSame(tr, br)).toBe(false);
+      expect(allSame(br, bl)).toBe(false);
+      expect(allSame(bl, tl)).toBe(false);
+
+      // For a rotated map, the diagonals should have different lengths
+      // (if axes were perfectly aligned, they would be equal)
+      const diag1 = Math.hypot(br[0] - tl[0], br[1] - tl[1]);
+      const diag2 = Math.hypot(tr[0] - bl[0], tr[1] - bl[1]);
+
+      // Diagonals must not be equal to within a tiny tolerance
+      // (a perfectly aligned rectangle would have equal diagonals)
+      const diagonalsDiffer = Math.abs(diag1 - diag2) > 0.00001;
+      expect(diagonalsDiffer).toBe(true);
+    });
+  });
+
+  describe('version passthrough', () => {
+    it('carries the GeoTransform version to the result', () => {
+      const controlPoints: ControlPoint[] = [
+        { x: 10, y: 20, lat: BASE_LAT, lon: BASE_LON, label: 'A' },
+        { x: 90, y: 80, lat: BASE_LAT - 0.002, lon: BASE_LON + 0.002, label: 'B' },
+      ];
+      const versionedGeoref: Georeference = { ...makeGeoref(controlPoints), version: 42 };
+      const t = solveGeoreference(versionedGeoref);
+      expect(t).not.toBeNull();
+      if (!t) return;
+
+      const result = layerImageCorners(t);
+      expect(result.version).toBe(42);
+    });
+
+    it('carries undefined version when the GeoTransform version is undefined (defensive case)', () => {
+      // Defensive test: in rare cases, a GeoTransform could be constructed
+      // with an undefined version (e.g., from a pre-versioning Georeference).
+      // Create a transform manually to simulate this edge case.
+      const controlPoints: ControlPoint[] = [
+        { x: 10, y: 20, lat: BASE_LAT, lon: BASE_LON, label: 'A' },
+        { x: 90, y: 80, lat: BASE_LAT - 0.002, lon: BASE_LON + 0.002, label: 'B' },
+      ];
+      const georef = makeGeoref(controlPoints);
+      const t = solveGeoreference(georef);
+      expect(t).not.toBeNull();
+      if (!t) return;
+
+      // Manually create a transform with undefined version (defensive edge case)
+      const tWithUndefinedVersion = { ...t, version: undefined };
+
+      const result = layerImageCorners(tWithUndefinedVersion);
+      expect(result.version).toBeUndefined();
+    });
   });
 });

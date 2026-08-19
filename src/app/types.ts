@@ -18,6 +18,32 @@ export interface ControlPoint {
   lat: number;
   lon: number;
   label?: string; // e.g. "NW corner of main stage"
+  /**
+   * Metres of uncertainty on lat/lon, when this point came from a device GPS
+   * fix rather than a known coordinate. Undefined for hand-entered points,
+   * which carry no honest uncertainty estimate either way — a typed
+   * coordinate looked up from a survey marker and one guessed off a map are
+   * both "no accuracy figure", and this field must not be made up a number
+   * to fill that gap.
+   *
+   * This exists because `georeferenceResiduals` (see `lib/geoUtils.ts`)
+   * measures how self-consistent the control points are against each
+   * other — how well the fitted transform reproduces them — NOT how true
+   * any of them are to the ground. A set of points all seeded from ±40 m
+   * GPS fixes can agree with each other almost perfectly (a tight residual)
+   * while being uniformly offset from reality by 40 m: the fit has no way
+   * to detect an error that all its inputs share. Recording the accuracy
+   * each point actually came in with is what lets a fit-quality readout
+   * stop overstating itself — a caller can compare the residual against the
+   * worst input accuracy and say "consistent, but only as trustworthy as
+   * its coarsest GPS fix" instead of implying the residual alone is the
+   * whole story.
+   *
+   * Optional field on an existing interface — no migration needed. Every
+   * control point written before this field existed simply has none, which
+   * is the correct reading for "accuracy unknown," not "point is exact."
+   */
+  accuracy?: number;
 }
 
 export interface Georeference {

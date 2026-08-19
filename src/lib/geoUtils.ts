@@ -686,3 +686,57 @@ export function georeferenceMapMatch(
   }
   return layerMapUrl === georef.calibratedForMapUrl ? 'fresh' : 'stale';
 }
+
+// --- Layer image corners for rendering -----------------------------------------------
+//
+// This is a one-way boundary: layerImageCorners hands out coordinates for a
+// renderer (MapLibre GL JS, Leaflet, etc.) to consume as an ImageSource overlay,
+// and the renderer is never asked to compute one back. geoUtils remains the sole
+// authority for pixel ↔ latlon transformations.
+
+/**
+ * Represents the geographic corners of a georeferenced venue map image, in an
+ * order and format suitable for passing directly to a mapping library's
+ * ImageSource (e.g. MapLibre GL JS).
+ */
+export interface ImageCorners {
+  /** [top-left, top-right, bottom-right, bottom-left], each [lon, lat].
+   *  Longitude first is GeoJSON/MapLibre order, and the opposite of
+   *  pixelToLatLon's {lat, lon} return — this is a high-risk boundary
+   *  (easy to swap the axes accidentally), so it is asserted explicitly
+   *  in tests.
+   */
+  coordinates: [[number, number], [number, number], [number, number], [number, number]];
+  version: number | undefined;
+}
+
+/**
+ * Derives the geographic corners of a georeferenced venue map image, in the
+ * order and format a rendering layer needs to overlay the raster on a
+ * real-world basemap.
+ *
+ * Evaluates pixelToLatLon at the four percent-space corners of the image:
+ * top-left (0, 0), top-right (100, 0), bottom-right (100, 100), bottom-left
+ * (0, 100). Each corner is returned as [lon, lat] — longitude first, per
+ * GeoJSON and MapLibre convention, which is the reverse of pixelToLatLon's
+ * {lat, lon} return. Carries t.version through onto the result, so a caller
+ * holding corners can ask "is this still the calibration the layer is using?"
+ * via georeferenceStaleness (see the version-stamping contract on
+ * GeoTransform.version and postLatLon).
+ */
+export function layerImageCorners(t: GeoTransform): ImageCorners {
+  const topLeft = pixelToLatLon(t, 0, 0);
+  const topRight = pixelToLatLon(t, 100, 0);
+  const bottomRight = pixelToLatLon(t, 100, 100);
+  const bottomLeft = pixelToLatLon(t, 0, 100);
+
+  return {
+    coordinates: [
+      [topLeft.lon, topLeft.lat],
+      [topRight.lon, topRight.lat],
+      [bottomRight.lon, bottomRight.lat],
+      [bottomLeft.lon, bottomLeft.lat],
+    ],
+    version: t.version,
+  };
+}

@@ -87,6 +87,15 @@ function buildGeoreferenceForSave(
     if (trimmedLabel) {
       point.label = trimmedLabel;
     }
+    // Carry the GPS fix's accuracy through to the saved record. Without
+    // this, a point placed via "Use my location" loses its accuracy figure
+    // the moment the venue is saved, and describeGeoreferenceStatus's
+    // GPS-bounded-fit caveat (GeoreferenceSection.tsx) would silently stop
+    // applying the next time the venue is reopened even though the fit is
+    // exactly as GPS-limited as it was in this session.
+    if (cp.accuracy !== undefined) {
+      point.accuracy = cp.accuracy;
+    }
     return point;
   });
 

@@ -13,9 +13,12 @@ import {
   callPinStaleness,
   isLayerCalibrated,
   placeCallPin,
+  placeCallPinFromLatLon,
   resolveCallPinPercent,
   type PercentPoint,
 } from '@/lib/callPositionUtils';
+import { isBasemapConfigured } from '@/lib/basemap/config';
+import BasemapView from '@/components/dispatch/BasemapView';
 import { offMapIndicator, type OffMapIndicator } from '@/lib/offMapUtils';
 import {
   declutterLabels,
@@ -38,6 +41,17 @@ import MarkerPlacementInstruction from '@/components/venue-management/MarkerPlac
 const MIN_MAP_SCALE = 0.5;
 const MAX_MAP_SCALE = 8;
 const ZOOM_STEP = 1.5;
+
+// Phase 8 (§8.D): the basemap is a second, selectable view alongside the
+// existing raster map, not a replacement for it. "Which view was open last"
+// is a per-browser UI preference rather than venue data, so it persists to
+// localStorage rather than anywhere in Firestore.
+type MapViewMode = 'raster' | 'basemap';
+const VIEW_MODE_STORAGE_KEY = 'crowdcad.venueMap.viewMode';
+
+function isMapViewMode(value: unknown): value is MapViewMode {
+  return value === 'raster' || value === 'basemap';
+}
 
 function StatusTimer({ since }: { since: number }) {
   const [elapsed, setElapsed] = React.useState(0);
@@ -1697,6 +1711,65 @@ export default function VenueMapModal({
   const currentLayerObj = layers[currentLayer];
   const currentLayerCalibrated = currentLayerObj ? isLayerCalibrated(currentLayerObj) : false;
 
+  // Which of the two map views (§8.D) is showing right now. Initialized from
+  // localStorage so an operator's choice survives closing and reopening this
+  // modal; the read is wrapped because localStorage throws in Safari private
+  // mode and some blocked-cookie configurations, and a map modal that fails
+  // to open over a UI preference read would be a bad trade for the one thing
+  // this modal exists to do on game day.
+  const [viewMode, setViewModeState] = useState<MapViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+        if (isMapViewMode(stored)) return stored;
+      } catch {
+        // Fall through to the computed default below.
+      }
+    }
+    // No stored preference: default to the basemap only when it is both
+    // configured AND useful for the layer on screen. A venue with no
+    // georeference has no four corners to hand MapLibre's ImageSource
+    // (§8.C), so opening straight into basemap view would show real-world
+    // tiles with the venue's own map nowhere on them -- a disorienting
+    // default for someone who hasn't asked for it yet. The toggle is still
+    // offered either way so the choice is one click, not hidden.
+    return isBasemapConfigured() && currentLayerCalibrated ? 'basemap' : 'raster';
+  });
+  // Persists the preference alongside updating state; a write failure (full
+  // or blocked storage) should not block switching views for the rest of
+  // this session, only fail to remember it for next time.
+  const setViewMode = (mode: MapViewMode) => {
+    setViewModeState(mode);
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Ignored -- see the read-side comment above.
+    }
+  };
+  // Set once, permanently, the first time BasemapView reports it can't draw
+  // (missing config, unreachable tiles, no WebGL, a rejected maplibre
+  // import). §8.B requires the basemap to degrade to nothing rather than a
+  // broken canvas, so a failure forces the view back to raster and the
+  // toggle disappears for the rest of this modal's lifetime -- a tile source
+  // that failed once is not going to recover mid-session, and flapping
+  // between the two views on every render would be worse than not offering
+  // the choice again. No user-facing error surfaces here on purpose: to the
+  // operator this should look like "there's no basemap here", not "the map
+  // is broken".
+  const [basemapFailed, setBasemapFailed] = useState(false);
+  const handleBasemapUnavailable = (reason: string) => {
+    console.warn(`[VenueMapModal] basemap unavailable: ${reason}`);
+    setBasemapFailed(true);
+    setViewMode('raster');
+  };
+  // The single source of truth for "is the basemap actually on screen right
+  // now" -- every render site below reads this instead of re-deriving it
+  // from isBasemapConfigured()/basemapFailed/viewMode separately, so the
+  // three can't drift out of sync between the map render, the notice gate,
+  // and the zoom-control visibility.
+  const effectiveBasemap = isBasemapConfigured() && !basemapFailed && viewMode === 'basemap';
+
   // A plain click on the map background (not on a marker -- CallMarker stops
   // its own click from bubbling here). Does nothing unless placement is
   // armed (or draft mode is active); an unarmed click is just... a click.
@@ -1731,8 +1804,17 @@ export default function VenueMapModal({
     });
     if (!placement.ok) return;
 
-    const callId = selectedCallId;
-    const placedPosition = placement.position;
+    await writeCallPinPlacement(selectedCallId, placement.position);
+  };
+
+  // Shared by handleMapClick's armed branch (above) and handleBasemapClick's
+  // armed branch (below): both produce a CallPosition through different math
+  // -- placeCallPin's georeference solve vs. placeCallPinFromLatLon's
+  // map.unproject passthrough, see §8.F -- but from there on, writing it to
+  // the call is identical. Factored out so that write can't quietly drift
+  // between the two paths the way two independent copies eventually would.
+  async function writeCallPinPlacement(callId: string, placedPosition: CallPosition) {
+    if (!updateEvent) return;
     await updateEvent((current: Event) => {
       const existing = current.calls.find((c) => c.id === callId);
       const logEntry = buildCallPinLogEntry(existing?.position ? 'moved' : 'placed', placedPosition.placedAt);
@@ -1742,6 +1824,36 @@ export default function VenueMapModal({
         ),
       };
     });
+  }
+
+  // The basemap counterpart of handleMapClick, and the whole of TAK plan
+  // §8.F in one function. A basemap click is already map.unproject(e.point)
+  // -- a real coordinate produced by MapLibre's own projection, not by
+  // anything geoUtils or a control point produced -- so unlike
+  // handleMapClick there is no `.ok` check and no refusal path:
+  // placeCallPinFromLatLon never returns one, because there is nothing here
+  // to refuse. This also does not consult isPanning or imgRef: those track
+  // the raster's CSS transform, and MapLibre owns its own pan/zoom gestures
+  // independently of either.
+  const handleBasemapClick = (coord: { lat: number; lon: number }) => {
+    const layer = currentLayerObj;
+    if (!layer) return;
+
+    if (isDraftMode) {
+      setDraftPosition(
+        placeCallPinFromLatLon(layer, coord, { source: 'manual', placedAt: Date.now(), placedBy: user?.uid })
+      );
+      return;
+    }
+
+    if (!isPlacementArmed || !selectedCallId || !updateEvent) return;
+
+    const placedPosition = placeCallPinFromLatLon(layer, coord, {
+      source: 'manual',
+      placedAt: Date.now(),
+      placedBy: user?.uid,
+    });
+    void writeCallPinPlacement(selectedCallId, placedPosition);
   };
 
   // Re-drag an already-placed call pin to correct it. Deliberately not
@@ -1905,6 +2017,12 @@ export default function VenueMapModal({
     : null;
   const draftPin = draftDisplayPercent ? { percent: draftDisplayPercent, isDragging: isDraftDragging } : null;
 
+  // BasemapView's draftPin wants a lat/lon, not the image-percent shape
+  // above -- draftPosition already carries both (CallPosition always has a
+  // lat/lon, §8.F), so this reads it straight off rather than re-deriving
+  // anything through the layer's georeference.
+  const basemapDraftPin = isDraftMode && draftPosition ? { lat: draftPosition.lat, lon: draftPosition.lon } : null;
+
   // Whether to show either "click to place" (calibrated) or the refusal
   // banner (uncalibrated) over the map right now.
   const showPlacementUi = isDraftMode || isPlacementArmed;
@@ -1963,68 +2081,149 @@ export default function VenueMapModal({
         <ModalBody className="p-6 flex flex-col" style={{ height: '100%' }}>
           <div className="flex flex-col gap-3" style={{ height: '100%' }}>
             <div className="relative w-full overflow-visible rounded-xl flex-1" style={{ minHeight: 0 }}>
-              <VenueMapWithPosts
-                layers={layers}
-                currentLayer={currentLayer}
-                staff={staff}
-                equipment={equipment}
-                teamTimers={teamTimers}
-                isOpen={isOpen}
-                scale={scale}
-                position={position}
-                isPanning={isPanning}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                imgRef={imgRef}
-                imgContainerRef={imgContainerRef}
-                callPins={callPins}
-                draggingCallId={draggingCallId}
-                onCallMarkerMouseDown={updateEvent ? handleCallMarkerMouseDown : undefined}
-                draftPin={draftPin}
-                onDraftMarkerMouseDown={isDraftMode ? handleDraftMarkerMouseDown : undefined}
-                isPlacementArmed={showPlacementUi}
-                onMapClick={handleMapClick}
-              />
+              {effectiveBasemap ? (
+                // currentLayerObj can be undefined (no layers yet); BasemapView
+                // requires a non-null layer, so this renders nothing rather
+                // than passing it one, matching VenueMapWithPosts's own
+                // no-op behaviour when layers is empty.
+                currentLayerObj && (
+                  <BasemapView
+                    layer={currentLayerObj}
+                    staff={staff}
+                    equipment={equipment}
+                    calls={calls}
+                    theme="dark"
+                    isPlacementArmed={showPlacementUi}
+                    onMapClick={handleBasemapClick}
+                    draftPin={basemapDraftPin}
+                    selectedCallId={selectedCallId}
+                    onUnavailable={handleBasemapUnavailable}
+                    className="h-full w-full"
+                  />
+                )
+              ) : (
+                <VenueMapWithPosts
+                  layers={layers}
+                  currentLayer={currentLayer}
+                  staff={staff}
+                  equipment={equipment}
+                  teamTimers={teamTimers}
+                  isOpen={isOpen}
+                  scale={scale}
+                  position={position}
+                  isPanning={isPanning}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  imgRef={imgRef}
+                  imgContainerRef={imgContainerRef}
+                  callPins={callPins}
+                  draggingCallId={draggingCallId}
+                  onCallMarkerMouseDown={updateEvent ? handleCallMarkerMouseDown : undefined}
+                  draftPin={draftPin}
+                  onDraftMarkerMouseDown={isDraftMode ? handleDraftMarkerMouseDown : undefined}
+                  isPlacementArmed={showPlacementUi}
+                  onMapClick={handleMapClick}
+                />
+              )}
 
               {showPlacementUi && (
-                currentLayerCalibrated ? (
+                // §8.F: control points remain required to overlay the raster
+                // (layerImageCorners still needs a solved georeference for
+                // that), but they are NOT required to drop a pin in basemap
+                // view -- a basemap click is map.unproject(e.point), a real
+                // coordinate by construction, supplied by MapLibre's own
+                // projection with no venue calibration involved anywhere.
+                // Demanding control points there would be asking the
+                // dispatcher to calibrate a picture in order to record a
+                // fact that never depended on the picture. The refusal banner
+                // stays exactly as it was for raster view, where a click really
+                // is only a percentage of an image until something solves it.
+                effectiveBasemap || currentLayerCalibrated ? (
                   <MarkerPlacementInstruction />
                 ) : (
                   <UncalibratedLayerNotice venueEditHref={venueEditHref} />
                 )
               )}
 
-              {/* Zoom Controls */}
-              <div className="absolute top-3 right-3 flex flex-row gap-1 z-20">
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="flat"
-                  onPress={handleZoomIn}
-                  className="bg-surface-deepest/90 backdrop-blur"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="flat"
-                  onPress={handleZoomOut}
-                  className="bg-surface-deepest/90 backdrop-blur"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="flat"
-                  onPress={handleResetZoom}
-                  className="bg-surface-deepest/90 backdrop-blur"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </div>
+              {/* View toggle (§8.D). Only offered once a basemap is actually
+                  configured, and hidden for good the moment one fails (see
+                  handleBasemapUnavailable) -- no point offering a switch to a
+                  view that's already proven it can't draw.
+                  Placed bottom-left rather than the top-left corner this
+                  control might otherwise default to: MarkerPlacementInstruction
+                  and UncalibratedLayerNotice both render top-left whenever
+                  showPlacementUi is true, and can be on screen at the same
+                  moment as this toggle. Bottom-left is the one corner of this
+                  shell nothing else ever claims. */}
+              {isBasemapConfigured() && !basemapFailed && (
+                <div className="absolute bottom-3 left-3 z-20 flex items-center gap-0.5 rounded-lg border border-surface-liner bg-surface-deepest/90 p-0.5 backdrop-blur">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    onPress={() => setViewMode('raster')}
+                    className={cn(
+                      'px-2.5 text-xs',
+                      viewMode === 'raster'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'bg-transparent text-surface-faint'
+                    )}
+                  >
+                    Venue image
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    onPress={() => setViewMode('basemap')}
+                    className={cn(
+                      'px-2.5 text-xs',
+                      viewMode === 'basemap'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'bg-transparent text-surface-faint'
+                    )}
+                  >
+                    Map
+                  </Button>
+                </div>
+              )}
+
+              {/* Zoom Controls -- drive `scale`/`position`, which are the
+                  raster CSS transform's own state and do nothing to a
+                  MapLibre canvas (it renders its own NavigationControl via
+                  BasemapView). Hidden rather than disabled in basemap view,
+                  since a control that visibly does nothing when pressed
+                  reads as broken, not as inapplicable. */}
+              {!effectiveBasemap && (
+                <div className="absolute top-3 right-3 flex flex-row gap-1 z-20">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={handleZoomIn}
+                    className="bg-surface-deepest/90 backdrop-blur"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={handleZoomOut}
+                    className="bg-surface-deepest/90 backdrop-blur"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={handleResetZoom}
+                    className="bg-surface-deepest/90 backdrop-blur"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Bottom Control Bar */}

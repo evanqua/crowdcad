@@ -8,6 +8,7 @@ import {
   formatHHMM,
   isLayerCalibrated,
   placeCallPin,
+  placeCallPinFromLatLon,
   resolveCallPinPercent,
 } from '@/lib/callPositionUtils';
 
@@ -246,6 +247,170 @@ describe('buildCallPinLogEntry', () => {
       (k) => buildCallPinLogEntry(k, ts).message
     );
     expect(new Set(messages).size).toBe(3);
+  });
+});
+
+describe('placeCallPinFromLatLon', () => {
+  it('§8.F behaviour: never refuses on uncalibrated layer, returns position with exact input lat/lon', () => {
+    const layer = makeLayer(undefined);
+    const result = placeCallPinFromLatLon(
+      layer,
+      { lat: 37.88, lon: -122.26 },
+      { source: 'tak', placedAt: 2000 }
+    );
+    expect(result.lat).toBe(37.88);
+    expect(result.lon).toBe(-122.26);
+  });
+
+  it('x/y are null (not undefined) when there is no transform', () => {
+    const layer = makeLayer(undefined);
+    const result = placeCallPinFromLatLon(
+      layer,
+      { lat: BASE_LAT, lon: BASE_LON },
+      { source: 'tak', placedAt: 1000 }
+    );
+    expect(result.x).toBe(null);
+    expect(result.y).toBe(null);
+    expect('x' in result).toBe(true);
+    expect('y' in result).toBe(true);
+  });
+
+  it('georeferenceVersion is undefined when there is no transform', () => {
+    const layer = makeLayer(undefined);
+    const result = placeCallPinFromLatLon(
+      layer,
+      { lat: BASE_LAT, lon: BASE_LON },
+      { source: 'manual', placedAt: 1000 }
+    );
+    expect(result.georeferenceVersion).toBeUndefined();
+  });
+
+  it('does not report pin as stale after recalibration when placed from lat/lon on uncalibrated layer', () => {
+    // Place pin on uncalibrated layer
+    const uncalibratedLayer = makeLayer(undefined);
+    const position = placeCallPinFromLatLon(
+      uncalibratedLayer,
+      { lat: BASE_LAT, lon: BASE_LON },
+      { source: 'tak', placedAt: 1000 }
+    );
+
+    // The pin's georeferenceVersion is undefined
+    expect(position.georeferenceVersion).toBeUndefined();
+
+    // Now layer gains a georeference (v1)
+    const calibratedLayer = makeLayer(makeGeoref(TWO_POINTS, 1));
+
+    // Check staleness: should be 'unknown' (not 'stale'), because unstamped
+    // version never claimed to be part of any calibration
+    const staleness = callPinStaleness(calibratedLayer, position);
+    expect(staleness).toBe('unknown');
+    expect(staleness).not.toBe('stale');
+  });
+
+  it('x/y are derived and round-trip when the layer is calibrated', () => {
+    const georef = makeGeoref(TWO_POINTS, 1);
+    const layer = makeLayer(georef);
+    const transform = solveGeoreference(georef)!;
+
+    // Start with a percent point
+    const origPercent = { x: 35.5, y: 72.3 };
+
+    // Convert to lat/lon using the transform
+    const { lat, lon } = pixelToLatLon(transform, origPercent.x, origPercent.y);
+
+    // Place a pin from that lat/lon
+    const result = placeCallPinFromLatLon(layer, { lat, lon }, {
+      source: 'manual',
+      placedAt: 3000,
+    });
+
+    // x/y should come back to the original within floating-point tolerance
+    expect(result.x).not.toBeNull();
+    expect(result.y).not.toBeNull();
+    expect(result.x!).toBeCloseTo(origPercent.x, 9);
+    expect(result.y!).toBeCloseTo(origPercent.y, 9);
+  });
+
+  it('stamps georeferenceVersion when the layer is calibrated', () => {
+    const georef = makeGeoref(TWO_POINTS, 4);
+    const layer = makeLayer(georef);
+    const result = placeCallPinFromLatLon(
+      layer,
+      { lat: BASE_LAT, lon: BASE_LON },
+      { source: 'manual', placedAt: 1000 }
+    );
+    expect(result.georeferenceVersion).toBe(4);
+  });
+
+  it('succeeds for coordinates outside the raster', () => {
+    const georef = makeGeoref(TWO_POINTS, 1);
+    const layer = makeLayer(georef);
+
+    // A coordinate far from the control points (likely outside the image bounds)
+    const farLat = 40.0;
+    const farLon = -120.0;
+
+    const result = placeCallPinFromLatLon(layer, { lat: farLat, lon: farLon }, {
+      source: 'manual',
+      placedAt: 5000,
+    });
+
+    // Position is returned with exact lat/lon
+    expect(result.lat).toBe(farLat);
+    expect(result.lon).toBe(farLon);
+    // x/y may be outside 0-100, but should still be numbers (not null)
+    expect(result.x).not.toBeNull();
+    expect(result.y).not.toBeNull();
+    expect(typeof result.x).toBe('number');
+    expect(typeof result.y).toBe('number');
+  });
+
+  it('passes through layerId, source, and placedAt', () => {
+    const layer = makeLayer(makeGeoref(TWO_POINTS));
+    const result = placeCallPinFromLatLon(
+      layer,
+      { lat: 37.88, lon: -122.26 },
+      { source: 'tak', placedAt: 7777 }
+    );
+    expect(result.layerId).toBe('layer-1');
+    expect(result.source).toBe('tak');
+    expect(result.placedAt).toBe(7777);
+  });
+
+  it('includes placedBy when supplied', () => {
+    const layer = makeLayer(makeGeoref(TWO_POINTS));
+    const result = placeCallPinFromLatLon(
+      layer,
+      { lat: BASE_LAT, lon: BASE_LON },
+      { source: 'manual', placedAt: 1000, placedBy: 'user-42' }
+    );
+    expect(result.placedBy).toBe('user-42');
+  });
+
+  it('omits placedBy entirely when not supplied', () => {
+    const layer = makeLayer(makeGeoref(TWO_POINTS));
+    const result = placeCallPinFromLatLon(
+      layer,
+      { lat: BASE_LAT, lon: BASE_LON },
+      { source: 'manual', placedAt: 1000 }
+    );
+    expect('placedBy' in result).toBe(false);
+  });
+
+  it('handles single control point (uncalibrated) correctly', () => {
+    const layer = makeLayer(makeGeoref([TWO_POINTS[0]]));
+    const result = placeCallPinFromLatLon(
+      layer,
+      { lat: BASE_LAT + 0.001, lon: BASE_LON + 0.001 },
+      { source: 'manual', placedAt: 2000 }
+    );
+    // Should still return a valid position with exact lat/lon
+    expect(result.lat).toBe(BASE_LAT + 0.001);
+    expect(result.lon).toBe(BASE_LON + 0.001);
+    // And no x/y should be derived
+    expect(result.x).toBeNull();
+    expect(result.y).toBeNull();
+    expect(result.georeferenceVersion).toBeUndefined();
   });
 });
 

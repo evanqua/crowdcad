@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Card, Input, ScrollShadow } from '@heroui/react';
-import { AlertTriangle, CheckCircle2, Crosshair, RefreshCw, Trash2 } from 'lucide-react';
+import { Button, Card, Input, ScrollShadow, Tooltip } from '@heroui/react';
+import { AlertTriangle, CheckCircle2, Crosshair, LocateFixed, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import type { ControlPoint, Georeference } from '@/app/types';
 import { MAX_ACCEPTABLE_RESIDUAL_METRES, georeferenceResiduals, solveGeoreference } from '@/lib/geoUtils';
+import { classifyAccuracyQuality, getGeolocationUnsupportedReason, useDeviceLocation } from '@/hooks/useDeviceLocation';
+import { cn } from '@/lib/utils';
 
 interface GeoreferenceSectionProps {
   controlPoints: ControlPoint[];
@@ -29,6 +31,49 @@ interface GeoreferenceSectionProps {
 interface GeoreferenceStatus {
   tone: 'muted' | 'ok' | 'warn' | 'stale';
   message: string;
+}
+
+/**
+ * Worst (largest) accuracy radius among the control points that carry one,
+ * or null if none do. "Worst" rather than "average" deliberately: a fit is
+ * only as trustworthy as its least-trustworthy input, the same reasoning
+ * `ControlPoint.accuracy`'s doc comment gives for recording this per-point
+ * instead of once for the whole set.
+ */
+function worstControlPointAccuracy(controlPoints: ControlPoint[]): number | null {
+  let worst: number | null = null;
+  for (const point of controlPoints) {
+    if (point.accuracy === undefined) continue;
+    if (worst === null || point.accuracy > worst) worst = point.accuracy;
+  }
+  return worst;
+}
+
+/**
+ * Appends a caveat to an already-"ok" status when the fit is built from a
+ * coarse GPS fix, without changing its tone. Only called on the 'ok'
+ * branches (see call sites) — a degenerate/stale/too-few-points status is
+ * already telling the operator something is wrong, and layering a GPS
+ * caveat on top of that would bury the more actionable message.
+ *
+ * Why this can't be inferred from the residual alone: georeferenceResiduals
+ * measures how self-consistent the control points are with each other, not
+ * how true they are to the ground. Points all seeded from the same ±40 m
+ * GPS fix can reproduce each other almost exactly (a tight residual) while
+ * being uniformly 40 m off from reality — the fit has no way to see an
+ * error shared by all its inputs. Once any point's own GPS accuracy is
+ * worse than the residual threshold, that accuracy — not the residual — is
+ * the honest bound on the georeference's quality.
+ */
+function boundByGpsInputIfCoarse(base: GeoreferenceStatus, controlPoints: ControlPoint[]): GeoreferenceStatus {
+  const worst = worstControlPointAccuracy(controlPoints);
+  if (worst === null || classifyAccuracyQuality(worst, MAX_ACCEPTABLE_RESIDUAL_METRES) !== 'coarse') {
+    return base;
+  }
+  return {
+    tone: base.tone,
+    message: `${base.message} Bounded by GPS input, not residuals: the coarsest control point fix is only accurate to ±${worst.toFixed(0)} m, so treat this fit as no better than that even though the residuals above look tight.`,
+  };
 }
 
 function describeGeoreferenceStatus(controlPoints: ControlPoint[], needsReconfirmation: boolean): GeoreferenceStatus {
@@ -72,10 +117,10 @@ function describeGeoreferenceStatus(controlPoints: ControlPoint[], needsReconfir
   }
 
   if (controlPoints.length === 2) {
-    return {
-      tone: 'ok',
-      message: 'Georeferenced — similarity fit (rotation + uniform scale, no shear)',
-    };
+    return boundByGpsInputIfCoarse(
+      { tone: 'ok', message: 'Georeferenced — similarity fit (rotation + uniform scale, no shear)' },
+      controlPoints
+    );
   }
 
   // For 3+ points the affine fit is least-squares, not exact (see
@@ -94,16 +139,19 @@ function describeGeoreferenceStatus(controlPoints: ControlPoint[], needsReconfir
       };
     }
 
-    return {
-      tone: 'ok',
-      message: `Georeferenced — least-squares affine fit (${controlPoints.length} points), max error ${maxMetres} m, RMS ${rmsMetres} m`,
-    };
+    return boundByGpsInputIfCoarse(
+      {
+        tone: 'ok',
+        message: `Georeferenced — least-squares affine fit (${controlPoints.length} points), max error ${maxMetres} m, RMS ${rmsMetres} m`,
+      },
+      controlPoints
+    );
   }
 
-  return {
-    tone: 'ok',
-    message: `Georeferenced — least-squares affine fit (${controlPoints.length} points)`,
-  };
+  return boundByGpsInputIfCoarse(
+    { tone: 'ok', message: `Georeferenced — least-squares affine fit (${controlPoints.length} points)` },
+    controlPoints
+  );
 }
 
 interface ControlPointRowProps {
@@ -125,6 +173,36 @@ function ControlPointRow({ point, index, onUpdate, onRemove }: ControlPointRowPr
   // user is mid-typing (e.g. "1.50" getting reformatted to "1.5").
   const lastCommittedLat = useRef(point.lat);
   const lastCommittedLon = useRef(point.lon);
+
+  // One hook instance per row, rather than one shared instance lifted to
+  // GeoreferenceSection or the page: a fix this row requests can only ever
+  // land in this row's own `location`/`status`, so there is no "which row
+  // is waiting for a fix" bookkeeping to get wrong when another row's
+  // button is pressed in between.
+  const geo = useDeviceLocation();
+
+  // Identifies the last fix already written into this point, so re-renders
+  // (onUpdate is a fresh closure most renders — the parent doesn't memoize
+  // it) don't re-fire onUpdate for a fix that was already applied.
+  const appliedFixTimestampRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (geo.status !== 'granted' || !geo.location) return;
+    if (appliedFixTimestampRef.current === geo.location.timestamp) return;
+    appliedFixTimestampRef.current = geo.location.timestamp;
+
+    const { lat, lon, accuracy } = geo.location;
+    // Resync the text fields the same way an external prop change does
+    // (see the lat/lon effects below) — a device fix is exactly that, an
+    // update this row didn't type.
+    lastCommittedLat.current = lat;
+    lastCommittedLon.current = lon;
+    setLatText(String(lat));
+    setLonText(String(lon));
+    setLatError(null);
+    setLonError(null);
+    onUpdate(index, { lat, lon, accuracy });
+  }, [geo.status, geo.location, index, onUpdate]);
 
   useEffect(() => {
     if (point.lat !== lastCommittedLat.current) {
@@ -174,6 +252,32 @@ function ControlPointRow({ point, index, onUpdate, onRemove }: ControlPointRowPr
     onUpdate(index, { lon: parsed });
   };
 
+  const handleUseMyLocation = () => geo.request();
+
+  // Computed directly from navigator/window rather than read off `geo.error`
+  // — this is the exact reasoning the hook itself uses to decide the button
+  // should be disabled (see getGeolocationUnsupportedReason's doc comment on
+  // why plain-HTTP LAN deployments matter here), and it's available even
+  // before the hook's mount effect has had a chance to run.
+  const unsupportedReason =
+    geo.status === 'unsupported'
+      ? getGeolocationUnsupportedReason(
+          typeof navigator !== 'undefined' && !!navigator.geolocation,
+          typeof window !== 'undefined' && window.isSecureContext === true
+        )
+      : null;
+
+  const accuracyQuality = point.accuracy !== undefined ? classifyAccuracyQuality(point.accuracy, MAX_ACCEPTABLE_RESIDUAL_METRES) : null;
+
+  const locateButtonTooltip =
+    geo.status === 'unsupported'
+      ? unsupportedReason ?? 'Geolocation is not available in this browser.'
+      : geo.status === 'denied'
+      ? 'Location permission was denied — re-enable it for this site in your browser settings, then try again.'
+      : geo.status === 'prompting'
+      ? 'Waiting for a location fix…'
+      : 'Use my current device location for this point';
+
   return (
     <Card isBlurred className="border-2 rounded-2xl border-default-200 bg-transparent">
       <div className="flex flex-col gap-2 px-3 py-2">
@@ -198,40 +302,101 @@ function ControlPointRow({ point, index, onUpdate, onRemove }: ControlPointRowPr
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Input
-              aria-label={`Control point ${index + 1} latitude`}
-              value={latText}
-              onValueChange={handleLatChange}
-              placeholder="Latitude"
-              size="sm"
-              variant="flat"
-              isInvalid={!!latError}
-              classNames={{
-                input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                inputWrapper: 'rounded-lg px-2 hover:bg-surface-deep',
-              }}
-            />
-            {latError && <p className="mt-1 text-xs text-status-red">{latError}</p>}
+        <div className="flex items-start gap-2">
+          <div className="grid flex-1 grid-cols-2 gap-2">
+            <div>
+              <Input
+                aria-label={`Control point ${index + 1} latitude`}
+                value={latText}
+                onValueChange={handleLatChange}
+                placeholder="Latitude"
+                size="sm"
+                variant="flat"
+                isInvalid={!!latError}
+                classNames={{
+                  input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+                  inputWrapper: 'rounded-lg px-2 hover:bg-surface-deep',
+                }}
+              />
+              {latError && <p className="mt-1 text-xs text-status-red">{latError}</p>}
+            </div>
+            <div>
+              <Input
+                aria-label={`Control point ${index + 1} longitude`}
+                value={lonText}
+                onValueChange={handleLonChange}
+                placeholder="Longitude"
+                size="sm"
+                variant="flat"
+                isInvalid={!!lonError}
+                classNames={{
+                  input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+                  inputWrapper: 'rounded-lg px-2 hover:bg-surface-deep',
+                }}
+              />
+              {lonError && <p className="mt-1 text-xs text-status-red">{lonError}</p>}
+            </div>
           </div>
-          <div>
-            <Input
-              aria-label={`Control point ${index + 1} longitude`}
-              value={lonText}
-              onValueChange={handleLonChange}
-              placeholder="Longitude"
-              size="sm"
-              variant="flat"
-              isInvalid={!!lonError}
-              classNames={{
-                input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                inputWrapper: 'rounded-lg px-2 hover:bg-surface-deep',
-              }}
-            />
-            {lonError && <p className="mt-1 text-xs text-status-red">{lonError}</p>}
-          </div>
+          <Tooltip content={locateButtonTooltip} placement="top">
+            {/* span wrapper: HeroUI's Tooltip needs a trigger that still
+                receives pointer events when the button inside is disabled,
+                otherwise a disabled button (unsupported/prompting) never
+                fires the hover that would explain why. */}
+            <span className="mt-0.5 inline-block flex-shrink-0">
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                onPress={handleUseMyLocation}
+                isDisabled={geo.status === 'unsupported' || geo.status === 'prompting'}
+                aria-label={`Use my current device location for control point ${index + 1}`}
+                className="min-w-8 w-8 h-8"
+              >
+                {geo.status === 'prompting' ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <LocateFixed className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </span>
+          </Tooltip>
         </div>
+
+        {/* Accuracy readout: only appears once a point has one, which today
+            means only a point placed via "Use my location" — hand-entered
+            coordinates carry no accuracy figure and should not be made to
+            look like they have one. */}
+        {point.accuracy !== undefined && (
+          <span className={cn('text-xs', accuracyQuality === 'coarse' ? 'text-status-orange' : 'text-surface-faint')}>
+            ±{Math.round(point.accuracy)} m accuracy
+          </span>
+        )}
+
+        {/* Coarse-fix warning: visible, not blocking (see task rationale —
+            the operator may have no better option than a coarse fix, and
+            this codebase's convention is honest degradation over refusal).
+            It must still be impossible to miss, hence full-width and
+            icon-led rather than folded into the small accuracy label above. */}
+        {accuracyQuality === 'coarse' && point.accuracy !== undefined && (
+          <div className="flex items-start gap-1.5 rounded-lg border border-status-orange/50 px-2 py-1.5 text-xs text-status-orange">
+            <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+            <span>
+              This fix is only accurate to ±{Math.round(point.accuracy)} m — too coarse to calibrate against
+              (need ≤{MAX_ACCEPTABLE_RESIDUAL_METRES} m). Try again outdoors or away from buildings if you can;
+              otherwise this point can still be used, but the georeference will be no more accurate than this fix.
+            </span>
+          </div>
+        )}
+
+        {geo.status === 'denied' && (
+          <p className="text-xs text-status-red">
+            {geo.error ?? 'Location permission was denied — re-enable it for this site in your browser settings, then try again.'}
+          </p>
+        )}
+        {geo.status === 'error' && (
+          <p className="text-xs text-status-red">{geo.error ?? 'Location request failed.'}</p>
+        )}
+
         <Input
           aria-label={`Control point ${index + 1} label`}
           value={point.label ?? ''}
