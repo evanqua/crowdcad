@@ -11,7 +11,7 @@ import { markerCounterScale } from '@/lib/labelScale';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer, ControlPoint, Georeference, BasemapCamera } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
-import { georeferenceMapMatch, layerPostsLatLon } from '@/lib/geoUtils';
+import { georeferenceMapMatch, layerPostsLatLon, postGeoPosition, postPercentOnLayer } from '@/lib/geoUtils';
 import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import { isBasemapConfigured } from '@/lib/basemap/config';
@@ -176,12 +176,20 @@ export default function VenueManagementPageClient() {
   // Marker placement mode
   const [isAddMarkerMode, setIsAddMarkerMode] = useState(false);
 
-  // Active marker being named
+  // Active marker being named. `x`/`y` are the raster path's image-percentage
+  // coordinates; a basemap-placed marker has no image pixel space to derive
+  // those from, so it carries `null` there instead and `lat`/`lon` (the
+  // coordinate-native system of record — see the Post doc comment in
+  // app/types.ts) carry the position instead. No use site in this file reads
+  // `pendingMarker.x`/`.y` directly (they only key off `layerIdx`/`postIdx`),
+  // so widening this to allow `null` is safe everywhere it's consumed.
   const [pendingMarker, setPendingMarker] = useState<{
-    x: number;
-    y: number;
+    x: number | null;
+    y: number | null;
     layerIdx: number;
     postIdx: number;
+    lat?: number;
+    lon?: number;
   } | null>(null);
   const [markerNameInput, setMarkerNameInput] = useState('');
   const [markerIsClinicInput, setMarkerIsClinicInput] = useState(false);
@@ -646,6 +654,42 @@ export default function VenueManagementPageClient() {
     setMarkerIsClinicInput(false);
   };
 
+  // Coordinate-native counterpart to handleImageClick above, for marker
+  // placement on the real basemap (10.C's `Post.lat`/`Post.lon`). There is no
+  // raster pixel space here to derive x/y from, so the post is built directly
+  // from the clicked lat/lon with x/y explicitly `null` -- never omitted and
+  // never `undefined` (Firestore rejects `undefined` at any depth, and posts
+  // inside `layer.posts` are written verbatim; see handleSubmit's save path).
+  const handleBasemapMapClick = ({ lat, lon }: { lat: number; lon: number }) => {
+    // Georeference (control point) mode has no map click handler wired in
+    // basemap view -- this should be unreachable -- but stay defensive rather
+    // than let a stray click during that mode create a stray Post.
+    if (isGeoreferenceMode) return;
+
+    const newPost: Post = { name: '', x: null, y: null, lat, lon };
+
+    setVenueData((prev) => {
+      const newLayers = [...prev.layers];
+      newLayers[currentLayer] = {
+        ...newLayers[currentLayer],
+        posts: [...newLayers[currentLayer].posts, newPost],
+      };
+      return { ...prev, layers: newLayers };
+    });
+    // Same postIdx computation as the raster path above -- venueData.layers's
+    // pre-update length, kept consistent with handleImageClick on purpose.
+    setPendingMarker({
+      x: null,
+      y: null,
+      lat,
+      lon,
+      layerIdx: currentLayer,
+      postIdx: venueData.layers[currentLayer].posts.length,
+    });
+    setMarkerNameInput('');
+    setMarkerIsClinicInput(false);
+  };
+
   // Confirm marker name
   const confirmMarkerName = () => {
     if (!pendingMarker) return;
@@ -948,49 +992,87 @@ export default function VenueManagementPageClient() {
     transform: `scale(${markerCounter}) translate(-50%, -50%)`,
   };
 
-  const renderMarkers = () => {
-    type CoordinatedPost = {
-      name: string;
-      x: number;
-      y: number;
-    };
+  // Per-post drawable percent for the CURRENTLY VIEWED layer only, resolved
+  // ONCE per render via postPercentOnLayer rather than once per marker --
+  // postPercentOnLayer solves the layer's georeference internally, so
+  // calling it per marker per render would re-solve the same transform
+  // posts.length times on every render. Follows the same "solve once, reuse
+  // per post" shape as layerPostLatLons above (which is cross-layer and
+  // reports ground position -- this is layer-scoped and reports screen
+  // position). Indexed by the ORIGINAL index into layer.posts, matching
+  // posts[i] -- never by an index into any filtered array. See renderMarkers
+  // below for why that distinction is load-bearing.
+  const currentLayerPostPercents = useMemo(() => {
+    const layer = venueData.layers[currentLayer];
+    if (!layer) return [];
+    return layer.posts.map((post) => postPercentOnLayer(layer, post));
+  }, [venueData.layers, currentLayer]);
 
-    return venueData.layers[currentLayer].posts
-      .filter((post): post is CoordinatedPost =>
-        typeof post === 'object' &&
-        post !== null &&
-        'name' in post &&
-        typeof post.x === 'number' &&
-        typeof post.y === 'number' &&
-        post.x !== null &&
-        post.y !== null
+  const renderMarkers = () => {
+    const layer = venueData.layers[currentLayer];
+    if (!layer) return null;
+
+    return layer.posts
+      // Attach the ORIGINAL index (and the resolved percent) to every post
+      // BEFORE filtering. Filtering first and then using .map's post-filter
+      // idx was a real bug: a text-only location (addTextLocation) or a
+      // legacy string post has no x/y and gets dropped by the filter below,
+      // which shifts every subsequent post's filtered-array index away from
+      // its true index into `layer.posts`. Since hover/drag/rename/pending
+      // all key off this index and act on `layer.posts[idx]` (or the
+      // full-array-indexed removePost/renamePost), a filtered index made
+      // them silently operate on the wrong post whenever a droppable post
+      // preceded a real marker in the array. Carrying originalIdx forward
+      // instead keeps every consumer pointed at the post actually under the
+      // cursor.
+      .map((post, originalIdx) => ({
+        post,
+        originalIdx,
+        percent: currentLayerPostPercents[originalIdx] ?? null,
+      }))
+      .filter(
+        (entry): entry is { post: Exclude<Post, string>; originalIdx: number; percent: { x: number; y: number } } =>
+          typeof entry.post === 'object' &&
+          entry.post !== null &&
+          entry.percent !== null
       )
-      .map((post, idx) => {
-        const isHover = hoverId === idx;
-        const isPending = pendingMarker?.layerIdx === currentLayer && pendingMarker?.postIdx === idx;
+      .map(({ post, originalIdx, percent }) => {
+        const isHover = hoverId === originalIdx;
+        const isPending =
+          pendingMarker?.layerIdx === currentLayer && pendingMarker?.postIdx === originalIdx;
+        // A coordinate-native post's on-screen percent is DERIVED from its
+        // lat/lon via this layer's georeference (postPercentOnLayer above),
+        // not stored. onMarkerMouseDown's drag handler writes a raw x/y
+        // percent straight onto the post, which for a coordinate-native post
+        // would leave its stored lat/lon and its now-overwritten x/y
+        // disagreeing about where it is. Correctly moving one of these means
+        // inverse-projecting the drop point back through the georeference
+        // into a new lat/lon, which is separate follow-on work -- so for now
+        // it still renders, hovers, and is renamable, just not drag-movable.
+        const isCoordinateNative = postGeoPosition(post) !== null;
 
         return (
-          <React.Fragment key={idx}>
+          <React.Fragment key={originalIdx}>
             <div
-              style={{ left: `${post.x}%`, top: `${post.y}%`, ...markerScaleStyle }}
+              style={{ left: `${percent.x}%`, top: `${percent.y}%`, ...markerScaleStyle }}
               className="absolute z-10"
             >
               <div
-                className={`flex h-6 w-6 cursor-grab items-center justify-center rounded-full border-2 transition-all ${
+                className={`flex h-6 w-6 ${isCoordinateNative ? 'cursor-pointer' : 'cursor-grab'} items-center justify-center rounded-full border-2 transition-all ${
                   isPending
                     ? 'border-status-blue bg-status-blue/20 scale-125'
-                    : isHover || draggingIdx === idx
+                    : isHover || draggingIdx === originalIdx
                     ? 'border-accent bg-accent/30 scale-110'
                     : 'border-accent bg-accent/20 hover:scale-110'
-                } ${draggingIdx === idx ? 'cursor-grabbing scale-110' : ''}`}
-                onMouseEnter={() => setHoverId(idx)}
-                onMouseLeave={() => setHoverId((cur) => (cur === idx ? null : cur))}
-                onMouseDown={onMarkerMouseDown(idx)}
+                } ${draggingIdx === originalIdx ? 'cursor-grabbing scale-110' : ''}`}
+                onMouseEnter={() => setHoverId(originalIdx)}
+                onMouseLeave={() => setHoverId((cur) => (cur === originalIdx ? null : cur))}
+                onMouseDown={isCoordinateNative ? undefined : onMarkerMouseDown(originalIdx)}
                 onClick={(e) => {
                   if (isPending) return;
                   e.preventDefault();
                   e.stopPropagation();
-                  renamePost(currentLayer, idx);
+                  renamePost(currentLayer, originalIdx);
                 }}
               >
                 <MapPin className="h-4 w-4 text-accent" strokeWidth={2.5} />
@@ -999,8 +1081,8 @@ export default function VenueManagementPageClient() {
             {isHover && !isPending && post.name && (
               <div
                 style={{
-                  left: `${post.x}%`,
-                  top: `${post.y}%`,
+                  left: `${percent.x}%`,
+                  top: `${percent.y}%`,
                   transformOrigin: 'top left',
                   transform: `scale(${markerCounter}) translate(-50%, calc(-100% - 14px))`,
                 }}
@@ -1331,7 +1413,13 @@ export default function VenueManagementPageClient() {
                           {allPosts.map((item, idx) => {
                             const post = item.post;
                             const label = typeof post === 'string' ? post : post.name;
-                            const hasCoordinates = typeof post === 'object' && post.x !== null && post.y !== null;
+                            // A coordinate-native post (10.C) has x: null, y: null by
+                            // design -- postGeoPosition is the accessor for its stored
+                            // lat/lon and must be consulted too, or a basemap-placed
+                            // post would wrongly read as "not placed".
+                            const hasCoordinates =
+                              typeof post === 'object' &&
+                              ((post.x !== null && post.y !== null) || postGeoPosition(post) !== null);
                             const isPending = pendingMarker?.layerIdx === item.layerIdx && pendingMarker?.postIdx === item.postIdx;
 
                             const derivedLatLon =
@@ -1476,32 +1564,40 @@ export default function VenueManagementPageClient() {
                     placeholder="Layer name"
                   />
                 </div>
-                {/* Marker/control-point placement only makes sense against the
-                    raster image (they operate on handleImageClick, a pixel
-                    click on that <Image>) -- hidden while the basemap is
-                    showing rather than left on screen doing nothing. */}
-                {previewUrl && !effectiveBasemap && (
+                {/* "Add Markers" works in EITHER view now (10.E): the raster
+                    path still derives x/y from an image-pixel click via
+                    handleImageClick, while basemap view hands
+                    handleBasemapMapClick a lat/lon directly (10.C's
+                    coordinate-native Post shape) and needs no image pixel
+                    space at all. "Add Control Point" stays raster-only and
+                    deliberately so -- a control point is, by definition, a
+                    correspondence between an IMAGE pixel and a ground
+                    coordinate, and there is no image to place one on in
+                    basemap view. Do not "fix" that; it is correct. */}
+                {(previewUrl || effectiveBasemap) && (
                   <div className="flex gap-2">
                     <MarkerModeToggleButton
                       isAddMarkerMode={isAddMarkerMode}
                       onToggle={toggleAddMarkerMode}
                     />
-                    <Button
-                      size="md"
-                      variant={isGeoreferenceMode ? 'solid' : 'bordered'}
-                      color={isGeoreferenceMode ? 'primary' : 'default'}
-                      onPress={toggleGeoreferenceMode}
-                      startContent={
-                        isGeoreferenceMode ? (
-                          <MousePointer2 className="h-3.5 w-3.5" />
-                        ) : (
-                          <Crosshair className="h-3.5 w-3.5" />
-                        )
-                      }
-                      className={isGeoreferenceMode ? 'bg-status-orange hover:bg-status-orange/90 text-surface-deepest' : ''}
-                    >
-                      {isGeoreferenceMode ? 'Click to Place' : 'Add Control Point'}
-                    </Button>
+                    {previewUrl && !effectiveBasemap && (
+                      <Button
+                        size="md"
+                        variant={isGeoreferenceMode ? 'solid' : 'bordered'}
+                        color={isGeoreferenceMode ? 'primary' : 'default'}
+                        onPress={toggleGeoreferenceMode}
+                        startContent={
+                          isGeoreferenceMode ? (
+                            <MousePointer2 className="h-3.5 w-3.5" />
+                          ) : (
+                            <Crosshair className="h-3.5 w-3.5" />
+                          )
+                        }
+                        className={isGeoreferenceMode ? 'bg-status-orange hover:bg-status-orange/90 text-surface-deepest' : ''}
+                      >
+                        {isGeoreferenceMode ? 'Click to Place' : 'Add Control Point'}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1528,9 +1624,39 @@ export default function VenueManagementPageClient() {
                           initialCamera={venueData.basemapCamera ?? null}
                           onUnavailable={handleBasemapUnavailable}
                           onCameraChange={handleBasemapCameraChange}
+                          isPlacementArmed={isAddMarkerMode}
+                          onMapClick={handleBasemapMapClick}
+                          draftPin={
+                            pendingMarker?.lat !== undefined && pendingMarker?.lon !== undefined
+                              ? { lat: pendingMarker.lat, lon: pendingMarker.lon }
+                              : null
+                          }
                           className="h-full w-full"
                         />
                       )}
+
+                      {/* Same pending-marker dialog and placement hint as the
+                          raster branch below -- no duplicated state, just
+                          rendered from here too now that basemap view can
+                          place markers (10.E). PendingMarkerDialog is
+                          `position: fixed` and centered, so it doesn't care
+                          which branch renders it; MarkerPlacementInstruction
+                          is `absolute left-3 top-3` so it needs this
+                          relatively-positioned map container as its anchor. */}
+                      {pendingMarker && (
+                        <PendingMarkerDialog
+                          markerNameInput={markerNameInput}
+                          markerInputRef={markerInputRef}
+                          setMarkerNameInput={setMarkerNameInput}
+                          markerIsClinicInput={markerIsClinicInput}
+                          setMarkerIsClinicInput={setMarkerIsClinicInput}
+                          onConfirm={confirmMarkerName}
+                          onCancel={cancelMarkerName}
+                          lat={pendingMarker.lat}
+                          lon={pendingMarker.lon}
+                        />
+                      )}
+                      {isAddMarkerMode && !pendingMarker && <MarkerPlacementInstruction />}
 
                       {/* View toggle (mirrors venuemapmodal.tsx's placement
                           rationale: bottom-left is the one corner no other
@@ -1718,6 +1844,8 @@ export default function VenueManagementPageClient() {
                           setMarkerIsClinicInput={setMarkerIsClinicInput}
                           onConfirm={confirmMarkerName}
                           onCancel={cancelMarkerName}
+                          lat={pendingMarker.lat}
+                          lon={pendingMarker.lon}
                         />
                       )}
 

@@ -452,14 +452,27 @@ export function georeferenceResiduals(
 
 // --- Derive-on-read Post accessors -----------------------------------------
 //
-// A Post's lat/lon is intentionally never stored: it is always recomputed
-// from the post's (x%, y%) plus the layer's current Georeference. This means
-// recalibrating a layer's control points (or editing a post's percentage
-// position) instantly and correctly changes every derived lat/lon, with no
-// migration/backfill step and no risk of a stored value drifting out of sync
-// with the control points that produced it. The cost is recomputing
-// solveGeoreference on read, which is why layerPostsLatLon exists to amortize
-// that solve across an entire layer's posts instead of once per post.
+// A Post's lat/lon is never stored FOR PERCENT-NATIVE POSTS — the common
+// case, and the only shape any existing venue has today. For those, lat/lon
+// is always recomputed from the post's (x%, y%) plus the layer's current
+// Georeference. This means recalibrating a layer's control points (or
+// editing a post's percentage position) instantly and correctly changes
+// every derived lat/lon, with no migration/backfill step and no risk of a
+// stored value drifting out of sync with the control points that produced
+// it. The cost is recomputing solveGeoreference on read, which is why
+// layerPostsLatLon exists to amortize that solve across an entire layer's
+// posts instead of once per post.
+//
+// COORDINATE-NATIVE posts (see the Post doc comment in app/types.ts) invert
+// this: lat/lon IS the stored record, and x/y are what gets derived on read
+// instead — per layer, via postPercentOnLayer — so the post can be drawn on
+// whichever raster image (if any) it happens to fall inside. postGeoPosition
+// below is the accessor for the stored coordinate; postLatLon,
+// layerPostsLatLon, and postPercentOnLayer all check it FIRST and let a
+// stored value win over derivation, because a coordinate-native post's
+// lat/lon did not come from this layer's georeference and re-deriving it
+// from percent (which the post doesn't reliably have) would throw away the
+// one thing that's actually known to be true.
 
 /**
  * Returns a Post's display name, regardless of which of the two historical
@@ -493,13 +506,50 @@ export function postPercent(post: Post): { x: number; y: number } | null {
 }
 
 /**
- * Derives a single Post's lat/lon from the layer's current georeference.
- * Nothing is ever stored: this recomputes the transform (via
- * solveGeoreference) on every call, so a recalibrated georeference is
- * reflected immediately. Returns null whenever a result can't be produced —
- * missing/degenerate georeference, or a post with no usable percentage
- * position — rather than throwing, since both legacy string posts and
- * unplaced posts are expected, live production shapes.
+ * Returns a coordinate-native Post's STORED lat/lon — the system of record
+ * for a post that was placed directly on a georeferenced basemap (or on a
+ * layer with no image at all), as opposed to a percent-native post whose
+ * record is `x`/`y`. See the Post doc comment in app/types.ts for the full
+ * two-shape story.
+ *
+ * Mirrors postPercent's validation style exactly, for the same reason:
+ * legacy string posts carry no coordinates of any kind, and even
+ * object-form posts may have `lat`/`lon` absent (the default — a
+ * percent-native post) or set to a non-finite number. Centralizing that
+ * check here means postLatLon, layerPostsLatLon, and postPercentOnLayer all
+ * treat "no stored coordinate" identically instead of re-deriving the same
+ * null checks.
+ */
+export function postGeoPosition(post: Post): { lat: number; lon: number } | null {
+  if (typeof post === 'string') {
+    return null;
+  }
+  const { lat, lon } = post;
+  if (lat === undefined || lon === undefined) {
+    return null;
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return null;
+  }
+  return { lat, lon };
+}
+
+/**
+ * Derives a single Post's lat/lon from the layer's current georeference —
+ * unless the post is coordinate-native, in which case its STORED lat/lon
+ * (see postGeoPosition) wins outright and the georeference is not even
+ * solved. In that case `georeferenceVersion` is `undefined`: no
+ * georeference produced this value, it IS the record, so stamping the
+ * layer's current version on it would claim a provenance that isn't true —
+ * the same trap `postLatLon` exists to avoid in the other direction (see
+ * georeferenceVersion below).
+ *
+ * For a percent-native post, nothing is ever stored: this recomputes the
+ * transform (via solveGeoreference) on every call, so a recalibrated
+ * georeference is reflected immediately. Returns null whenever a result
+ * can't be produced — missing/degenerate georeference, or a post with no
+ * usable percentage position — rather than throwing, since both legacy
+ * string posts and unplaced posts are expected, live production shapes.
  *
  * The result carries `georeferenceVersion`, copied from the GeoTransform
  * that produced it (see GeoTransform.version) — the same field name and
@@ -520,6 +570,10 @@ export function postLatLon(
   layer: Layer,
   post: Post
 ): { lat: number; lon: number; georeferenceVersion: number | undefined } | null {
+  const stored = postGeoPosition(post);
+  if (stored) {
+    return { lat: stored.lat, lon: stored.lon, georeferenceVersion: undefined };
+  }
   const transform = solveGeoreference(layer.georeference);
   if (!transform) {
     return null;
@@ -539,11 +593,19 @@ export function postLatLon(
  * affine transform) and reuse it for every post, rather than re-solving on
  * each post as a naive `layer.posts.map(p => postLatLon(layer, p))` would.
  *
+ * A coordinate-native post's STORED lat/lon (see postGeoPosition) wins per
+ * post, before the transform is even consulted — same rule as postLatLon,
+ * and for the same reason `georeferenceVersion` comes back `undefined` for
+ * those entries. The georeference is solved LAZILY, only once at least one
+ * post actually needs derivation: a map-first venue whose posts are all
+ * coordinate-native (no image, so no georeference to speak of) pays nothing
+ * for a solve it never needed.
+ *
  * Always returns one entry per post, in original order — including posts
  * that can't be located (`latLon: null`), and even when the layer has no
- * usable georeference at all (every entry gets `latLon: null`, but posts are
- * never dropped from the result). `layer.posts` is treated defensively as an
- * empty array when undefined/null.
+ * usable georeference at all (every percent-native entry gets
+ * `latLon: null`, but posts are never dropped from the result). `layer.posts`
+ * is treated defensively as an empty array when undefined/null.
  *
  * Each non-null `latLon` carries `georeferenceVersion` — see the identical
  * field on postLatLon's return value above for what it means and why it's
@@ -555,9 +617,24 @@ export function layerPostsLatLon(layer: Layer): Array<{
   latLon: { lat: number; lon: number; georeferenceVersion: number | undefined } | null;
 }> {
   const posts = layer.posts ?? [];
-  const transform = solveGeoreference(layer.georeference);
+  // Solved lazily, on first post that actually needs it — see the doc
+  // comment above for why an all-coordinate-native layer must not pay for
+  // this.
+  let transform: GeoTransform | null | undefined;
 
   return posts.map((post) => {
+    const stored = postGeoPosition(post);
+    if (stored) {
+      return {
+        post,
+        name: postName(post),
+        latLon: { lat: stored.lat, lon: stored.lon, georeferenceVersion: undefined },
+      };
+    }
+
+    if (transform === undefined) {
+      transform = solveGeoreference(layer.georeference);
+    }
     if (!transform) {
       return { post, name: postName(post), latLon: null };
     }
@@ -572,6 +649,53 @@ export function layerPostsLatLon(layer: Layer): Array<{
       latLon: { lat, lon, georeferenceVersion: transform.version },
     };
   });
+}
+
+/**
+ * Returns a Post's image-percentage coordinates on a SPECIFIC layer's
+ * raster — the read path for drawing a post as a pin on a map image, as
+ * opposed to postLatLon/layerPostsLatLon, which report the post's ground
+ * position and are indifferent to any particular image.
+ *
+ * For a percent-native post this is just postPercent, unchanged — x/y
+ * already ARE the record, there's nothing to derive.
+ *
+ * For a coordinate-native post, the stored lat/lon (see postGeoPosition) is
+ * projected onto this layer's image via latLonToPixel against the layer's
+ * solved georeference:
+ * - Returns null if the layer has no usable georeference (nothing to
+ *   project onto) — this includes a map-first venue with no image at all.
+ * - Returns null if the derived percentage falls outside the image (x or y
+ *   outside 0..100), or is non-finite (latLonToPixel's degenerate-transform
+ *   guard).
+ *
+ * In neither null case is the value clamped into range. This mirrors
+ * `CallPosition.x`/`y` being null off-layer (see the doc comment there) and
+ * the TAK bridge's `onMap: false` for an off-map fix (see
+ * `docs/TAK_INTEGRATION_PLAN.md` / the TAK section of the repo's CLAUDE.md):
+ * the post is still real and its ground position is still exactly known —
+ * it is the *drawing* on THIS particular image that is unavailable. Clamping
+ * would silently draw a pin at the edge of an image the post isn't actually
+ * inside, which looks authoritative and is wrong — a confident lie, exactly
+ * the failure a coordinate-native post exists to avoid in the first place.
+ */
+export function postPercentOnLayer(layer: Layer, post: Post): { x: number; y: number } | null {
+  const stored = postGeoPosition(post);
+  if (!stored) {
+    return postPercent(post);
+  }
+  const transform = solveGeoreference(layer.georeference);
+  if (!transform) {
+    return null;
+  }
+  const { x, y } = latLonToPixel(transform, stored.lat, stored.lon);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return null;
+  }
+  if (x < 0 || x > 100 || y < 0 || y > 100) {
+    return null;
+  }
+  return { x, y };
 }
 
 // --- Staleness detection -----------------------------------------------

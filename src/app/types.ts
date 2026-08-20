@@ -1,3 +1,35 @@
+/**
+ * The bare-string form is a legacy shape kept intentionally unchanged: it is
+ * load-bearing in scheduling, where `PostAssignment` keys posts by NAME, not
+ * by object identity. A string post carries no coordinates of any kind and
+ * never will.
+ *
+ * The object form's `lat`/`lon` follow the same system-of-record convention
+ * as `CallPosition` in this file (read that doc comment first) — with the
+ * roles reversed depending on which fields are present:
+ *
+ * - `lat`/`lon` ABSENT (the default, and the only shape any existing venue
+ *   has today): `x`/`y` are the record, exactly as before. Nothing about
+ *   this post's behaviour changes.
+ * - `lat`/`lon` PRESENT: they become the record, and `x`/`y` are derived
+ *   per-layer from the layer's georeference (see `postPercentOnLayer` in
+ *   `lib/geoUtils.ts`), and may be `null` on any given layer when the point
+ *   falls outside that layer's image — the post is still real, only the
+ *   *drawing* on that particular raster is unavailable. This is what lets a
+ *   Post be placed on a real basemap in a venue that has no map image at
+ *   all: there is nothing for `x`/`y` to be a percentage OF, but `lat`/`lon`
+ *   need no image to mean something.
+ *
+ * There is deliberately NO migration that backfills `lat`/`lon` onto
+ * existing percent-only posts. An ungeoreferenced percent post has no true
+ * lat/lon — synthesizing one from a guessed extent would produce a marker
+ * that LOOKS authoritative and is wrong, which is the same failure the TAK
+ * integration refuses when it records an off-map fix as `onMap: false`
+ * rather than clamping it onto the image: a clamped (or guessed) marker is
+ * a confident lie. A post only gets `lat`/`lon` when something actually
+ * knows its ground position — e.g. it was placed directly on a georeferenced
+ * basemap, or on a layer with no image at all.
+ */
 export type Post =
   | string
   | {
@@ -5,6 +37,15 @@ export type Post =
     x: number | null; // percentage of width
     y: number | null; // percentage of height
     isClinic?: boolean;
+    /**
+     * System-of-record latitude, in degrees. Present only for coordinate-
+     * native posts — see the type-level doc comment above. When present,
+     * this — not `x`/`y` — is the ground truth; `x`/`y` are re-derived per
+     * layer on read (see `postPercentOnLayer`).
+     */
+    lat?: number;
+    /** System-of-record longitude, in degrees. See `lat` above. */
+    lon?: number;
   };
 
 export interface Clinic {

@@ -9,6 +9,12 @@ interface PendingMarkerDialogProps {
   setMarkerIsClinicInput: (value: boolean) => void;
   onConfirm: () => void;
   onCancel: () => void;
+  /** The lat/lon this marker was actually dropped at, when placed on the
+   *  real basemap (10.E) rather than a raster image. Only present for a
+   *  basemap-placed marker -- the raster path leaves both undefined, and
+   *  the coordinate readout below is omitted entirely in that case. */
+  lat?: number;
+  lon?: number;
 }
 
 export default function PendingMarkerDialog({
@@ -19,6 +25,8 @@ export default function PendingMarkerDialog({
   setMarkerIsClinicInput,
   onConfirm,
   onCancel,
+  lat,
+  lon,
 }: PendingMarkerDialogProps) {
   return (
     <div
@@ -30,6 +38,11 @@ export default function PendingMarkerDialog({
       }}
     >
       <p className="mb-2 text-xs font-medium text-surface-light">Name this location:</p>
+      {lat !== undefined && lon !== undefined && (
+        <p className="mb-2 text-xs text-surface-faint">
+          {lat.toFixed(6)}, {lon.toFixed(6)}
+        </p>
+      )}
       <Input
         ref={markerInputRef}
         value={markerNameInput}

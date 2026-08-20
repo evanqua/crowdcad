@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Modal, ModalContent, ModalBody, Button, Card, Select, SelectItem } from '@heroui/react';
@@ -31,6 +31,7 @@ import {
   type LabelBox,
 } from '@/lib/labelScale';
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
+import { postPercentOnLayer } from '@/lib/geoUtils';
 import { cn } from '@/lib/utils';
 import MarkerModeToggleButton from '@/components/venue-management/MarkerModeToggleButton';
 import MarkerPlacementInstruction from '@/components/venue-management/MarkerPlacementInstruction';
@@ -293,6 +294,15 @@ function OffMapBadge({
 
 interface PostMarkerProps {
   post: Post;
+  // This layer's resolved percent position for `post` -- see
+  // postPercentOnLayer in geoUtils.ts. Resolved ONCE per render by the
+  // parent (VenueMapWithPosts's rasterPostPercents memo) rather than here,
+  // because deriving it requires solving the layer's georeference, which is
+  // not free and must not happen per-marker. `null` means this post has no
+  // usable position on THIS raster (percent-native and never placed, or
+  // coordinate-native and off this layer's image / ungeoreferenced) -- the
+  // marker must not draw, not fall back to (0, 0).
+  percent: { x: number; y: number } | null;
   rect: ImageRect;
   staff: Staff[];
   mapScale: number;
@@ -304,16 +314,16 @@ interface PostMarkerProps {
   showLabel?: boolean;
 }
 
-function PostMarker({ post, rect, mapScale, showLabel }: PostMarkerProps) {
+function PostMarker({ post, percent, rect, mapScale, showLabel }: PostMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
-  if (!isPostObject(post)) return null;
+  if (!isPostObject(post) || !percent) return null;
 
   const { x, y, width, height } = rect;
-  const left = x + (post.x / 100) * width;
-  const top = y + (post.y / 100) * height;
-  
+  const left = x + (percent.x / 100) * width;
+  const top = y + (percent.y / 100) * height;
+
   // Check if this is a clinic location
   const isClinic = post.name.toLowerCase().includes('clinic');
   const Icon = isClinic ? HousePlus : MapPin;
@@ -444,14 +454,17 @@ function getContainedImageRect(containerW: number, containerH: number, naturalW:
 // Equipment marker - static display only
 interface EquipmentMarkerProps {
   equipment: Equipment;
-  post: Post;
+  // This layer's resolved percent position for the post the equipment is
+  // assigned to (see PostMarkerProps.percent for the full contract).
+  // `null` means it has no usable position on THIS raster.
+  percent: { x: number; y: number } | null;
   rect: ImageRect;
   mapScale: number;
 }
 
 function EquipmentMarker({
   equipment,
-  post,
+  percent,
   rect,
   mapScale,
 }: EquipmentMarkerProps) {
@@ -459,14 +472,13 @@ function EquipmentMarker({
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
 
-  const postIsValid = isPostObject(post);
-  if (!postIsValid) return null;
+  if (!percent) return null;
 
   // Position equipment marker
   // The stagger offset is applied in map-container pixels, so it has to shrink
   // with zoom to keep a constant on-screen gap from the post marker.
-  const left = rect.x + (post.x / 100) * rect.width - staggerOffsetPx(15, mapScale);
-  const top = rect.y + (post.y / 100) * rect.height + staggerOffsetPx(15, mapScale);
+  const left = rect.x + (percent.x / 100) * rect.width - staggerOffsetPx(15, mapScale);
+  const top = rect.y + (percent.y / 100) * rect.height + staggerOffsetPx(15, mapScale);
 
   const iconType = getEquipmentIcon(equipment);
 
@@ -580,7 +592,10 @@ function getTeamMarkerColors(team: Staff) {
 
 interface TeamMarkerProps {
   team: Staff;
-  post: Post;
+  // This layer's resolved percent position for the post the team is
+  // assigned to (see PostMarkerProps.percent for the full contract).
+  // `null` means it has no usable position on THIS raster.
+  percent: { x: number; y: number } | null;
   rect: ImageRect;
   teamTimers: { [team: string]: number };
   mapScale: number;
@@ -588,7 +603,7 @@ interface TeamMarkerProps {
 
 function TeamMarker({
   team,
-  post,
+  percent,
   rect,
   teamTimers,
   mapScale,
@@ -597,12 +612,11 @@ function TeamMarker({
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
 
-  const postIsValid = isPostObject(post);
-  if (!postIsValid) return null;
+  if (!percent) return null;
 
   // Stagger team marker 8px right and 8px up from post center
-  const left = rect.x + (post.x / 100) * rect.width + staggerOffsetPx(16, mapScale);
-  const top = rect.y + (post.y / 100) * rect.height - staggerOffsetPx(16, mapScale);
+  const left = rect.x + (percent.x / 100) * rect.width + staggerOffsetPx(16, mapScale);
+  const top = rect.y + (percent.y / 100) * rect.height - staggerOffsetPx(16, mapScale);
 
   const { color } = getTeamMarkerColors(team);
 
@@ -1056,8 +1070,33 @@ function VenueMapWithPosts({
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const mapUrl = layers[currentLayer]?.mapUrl || '';
-  const posts = layers[currentLayer]?.posts || [];
   const activeLayer = layers[currentLayer];
+  // Stabilized via useMemo (rather than `layers[currentLayer]?.posts || []`
+  // inline) so the `|| []` fallback doesn't hand rasterPostPercents below a
+  // fresh array identity on every render -- that would defeat the whole
+  // point of amortizing postPercentOnLayer's georeference solve.
+  const posts = useMemo(() => activeLayer?.posts || [], [activeLayer]);
+
+  // Each post's percent position on THIS raster, derived once per render
+  // instead of once per marker -- postPercentOnLayer solves the layer's
+  // georeference internally, which is not free, so re-deriving it inside
+  // every PostMarker/EquipmentMarker/TeamMarker would be a real performance
+  // regression. Mirrors the layerPostLatLons precedent in
+  // venues/management/page.client.tsx and layerPostsLatLon in geoUtils.ts:
+  // indexed in parallel with `posts`, so callers that already have a post's
+  // index (the post-marker loop, the label-box pass) can look its resolved
+  // percent up directly.
+  //
+  // For a percent-native post this is bit-identical to reading post.x/post.y
+  // directly (postPercentOnLayer's percent-native branch is just
+  // postPercent). For a coordinate-native post it is derived from the
+  // stored lat/lon via the layer's georeference, and is `null` -- never
+  // clamped -- when the layer has no usable georeference or the point falls
+  // outside this layer's image.
+  const rasterPostPercents = useMemo<Array<{ x: number; y: number } | null>>(
+    () => (activeLayer ? posts.map((post) => postPercentOnLayer(activeLayer, post)) : posts.map(() => null)),
+    [activeLayer, posts]
+  );
 
   // Update container size when component mounts and on resize
   useEffect(() => {
@@ -1270,16 +1309,18 @@ function VenueMapWithPosts({
   if (shouldRenderMarkers) {
     posts.forEach((post, i) => {
       if (!isPostObject(post) || !post.name) return;
+      const percent = rasterPostPercents[i];
+      if (!percent) return;
       const box = estimateLabelBox(post.name, LABEL_FONT_BASE_PX);
       const halfPx = post.name.toLowerCase().includes('clinic')
         ? CLINIC_MARKER_HALF_PX
         : POST_MARKER_HALF_PX;
       labelBoxes.push({
         id: `post-${i}`,
-        centerX: rect.x + (post.x / 100) * rect.width,
+        centerX: rect.x + (percent.x / 100) * rect.width,
         centerY:
           rect.y +
-          (post.y / 100) * rect.height +
+          (percent.y / 100) * rect.height +
           (halfPx + LABEL_GAP_PX + box.height / 2) * labelCounter,
         width: box.width * labelCounter,
         height: box.height * labelCounter,
@@ -1364,24 +1405,39 @@ function VenueMapWithPosts({
         onMouseLeave={onMouseUp}
         onClick={onMapClick}
       >
-        <Image
-          ref={imgRef}
-          src={mapUrl}
-          alt="Venue Map"
-          width={1200}
-          height={800}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', userSelect: 'none' }}
-          unoptimized
-          onLoad={handleImageLoad}
-          draggable={false}
-          onDragStart={(e) => e.preventDefault()}
-        />
+        {mapUrl ? (
+          <Image
+            ref={imgRef}
+            src={mapUrl}
+            alt="Venue Map"
+            width={1200}
+            height={800}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', userSelect: 'none' }}
+            unoptimized
+            onLoad={handleImageLoad}
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+          />
+        ) : (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <p className="text-sm text-surface-faint">No venue image for this layer</p>
+          </div>
+        )}
         {shouldRenderMarkers && (
           <>
             {posts.map((post, i) => (
               <PostMarker
                 key={i}
                 post={post}
+                percent={rasterPostPercents[i] ?? null}
                 rect={rect}
                 staff={staff}
                 mapScale={scale}
@@ -1389,7 +1445,8 @@ function VenueMapWithPosts({
               />
             ))}
             {equipment.map((equip) => {
-              const postObj = posts.find(p => (typeof p === "string" ? p : p.name) === equip.location);
+              const postIdx = posts.findIndex(p => (typeof p === "string" ? p : p.name) === equip.location);
+              const postObj = postIdx === -1 ? undefined : posts[postIdx];
               if (!postObj || typeof postObj === "string") {
                 return null;
               }
@@ -1398,21 +1455,22 @@ function VenueMapWithPosts({
                 <EquipmentMarker
                   key={equip.id}
                   equipment={equip}
-                  post={postObj}
+                  percent={rasterPostPercents[postIdx] ?? null}
                   rect={rect}
                   mapScale={scale}
                 />
               );
             })}
             {staff.map((team) => {
-              const postObj = posts.find(p => (typeof p === "string" ? p : p.name) === team.location);
+              const postIdx = posts.findIndex(p => (typeof p === "string" ? p : p.name) === team.location);
+              const postObj = postIdx === -1 ? undefined : posts[postIdx];
               if (!postObj || typeof postObj === "string") return null;
 
               return (
                 <TeamMarker
                   key={team.team}
                   team={team}
-                  post={postObj}
+                  percent={rasterPostPercents[postIdx] ?? null}
                   rect={rect}
                   teamTimers={teamTimers}
                   mapScale={scale}

@@ -222,6 +222,10 @@ from the phase section it affects.
 | **8.I** | **`Venue.basemapCamera` + the 4-level initial-camera precedence chain (saved camera → raster corners → located markers → archive coverage bounds → MapLibre default), `resolveInitialCamera()`, `parseArchiveCoverage`/`isOutsideCoverage`, `onCoverageWarning`. Shipped contract-first as two commits eight minutes apart so the shared type could not be a moving target. 22 tests in `camera.test.ts` — note the commit message's "26" is wrong; `npx vitest run` counts 22** | **Done** | `b6d3dc9` + `a78421a` |
 | **8.J** | **Basemap in the *venue editor* — the raster/basemap toggle ported across from the dispatch modal, plus "Set default view" / "Clear default view" writing `Venue.basemapCamera` through the new `sanitizeBasemapCameraForSave()` (Firestore rejects `undefined` at any depth). 4 tests. Shipped together with 10.D because without it the button was inert** | **Done** | `40342f5` |
 | **10.D** | **`onCameraChange` on `BasemapView` — fires on `moveend` and once when the map first becomes ready, held through a ref. Closes 8.J's inert "Set default view" button, which had been passing a callback through a type cast to a prop that did not exist. The mount emit was added during implementation and was not in the scoping: without it an operator cannot save a camera §8.I already resolved for them. The type cast at the editor call site is gone** | **Done** | `40342f5` |
+| **10.C** | **`Post.lat`/`Post.lon` — a coordinate of record for the object form, following `CallPosition`'s convention rather than inventing a second one. `postGeoPosition()` added as the validating reader; `postLatLon`/`layerPostsLatLon` now let a stored coordinate win before the georeference is consulted, and solve it lazily so an all-coordinate-native layer performs zero solves. `postPercentOnLayer()` added (not in the scoping) as the read path for drawing a coordinate-native post on a raster — returns `null`, never a clamped value, off-image. No backfill migration. `geoUtils.test.ts` 70 → 85 tests** | **Done (uncommitted)** | this session |
+| **10.E** | **Placement against the basemap in the editor. The marker-tool gate was *split*, not widened: "Add Markers" is now `previewUrl \|\| effectiveBasemap`, while "Add Control Point" stays raster-only because a control point is by definition an image-pixel↔ground correspondence. `handleBasemapMapClick` builds `{ name: '', x: null, y: null, lat, lon }` with every key explicitly present (post objects are written to Firestore verbatim). `pendingMarker` widened; `PendingMarkerDialog` shows the captured lat/lon to 6 dp. Both raster renderers now resolve through `postPercentOnLayer` so a map-placed post is not invisible in venue-image view. Dragging a coordinate-native post is deliberately disabled** | **Done (uncommitted)** | this session |
+| **10.E(1)** | **Pre-existing, live, silently destructive: the editor's raster marker renderer used the post-`.filter()` index as if it were the index into the full `posts` array, so with any text-only or bare-string post present, dragging or renaming a marker acted on a *different* post. Fixed by capturing the original index before the filter** | **Done (uncommitted)** | this session |
+| **10.E(2)** | **A venue with no image made the dispatch modal render `<Image src="">`, which Next.js reports as two console errors. Now omitted entirely with a muted empty-state in its place** | **Done (uncommitted)** | this session |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -2381,6 +2385,59 @@ change split across two files."
 
 Phase 8 is now marked complete except 8.G's basemap-view self-marker. Phase 10 moves to
 partly built.
+
+### 2026-08-19 (cont. 2) — a location can finally be placed on the map (10.C, 10.E)
+
+The 8.J/10.D checkpoint was handed back for testing with two caveats stated up front: the
+tile archive is a UC Berkeley extract, and basemap view in the editor was still look-only.
+The test came back confirming both — the map renders and behaves, and *"cannot mark
+locations on the map."* That was the expected result, not a regression; closing it is
+10.C and 10.E, which landed together here.
+
+**`Post` now has a coordinate of record.** The object form gained `lat`/`lon` following
+`CallPosition`'s convention rather than inventing a second one, and `geoUtils` gained
+`postGeoPosition` to read it and `postPercentOnLayer` to derive a drawable percent from
+it. Existing venues are untouched and there is no backfill: an ungeoreferenced percent
+post has no true lat/lon, and synthesising one from a guessed extent produces a marker
+that looks authoritative and is wrong — the same refusal `TAK_DECISIONS.md` §6 makes when
+it records an off-map fix as `onMap: false` rather than clamping it.
+
+**The editor's marker gate was split rather than widened.** "Add Markers" now works in
+both views; "Add Control Point" stays raster-only, because a control point is by
+definition a correspondence between an image pixel and a ground coordinate and there is
+no image to place one on in basemap view. That distinction is now a comment at the gate,
+since the obvious "fix" is to relax both together and it would be wrong.
+
+**Two things the scoping did not anticipate turned up during implementation, and both had
+to be closed for the feature to be coherent.** A map-placed post was invisible on *every*
+raster — both renderers read `post.x`/`post.y` raw, so a pin placed on the map vanished
+the moment the operator flipped to venue-image view, even on a georeferenced venue where
+its position had been derivable all along. And dragging such a post in raster view would
+have written a percent back onto a record whose truth is lat/lon; that is now disabled
+with the cursor saying so, because moving one correctly means inverse-projecting through
+the georeference and that is genuinely separate work.
+
+**A pre-existing bug surfaced on the way and is the most serious thing in this entry.**
+The editor's raster renderer used the index of the *filtered* post array as if it were the
+index into the full one. Every post the filter dropped — a text-only location, a legacy
+bare-string post — shifted every index after it, so dragging or renaming a marker acted on
+a different post than the one clicked. A rename silently retitled the wrong location. The
+venue in the 2026-08-19 screenshot has exactly that shape: a text location listed above a
+placed marker. This was live, it predates Phase 10 entirely, and coordinate-native posts
+only made it easier to hit. Recorded as 10.E(1) rather than folded into 10.E, because a
+data-corruption bug that shipped deserves its own line in the table.
+
+The console error reported alongside the marker gap — `<Image src="">` on a venue with no
+image — is 10.E(2). It is a direct consequence of Phase 10 making "venue with no picture" a
+supported shape rather than a degenerate one.
+
+Verification for the whole change: `tsc --noEmit` clean, 361/361 tests across 16 files (up
+from 346), and no new lint warnings — the four that remain are byte-identical to `HEAD`.
+
+What is still not built, stated so the next checkpoint is not oversold: **10.F** (locating a
+venue at creation via device GPS or typed coordinates) and **10.G** (surfacing 8.I's
+`onCoverageWarning` in the editor, so a venue outside the tile extract is told so instead of
+rendering grey). Phase 10 stays 🟡 partly built.
 
 
 ---
@@ -4629,7 +4686,7 @@ or swapping a raster. **The correct move is to give `Post` the `CallPosition` tr
 not to invent a second convention.** Two coordinate philosophies in one document is a bug
 factory; three is a rewrite.
 
-#### 10.C — `Post` gains a coordinate of record
+#### 10.C — `Post` gains a coordinate of record — ✅ BUILT (uncommitted)
 
 Propose extending the object form of `Post` with an optional geographic position, leaving
 both the bare-string form and the percent-only form untouched:
@@ -4651,6 +4708,40 @@ confirmed operator action, not a migration that runs while nobody is watching.
 The `string` form of `Post` must keep working. It is load-bearing in scheduling
 (`PostAssignment` is keyed by post *name*, `types.ts:408`) and this phase has no business
 touching that.
+
+**Built as scoped, plus one accessor the scoping did not name.** `Post`'s object form
+gained `lat?: number` / `lon?: number`; `geoUtils` gained `postGeoPosition(post)` as the
+validating reader (mirroring `postPercent`'s null/NaN discipline so no caller re-derives
+those checks), and `postLatLon` / `layerPostsLatLon` now let a **stored** coordinate win
+before the georeference is consulted at all.
+
+Two implementation decisions are worth recording because neither is obvious from the
+scoping text.
+
+First, a coordinate-native post returns `georeferenceVersion: undefined`, not the layer's
+current version. The field means *which calibration produced these numbers* — and for a
+stored coordinate the answer is "none did." Stamping the layer's version onto a value the
+layer did not compute would make `georeferenceStaleness` report a freshness it has no
+basis for.
+
+Second, `layerPostsLatLon` now solves the georeference **lazily**, on the first post that
+actually needs derivation. The whole reason that function exists alongside `postLatLon` is
+to amortize one `solveGeoreference` across a layer; on a map-first venue where every post
+is coordinate-native, the honest amortized cost is zero solves, not one.
+
+The accessor the scoping did not name is **`postPercentOnLayer(layer, post)`** — the read
+path for *drawing* a coordinate-native post on a raster. Percent-native posts pass through
+`postPercent` unchanged; coordinate-native posts derive percent through the layer's
+georeference and return `null` — never a clamped value — when the layer has no usable
+calibration or the point falls outside the image. It was needed the moment the two
+representations had to coexist on one screen, and its absence is what would otherwise make
+a map-placed post silently vanish in venue-image view.
+
+`geoUtils.test.ts` went from 70 tests to 85: `postGeoPosition`'s validation table, a
+coordinate-native post returning its stored value verbatim *even with no georeference on
+the layer at all*, a mixed layer (string + percent-native + coordinate-native) returning
+three entries in order, and `postPercentOnLayer`'s four cases including the far-outside one
+that must return `null` rather than clamp.
 
 #### 10.D — Close 8.J's inert button: `onCameraChange` on `BasemapView` — ✅ BUILT (`40342f5`)
 
@@ -4689,7 +4780,7 @@ component-test harness (§8.I) — the emit is four `map.get*()` calls behind a 
 pure part it feeds (`sanitizeBasemapCameraForSave`) is already covered. Verified in a
 browser instead; see the note at the end of this phase.
 
-#### 10.E — Placement against the basemap in the editor
+#### 10.E — Placement against the basemap in the editor — ✅ BUILT (uncommitted)
 
 `BasemapView` already delivers what is needed: a map click hands
 `{ lat: e.lngLat.lat, lon: e.lngLat.lng }` to `onMapClick` (`BasemapView.tsx:717`), and
@@ -4705,6 +4796,101 @@ click handler with nowhere to put its answer.
 
 `PendingMarkerDialog` needs no structural change, but it should show the captured lat/lon
 so the operator can see what was recorded before naming it.
+
+**Built, and the gate was split rather than widened.** The scoping said to change
+`previewUrl && !effectiveBasemap` to "admit the basemap case", which read as one condition
+to relax. It is two buttons with genuinely different requirements, and collapsing them
+would have been wrong:
+
+- **"Add Markers"** is now `previewUrl || effectiveBasemap`. The raster path still derives
+  `x`/`y` from an image-pixel click through `handleImageClick`; the new
+  `handleBasemapMapClick` is handed a lat/lon directly and needs no image pixel space at
+  all.
+- **"Add Control Point" stays raster-only, deliberately.** A control point *is* a
+  correspondence between an image pixel and a ground coordinate. In basemap view there is
+  no image to place one on, so the button is not hidden because it is inconvenient — it is
+  hidden because it is meaningless. The comment at the gate says so, because the next
+  reader will otherwise "fix" it.
+
+`handleBasemapMapClick` builds the post as `{ name: '', x: null, y: null, lat, lon }` with
+every key explicitly present. That is not stylistic: the venue save path strips `undefined`
+only at the *top level of each layer*, and post objects inside `layer.posts` are written to
+Firestore verbatim, so an omitted-vs-`null` slip here surfaces as a failed write rather
+than a bad value.
+
+`pendingMarker` widened to `x: number | null, y: number | null` plus optional `lat`/`lon`.
+An audit of all eight of its use sites found that **none** of them read `.x`/`.y` — every
+one keys off `layerIdx`/`postIdx` alone — so the widening is inert everywhere except the
+new coordinate readout. `PendingMarkerDialog` gained optional `lat`/`lon` and renders them
+to six decimal places above the name field, showing nothing extra on the raster path.
+
+The sidebar's "located" icon needed fixing too: it tested `post.x !== null && post.y !==
+null`, which reads a coordinate-native post — `x: null` by design — as *not placed*. It now
+also consults `postGeoPosition`.
+
+**Two consequences the scoping missed, both closed in the same change.**
+
+*A map-placed post was invisible on every raster.* Both raster renderers — the dispatch
+modal's (`venuemapmodal.tsx`, in `PostMarker`, `EquipmentMarker`, `TeamMarker`, and the
+label-collision pass) and the editor's own (`page.client.tsx`) — read `post.x`/`post.y`
+raw. A coordinate-native post has `x: null` by design, so an operator would place a pin on
+the map, flip to venue-image view, and watch it vanish *even on a properly georeferenced
+venue where its position was derivable the whole time*. Both now resolve through
+`postPercentOnLayer`, memoized once per render per layer rather than solving the
+georeference once per marker. A `null` result is skipped entirely — no marker, no label, no
+`NaN` in a style value, and no clamping to an edge.
+
+*Dragging a coordinate-native post is disabled, deliberately.* The editor's drag handler
+writes a new percent back onto the post. Doing that to a post whose record is `lat`/`lon`
+would leave the two representations disagreeing, with the percent silently winning on one
+screen and the coordinate on another. Moving one correctly means inverse-projecting the
+drop point through the layer's georeference and writing *that* back — real work, and out of
+scope here. Until then a coordinate-native post renders, hovers and renames normally but
+does not drag, and the cursor says so. This is a stated limitation, not an oversight.
+
+#### 10.E(1) — A pre-existing index bug, found while wiring the above — ✅ FIXED (uncommitted)
+
+Not caused by this phase, and worth recording separately because it was **live in
+production and silently destructive**.
+
+The editor's raster marker renderer read:
+
+```ts
+venueData.layers[currentLayer].posts
+  .filter(/* keeps only posts with numeric x AND y */)
+  .map((post, idx) => ...)
+```
+
+`idx` is the index into the *filtered* array. It was then passed to `renamePost`,
+`onMarkerMouseDown`, `draggingIdx`, `hoverId` and the `pendingMarker.postIdx` comparison —
+every one of which indexes into the **full** `posts` array. Any post the filter dropped
+shifted every index after it.
+
+Dropped posts are not exotic. A text-only location added through the "Locations" field is
+`{ name, x: null, y: null }` and is dropped; so is any legacy bare-string post. So on a
+layer with a text location listed before a placed marker — the exact shape of the venue in
+the 2026-08-19 screenshot — **dragging or renaming a marker acted on a different post than
+the one clicked.** A rename silently retitled the wrong location; a drag wrote coordinates
+onto it.
+
+Fixed by capturing the original index *before* the filter
+(`.map((post, originalIdx) => ({ post, originalIdx, percent })).filter(...)`) and threading
+it through every consumer. Coordinate-native posts made this worse — they are dropped from
+the raster too — which is how it surfaced, but the bug predates them entirely.
+
+#### 10.E(2) — A no-image venue crashed the dispatch modal's console — ✅ FIXED (uncommitted)
+
+Reported from the running app on 2026-08-19, alongside the "cannot mark locations" report.
+`VenueMapWithPosts` rendered `<Image src={mapUrl} />` where `mapUrl` is
+`layers[currentLayer]?.mapUrl || ''`. Phase 10 makes "a venue with no image" a *supported*
+shape rather than a degenerate one, so that empty string is now reachable by design, and
+Next.js logs two errors for it — including a warning that an empty `src` makes the browser
+re-download the whole page.
+
+The `<Image>` is now omitted entirely (not handed `null`) when there is no map URL, with a
+muted "No venue image for this layer" in its place. `shouldRenderMarkers` already gated on
+`imageLoaded && rect.width > 0`, so the no-image path could not produce mispositioned
+markers — that part was already correct and was left alone.
 
 #### 10.F — Locating the venue at creation, without assuming internet
 

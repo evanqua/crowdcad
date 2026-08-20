@@ -13,9 +13,11 @@ import {
   metresBetween,
   METRES_PER_DEGREE_LATITUDE,
   pixelToLatLon,
+  postGeoPosition,
   postLatLon,
   postName,
   postPercent,
+  postPercentOnLayer,
   solveGeoreference,
 } from '@/lib/geoUtils';
 
@@ -394,6 +396,40 @@ describe('postName / postPercent / postLatLon / layerPostsLatLon (derive-on-read
     });
   });
 
+  describe('postGeoPosition', () => {
+    it('returns null for a legacy string post', () => {
+      expect(postGeoPosition('Gate A')).toBeNull();
+    });
+
+    it('returns null when lat is missing', () => {
+      expect(postGeoPosition({ name: 'P', x: null, y: null, lon: BASE_LON })).toBeNull();
+    });
+
+    it('returns null when lon is missing', () => {
+      expect(postGeoPosition({ name: 'P', x: null, y: null, lat: BASE_LAT })).toBeNull();
+    });
+
+    it('returns null when both lat and lon are missing (percent-native post)', () => {
+      expect(postGeoPosition({ name: 'P', x: 50, y: 50 })).toBeNull();
+    });
+
+    it('returns null when lat is NaN', () => {
+      expect(postGeoPosition({ name: 'P', x: null, y: null, lat: NaN, lon: BASE_LON })).toBeNull();
+    });
+
+    it('returns null when lon is Infinity', () => {
+      expect(
+        postGeoPosition({ name: 'P', x: null, y: null, lat: BASE_LAT, lon: Infinity })
+      ).toBeNull();
+    });
+
+    it('returns the stored pair for a valid coordinate-native post', () => {
+      expect(
+        postGeoPosition({ name: 'P', x: null, y: null, lat: BASE_LAT, lon: BASE_LON })
+      ).toEqual({ lat: BASE_LAT, lon: BASE_LON });
+    });
+  });
+
   describe('postLatLon', () => {
     it('returns null when the layer has no georeference', () => {
       const layer = makeLayer({ posts: [{ name: 'P', x: 50, y: 50 }] });
@@ -476,6 +512,23 @@ describe('postName / postPercent / postLatLon / layerPostsLatLon (derive-on-read
       if (!result) return;
       expect(result.georeferenceVersion).toBe(7);
     });
+
+    it('returns the STORED lat/lon verbatim for a coordinate-native post, with georeferenceVersion undefined', () => {
+      const coordPost: Post = { name: 'GPS Post', x: null, y: null, lat: BASE_LAT, lon: BASE_LON };
+      const versionedGeoref: Georeference = { ...northUpGeoref, version: 9 };
+      const layer = makeLayer({ georeference: versionedGeoref, posts: [coordPost] });
+
+      const result = postLatLon(layer, coordPost);
+      expect(result).toEqual({ lat: BASE_LAT, lon: BASE_LON, georeferenceVersion: undefined });
+    });
+
+    it('returns the STORED lat/lon for a coordinate-native post even when the layer has NO georeference at all', () => {
+      const coordPost: Post = { name: 'GPS Post', x: null, y: null, lat: BASE_LAT, lon: BASE_LON };
+      const layer = makeLayer({ posts: [coordPost] }); // no georeference
+
+      const result = postLatLon(layer, coordPost);
+      expect(result).toEqual({ lat: BASE_LAT, lon: BASE_LON, georeferenceVersion: undefined });
+    });
   });
 
   describe('layerPostsLatLon', () => {
@@ -540,6 +593,77 @@ describe('postName / postPercent / postLatLon / layerPostsLatLon (derive-on-read
       // posts is missing, to prove the accessor doesn't throw.
       layer.posts = undefined;
       expect(layerPostsLatLon(layer)).toEqual([]);
+    });
+
+    it('handles a mixed layer of string, percent-native, and coordinate-native posts, in order', () => {
+      const stringPost: Post = 'Gate A';
+      const percentPost: Post = { name: 'Aid Station', x: 25, y: 75 };
+      const coordPost: Post = { name: 'GPS Post', x: null, y: null, lat: BASE_LAT, lon: BASE_LON };
+      const posts: Post[] = [stringPost, percentPost, coordPost];
+      const layer = makeLayer({ georeference: northUpGeoref, posts });
+
+      const result = layerPostsLatLon(layer);
+      expect(result).toHaveLength(3);
+      expect(result.map((r) => r.post)).toEqual(posts);
+
+      // String post: unlocatable.
+      expect(result[0].latLon).toBeNull();
+
+      // Percent-native post: derived from the georeference, matches
+      // postLatLon's own derivation.
+      const t = solveGeoreference(northUpGeoref);
+      expect(t).not.toBeNull();
+      if (!t) return;
+      const expectedPercent = pixelToLatLon(t, 25, 75);
+      expect(result[1].latLon?.lat).toBeCloseTo(expectedPercent.lat, 12);
+      expect(result[1].latLon?.lon).toBeCloseTo(expectedPercent.lon, 12);
+      expect(result[1].latLon?.georeferenceVersion).toBe(t.version);
+
+      // Coordinate-native post: stored value verbatim, undefined version.
+      expect(result[2].latLon).toEqual({
+        lat: BASE_LAT,
+        lon: BASE_LON,
+        georeferenceVersion: undefined,
+      });
+    });
+  });
+
+  describe('postPercentOnLayer', () => {
+    it('passes a percent-native post through unchanged', () => {
+      const layer = makeLayer({ georeference: northUpGeoref });
+      const post: Post = { name: 'Aid Station', x: 25, y: 75 };
+      expect(postPercentOnLayer(layer, post)).toEqual({ x: 25, y: 75 });
+    });
+
+    it('passes a percent-native post through unchanged even without a georeference', () => {
+      const layer = makeLayer(); // no georeference
+      const post: Post = { name: 'Aid Station', x: 25, y: 75 };
+      expect(postPercentOnLayer(layer, post)).toEqual({ x: 25, y: 75 });
+    });
+
+    it('derives a sensible percent for a coordinate-native post inside the image', () => {
+      const layer = makeLayer({ georeference: northUpGeoref });
+      // The centre of the north-up control points should land near the
+      // centre of the image.
+      const post: Post = { name: 'GPS Post', x: null, y: null, lat: BASE_LAT, lon: BASE_LON };
+      const result = postPercentOnLayer(layer, post);
+      expect(result).not.toBeNull();
+      if (!result) return;
+      expect(result.x).toBeCloseTo(50, 6);
+      expect(result.y).toBeCloseTo(50, 6);
+    });
+
+    it('returns null, not a clamped value, for a coordinate-native post far outside the image', () => {
+      const layer = makeLayer({ georeference: northUpGeoref });
+      // Many degrees away from the venue — nowhere near the image.
+      const post: Post = { name: 'Far Away', x: null, y: null, lat: BASE_LAT + 10, lon: BASE_LON + 10 };
+      expect(postPercentOnLayer(layer, post)).toBeNull();
+    });
+
+    it('returns null for a coordinate-native post on a layer with no georeference', () => {
+      const layer = makeLayer(); // no georeference at all
+      const post: Post = { name: 'GPS Post', x: null, y: null, lat: BASE_LAT, lon: BASE_LON };
+      expect(postPercentOnLayer(layer, post)).toBeNull();
     });
   });
 
