@@ -23,7 +23,6 @@ function toServiceUser(user: User): ServiceUser {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName,
-    photoURL: user.photoURL,
     phoneNumber: user.phoneNumber,
   };
 }
@@ -66,10 +65,7 @@ export class FirebaseAuthService implements IAuthService {
     });
   }
 
-  async updateProfile(updates: {
-    displayName?: string | null;
-    photoURL?: string | null;
-  }): Promise<void> {
+  async updateProfile(updates: { displayName?: string | null }): Promise<void> {
     const user = auth.currentUser;
     if (!user) throw new ServiceError('auth/no-current-user', 'No user is signed in.');
     try {

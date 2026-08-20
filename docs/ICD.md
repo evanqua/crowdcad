@@ -69,7 +69,6 @@ Only fields actually read/written by the app are listed; PocketBase auth collect
 | `id` | text (15-char, system) | Primary key, auto-generated. | No | `"a1b2c3d4e5f6g7h"` |
 | `email` | email (system) | Login identity. | No | `"medic@example.org"` |
 | `name` | text | Display name. | Yes | `"Jordan Lee"` |
-| `avatar` | file | Profile photo; served at `/api/files/_pb_users_auth_/{id}/{avatar}`. | Yes | `"avatar_x7z.png"` |
 | `phone` | text | Contact phone number. | Yes | `"+1-555-0100"` |
 | `isAdmin` | bool | Grants access to CrowdCAD's Profile → Admin section (manage other admins, org settings). Added via `scripts/setAdminPocketbase.js`; not present by default until the setup script runs. | Yes (defaults false) | `true` |
 

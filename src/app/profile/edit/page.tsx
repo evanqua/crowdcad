@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
 import { authService, dbService } from '@/lib/services';
-import { Card, CardBody, Button, Avatar, Input } from '@heroui/react';
+import { Card, CardBody, Button, Input } from '@heroui/react';
 import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
 import LoadingScreen from '@/components/ui/loading-screen';
 
@@ -70,8 +70,6 @@ export default function EditProfilePage() {
           >
             <CardBody className="p-6">
               <div className="flex items-center gap-6">
-                <Avatar name={displayName || (user.email ?? 'U')} isBordered showFallback className="w-20 h-20" />
-
                 <div className="flex-1">
                   <h1 className="text-2xl font-semibold">Edit Profile</h1>
                   <p className="text-surface-light/80">Update your public profile information.</p>

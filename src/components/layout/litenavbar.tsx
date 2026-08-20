@@ -10,7 +10,6 @@ import { useAuth } from '@/hooks/useauth';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { getLiteEvent } from '@/lib/liteEventStore';
 import {
-  Avatar,
   Button,
   Dropdown,
   DropdownItem,
@@ -29,17 +28,6 @@ import { LogOut, Menu, Moon, Sun, UserRound } from 'lucide-react';
 const LoginModalLazy = dynamic(() => import('@/components/modals/auth/loginmodal'), {
   ssr: false,
 });
-
-function initialsFromUser(u?: { displayName?: string | null; email?: string | null }) {
-  const fromName =
-    u?.displayName
-      ?.trim()
-      .split(/\s+/)
-      .map((segment) => segment[0]?.toUpperCase())
-      .join('') ?? '';
-  if (fromName) return fromName.slice(0, 2);
-  return (u?.email?.[0] ?? 'U').toUpperCase();
-}
 
 function LiveClock() {
   const [now, setNow] = useState<Date>(() => new Date());
@@ -301,15 +289,9 @@ export default function LiteNavbar() {
                         aria-label="Open profile menu"
                         className="relative rounded-full p-0.5 bg-gradient-to-br from-accent/70 to-[rgba(240,28,28,0.4)] cursor-pointer"
                       >
-                        <Avatar
-                          showFallback
-                          name={initialsFromUser(user)}
-                          classNames={{
-                            base: "bg-surface-base border-surface-liner",
-                            name: "text-surface-light text-sm font-bold",
-                          }}
-                          className="h-7 w-7 border-surface-liner"
-                        />
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-surface-liner bg-surface-base">
+                          <UserRound className="size-4 text-surface-light" />
+                        </span>
                       </button>
                   </DropdownTrigger>
 

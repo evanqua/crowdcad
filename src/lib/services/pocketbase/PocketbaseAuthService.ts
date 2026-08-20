@@ -9,9 +9,6 @@ function toServiceUser(model: Record<string, unknown>): ServiceUser {
     uid: model.id as string,
     email: (model.email as string) ?? null,
     displayName: (model.name as string) ?? null,
-    photoURL: model.avatar
-      ? `${pb.baseURL}/api/files/_pb_users_auth_/${model.id}/${model.avatar}`
-      : null,
     phoneNumber: (model.phone as string) ?? null,
   };
 }
@@ -62,20 +59,11 @@ export class PocketbaseAuthService implements IAuthService {
     return unsubscribe;
   }
 
-  async updateProfile(updates: {
-    displayName?: string | null;
-    photoURL?: string | null;
-  }): Promise<void> {
+  async updateProfile(updates: { displayName?: string | null }): Promise<void> {
     if (!pb.authStore.isValid || !pb.authStore.model) {
       throw new ServiceError('auth/no-current-user', 'No user is signed in.');
     }
     const userId = (pb.authStore.model as Record<string, unknown>).id as string;
-    if (updates.photoURL !== undefined) {
-      throw new ServiceError(
-        'not-supported',
-        'PocketBase adapter does not support URL-based photoURL updates. Upload an avatar file directly via the PocketBase API instead.',
-      );
-    }
     const data: Record<string, unknown> = {};
     if (updates.displayName !== undefined) data.name = updates.displayName;
     try {
