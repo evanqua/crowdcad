@@ -2,18 +2,21 @@
 
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
 import { dbService, storageService } from '@/lib/services';
 import { markerCounterScale } from '@/lib/labelScale';
-import type { Post, Venue, Equipment, EquipmentStatus, Layer, ControlPoint, Georeference } from '@/app/types';
+import type { Post, Venue, Equipment, EquipmentStatus, Layer, ControlPoint, Georeference, BasemapCamera } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
 import { georeferenceMapMatch, layerPostsLatLon } from '@/lib/geoUtils';
 import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
+import { isBasemapConfigured } from '@/lib/basemap/config';
+import { sanitizeBasemapCameraForSave } from '@/lib/basemapCameraUtils';
+import BasemapView from '@/components/dispatch/BasemapView';
 import NewLayerModal from '@/components/modals/venue/newlayer';
 import LocationEditModal from '@/components/modals/venue/locationedit';
 import EquipmentManagementSection from '@/components/venue-management/EquipmentManagementSection';
@@ -44,8 +47,24 @@ import {
   ChevronRight,
   Crosshair,
   MousePointer2,
+  Compass,
+  X,
 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+
+// Phase 8 venue-editor follow-up: which of the two map views (raster upload
+// vs. the real basemap) is showing right now. Mirrors venuemapmodal.tsx's own
+// `MapViewMode`/`VIEW_MODE_STORAGE_KEY`/`isMapViewMode` (search that file for
+// `viewMode` before changing this) but keeps its own storage key: the editor's
+// default-view logic differs from the modal's (see the state initializer
+// below), so conflating the two browser preferences would let one screen's
+// choice silently override the other's.
+type MapViewMode = 'raster' | 'basemap';
+const EDITOR_VIEW_MODE_STORAGE_KEY = 'crowdcad.venueEditor.viewMode';
+
+function isMapViewMode(value: unknown): value is MapViewMode {
+  return value === 'raster' || value === 'basemap';
+}
 
 
 // Props: none required for this page
@@ -139,6 +158,11 @@ export default function VenueManagementPageClient() {
     name: string;
     equipment: EquipmentWithLocation[];
     layers: Layer[];
+    /** Saved opening camera for basemap view. See `BasemapCamera`'s doc
+     *  comment in app/types.ts. Absent (never set) is the default for every
+     *  venue until an operator explicitly captures one via "Set default
+     *  view" — never written as `undefined`, only omitted. */
+    basemapCamera?: BasemapCamera;
   }>({
     name: '',
     equipment: [],
@@ -224,6 +248,90 @@ export default function VenueManagementPageClient() {
     disablePan: () => isAddMarkerMode || isGeoreferenceMode || draggingIdx !== null,
   });
 
+  // --- Basemap view (TAK plan §8, venue-editor follow-up) --------------------
+  //
+  // Which of the two map views is showing right now. Initialized from
+  // localStorage exactly like venuemapmodal.tsx's own viewMode state, wrapped
+  // in the same try/catch for the same reason (Safari private mode etc.).
+  const [viewMode, setViewModeState] = useState<MapViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage.getItem(EDITOR_VIEW_MODE_STORAGE_KEY);
+        if (isMapViewMode(stored)) return stored;
+      } catch {
+        // Fall through to the computed default below.
+      }
+    }
+    // No stored preference: UNLIKE the modal, default to basemap the moment
+    // it's configured and the layer on screen has no uploaded image at all --
+    // that is the primary case this feature exists for (a campus-scale venue
+    // with no raster and nothing to calibrate yet), and showing the upload
+    // dropzone with no way past it would strand that flow entirely. A layer
+    // that already has an image defaults to it unchanged, so reopening an
+    // already-calibrated floor plan isn't surprised by a real-world map.
+    const hasMapUrl = !!venueData.layers[currentLayer]?.mapUrl;
+    return isBasemapConfigured() && !hasMapUrl ? 'basemap' : 'raster';
+  });
+  const setViewMode = (mode: MapViewMode) => {
+    setViewModeState(mode);
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(EDITOR_VIEW_MODE_STORAGE_KEY, mode);
+    } catch {
+      // Ignored -- see the read-side comment above.
+    }
+  };
+  // Set once, permanently, the first time BasemapView reports it can't draw.
+  // See venuemapmodal.tsx's identical handleBasemapUnavailable for the full
+  // rationale (§8.B degrade-to-nothing); this is the same contract applied to
+  // the editor instead of the dispatch map.
+  const [basemapFailed, setBasemapFailed] = useState(false);
+  const handleBasemapUnavailable = useCallback((reason: string) => {
+    console.warn(`[VenueManagementPage] basemap unavailable: ${reason}`);
+    setBasemapFailed(true);
+    setViewMode('raster');
+  }, []);
+  // Single source of truth for "is the basemap actually on screen right now"
+  // -- see venuemapmodal.tsx's effectiveBasemap for why every render site
+  // reads this instead of re-deriving it from the three inputs separately.
+  const effectiveBasemap = isBasemapConfigured() && !basemapFailed && viewMode === 'basemap';
+
+  // Live camera as last reported by BasemapView, for "Set default view" below.
+  // BasemapView calls this on every `moveend` plus once when the map becomes
+  // ready (§10.D). A ref rather than state because re-rendering the whole
+  // editor on every pan/zoom, for a value only ever read on button-press,
+  // would be pure churn. `hasLiveCamera` mirrors the ref's presence only so
+  // the "Set default view" button's disabled state can react to it -- and
+  // because BasemapView emits once on mount, it flips true as soon as the map
+  // is up, without the operator having to move anything first.
+  const liveBasemapCameraRef = useRef<BasemapCamera | null>(null);
+  const [hasLiveCamera, setHasLiveCamera] = useState(false);
+  const handleBasemapCameraChange = useCallback((camera: BasemapCamera) => {
+    liveBasemapCameraRef.current = camera;
+    setHasLiveCamera(true);
+  }, []);
+
+  // Captures the CURRENT basemap camera as this venue's default opening view.
+  // View state only, per §8.C -- this never touches a post/marker position,
+  // only Venue.basemapCamera. No-ops if BasemapView hasn't reported a camera
+  // yet (see handleBasemapCameraChange above); the button is disabled in
+  // that state so this branch should be unreachable in practice.
+  const handleSetDefaultView = () => {
+    const camera = liveBasemapCameraRef.current;
+    if (!camera) return;
+    setVenueData((prev) => ({ ...prev, basemapCamera: sanitizeBasemapCameraForSave(camera) }));
+  };
+  // Firestore rejects `undefined` at any depth -- OMIT the key entirely
+  // rather than setting it undefined, matching buildGeoreferenceForSave's
+  // own handling of `georeference` above.
+  const handleClearDefaultView = () => {
+    setVenueData((prev) => {
+      const next = { ...prev };
+      delete next.basemapCamera;
+      return next;
+    });
+  };
+
   // Drag/hover
   const [pendingLayer, setPendingLayer] = useState<number | null>(null);
 
@@ -296,13 +404,29 @@ export default function VenueManagementPageClient() {
                 mapUrl: venue.mapUrl,
               }];
             }
-            setVenueData({
-              name: venue.name,
-              equipment: venue.equipment || [],
-              layers,
+            setVenueData((prev) => {
+              const next: typeof prev = { name: venue.name, equipment: venue.equipment || [], layers };
+              if (venue.basemapCamera) next.basemapCamera = venue.basemapCamera;
+              return next;
             });
             setCurrentLayer(0);
             setGeoreferenceDirtyLayerIds(new Set());
+            // Sync the view-mode default now that we know whether this venue
+            // actually has a raster image, but only when the operator hasn't
+            // already chosen a preference this browser: the initial state's
+            // own guess (computed before any venue data existed, per the
+            // viewMode initializer above) assumed "new venue" until this load
+            // says otherwise, and is not itself a preference to respect.
+            try {
+              const stored =
+                typeof window !== 'undefined' ? window.localStorage.getItem(EDITOR_VIEW_MODE_STORAGE_KEY) : null;
+              if (!isMapViewMode(stored)) {
+                const hasMapUrl = !!layers[0]?.mapUrl;
+                setViewModeState(isBasemapConfigured() && !hasMapUrl ? 'basemap' : 'raster');
+              }
+            } catch {
+              // Ignored -- worst case the pre-load guess stands.
+            }
           }
         } catch (error) {
           console.error('Error loading venue:', error);
@@ -1020,6 +1144,16 @@ export default function VenueManagementPageClient() {
         dataToSave.mapUrl = venueData.layers[0].mapUrl;
       }
 
+      // Only add basemapCamera if the operator has captured one -- omit the
+      // key entirely rather than writing `undefined` (Firestore rejects
+      // `undefined` at any depth, same as mapUrl above and georeference in
+      // buildGeoreferenceForSave). venueData.basemapCamera is already fully
+      // sanitized at capture time by sanitizeBasemapCameraForSave, so no
+      // further stripping is needed here.
+      if (venueData.basemapCamera) {
+        dataToSave.basemapCamera = venueData.basemapCamera;
+      }
+
       if (venueId) {
         await dbService.updateDocument('venues', venueId, dataToSave);
       } else {
@@ -1342,7 +1476,11 @@ export default function VenueManagementPageClient() {
                     placeholder="Layer name"
                   />
                 </div>
-                {previewUrl && (
+                {/* Marker/control-point placement only makes sense against the
+                    raster image (they operate on handleImageClick, a pixel
+                    click on that <Image>) -- hidden while the basemap is
+                    showing rather than left on screen doing nothing. */}
+                {previewUrl && !effectiveBasemap && (
                   <div className="flex gap-2">
                     <MarkerModeToggleButton
                       isAddMarkerMode={isAddMarkerMode}
@@ -1368,10 +1506,154 @@ export default function VenueManagementPageClient() {
                 )}
               </div>
 
-              <div 
-                className={`rounded-xl relative flex flex-col items-center justify-start w-full ${previewUrl ? 'max-h-[calc(100vh-180px)]' : 'h-full'}`}
+              <div
+                className={`rounded-xl relative flex flex-col items-center justify-start w-full ${(previewUrl || effectiveBasemap) ? 'max-h-[calc(100vh-180px)]' : 'h-full'}`}
               >
-                {previewUrl ? (
+                {effectiveBasemap ? (
+                  <div className="w-full flex flex-col gap-3 max-h-full">
+                    <div
+                      className="relative w-full overflow-hidden rounded-2xl"
+                      style={{ height: 'calc(100vh - 200px)', minHeight: '360px' }}
+                    >
+                      {/* venueData.layers always has at least one entry (see
+                          the initial state above), but stay defensive rather
+                          than hand BasemapView's required `layer` prop a
+                          possibly-undefined value -- matches
+                          venuemapmodal.tsx's own `currentLayerObj &&` guard. */}
+                      {venueData.layers[currentLayer] && (
+                        <BasemapView
+                          layer={venueData.layers[currentLayer]}
+                          staff={[]}
+                          theme="dark"
+                          initialCamera={venueData.basemapCamera ?? null}
+                          onUnavailable={handleBasemapUnavailable}
+                          onCameraChange={handleBasemapCameraChange}
+                          className="h-full w-full"
+                        />
+                      )}
+
+                      {/* View toggle (mirrors venuemapmodal.tsx's placement
+                          rationale: bottom-left is the one corner no other
+                          overlay in this panel claims). */}
+                      <div className="absolute bottom-3 left-3 z-20 flex items-center gap-0.5 rounded-lg border border-surface-liner bg-surface-deepest/90 p-0.5 backdrop-blur">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          onPress={() => setViewMode('raster')}
+                          className="px-2.5 text-xs bg-transparent text-surface-faint"
+                        >
+                          Venue image
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          onPress={() => setViewMode('basemap')}
+                          className="px-2.5 text-xs bg-accent text-accent-foreground"
+                        >
+                          Map
+                        </Button>
+                      </div>
+
+                      {/* Set/clear this venue's default basemap framing.
+                          Basemap-only: a raster view has no camera to save. */}
+                      <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
+                        {venueData.basemapCamera && (
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={handleClearDefaultView}
+                            startContent={<X className="h-3.5 w-3.5" />}
+                            className="bg-surface-deepest/90 backdrop-blur text-xs"
+                          >
+                            Clear default view
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          isDisabled={!hasLiveCamera}
+                          onPress={handleSetDefaultView}
+                          startContent={<Compass className="h-3.5 w-3.5" />}
+                          className="bg-surface-deepest/90 backdrop-blur text-xs"
+                          title={
+                            hasLiveCamera
+                              ? 'Save the current view as this venue\'s default'
+                              : 'Waiting on BasemapView to report the current camera'
+                          }
+                        >
+                          Set default view
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Bottom Info Bar -- same layer-nav shell as the raster
+                        panel below, so switching views mid-edit doesn't also
+                        hide the ability to add/rename/delete layers. */}
+                    <Card
+                      isBlurred
+                      className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <MapPinned className="h-4 w-4 text-accent" />
+                          <span className="text-xs text-surface-light truncate max-w-[120px]">{mapFileName}</span>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={() => fileInputRef.current?.click()}
+                            startContent={<Upload className="h-3 w-3" />}
+                            className="ml-2"
+                          >
+                            Replace
+                          </Button>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            isDisabled={currentLayer <= 0}
+                            onPress={() => setCurrentLayer(currentLayer - 1)}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <span
+                            className="text-xs text-surface-light min-w-[100px] text-center"
+                          >
+                            {venueData.layers?.[currentLayer]?.name || 'Layer'}
+                          </span>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            isDisabled={!venueData.layers || currentLayer >= venueData.layers.length - 1}
+                            onPress={() => setCurrentLayer(currentLayer + 1)}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            onPress={deleteLayer}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            data-testid="add-layer-button"
+                            onPress={() => setIsNewLayerModalOpen(true)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                ) : previewUrl ? (
                   <div className="w-full flex flex-col gap-3 max-h-full">
                     <div className="relative w-full overflow-hidden rounded-2xl">
                       <MapPanSurface
@@ -1473,6 +1755,31 @@ export default function VenueManagementPageClient() {
                           </p>
                         </div>
                       )}
+
+                      {/* View toggle (§8.D-style). Only offered once a
+                          basemap is actually configured, and hidden for good
+                          the moment one fails -- see handleBasemapUnavailable
+                          and venuemapmodal.tsx's identical gate. */}
+                      {isBasemapConfigured() && !basemapFailed && (
+                        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-0.5 rounded-lg border border-surface-liner bg-surface-deepest/90 p-0.5 backdrop-blur">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={() => setViewMode('raster')}
+                            className="px-2.5 text-xs bg-accent text-accent-foreground"
+                          >
+                            Venue image
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={() => setViewMode('basemap')}
+                            className="px-2.5 text-xs bg-transparent text-surface-faint"
+                          >
+                            Map
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Bottom Info Bar - Now OUTSIDE and BELOW the image container */}
@@ -1543,7 +1850,7 @@ export default function VenueManagementPageClient() {
                 ) : (
                   <Card
                     isBlurred
-                    className="border-2 border-default-200 bg-transparent w-full h-full px-3 py-2"
+                    className="border-2 border-default-200 bg-transparent w-full h-full px-3 py-2 relative"
                   >
                     <button
                       type="button"
@@ -1558,6 +1865,32 @@ export default function VenueManagementPageClient() {
                         </p>
                       </div>
                     </button>
+                    {/* Reachable here too: this dropzone only renders when the
+                        operator explicitly chose "Venue image" with nothing
+                        uploaded yet (the no-image default already routes to
+                        the basemap panel above -- see the viewMode
+                        initializer), and without this they'd have no way back
+                        to the map short of a page reload. */}
+                    {isBasemapConfigured() && !basemapFailed && (
+                      <div className="absolute bottom-3 left-3 z-20 flex items-center gap-0.5 rounded-lg border border-surface-liner bg-surface-deepest/90 p-0.5 backdrop-blur">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          onPress={() => setViewMode('raster')}
+                          className="px-2.5 text-xs bg-accent text-accent-foreground"
+                        >
+                          Venue image
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          onPress={() => setViewMode('basemap')}
+                          className="px-2.5 text-xs bg-transparent text-surface-faint"
+                        >
+                          Map
+                        </Button>
+                      </div>
+                    )}
                   </Card>
                 )}
               </div>

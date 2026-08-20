@@ -105,6 +105,23 @@ export interface BasemapViewProps {
    *  corners, then located markers, then the PMTiles archive's own coverage
    *  bounds. */
   initialCamera?: BasemapCamera | null;
+  /** Reports the map's current camera on every `moveend`, plus once when the
+   *  map first becomes ready. This is the WRITE side of `initialCamera`: it
+   *  exists so an operator can capture "open this venue here" from a view they
+   *  framed by hand (§8.J's "Set default view"), which is the only way a venue
+   *  with no raster and no georeference ever acquires a sane opening camera at
+   *  all -- otherwise §8.I's precedence chain falls through to MapLibre's world
+   *  view, where a venue-sized PMTiles extract has no tiles (§10.D).
+   *
+   *  `updatedAt` is deliberately NOT stamped here. This reports what the camera
+   *  IS; when that reading was turned into a saved preference is the concern of
+   *  whoever persists it, and `sanitizeBasemapCameraForSave()` already stamps it
+   *  at write time.
+   *
+   *  Note this is view state leaving the map, never a coordinate entering one:
+   *  §8.C's one-way boundary governs marker placement and is untouched by a
+   *  camera readout -- nothing downstream turns these numbers into a marker. */
+  onCameraChange?: (camera: BasemapCamera) => void;
   /** 'dark' matches the app's dark dispatch surfaces; 'light' matches most
    *  venue-map screenshots, which tend to be light. */
   theme?: 'light' | 'dark';
@@ -400,6 +417,7 @@ export default function BasemapView({
   equipment,
   calls,
   initialCamera,
+  onCameraChange,
   theme = 'dark',
   isPlacementArmed = false,
   onMapClick,
@@ -438,11 +456,13 @@ export default function BasemapView({
   const onSelectCallRef = useRef(onSelectCall);
   const onUnavailableRef = useRef(onUnavailable);
   const onCoverageWarningRef = useRef(onCoverageWarning);
+  const onCameraChangeRef = useRef(onCameraChange);
   useEffect(() => {
     onMapClickRef.current = onMapClick;
     onSelectCallRef.current = onSelectCall;
     onUnavailableRef.current = onUnavailable;
     onCoverageWarningRef.current = onCoverageWarning;
+    onCameraChangeRef.current = onCameraChange;
   });
 
   // First reason wins: once a mount attempt is known to be doomed, a second
@@ -722,6 +742,37 @@ export default function BasemapView({
       canvas.style.cursor = '';
     };
   }, [runtime, isPlacementArmed]);
+
+  // --- camera readout (§10.D) ----------------------------------------------
+  // The write side of `initialCamera`. One listener is enough: MapLibre routes
+  // pan, zoom, rotate and pitch through the same move lifecycle, so `moveend`
+  // covers all four, and using the *end* event rather than `move` means a drag
+  // reports once on release instead of on every animation frame.
+  //
+  // The emit on mount is deliberate. Without it, an operator who is happy with
+  // the camera §8.I already resolved for them could not save it -- the button
+  // that captures it would sit disabled until they nudged the map to prove a
+  // camera existed, which is a strange thing to have to do to accept a default.
+  useEffect(() => {
+    if (!runtime) return;
+    const { map } = runtime;
+
+    const emit = () => {
+      const centre = map.getCenter();
+      onCameraChangeRef.current?.({
+        center: { lat: centre.lat, lon: centre.lng },
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      });
+    };
+
+    emit();
+    map.on('moveend', emit);
+    return () => {
+      map.off('moveend', emit);
+    };
+  }, [runtime]);
 
   // --- posts / teams / calls / equipment markers ---------------------------
   useEffect(() => {
