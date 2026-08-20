@@ -211,14 +211,17 @@ from the phase section it affects.
 | **7.E(3)** | **Label behaviour. New pure `src/lib/labelScale.ts`: sub-linear scaling (`markerCounterScale` = `mapScale ** -k`, net size `mapScale ** (1 - k)`, `k = 0.5`), collision declutter (`declutterLabels`, hides rather than nudges), zoom-gated secondary detail (`minScale`). `layoutOffMapBadges` moved in as `layoutEdgeBadges` and subsumed as an obstacle set rather than left to run beside the new pass. Wired into BOTH `venuemapmodal.tsx` and the venue editor, which had opposite behaviours. New `labelScale.test.ts` 45. Suite 215 → 260** | **Done** | `3ea888f` |
 | **7.B** | **Pin-drop UI: placement mode + drag-to-correct + clear on `venuemapmodal.tsx`, a `CallMarker` coloured through `getStatusColor()`, an optional draft-pin affordance on Quick Call, and the new pure `src/lib/callPositionUtils.ts` (`placeCallPin` refuses on an uncalibrated layer; `resolveCallPinPercent` re-derives x/y from the layer's current transform on every read). `Call.position` finally has a writer. 20 new tests, suite 173 → 193** | **Done** | `4dc00c8` |
 | — | **Second 2026-08-18 field report investigated and recorded: §0.6.6. Phases 8.F (georeference is not a precondition in basemap view) and 8.G (device GPS as a control-point source) newly scoped within Phase 8. No code.** | **Done** | 2026-08-18 |
-| **8.A** | **MapLibre GL JS chosen and wired, `maplibre-gl`/`pmtiles`/`@protomaps/basemaps` added to both root and core `package.json`, loaded only via dynamic `import()` inside `BasemapView.tsx` so a deployment with no basemap configured never pays for the ~200KB dependency. Initially shipped on `maplibre-gl@^6.4.1`; corrected to **`^5.24.0` and pinned** after visual verification showed 6.x silently drops all vector tile data (§0.3(59))** | **Done (uncommitted)** | this session |
-| **8** | **Phase 8 visually verified working in a browser for the first time (local Berkeley PMTiles extract) — base map, venue raster (0.85 opacity), and Protomaps labels all draw in the documented §8.A layer order; both post markers place correctly; `© OpenStreetMap` attribution present. Four real bugs found and fixed in the process: the maplibre-gl 6.x incompatibility (§0.3(59)), unabsolutised sprite/glyph URLs (§0.3(60)), the `absolute inset-0` container collapsing to zero height (§0.3(61)), and the camera-fit deadlock on `load` (§0.3(62)). Full accounting in §8.H** | **Done (uncommitted)** | this session |
-| **8.B** | **`src/lib/basemap/config.ts` — `readBasemapConfig()` / `isBasemapConfigured()`, `null` unless `NEXT_PUBLIC_BASEMAP_PMTILES_URL` is set (the degrade-to-nothing gate), 30 tests. `scripts/fetch-basemap.sh` builds the offline PMTiles/glyph/sprite bundle into `public/basemap/` (gitignored, mirrored into the root wrapper). No asset bundle is committed — a fresh clone has no basemap until the script is run and the env var is set** | **Done (uncommitted)** | this session |
-| **8.C** | **`geoUtils.layerImageCorners()` — the four percent-corners evaluated through `pixelToLatLon`, MapLibre `ImageSource` order. `src/lib/basemap/style.ts` builds the style: Protomaps base → venue raster (opacity 0.85) → Protomaps labels on top. `BasemapView` only ever hands MapLibre a lat/lon it was given; it never asks MapLibre to compute one** | **Done (uncommitted)** | this session |
-| **8.D** | **Second, selectable view. `MapViewMode = 'raster' \| 'basemap'` in `venuemapmodal.tsx`, persisted to `localStorage['crowdcad.venueMap.viewMode']`. Deviation from the plan text: defaults to basemap only when a basemap is configured AND the current layer is calibrated (not simply "when configured"), and the toggle sits bottom-left rather than an unstated default corner, because top-left is already claimed by the placement banners** | **Done (uncommitted)** | this session |
+| **8.A** | **MapLibre GL JS chosen and wired, `maplibre-gl`/`pmtiles`/`@protomaps/basemaps` added to both root and core `package.json`, loaded only via dynamic `import()` inside `BasemapView.tsx` so a deployment with no basemap configured never pays for the ~200KB dependency. Initially shipped on `maplibre-gl@^6.4.1`; corrected to **`^5.24.0` and pinned** after visual verification showed 6.x silently drops all vector tile data (§0.3(59))** | **Done** | `0e030bc` |
+| **8** | **Phase 8 visually verified working in a browser for the first time (local Berkeley PMTiles extract) — base map, venue raster (0.85 opacity), and Protomaps labels all draw in the documented §8.A layer order; both post markers place correctly; `© OpenStreetMap` attribution present. Four real bugs found and fixed in the process: the maplibre-gl 6.x incompatibility (§0.3(59)), unabsolutised sprite/glyph URLs (§0.3(60)), the `absolute inset-0` container collapsing to zero height (§0.3(61)), and the camera-fit deadlock on `load` (§0.3(62)). Full accounting in §8.H** | **Done** | `0e030bc` |
+| **8.B** | **`src/lib/basemap/config.ts` — `readBasemapConfig()` / `isBasemapConfigured()`, `null` unless `NEXT_PUBLIC_BASEMAP_PMTILES_URL` is set (the degrade-to-nothing gate), 30 tests. `scripts/fetch-basemap.sh` builds the offline PMTiles/glyph/sprite bundle into `public/basemap/` (gitignored, mirrored into the root wrapper). No asset bundle is committed — a fresh clone has no basemap until the script is run and the env var is set** | **Done** | `0e030bc` |
+| **8.C** | **`geoUtils.layerImageCorners()` — the four percent-corners evaluated through `pixelToLatLon`, MapLibre `ImageSource` order. `src/lib/basemap/style.ts` builds the style: Protomaps base → venue raster (opacity 0.85) → Protomaps labels on top. `BasemapView` only ever hands MapLibre a lat/lon it was given; it never asks MapLibre to compute one** | **Done** | `0e030bc` |
+| **8.D** | **Second, selectable view. `MapViewMode = 'raster' \| 'basemap'` in `venuemapmodal.tsx`, persisted to `localStorage['crowdcad.venueMap.viewMode']`. Deviation from the plan text: defaults to basemap only when a basemap is configured AND the current layer is calibrated (not simply "when configured"), and the toggle sits bottom-left rather than an unstated default corner, because top-left is already claimed by the placement banners** | **Done** | `0e030bc` |
 | **8.E** | **No code — this subsection is a framing warning ("a basemap will make the map look like a GIS without making it one"), not a deliverable. Still applies; ship the toggle with that caveat stated to IC-EMS** | **N/A** | — |
-| **8.F** | **Basemap-view pin-dropping without control points — gate is `effectiveBasemap \|\| currentLayerCalibrated` (equivalent to the planned `viewMode === 'raster' && !currentLayerCalibrated`) guarding `UncalibratedLayerNotice` in `venuemapmodal.tsx`. `placeCallPinFromLatLon()` added to `callPositionUtils.ts` as the basemap-side writer; raster and basemap clicks share a new `writeCallPinPlacement` helper so `Call.position` cannot drift between the two paths** | **Done (uncommitted)** | this session |
-| **8.G** | **`useDeviceLocation` hook (`classifyPositionError`, `classifyAccuracyQuality`, `getGeolocationUnsupportedReason`, 11 tests) and "Use my location" per control-point row in `GeoreferenceSection` — **built and wired**, including a coarse-fix warning (never a disable) above `MAX_ACCEPTABLE_RESIDUAL_METRES`, and `ControlPoint.accuracy?: number` on `types.ts`. **Not wired:** the basemap-view "you are here" self-marker — `BasemapView.tsx` accepts a `deviceLocation` prop and draws it, but no caller in `venuemapmodal.tsx` ever passes one, so a dispatcher in basemap view never sees their own position. A pre-existing bug was found and fixed in the same change: `buildGeoreferenceForSave` (`page.client.tsx`) was silently stripping `accuracy` off every control point on save; it now carries it through** | **Partially done (uncommitted)** | this session |
+| **8.F** | **Basemap-view pin-dropping without control points — gate is `effectiveBasemap \|\| currentLayerCalibrated` (equivalent to the planned `viewMode === 'raster' && !currentLayerCalibrated`) guarding `UncalibratedLayerNotice` in `venuemapmodal.tsx`. `placeCallPinFromLatLon()` added to `callPositionUtils.ts` as the basemap-side writer; raster and basemap clicks share a new `writeCallPinPlacement` helper so `Call.position` cannot drift between the two paths** | **Done** | `0e030bc` |
+| **8.G** | **`useDeviceLocation` hook (`classifyPositionError`, `classifyAccuracyQuality`, `getGeolocationUnsupportedReason`, 11 tests) and "Use my location" per control-point row in `GeoreferenceSection` — **built and wired**, including a coarse-fix warning (never a disable) above `MAX_ACCEPTABLE_RESIDUAL_METRES`, and `ControlPoint.accuracy?: number` on `types.ts`. **Not wired:** the basemap-view "you are here" self-marker — `BasemapView.tsx` accepts a `deviceLocation` prop and draws it, but no caller in `venuemapmodal.tsx` ever passes one, so a dispatcher in basemap view never sees their own position. A pre-existing bug was found and fixed in the same change: `buildGeoreferenceForSave` (`page.client.tsx`) was silently stripping `accuracy` off every control point on save; it now carries it through** | **Partially done** | `0e030bc` |
+| **8.I** | **`Venue.basemapCamera` + the 4-level initial-camera precedence chain (saved camera → raster corners → located markers → archive coverage bounds → MapLibre default), `resolveInitialCamera()`, `parseArchiveCoverage`/`isOutsideCoverage`, `onCoverageWarning`. Shipped contract-first as two commits eight minutes apart so the shared type could not be a moving target. 22 tests in `camera.test.ts` — note the commit message's "26" is wrong; `npx vitest run` counts 22** | **Done** | `b6d3dc9` + `a78421a` |
+| **8.J** | **Basemap in the *venue editor* — the raster/basemap toggle ported across from the dispatch modal, plus "Set default view" / "Clear default view" writing `Venue.basemapCamera` through the new `sanitizeBasemapCameraForSave()` (Firestore rejects `undefined` at any depth). 4 tests. Shipped together with 10.D because without it the button was inert** | **Done** | `40342f5` |
+| **10.D** | **`onCameraChange` on `BasemapView` — fires on `moveend` and once when the map first becomes ready, held through a ref. Closes 8.J's inert "Set default view" button, which had been passing a callback through a type cast to a prop that did not exist. The mount emit was added during implementation and was not in the scoping: without it an operator cannot save a camera §8.I already resolved for them. The type cast at the editor call site is gone** | **Done** | `40342f5` |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -1279,6 +1282,36 @@ writing pins somewhere with no consumer.
 
 ### 0.4 Recommended next steps, in order
 
+> **Amended 2026-08-19.** Two things changed the ordering below. First, this document
+> had drifted from the tree: §8.I was committed (`b6d3dc9`, `a78421a`) and documented
+> nowhere, and §8.J is sitting uncommitted in the working directory — both are now
+> written up, and §13's Phase 8 `(uncommitted)` markers are corrected. Second, a gap was
+> reported from the running app that outranks most of what follows: **creating a venue
+> offers no map-backed option at all**, only a static image upload. Phase 8 built a real
+> basemap and never surfaced it on the one screen where a venue comes into existence.
+> That is now **Phase 10**, and the IC-EMS GIS walkthrough the same day is **Phase 11**.
+>
+> Revised priority, ahead of items 1–3 below for anyone touching the map:
+>
+> - ~~**10.D first**~~ — ✅ done in `40342f5`, landed together with §8.J because the
+>   editor's "Set default view" button was written against a prop that did not exist and
+>   was therefore inert; shipping the toggle without the prop would have meant a visible
+>   control that could not work.
+> - ~~**Commit §8.J**~~ — ✅ done in the same commit. The editor now has a basemap
+>   surface, which unblocks the rest of Phase 10.
+> - **10.C then 10.E** — give `Post` a coordinate of record the way §7.A did for
+>   `Call.position`, then wire `onMapClick` in the editor. These are one change split
+>   across two files; doing 10.E first yields a click handler with nowhere to put its
+>   answer.
+> - **11.B when convenient** — CSV import of lat/long locations is the highest-value,
+>   lowest-risk item in either phase, and it is what stops a 134-location venue from
+>   being hand-clicked.
+>
+> The §7.3 type-code spike (item 1) is still the top priority for the *TAK* half of this
+> project. Phase 10 is the top priority for the *map* half. They need different people
+> and different equipment, and neither blocks the other.
+
+
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
    (see "Verify the state you inherited"). Read §0.45 for what the inbound half is —
    it is described nowhere else here.
@@ -2267,6 +2300,88 @@ deployment with no basemap configured never pays for the renderer.
 **Still not committed.** Same working-tree state as the previous entry, now with these
 four fixes layered on top. §0.1's new Phase 8 row and Phase 8's new §8.H record the same
 material in the phase-status and phase-detail locations respectively.
+
+
+### 2026-08-19 — the IC-EMS GIS walkthrough, and the venue-creation gap it exposed
+
+The CrowdCAD team met with IC-EMS (Indiana University / IU Health LifeLine EMS and
+IC-EMS) and was shown their existing GIS+ATAK workflow for IU Football at Memorial
+Stadium, built in ArcGIS Pro. Five things were demonstrated. An ArcGIS Pro project
+layering basemaps under a georeferenced `StadiumMapNew` raster and point-feature
+layers, worked at roughly 1:4,639–1:7,249 scale. A 134-row location attribute table —
+`Category` / `Subcategory` / `Label` / `Lat` / `Long` — authored as a CSV and turned into
+points via ArcGIS's `XY Table To Point` tool, with CSV as their standing interchange
+format. A track-playback product for the 2024-11-30 IU–Purdue game showing full-shift
+movement as one polyline per callsign (`Supervisor`, `Code Truck`, `East Stands Row 24`,
+and others). A call-symbology product classifying the same game's calls by run type
+(Medical, Trauma, Other, Intoxication) with distinct icon and colour per class. And a
+season-scale kernel-density heat map of call volume across the 2023-2024 season,
+independent of any single event.
+
+Separately, and not from IC-EMS: creating a venue in CrowdCAD today offers no
+map-backed option at all. The only path is a static image upload, which is the same gap
+this document's Phase 10 (scoped elsewhere) exists to close, and which sharpens what
+Phase 11 depends on — CSV import and GeoJSON export only make sense once a venue's
+geometry is lat/lon-native rather than percent-of-image.
+
+This session added two new phases to the plan rather than writing code. Phase 10 covers
+map-first venue creation. Phase 11 covers the GIS-interchange and after-action-analytics
+work motivated directly by this walkthrough: a structured location taxonomy that
+subsumes `isClinic` rather than sitting beside it (11.A); CSV/GeoJSON/KML interchange in
+both directions, called out as the highest-value, lowest-risk item and cross-referenced
+against the KMZ/GeoTIFF ask already standing in `TAK_OPEN_QUESTIONS.md` §6 (11.B); track
+history, scoped honestly against the §6.2 write-rate constraint and flagged as
+PHI-adjacent under §8 rather than treated as free (11.C); call symbology by run type,
+extending `statusColors.ts` (11.D); and season-scale density surfaces, scoped down to an
+export-first version rather than an in-app reimplementation (11.E). The document was
+also reconciled with the committed 8.I work already in the tree, so Phase 8's status and
+this session's additions read consistently against each other rather than as two
+uncoordinated edits landing the same day.
+
+### 2026-08-19 (cont.) — the editor gets a basemap, and the inert button is closed (8.J, 10.D)
+
+The planning half of this session ended with two phases written and a working tree
+holding an uncommitted §8.J diff. The implementation half closed both.
+
+**The two were committed together, deliberately, as `40342f5`.** §8.J ports the
+raster/basemap toggle into the venue editor and adds "Set default view" /
+"Clear default view"; §10.D adds the `onCameraChange` prop that button depends on.
+Committing 8.J alone would have shipped a visible control that could not work — the
+editor passed `onCameraChange` through a type cast to a prop that did not exist on
+`BasemapViewProps`, so `hasLiveCamera` never became true and the button was permanently
+disabled. A disabled button with no explanation is indistinguishable from a broken one,
+which is a worse artifact to leave in a repo than either half alone.
+
+`BasemapView` now fires `onCameraChange` on `moveend` **and once when the map first
+becomes ready**, holding the callback through a ref like every other callback in that
+file. The mount emit was not in 10.D as scoped and was added during implementation:
+without it an operator who is happy with the camera §8.I already resolved for them
+cannot save it, because the capture button stays disabled until they nudge the map to
+prove a camera exists. The readout deliberately does not stamp `updatedAt` —
+`sanitizeBasemapCameraForSave()` already stamps that at write time, and two timestamps
+meaning different things would agree only by accident. The type cast at the editor call
+site was removed in the same commit; nothing passes through `as` any more.
+
+Verification: `npm run type-check` clean, `npx vitest run` → **16 files, 346 tests
+passed**, `npm run lint` → 3 warnings, all pre-existing in the 8.J WIP diff
+(`uploadWithRetry` unused, `LayerControlBar` unused, a type-only `prev`) and none from
+this work. No test accompanies the component change itself — this repo has no
+component-test harness (§8.I), the emit is four `map.get*()` calls behind a ref, and the
+pure function it feeds is already covered — so this is the second Phase 8/10 item whose
+verification is a browser session rather than a suite, and it is handed to the operator
+as an explicit test checkpoint rather than claimed as done here.
+
+**What this does not yet do, stated so the checkpoint is not oversold.** The editor can
+now *show* a basemap and *save a camera*; it still cannot place a post on one. The
+marker-tool gate at `page.client.tsx:1484` is still `previewUrl && !effectiveBasemap`,
+which means turning the basemap on in the editor continues to hide the marker tool.
+Basemap view in the editor remains look-only until 10.C gives `Post` a coordinate of
+record and 10.E rewires that gate — the two items the phase already records as "one
+change split across two files."
+
+Phase 8 is now marked complete except 8.G's basemap-view self-marker. Phase 10 moves to
+partly built.
+
 
 ---
 
@@ -3811,7 +3926,7 @@ somebody using the product.
 
 ---
 
-### Phase 8 — A real basemap under the venue raster — 🟡 BUILT, UNCOMMITTED, VISUALLY VERIFIED
+### Phase 8 — A real basemap under the venue raster — ✅ COMPLETE (`0e030bc`, `b6d3dc9`, `a78421a`, `40342f5`) except 8.G's self-marker
 
 **8.F and 8.G were scoped 2026-08-18** in response to the second field report (§0.6.6).
 **Implementation followed the same day, and visual verification followed later the same
@@ -4200,6 +4315,166 @@ self-marker use case is still unwired (§0.3(58)). Visual verification closes th
 actually render" question; it does not close the "is it committed" or "is it tested at the
 component level" questions, which remain open exactly as §0.1 states them.
 
+
+#### 8.I — `Venue.basemapCamera` and the initial-camera precedence chain — ✅ BUILT (`b6d3dc9`, `a78421a`)
+
+**Shipped as two commits, contract first:** `b6d3dc9` landed the shared type —
+`BasemapCamera` on `app/types.ts:107-119` plus `Venue.basemapCamera?` — and a bare
+`initialCamera` prop on `BasemapView`, so the type could settle before either consumer
+(dispatch-side read in this sub-item, editor-side write in §8.J) was written against a
+moving target. `a78421a` landed the actual resolution logic eight minutes later.
+
+**What `Venue.basemapCamera` is:** a saved opening camera — `{ center: { lat, lon },
+zoom, bearing?, pitch?, updatedAt? }` — persisted on the venue, not the layer, "because
+layers are floors of one building and share a single real-world footprint, so a
+per-layer camera would be the same numbers repeated with an opportunity to disagree"
+(`types.ts:107-109`). It is deliberately **view state, not position state**, and the
+type's own doc comment states why that distinction is what makes it safe at all:
+
+> This is VIEW state, not position state, and the distinction is the whole reason it is
+> safe: §8.C requires every marker to derive from lat/lon via `geoUtils`, never from
+> anything the map library owns. A camera never becomes a marker — nothing reads these
+> numbers to place anything — so storing MapLibre's own view parameters here does not
+> open the door §8.C closes.
+
+**Why it exists**, in the same comment, is the same motivating case §8.B and §8.D
+already worried about in the abstract, now named exactly:
+
+> It exists because the alternative is inference. `BasemapView` otherwise frames itself
+> from the venue raster's corners or from already-located markers, and a venue that has
+> NEITHER — a campus-scale venue with no uploaded image and no georeference, which is
+> the case that motivated this — leaves MapLibre at its built-in world view, where a
+> venue-sized PMTiles extract has no tiles at all.
+
+That is: a brand-new venue with nothing uploaded and nothing calibrated has no raster
+corners and no located markers to frame from, so without this, MapLibre opens at its own
+default world view — and a venue-scale PMTiles extract has no tiles anywhere near world
+zoom, so the operator sees a blank grey map with no way to navigate to their own venue.
+
+**The precedence chain**, in `src/lib/basemap/camera.ts`'s `resolveInitialCamera()`, is
+four levels, tried in order and returning at the first that has anything to offer:
+
+1. **Saved camera** — `Venue.basemapCamera`, passed in as `initialCamera`. An explicit
+   operator choice always wins over anything the module could infer.
+2/3. **Raster corners, or (no raster) located markers** — collapsed into one level
+   because by the time a camera is being picked they're handled identically: both arrive
+   as a `geometryPoints: [number, number][]` array that `BasemapView` has already
+   resolved before calling in, and the module just extends an `LngLatBounds` to fit them.
+4. **The PMTiles archive's own coverage bounds** — parsed and validated from the
+   archive's header by `parseArchiveCoverage()`, the last resort for a venue with no
+   image, no georeference, and no located staff/calls either: better to open somewhere
+   the archive actually has tiles than at MapLibre's blank world view.
+
+Beyond level 4, if the archive has no usable coverage bounds either, resolution returns
+`{ source: 'none' }` and `BasemapView` falls through to MapLibre's own built-in default —
+the module doesn't manufacture a fifth camera for that case.
+
+As `a78421a`'s commit message states, every resolved camera is **passed to the `Map`
+constructor, never fitted inside a `load` handler** — the same constraint §8.H's bug #4
+already established, restated here because it governs this module's contract too:
+fitting on `load` deadlocks, since `load` needs every source loaded and the extract has
+no tiles at world view to load into.
+
+**`onCoverageWarning`** fires — and only ever fires, it never renders anything itself —
+when the resolved camera's `venueCentre` (levels 1 and 2/3 carry one; level 4, the
+archive's own coverage, cannot be "outside" itself so carries none) falls outside the
+archive's coverage bounds via `isOutsideCoverage()`. The rationale is the same
+indistinguishability problem §8.B's degrade-to-nothing discipline keeps citing: a venue
+sited outside the archive's coverage renders a blank map that looks identical to a
+broken one, so the mismatch needs to be signaled rather than silently rendered as
+nothing. **No consumer yet** — the prop exists on `BasemapView` and is wired to fire, but
+nothing in `venuemapmodal.tsx` or the dispatch page passes a handler for it.
+
+**Tests:** `src/lib/__tests__/basemap/camera.test.ts`, 22 tests (commit message says 26;
+counted and run directly — `npx vitest run` reports 22 passed). `camera.ts` is pure and
+synchronous — no `maplibre-gl`, no `pmtiles`, no network — the same test-without-a-browser
+trade-off `src/lib/basemap/config.ts` already documents for itself, load-bearing here
+because, per `a78421a`'s message, "this repo has no component-test harness."
+
+**Consumer wiring landed in the same commit:** `venuemapmodal.tsx` now passes
+`initialCamera={basemapCamera}` (sourced from `event.venue.basemapCamera`) into its
+`BasemapView`, with the call site's own comment noting the camera is "read once at
+construction and never re-applied, so re-framing the map out from under a dispatcher who
+has deliberately panned somewhere is avoided." The dispatch page (`page.tsx`) now threads
+`basemapCamera={event.venue.basemapCamera}` into both the main map and Quick Call's
+draft-pick picker. This closes the **read** side for the dispatch board; the venue
+editor's own read/write path is §8.J.
+
+Camera is view state and never becomes a coordinate, so §8.C's one-way boundary is
+untouched by any of this — restated in both commit messages because it is the property
+the rest of Phase 8 depends on staying true.
+
+#### 8.J — Basemap in the venue editor, and "Set default view" — ✅ BUILT (`40342f5`)
+
+Ports §8.D's raster/basemap toggle from `venuemapmodal.tsx` into
+`venues/management/page.client.tsx` — the venue *editor*, which §8.D had explicitly
+scoped out ("The venue editor legitimately stays percent-native... there is no
+basemap-relative way to ask 'where on this raster is this control point' that makes more
+sense than the current pixel-click interaction"). That scoping still holds for control
+points; this sub-item does not touch marker/control-point placement. What it adds is a
+second, selectable map view for the editor's own preview panel, plus a way for an
+operator to capture and save `Venue.basemapCamera` from inside the editor rather than
+only reading it (§8.I covers reading it into the dispatch board).
+
+**A separate storage key, deliberately.** `EDITOR_VIEW_MODE_STORAGE_KEY =
+'crowdcad.venueEditor.viewMode'`, distinct from the modal's
+`'crowdcad.venueMap.viewMode'`. The file's own comment states why conflating them would
+be wrong: "the editor's default-view logic differs from the modal's... so conflating the
+two browser preferences would let one screen's choice silently override the other's."
+
+**The default differs from the modal's on purpose.** §8.D's modal defaults to basemap
+only when `isBasemapConfigured() && currentLayerCalibrated` — deliberately *not* opening
+an uncalibrated layer straight into a bare basemap. The editor inverts the uncalibrated
+case: it defaults to basemap when `isBasemapConfigured() && !hasMapUrl` — no uploaded
+image at all. This is the same bootstrap case §8.I's doc comment names ("a campus-scale
+venue with no uploaded image and no georeference"), but from the editor's side: showing
+the raster-upload dropzone with no way past it would strand that flow entirely, where a
+layer that already has an image still defaults to it unchanged, so reopening an
+already-calibrated floor plan isn't surprised by a real-world map in its place. The
+initial guess (computed before venue data has loaded) is re-synced once the venue loads
+and its actual `mapUrl` is known — but only when no stored preference exists yet, since
+the pre-load guess "is not itself a preference to respect."
+
+**`handleBasemapUnavailable`** is the same fail-to-raster contract as the modal's
+identical handler (§8.B's degrade-to-nothing, applied here to the editor instead of the
+dispatch map): set once, permanently, the first time `BasemapView` reports it can't
+draw, and force `viewMode` back to `'raster'`.
+
+**`effectiveBasemap`** is the single source of truth for "is the basemap actually on
+screen right now" — `isBasemapConfigured() && !basemapFailed && viewMode === 'basemap'`
+— mirroring the modal's own `effectiveBasemap`, read at every render site instead of
+each one re-deriving it from the three inputs separately. It also gates marker/control-
+point UI off the raster panel: control-point placement operates on `handleImageClick`, a
+pixel click against the raster `<Image>`, which has no meaning once the basemap is what's
+on screen.
+
+**`sanitizeBasemapCameraForSave()`**, split out to `src/lib/basemapCameraUtils.ts`
+specifically so it could be unit-tested at all — "this repo has no component-test
+harness... pure extraction is the established way to get anything under test at all,"
+per the file's own header. It normalizes a live-read camera before it's written to
+`venueData.basemapCamera`: `bearing`/`pitch` are omitted entirely rather than set to
+`undefined` when the camera is north-up/flat (Firestore rejects `undefined` at any depth
+— the same pattern `buildGeoreferenceForSave` already uses for `label`/`updatedBy`), and
+`updatedAt` is always stamped fresh from `Date.now()` rather than trusted from the input,
+since it records when *this capture* happened. Four tests in
+`src/lib/__tests__/basemapCameraUtils.test.ts` cover the omission, the pass-through case,
+the fresh-stamp override, and that a real `0` for bearing/pitch is kept rather than
+treated as unset. The save path itself (`handleSave` in `page.client.tsx`) then omits the
+`basemapCamera` key from `dataToSave` entirely when unset, rather than writing
+`undefined` — the same Firestore constraint, applied at the top-level write.
+
+**The defect this shipped with, and how it was closed — ✅ `40342f5`.** As first
+written, "Set default view" was inert. The button calls `handleSetDefaultView`, which
+reads `liveBasemapCameraRef.current` and writes it into `venueData.basemapCamera` via
+`sanitizeBasemapCameraForSave`. That ref is kept current by `handleBasemapCameraChange`,
+passed to `BasemapView` as an `onCameraChange` prop — but `BasemapViewProps` had no such
+prop, so it was smuggled through a type cast and `BasemapView` never called it.
+`hasLiveCamera` therefore never became `true`, the button stayed permanently disabled,
+and `handleSetDefaultView`'s body was unreachable in practice. **This is why 8.J was
+landed together with §10.D rather than on its own**: committing the editor toggle alone
+would have shipped a visible control that could not work, and a disabled button with no
+explanation is indistinguishable from a broken one. §10.D added the prop, the cast is
+gone, and the capture path now runs end to end.
 ---
 
 ### Phase 9 — Multi-level venues, and what TAK can honestly carry — ⛔ NOT STARTED
@@ -4285,6 +4560,351 @@ not on TAK or Phase 8 at all. None of Phase 9 needs hardware — the entire phas
 modelling and rendering; only §7.D's pin-type spike and any future device testing of the
 `<detail>` extension in TAK clients would need a phone, and that testing is optional
 confirmation rather than a blocker to shipping 9.A–9.D.
+
+---
+
+### Phase 10 — Map-first venues: creating a venue that has no picture — 🟡 PARTLY BUILT
+
+> **Origin.** Raised 2026-08-19 from the running app: creating a venue at
+> `/venues/management` offers "Upload Venue Map — Optional, click to select an image" and
+> a Georeference tab reading "Not georeferenced — place at least 2 points." There is no
+> control anywhere in that flow that says *this venue is a real place, show me a map*.
+> The basemap Phase 8 built is real, committed, and invisible from the one screen where a
+> venue is brought into existence.
+
+Phase 8 asked "can we put a real basemap under the venue raster?" and answered yes. Phase
+10 asks the question Phase 8 deliberately did not: **what about a venue that has no
+raster to put it under?** Every IC-EMS product shown on 2026-08-19 (§0.6, Phase 11) is
+built on venue geometry that is lat/lon-native — their 134 stadium locations are a CSV of
+`Lat`/`Long` before they are anything else. CrowdCAD's creation flow inverts that: an
+image is the entry point and coordinates are an optional calibration applied afterward,
+which means the coordinate-native path is reachable only by first walking the
+image-native one.
+
+This phase is the blocking work. Phase 11 is what makes CrowdCAD legible to a GIS
+agency; Phase 10 is what lets an operator create a usable venue at all without a
+photograph.
+
+#### 10.A — Why there is no map option, precisely
+
+Three independent causes, each on its own sufficient to produce the screen the operator
+saw. They must be named separately because fixing any one of them alone changes nothing.
+
+- **The editor was never given the toggle.** Phase 8.D put the raster/basemap switch into
+  the *dispatch* modal (`venuemapmodal.tsx`), not the venue editor. The editor is
+  raster-only by construction, and remained so until the uncommitted 8.J diff began
+  porting the same pattern across. The feature existed; the screen that needed it did not
+  import it.
+- **Post placement is bound to the `<img>` element.** `MarkerModeToggleButton` renders
+  only behind `{previewUrl && !effectiveBasemap && (` (`page.client.tsx:1484`), and
+  placement runs `onClick` on the raster image through `pixelToPercent()`
+  (`markerUtils.ts:18`) against that image's bounding rect. With no image there is no
+  click target and therefore no way to place a location. The georeference flow inherits
+  the same dependency — control points are placed *on the image*, so "place at least 2
+  points" is not merely unmet but **unsatisfiable** without an upload. Note the gate's
+  second clause: even in the uncommitted 8.J state, turning the basemap *on* in the
+  editor **hides the marker tool**. Basemap view in the editor is currently look-only.
+- **`Post` has no coordinate of record.** `Post` is
+  `string | { name, x, y, isClinic? }` (`types.ts:1-8`) where `x`/`y` are explicitly
+  "percentage of width/height". A post on a map-first venue has no image to be a
+  percentage *of*. This is the actual data-model blocker, and it is why 10.C — not the
+  UI work — is the load-bearing item in this phase.
+
+The creation button itself is **not** a cause and should not be blamed: it gates on the
+name alone (`isDisabled={!venueData.name.trim()}`, `page.client.tsx:1447`) and the map
+field is already labelled `(Optional)` (`:1466`). A venue with no image already saves
+fine. It is simply useless afterward, which is the more precise complaint.
+
+#### 10.B — The precedent already exists: do for `Post` what 7.A did for `Call`
+
+This phase should not invent a design. Phase 7.A already faced this exact asymmetry and
+resolved it: `CallPosition` (`types.ts:368`) stores **lat/lon as the system of record**
+with `x`/`y` percent *derived on read* and permitted to be `null` when the point falls
+outside the layer. The stated reason (§7.A) was that a call can arrive from a phone that
+never saw the venue image, so lat/lon is the only representation both ends share.
+
+A post on a map-first venue is the same object under a different name: authored against a
+real map, meaningful without any image, and required to survive the venue later gaining
+or swapping a raster. **The correct move is to give `Post` the `CallPosition` treatment,
+not to invent a second convention.** Two coordinate philosophies in one document is a bug
+factory; three is a rewrite.
+
+#### 10.C — `Post` gains a coordinate of record
+
+Propose extending the object form of `Post` with an optional geographic position, leaving
+both the bare-string form and the percent-only form untouched:
+
+- `lat`/`lon` present → this post is coordinate-native; `x`/`y` are derived per-layer via
+  `pixelToLatLon`'s inverse and may be `null` when the post falls outside the raster.
+- `lat`/`lon` absent → unchanged legacy behaviour; `x`/`y` remain the record, exactly as
+  today.
+
+**Do not migrate existing venues automatically.** An ungeoreferenced percent post has no
+true lat/lon, and synthesising one from a guessed extent would produce a marker that
+looks authoritative and is wrong — the identical failure `TAK_DECISIONS.md` §6 refuses
+when it records off-map positions as `onMap: false` rather than clamping them, because
+"a clamped marker is a confident lie." A georeferenced venue *can* have lat/lon computed
+for its posts, and that computation already exists (`postLatLon`/`layerPostsLatLon`), but
+writing the result back as the record is a one-way door and should be an explicit,
+confirmed operator action, not a migration that runs while nobody is watching.
+
+The `string` form of `Post` must keep working. It is load-bearing in scheduling
+(`PostAssignment` is keyed by post *name*, `types.ts:408`) and this phase has no business
+touching that.
+
+#### 10.D — Close 8.J's inert button: `onCameraChange` on `BasemapView` — ✅ BUILT (`40342f5`)
+
+The smallest change in the phase and the one that unblocks the most. `BasemapView`
+exposes `onMapClick`, `onSelectCall`, `onUnavailable` and `onCoverageWarning`
+(`BasemapView.tsx:84-140`) but **no camera reporting**. The uncommitted editor passes one
+anyway through a type cast (`page.client.tsx:1536`) so that "Set default view" (`:1589`)
+compiles; `BasemapView` never calls it, so the button is inert and the saved
+`Venue.basemapCamera` is never written from the UI.
+
+Add `onCameraChange?: (camera: BasemapCamera) => void`, fired on `moveend` and held
+through a ref like every other callback in that file (`:437-445`) so a re-render storm
+cannot follow the map. This matters more than its size suggests: 8.I's precedence chain
+falls back through raster corners → located markers → archive coverage → **MapLibre's
+world view**, and a venue with no image, no georeference and no saved camera lands on
+that last rung, where a venue-sized PMTiles extract has no tiles and the operator sees
+grey. The saved camera is the only rung a map-first venue can reach at creation time.
+
+**Shipped as scoped, with two decisions worth recording.** `onCameraChange` fires on
+`moveend` and *also once when the map first becomes ready*. The mount emit was not in the
+original scoping and is the difference between a usable button and a riddle: without it,
+an operator who is happy with the camera §8.I already resolved for them cannot save it,
+because the capture button stays disabled until they nudge the map to prove a camera
+exists — which is a strange thing to have to do in order to accept a default. One
+listener covers pan, zoom, rotate and pitch, since MapLibre routes all four through the
+same move lifecycle, and `moveend` rather than `move` means a drag reports once on
+release instead of on every animation frame.
+
+Second: the readout deliberately does **not** stamp `updatedAt`. It reports what the
+camera *is*; when a reading became a saved preference is the write path's concern, and
+`sanitizeBasemapCameraForSave()` already stamps it there. Stamping in both places would
+give two timestamps that mean different things and agree only by accident.
+
+No test accompanies this. `BasemapView` is a component and this repo has no
+component-test harness (§8.I) — the emit is four `map.get*()` calls behind a ref, and the
+pure part it feeds (`sanitizeBasemapCameraForSave`) is already covered. Verified in a
+browser instead; see the note at the end of this phase.
+
+#### 10.E — Placement against the basemap in the editor
+
+`BasemapView` already delivers what is needed: a map click hands
+`{ lat: e.lngLat.lat, lon: e.lngLat.lng }` to `onMapClick` (`BasemapView.tsx:717`), and
+§8.F already established that a basemap click needs no georeference because
+`map.unproject()` yields real coordinates directly. The dispatch modal consumes this
+today (`venuemapmodal.tsx:1817-1834`); **the editor simply never passes the prop.**
+
+So the work is: wire `onMapClick` in the editor, change the marker-tool gate at
+`page.client.tsx:1484` from `previewUrl && !effectiveBasemap` to admit the basemap case,
+and route the resulting lat/lon into a post — which is only possible once 10.C exists.
+**10.C and 10.E are one change split across two files**; sequencing 10.E first produces a
+click handler with nowhere to put its answer.
+
+`PendingMarkerDialog` needs no structural change, but it should show the captured lat/lon
+so the operator can see what was recorded before naming it.
+
+#### 10.F — Locating the venue at creation, without assuming internet
+
+Three ways to answer "where is this venue", in ascending cost:
+
+- **Device GPS.** Already built for control-point capture in 8.G (`useDeviceLocation.ts`,
+  the "Use my location" control in `GeoreferenceSection`). Correct and free when the
+  venue is created on site.
+- **Typed coordinates.** A lat/lon pair, which is exactly what IC-EMS already has in a
+  spreadsheet column. Trivially implementable and it composes with 11.B's CSV import.
+- **Pan and zoom, then capture.** The 8.J "Set default view" flow, live once 10.D lands.
+
+**Recommend against a geocoder search box as the default path.** §8.B's requirement is
+that the basemap "degrade to nothing" because stadium connectivity is a premise of this
+project, not an edge case; a location search that silently requires internet is a trap
+sprung at precisely the moment it is needed, and it would be the only online dependency
+in an otherwise offline-first map stack. If one is added later it belongs behind the same
+`readBasemapConfig()`-style presence check that already makes the basemap itself optional
+— available when configured, absent without error when not.
+
+#### 10.G — Tile coverage is per-venue, and nothing generates it
+
+`scripts/fetch-basemap.sh` extracts **one bounding box** into `public/basemap/venue.pmtiles`
+— default `-122.30,37.845,-122.23,37.895`, which is UC Berkeley, at `MAXZOOM=16`, about
+5 MB, and gitignored so a fresh clone has no tiles at all. A venue in Bloomington, Indiana
+has no coverage whatsoever, and the operator's symptom would be a grey rectangle rather
+than an error.
+
+8.I already built the detector — `parseArchiveCoverage`/`isOutsideCoverage` and the
+`onCoverageWarning` callback — but in the editor it currently has nowhere to surface.
+**Creation is the cheapest possible moment to catch a coverage mistake**, so the warning
+belongs in the creation flow as visible text, not a console line. Beyond that this is an
+ops question rather than a code one: either a wider archive, or a per-venue extract keyed
+to the venue's saved camera, plus a runbook entry. Note the sizing constraint recorded in
+the script's own header — archive size grows with *area*, "not much with maxzoom" — so
+widening the box is the expensive axis and deepening it is not.
+
+#### 10.H — What this does not solve
+
+In the spirit of §8.E, stated before anyone is disappointed:
+
+- **It does not give floors.** A map-first venue is as flat as a raster one. Multi-level
+  is Phase 9 and 9.A still gates it.
+- **It does not make a diagram venue geographic.** A hand-drawn floor plan with no
+  control points has no coordinates, and this phase adds no way to conjure them.
+- **It does not replace the georeferenced raster overlay.** IC-EMS keeps their stadium
+  diagram layered *on top of* the basemap for a reason: OSM knows where Memorial Stadium
+  is, and does not know where section 24 is. A map-first venue with meaningful interior
+  structure will still want a raster overlay eventually — Phase 10 removes the raster as
+  a *precondition*, not as a capability.
+
+**Effort:** 10.A none (diagnosis, written). 10.D S and unblocks the most per line changed
+— do it first. 10.C M and is the real work of the phase. 10.E S–M but is not separable
+from 10.C. 10.F S for GPS and typed coordinates, and explicitly out of scope for a
+geocoder. 10.G S in code, ops question otherwise. 10.H none.
+
+**Ordering:** 10.D → 10.C → 10.E is the critical path; 10.F and 10.G are independent and
+can land in any order around it. Landing 8.J first (or concurrently) is a prerequisite for
+all of it, since the editor has no basemap surface at all until that diff is committed.
+
+**Exit criteria:** an operator can create a venue with no image, see a real map, place
+named locations on it that persist with real coordinates, save an opening camera the
+venue reopens at, and be told plainly at creation time if the venue falls outside tile
+coverage — with every existing percent-only venue continuing to behave exactly as it does
+today.
+
+---
+
+### Phase 11 — What IC-EMS actually showed us: GIS interchange and after-action analytics — ⛔ NOT STARTED
+
+**Phase 11 is not the blocking work.** Phase 10 — map-first venue creation, scoped
+separately — is what unblocks the operator: it is the difference between a venue that
+takes an afternoon of clicking and one that does not exist yet. Phase 11 is what makes
+CrowdCAD *legible* to an agency that already lives in ArcGIS, and it is deliberately
+sequenced after Phase 10 because every item below depends on venue geometry being
+lat/lon-native — a `Post` with only a percentage-of-image `x`/`y` and no coordinate has
+nothing to interchange.
+
+#### 11.A — A location taxonomy that survives the round trip
+
+`Post` (`core/src/app/types.ts:1-7`) is today `string | { name, x, y, isClinic? }` — a
+flat name and one boolean special case. IC-EMS's 134-row attribute table carries three
+separate fields — `Category` (`Gate`, `Facility`, `Lot`), `Subcategory` (`East`, `North`,
+`South`, `Interior`, `Purple`), `Label` (`Gate E5`, `NEZ Gate`, `K1`–`K5`) — and none of
+it survives a round trip through CrowdCAD's model today: it would all get flattened into
+`name`.
+
+Propose an optional structured classification alongside the existing string form —
+something in the shape of `classification?: { category: string; subcategory?: string }`
+— so nothing that already reads `Post` as `string | { name, x, y }` breaks. The point
+worth making plainly: `isClinic` is already a special-cased category sitting beside the
+general model rather than inside it, and a real taxonomy should *subsume* `isClinic`
+(clinic becomes a `category` value, not a parallel boolean), not add a fourth field next
+to it.
+
+**Warn against inventing a CrowdCAD-only vocabulary.** `Purple` is a parking-lot colour
+at IU's Memorial Stadium. It means nothing at any other venue, and a hardcoded enum of
+`Category`/`Subcategory` values would be wrong the first time this ships to a second
+customer. The taxonomy has to be operator-defined per venue — free-text fields with
+autocomplete-from-existing-values, not a fixed dropdown — or Phase 11 reproduces the
+exact mistake it is trying to interoperate around.
+
+#### 11.B — CSV and GeoJSON interchange, in both directions
+
+**This is the highest-value, lowest-risk item in the phase**, and it should be treated
+as such when this phase gets prioritized against Phase 10 and everything else in flight.
+
+Import: a CSV with lat/long/label columns (plus, once 11.A exists, category/subcategory
+columns) creates `Post`s directly. This is IC-EMS's own workflow, verbatim — a CSV of
+`Lat`, `Long`, `Category`, `Subcategory`, `Label` fed through ArcGIS's `XY Table To
+Point` tool to build a feature layer — replayed as a CrowdCAD import instead of an
+ArcGIS one. It means a venue with 134 locations does not get hand-clicked into
+existence one marker at a time. CSV import is, in fact, the fastest available answer to
+"I do not want to place 134 pins by hand," and it substantially substitutes for editor
+UI that would otherwise have to be built for bulk placement.
+
+Export: a GeoJSON `FeatureCollection` of posts, calls, and tracks, which ArcGIS Pro
+opens natively with no conversion step — this is the mechanism that lets IC-EMS keep
+building their season-scale products (§11.E) in the tool they already know, using data
+that originated in CrowdCAD.
+
+KML/KMZ is the secondary format worth supporting — it is TAK's own native geographic
+container, not just ArcGIS's — and a KMZ/GeoTIFF of the real venue is already an
+outstanding ask *from* IC-EMS, tracked as an open item in
+`core/docs/TAK_OPEN_QUESTIONS.md` §6 ("Georeferenced venue overlay"). 11.B's export side
+and that open question are the same underlying need pointed in opposite directions:
+§6 asks CrowdCAD to *consume* a KMZ/GeoTIFF IC-EMS already has of the stadium; 11.B
+would let CrowdCAD *produce* one from data it holds.
+
+#### 11.C — Track history, and the honest gap
+
+CrowdCAD stores current team position only — `Staff.position` is a last-known mirror,
+and the `positions` collection described in §6.2 is itself throttled and retention-capped
+(30 days by default, §8 item 8), not an archive. There is no breadcrumb history anywhere
+in the system today.
+
+IC-EMS's per-callsign polylines — full-shift movement traces for `East Stands Row 24`,
+`Supervisor`, `Code Truck`, `MR-12 Gator`, and the rest, drawn one colour per callsign
+across the entire game — were the single most visually striking thing demonstrated, and
+they are pure history: nothing about them exists at any single instant, only as a
+trace over time. Building the equivalent means keeping what §6.2 currently throttles
+*away* from being kept, which is a direct collision with the write-rate constraint that
+section exists to enforce — more positions written, and now durably, is exactly the cost
+§6.2 was designed to avoid, not a free add-on to it.
+
+State the storage-cost problem plainly rather than assuming it away: a season of
+full-shift tracks at even a modest sample rate, retained rather than expired, is a
+different order of data volume than anything else this document has scoped. And track
+history is not merely a storage question — a position history that can be joined to a
+call (which team responded, tracked minute-by-minute, to which incident) is
+PHI-adjacent in exactly the way §8 already treats inbound free text: the position itself
+is not clinical data, but the join can reconstruct clinically sensitive context. Any
+track-history design needs to sit inside §8's retention and access rules from the start,
+not be bolted on after the fact.
+
+#### 11.D — Call symbology by run type
+
+CrowdCAD already has call types; the map does not symbolise pins by them the way
+IC-EMS's product does (Medical / Trauma / Other / Intoxication, distinct icon and colour
+per class, with counts in the legend). Small and self-contained relative to the rest of
+this phase, and it depends on Phase 7's call pins already being on the map at all.
+
+`core/src/lib/statusColors.ts` is the existing centralised colour authority
+(`STATUS_COLORS`, `getStatusColor()`) for dispatch UI generally — this should extend
+that map with a run-type axis rather than introduce a second, parallel colour system
+that the rest of the app does not know about.
+
+#### 11.E — Density surfaces and season-scale review
+
+IC-EMS's heat map ("EMS Calls For Service 2023-2024 — Density of Calls By Area") spans
+an entire season across multiple events, not one game. Every other query in CrowdCAD is
+scoped to a single event — `Event` is the unit everything else in this document
+(§6.2's write path, §6.4's bridge, the org-scoping in Firestore rules) is built around.
+A cross-event query is a genuinely new access pattern, not a variant of an existing one,
+and it raises its own Firestore-rules and org-scoping questions: which org members can
+see aggregate call data across events they did not personally staff, and whether that
+aggregate view needs the same PHI discipline §8 applies to a single call.
+
+**This is the largest and least urgent item in the phase.** A defensible first version
+is not CrowdCAD reimplementing kernel density estimation — it is the GeoJSON export from
+11.B, applied across events, letting IC-EMS keep doing this analysis in ArcGIS Pro with
+data CrowdCAD supplied. Building an in-app density surface is a legitimate later
+ambition, not a first cut.
+
+**Effort:** 11.A is S–M and is a prerequisite for the category/subcategory columns in
+11.B's import, though 11.B's lat/long-only import works without it. 11.B is S for CSV
+import, M for GeoJSON/KML export (S if scoped to posts only; M once calls and tracks are
+included). 11.C is L, blocked on resolving its conflict with §6.2's write-rate
+constraint before any storage design is written, and its access-control design is
+blocked on §8. 11.D is S and depends only on Phase 7. 11.E is L, and its honest first
+version (export-only) is closer to S once 11.B exists.
+
+**Exit criteria:** A venue with 100+ locations can be created from a CSV without manual
+pin placement (11.B); a `Post` can carry an operator-defined category without breaking
+existing string-form posts (11.A); posts, calls, and tracks can be exported as GeoJSON
+and opened in ArcGIS Pro without a conversion step (11.B); call pins are colour- and
+icon-coded by run type using `statusColors.ts` (11.D). Track history (11.C) and
+cross-event density (11.E) are explicitly not required for this phase to be called done
+— they are the two items where the honest scope is "designed and sequenced," not
+"shipped."
 
 ---
 
@@ -4796,6 +5416,33 @@ Phase 8 — modified:
 ✅ (uncommitted) package.json                                             BOTH root and core — maplibre-gl (pinned ^5.24.0,
                                                                           NOT 6.x — §0.3(59)), pmtiles, @protomaps/basemaps
 ✅ (uncommitted) .gitignore                                               BOTH root and core — public/basemap/, .cache/
+```
+
+**Correction, 2026-08-19.** Every `✅ (uncommitted)` marker in the two Phase 8 blocks
+above is now stale: those files landed in `0e030bc`. They are left as written so the
+session history reads honestly, but read them as committed. The 8.I entries below are
+committed; only the 8.J entries are genuinely still uncommitted.
+
+Phase 8 — §8.I and §8.J:
+
+```
+✅ src/app/types.ts                                       BasemapCamera, Venue.basemapCamera — §8.I (`b6d3dc9`)
+✅ src/components/dispatch/BasemapView.tsx                initialCamera prop (`b6d3dc9`); the 4-level resolution call and
+                                                           onCoverageWarning (`a78421a`) — §8.I
+✅ src/lib/basemap/camera.ts                              resolveInitialCamera(), parseArchiveCoverage(),
+                                                           coverageToPoints(), isOutsideCoverage() — pure, §8.I (`a78421a`)
+✅ src/lib/__tests__/basemap/camera.test.ts                22 tests — §8.I (`a78421a`)
+✅ src/components/modals/event/venuemapmodal.tsx          basemapCamera prop threaded into BasemapView as
+                                                           initialCamera — §8.I (`a78421a`)
+✅ src/app/(main)/events/[eventId]/dispatch/page.tsx      event.venue.basemapCamera threaded to both the main map and
+                                                           Quick Call's draft-pick picker — §8.I (`a78421a`)
+✅ src/app/(main)/venues/management/page.client.tsx        raster/basemap toggle ported into the editor;
+                                                           "Set default view"/"Clear default view"; EDITOR_VIEW_MODE_
+                                                           STORAGE_KEY — §8.J (`40342f5`)
+✅ src/lib/basemapCameraUtils.ts                           sanitizeBasemapCameraForSave() — §8.J (`40342f5`)
+✅ src/lib/__tests__/basemapCameraUtils.test.ts            4 tests — §8.J (`40342f5`)
+✅ src/components/dispatch/BasemapView.tsx                 onCameraChange, fired on moveend + once on ready;
+                                                           removed the type cast at the editor call site — §10.D (`40342f5`)
 ```
 
 **Dependency decision:** MapLibre GL JS, pmtiles 4.x, `@protomaps/basemaps` 5.x —
