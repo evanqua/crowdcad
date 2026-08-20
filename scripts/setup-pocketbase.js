@@ -147,11 +147,19 @@ async function main() {
     { name: 'mapUrl', type: 'text' },
     { name: 'sharedWith', type: 'json' },
     { name: 'isOrgVenue', type: 'bool' },
+    { name: 'basemapCamera', type: 'json' },
   ]);
 
   // `isOrgVenue` on `venues` — set for deployments where this collection
   // already existed before the field was added above.
   await ensureField(headers, 'venues', { name: 'isOrgVenue', type: 'bool' });
+
+  // `basemapCamera` on `venues` — same back-fill, and it matters more than most.
+  // PocketBase drops unknown fields on write without erroring, so a database
+  // created before this field existed accepts every venue save and silently
+  // discards the basemap georeference. The failure is invisible until someone
+  // reopens the venue and finds the camera gone.
+  await ensureField(headers, 'venues', { name: 'basemapCamera', type: 'json' });
 
   await ensureCollection(headers, 'events', [
     { name: 'name', type: 'text' },

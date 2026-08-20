@@ -24,6 +24,19 @@
 // for itself. BasemapView is the only caller; it supplies inputs it has
 // already computed or fetched (raster/marker points, a parsed archive
 // header) and turns the result into MapLibre constructor options.
+//
+// `sanitizeBasemapCameraForSave` below is the write-side counterpart of
+// `resolveInitialCamera` (the venue editor's "Set default view" writes the
+// camera this module later reads back via the `prop` precedence level) and
+// was merged in here from the former `lib/basemapCameraUtils.ts` so the two
+// camera modules don't keep drifting apart. It's the one export in this file
+// that takes a domain type (`BasemapCamera` from `@/app/types`) rather than
+// the structurally-equivalent local `CameraProp` — a deliberate, narrow
+// exception to this module's otherwise-zero domain-type dependency, made
+// because `Venue.basemapCamera` IS a `BasemapCamera` and there is no
+// meaningful "shape-only" version of a save sanitizer.
+
+import type { BasemapCamera } from '@/app/types';
 
 /** The subset of a PMTiles v4 `Header` this module cares about. Deliberately
  *  NOT `import type { Header } from 'pmtiles'` — keeping this module free of
@@ -181,4 +194,34 @@ export function resolveInitialCamera(input: {
   }
 
   return { source: 'none' };
+}
+
+// --- save-side sanitizer (merged from lib/basemapCameraUtils.ts) -----------
+//
+// Pure helper for the venue editor's "Set default view" control (TAK plan
+// §8 follow-up). Kept pure/framework-free like the rest of this module —
+// see the module doc comment above.
+
+/**
+ * Prepares a live-read `BasemapCamera` for storage on `Venue.basemapCamera`.
+ *
+ * Firestore rejects `undefined` at any depth, so `bearing`/`pitch` must be
+ * OMITTED rather than set to `undefined` when the reported camera is
+ * north-up/flat — same pattern `buildGeoreferenceForSave` uses in
+ * page.client.tsx for `label`/`updatedBy`. `updatedAt` is always stamped
+ * fresh here rather than trusted from the input, since it records when THIS
+ * capture happened, not whenever the camera object was constructed.
+ */
+export function sanitizeBasemapCameraForSave(
+  camera: BasemapCamera,
+  now: number = Date.now()
+): BasemapCamera {
+  const result: BasemapCamera = {
+    center: { lat: camera.center.lat, lon: camera.center.lon },
+    zoom: camera.zoom,
+    updatedAt: now,
+  };
+  if (camera.bearing !== undefined) result.bearing = camera.bearing;
+  if (camera.pitch !== undefined) result.pitch = camera.pitch;
+  return result;
 }

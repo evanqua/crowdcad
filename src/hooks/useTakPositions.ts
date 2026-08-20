@@ -93,6 +93,19 @@ function toTakPosition(record: TakPositionRecord): TakPosition {
   };
 }
 
+/**
+ * RC-2: a denied read and "nobody is transmitting" used to be indistinguishable
+ * — the subscription's error callback swallowed everything and reported an
+ * empty, "loaded" index either way. That masked real failures (a permission
+ * rule change, an auth problem, the backend being unreachable) behind what
+ * looked like an idle feed. `kind` is what the UI keys its notice off of;
+ * `message` is the backend's own text, carried through for a details line.
+ */
+export type TakPositionsError = {
+  kind: 'permission-denied' | 'unavailable' | 'unknown';
+  message: string;
+};
+
 export interface TakPositionIndex {
   /** Every position reported for this event, keyed by normalised callsign. */
   byCallsign: Map<string, TakPositionRecord>;
@@ -100,13 +113,77 @@ export interface TakPositionIndex {
   byBoundTeam: Map<string, TakPositionRecord>;
   /** True once the first snapshot has arrived, successfully or not. */
   loaded: boolean;
+  /**
+   * Non-null when the subscription is failing for a reason that is NOT the
+   * benign "collection doesn't exist yet" case. Positions stay empty either
+   * way — this field is what lets the dispatch page tell a real failure
+   * apart from an honestly idle feed. See `classifySubscriptionError`.
+   */
+  error: TakPositionsError | null;
 }
 
 const EMPTY_INDEX: TakPositionIndex = {
   byCallsign: new Map(),
   byBoundTeam: new Map(),
   loaded: false,
+  error: null,
 };
+
+/**
+ * Classify whatever `dbService.subscribeToQuery`'s `onError` callback hands
+ * us. Both backend adapters normalise their native errors into a
+ * `ServiceError` (see `lib/services/types.ts`) before calling `onError`, so in
+ * practice `err` always carries a `.code` string:
+ *
+ *   Firebase (`lib/services/firebase/utils.ts` → `toFirebaseServiceError`):
+ *     `err.code` is the raw Firestore error code — `'permission-denied'`,
+ *     `'unavailable'`, `'not-found'`, `'unauthenticated'`, `'unknown'`, etc.
+ *
+ *   PocketBase (`lib/services/pocketbase/utils.ts` → `toPbServiceError`):
+ *     HTTP status is mapped to a code — 403 → `'permission-denied'`,
+ *     404 → `'not-found'`, 401 → `'unauthenticated'`, anything else →
+ *     `` `pocketbase/${status}` `` (status `0` for a dropped connection /
+ *     CORS failure with no response, 5xx for a server error).
+ *
+ * `'not-found'` is the benign case on both backends — the `tak_positions`
+ * collection genuinely doesn't exist yet (Firebase has no rule for it, or
+ * `setup-pocketbase.js` hasn't run against this PocketBase instance) — so it
+ * returns `null` and the caller treats it exactly like "no positions yet".
+ * Everything else (denied reads, missing/expired auth, the backend being
+ * unreachable, or anything unrecognised) returns a typed error instead of
+ * being swallowed.
+ */
+export function classifySubscriptionError(err: unknown): TakPositionsError | null {
+  const code =
+    typeof err === 'object' && err !== null && 'code' in err
+      ? String((err as { code: unknown }).code)
+      : undefined;
+  const message = err instanceof Error ? err.message : String(err);
+
+  // Benign: the collection/table simply doesn't exist yet.
+  if (code === 'not-found') return null;
+
+  // Denied or unauthenticated reads are the same operator-facing story: the
+  // backend refused to hand over positions.
+  if (code === 'permission-denied' || code === 'unauthenticated') {
+    return { kind: 'permission-denied', message };
+  }
+
+  if (code === 'unavailable') {
+    return { kind: 'unavailable', message };
+  }
+
+  if (code?.startsWith('pocketbase/')) {
+    const status = Number(code.slice('pocketbase/'.length));
+    // status 0 is a dropped connection / CORS failure with no HTTP response
+    // at all; 5xx is the server itself failing. Both are transport, not a
+    // rule denying the read.
+    if (status === 0 || status >= 500) return { kind: 'unavailable', message };
+    return { kind: 'unknown', message };
+  }
+
+  return { kind: 'unknown', message };
+}
 
 /**
  * Subscribe to live positions for one event.
@@ -116,10 +193,12 @@ const EMPTY_INDEX: TakPositionIndex = {
  */
 export function useTakPositions(eventId: string | undefined | null): TakPositionIndex {
   const [records, setRecords] = useState<TakPositionRecord[] | null>(null);
+  const [error, setError] = useState<TakPositionsError | null>(null);
 
   useEffect(() => {
     if (!eventId) {
       setRecords(null);
+      setError(null);
       return;
     }
 
@@ -136,12 +215,26 @@ export function useTakPositions(eventId: string | undefined | null): TakPosition
           if (snapshot.data) next.push({ ...snapshot.data, id: snapshot.id });
         }
         setRecords(next);
+        // A snapshot that actually arrived means the subscription is
+        // healthy again — clear out any previously surfaced error.
+        setError(null);
       },
-      () => {
-        // A missing collection is the normal state on the Firebase backend and
-        // before setup-pocketbase.js has run. Treat it as "no positions" rather
-        // than breaking the dispatch board over an optional feature.
-        if (!cancelled) setRecords([]);
+      (err) => {
+        if (cancelled) return;
+        const classified = classifySubscriptionError(err);
+        if (classified === null) {
+          // Benign: missing collection, normal before setup-pocketbase.js has
+          // run, or on the Firebase backend where the collection has no rule.
+          // Treat it as "no positions" rather than breaking the dispatch
+          // board over an optional feature — and stay silent about it.
+          setError(null);
+        } else {
+          // A real failure. Never mask it as an idle feed (RC-2): surface a
+          // distinct, observable error state, but still don't crash the
+          // board — positions just stay empty.
+          setError(classified);
+        }
+        setRecords([]);
       },
     );
 
@@ -160,8 +253,8 @@ export function useTakPositions(eventId: string | undefined | null): TakPosition
       const key = norm(record.boundTeam);
       if (key) byBoundTeam.set(key, record);
     }
-    return { byCallsign, byBoundTeam, loaded: true };
-  }, [records]);
+    return { byCallsign, byBoundTeam, loaded: true, error };
+  }, [records, error]);
 }
 
 /**

@@ -22,6 +22,23 @@ function buildFilter(constraints: QueryConstraint[]): string {
     .join(' && ');
 }
 
+/**
+ * Detaches a realtime listener once its subscribe() has settled.
+ *
+ * Teardown is deliberately best-effort. Removing a listener makes the SDK POST
+ * /api/realtime with the client id it currently holds, and after the SSE stream
+ * reconnects (dev-server reload, laptop waking, PocketBase restart) that id can
+ * already be gone server-side — which comes back as a 404 "Missing or invalid
+ * client id". Nothing is left to clean up in that case and no caller can act on
+ * it, so it must not surface as an unhandled rejection.
+ */
+function teardown(
+  subscribed: Promise<unknown>,
+  getRemover: () => (() => Promise<void>) | null,
+): Promise<void> {
+  return subscribed.then(() => getRemover()?.()).then(() => {}, () => {});
+}
+
 export class PocketbaseDbService implements IDbService {
   async getDocument<T>(col: string, id: string): Promise<DocSnapshot<T>> {
     try {
@@ -186,7 +203,12 @@ export class PocketbaseDbService implements IDbService {
 
     // Subscribe to SSE immediately so we don't miss any events that arrive
     // while the initial poll is in-flight.
-    pb.collection(col).subscribe(id, (event: { action: string; record: unknown }) => {
+    //
+    // Keep the UnsubscribeFunc that subscribe() resolves to: it removes only
+    // this listener. pb.collection(col).unsubscribe(id) would instead drop
+    // every listener watching that record, including other components'.
+    let removeListener: (() => Promise<void>) | null = null;
+    const subscribed = pb.collection(col).subscribe(id, (event: { action: string; record: unknown }) => {
       if (cancelled) return;
       // SSE beat the poll — mark initial load done so the poll callback is skipped.
       initialLoadDone = true;
@@ -195,7 +217,10 @@ export class PocketbaseDbService implements IDbService {
       } else {
         callback(toSnapshot<T>(event.record as unknown as Record<string, unknown>));
       }
-    }).catch((err: unknown) => onError?.(toPbServiceError(err)));
+    }).then((unsub: () => Promise<void>) => {
+      if (cancelled) { void unsub().catch(() => {}); return; }
+      removeListener = unsub;
+    }).catch((err: unknown) => { if (!cancelled) onError?.(toPbServiceError(err)); });
 
     // Poll until the document appears (handles the case where the record was
     // just created and PocketBase's SSE has not emitted the create event yet).
@@ -242,7 +267,7 @@ export class PocketbaseDbService implements IDbService {
 
     return () => {
       cancelled = true;
-      pb.collection(col).unsubscribe(id);
+      void teardown(subscribed, () => removeListener);
     };
   }
 
@@ -267,13 +292,24 @@ export class PocketbaseDbService implements IDbService {
     // Initial load
     refetch();
 
-    // Re-fetch on any change in the collection
-    pb.collection(col).subscribe('*', () => { if (!cancelled) refetch(); })
-      .catch((err: unknown) => onError?.(toPbServiceError(err)));
+    // Re-fetch on any change in the collection.
+    //
+    // Several listeners routinely watch the same collection at once — the venue
+    // picker alone opens three on `venues` (owned, shared, org-wide). They all
+    // land on the same `col/*` topic, so unsubscribing by topic would tear down
+    // the sibling listeners too, and once the last one goes the SDK drops the
+    // SSE connection entirely. Keep the per-listener UnsubscribeFunc instead.
+    let removeListener: (() => Promise<void>) | null = null;
+    const subscribed = pb.collection(col).subscribe('*', () => { if (!cancelled) refetch(); })
+      .then((unsub: () => Promise<void>) => {
+        if (cancelled) { void unsub().catch(() => {}); return; }
+        removeListener = unsub;
+      })
+      .catch((err: unknown) => { if (!cancelled) onError?.(toPbServiceError(err)); });
 
     return () => {
       cancelled = true;
-      pb.collection(col).unsubscribe('*');
+      void teardown(subscribed, () => removeListener);
     };
   }
 }

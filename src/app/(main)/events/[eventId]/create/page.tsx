@@ -2,7 +2,7 @@
 
 import { useRouter, useParams } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
-import { Event, Venue, Staff, Supervisor, Post, Equipment, EventEquipment } from '@/app/types';
+import { Event, Venue, Layer, Staff, Supervisor, Post, Equipment, EventEquipment } from '@/app/types';
 import { authService, dbService } from '@/lib/services';
 import Image from 'next/image';
 import { Tabs, Tab, Button, Card, ScrollShadow } from '@heroui/react';
@@ -91,10 +91,15 @@ export default function EventCreation() {
     isTeamLead,
     setIsTeamLead,
     currentMembers,
+    setCurrentMembers,
     addMember,
     removeMember,
     reset: resetTeamForm,
   } = useTeamForm();
+
+  const [takCallsign, setTakCallsign] = useState('');
+  const [isEditTeamModalOpen, setIsEditTeamModalOpen] = useState(false);
+  const [editTeamOriginalName, setEditTeamOriginalName] = useState<string | null>(null);
 
   const {
     scheduleFrom,
@@ -196,9 +201,13 @@ export default function EventCreation() {
               dateString = d.toISOString().split('T')[0];
             }
             
-            // Migrate old venue format to new format with layers
+            // Migrate old venue format to new format with layers.
+            // The length check is load-bearing: `layers: []` is an empty array,
+            // which is truthy, so `!venue.layers` is false and a venue saved
+            // with no layers would skip this migration on every load — keeping
+            // its posts stranded on the legacy top-level `posts` field forever.
             let venue = data.venue;
-            if (venue && !venue.layers) {
+            if (venue && (!venue.layers || venue.layers.length === 0)) {
               
               // Convert old format to new format
               venue = {
@@ -304,10 +313,79 @@ export default function EventCreation() {
       location: "No Post",
       status: "On Break",
       members,
+      ...(takCallsign.trim() ? { takCallsign: takCallsign.trim() } : {}),
     };
     setEventData(prev => ({ ...prev, staff: [...(prev.staff || []), newStaff] }));
     resetTeamForm();
+    setTakCallsign('');
     setIsTeamModalOpen(false);
+  };
+
+  const handleEditTeam = (idx: number) => {
+    const staff = (eventData.staff || [])[idx];
+    if (!staff) return;
+
+    setTeamName(staff.team);
+    setTakCallsign(staff.takCallsign || '');
+    const parsedMembers = (staff.members || []).map((m) => {
+      const lead = m.includes('(Lead)');
+      const nameCertMatch = m.match(/^(.+?)\s\[(.+?)\]/);
+      const name = nameCertMatch ? nameCertMatch[1].trim() : m.trim();
+      const cert = nameCertMatch ? nameCertMatch[2].trim() : '';
+      return { name, cert, lead };
+    });
+    setCurrentMembers(parsedMembers);
+    setMemberName('');
+    setMemberCert('');
+    setIsTeamLead(false);
+    setEditTeamOriginalName(staff.team);
+    setIsEditTeamModalOpen(true);
+  };
+
+  const handleSaveEditedTeam = () => {
+    if (!teamName.trim() || currentMembers.length === 0 || !editTeamOriginalName) {
+      alert('Please enter a team name and add at least one member.');
+      return;
+    }
+
+    const newName = teamName.trim();
+    const oldName = editTeamOriginalName;
+
+    const duplicate = (eventData.staff || []).some(
+      staff => staff.team !== oldName && staff.team.toLowerCase() === newName.toLowerCase()
+    );
+    if (duplicate) {
+      alert(`A team with the name "${newName}" already exists. Please choose a different name.`);
+      return;
+    }
+
+    const members = currentMembers.map(
+      m => `${m.name} [${m.cert}]${m.lead ? " (Lead)" : ""}`
+    );
+    const trimmedCallsign = takCallsign.trim();
+
+    // Event creation has no calls/detached-teams/post-assignments yet — the team's
+    // own entry in `staff` is the only place the team name is keyed by, so renaming
+    // it here is the entire propagation surface (unlike the dispatch page, which
+    // also has to rewrite calls[].assignedTeam and calls[].detachedTeams).
+    setEventData(prev => ({
+      ...prev,
+      staff: (prev.staff || []).map(s => {
+        if (s.team !== oldName) return s;
+        const { takCallsign: _prevCallsign, ...rest } = s;
+        return {
+          ...rest,
+          ...(trimmedCallsign ? { takCallsign: trimmedCallsign } : {}),
+          team: newName,
+          members,
+        };
+      }),
+    }));
+
+    resetTeamForm();
+    setTakCallsign('');
+    setEditTeamOriginalName(null);
+    setIsEditTeamModalOpen(false);
   };
 
   const handleAddSamUnit = () => {
@@ -481,11 +559,28 @@ export default function EventCreation() {
 
   if (loading) return <LoadingScreen label="Loading event data…" />;
   
-  const hasVenue = Boolean(eventData.venue?.name && eventData.venue?.layers?.length);
-  const hasMap = hasVenue && Boolean(eventData.venue?.layers?.[currentLayer]?.mapUrl);
-  const allPosts = hasVenue ? (eventData.venue?.layers?.flatMap(layer => layer.posts || []) || []) : [];
-  const currentLayerPosts = hasVenue ? (eventData.venue?.layers?.[currentLayer]?.posts || []) : [];
-  const flattenedPosts = hasVenue ? (eventData.venue?.layers?.flatMap(layer => (layer.posts || []).map(p => ({ post: p, layerName: layer.name }))) || []) : [];
+  const hasVenue = Boolean(eventData.venue?.name);
+
+  // A venue may carry its posts on the legacy top-level `posts` field with
+  // `layers: []`. Deriving markers straight off `venue.layers` renders nothing
+  // in that case, which reads as "this venue has no posts" rather than as a
+  // format difference. Normalize to a single synthesized layer first — the same
+  // shape the dispatch map builds in `events/[eventId]/dispatch/page.tsx`.
+  const effectiveLayers: Layer[] = eventData.venue?.layers?.length
+    ? eventData.venue.layers
+    : hasVenue
+      ? [{
+          id: eventData.venue?.id || 'layer-1',
+          name: 'Main Floor',
+          posts: eventData.venue?.posts || eventData.eventPosts || [],
+          mapUrl: eventData.venue?.mapUrl,
+        }]
+      : [];
+
+  const hasMap = hasVenue && Boolean(effectiveLayers[currentLayer]?.mapUrl);
+  const allPosts = effectiveLayers.flatMap(layer => layer.posts || []);
+  const currentLayerPosts = effectiveLayers[currentLayer]?.posts || [];
+  const flattenedPosts = effectiveLayers.flatMap(layer => (layer.posts || []).map(p => ({ post: p, layerName: layer.name })));
 
   
 
@@ -589,6 +684,7 @@ export default function EventCreation() {
                           openTeams={openTeams}
                           setOpenTeams={setOpenTeams}
                           onDeleteTeam={handleDeleteTeam}
+                          onEditTeam={handleEditTeam}
                           onAddTeam={() => setIsTeamModalOpen(true)}
                           onUploadCSV={() => setBulkImportMode('team')}
                         />
@@ -731,8 +827,8 @@ export default function EventCreation() {
                         >
                           <Image
                             ref={imgRef}
-                            src={eventData.venue?.layers?.[currentLayer]?.mapUrl || ''}
-                            alt={`${eventData.venue?.layers?.[currentLayer]?.name || 'Venue'} map`}
+                            src={effectiveLayers[currentLayer]?.mapUrl || ''}
+                            alt={`${effectiveLayers[currentLayer]?.name || 'Venue'} map`}
                             width={1200}
                             height={800}
                             className="w-full h-auto"
@@ -766,10 +862,10 @@ export default function EventCreation() {
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-surface-light">Layer:</span>
                           <span className="text-sm font-medium text-surface-light">
-                            {eventData.venue?.layers?.[currentLayer]?.name || 'Main Floor'}
+                            {effectiveLayers[currentLayer]?.name || 'Main Floor'}
                           </span>
                         </div>
-                        {eventData.venue?.layers && eventData.venue.layers.length > 1 && (
+                        {effectiveLayers.length > 1 && (
                           <div className="flex items-center gap-2">
                             <Button
                               isIconOnly
@@ -781,14 +877,14 @@ export default function EventCreation() {
                               <ChevronLeft className="h-4 w-4" />
                             </Button>
                             <span className="text-xs text-surface-light">
-                              {currentLayer + 1} / {eventData.venue.layers.length}
+                              {currentLayer + 1} / {effectiveLayers.length}
                             </span>
                             <Button
                               isIconOnly
                               size="sm"
                               variant="flat"
-                              onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
-                              isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}
+                              onPress={() => setCurrentLayer(prev => Math.min(effectiveLayers.length - 1, prev + 1))}
+                              isDisabled={currentLayer === effectiveLayers.length - 1}
                             >
                               <ChevronRight className="h-4 w-4" />
                             </Button>
@@ -828,6 +924,29 @@ export default function EventCreation() {
         submitLabelOverride="Add Team"
         teamName={teamName}
         setTeamName={setTeamName}
+        takCallsign={takCallsign}
+        setTakCallsign={setTakCallsign}
+        memberName={memberName}
+        setMemberName={setMemberName}
+        memberCert={memberCert}
+        setMemberCert={setMemberCert}
+        isTeamLead={isTeamLead}
+        setIsTeamLead={setIsTeamLead}
+        addMember={addMember}
+        currentMembers={currentMembers}
+        removeMember={removeMember}
+        roles={certifications.map(name => ({ name, fullName: name }))}
+      />
+
+      <AddTeamModal
+        isOpen={isEditTeamModalOpen}
+        onClose={() => setIsEditTeamModalOpen(false)}
+        mode="edit"
+        onSubmit={handleSaveEditedTeam}
+        teamName={teamName}
+        setTeamName={setTeamName}
+        takCallsign={takCallsign}
+        setTakCallsign={setTakCallsign}
         memberName={memberName}
         setMemberName={setMemberName}
         memberCert={memberCert}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, ButtonGroup, Card, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, ScrollShadow } from '@heroui/react';
-import { Trash2, ChevronDown } from 'lucide-react';
+import { Trash2, Pencil, ChevronDown } from 'lucide-react';
 import type { Staff } from '@/app/types';
 
 type Props = {
@@ -8,6 +8,7 @@ type Props = {
   openTeams: Record<number, boolean>;
   setOpenTeams: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
   onDeleteTeam: (idx: number) => void;
+  onEditTeam: (idx: number) => void;
   onAddTeam: () => void;
   onUploadCSV: () => void;
 };
@@ -17,6 +18,7 @@ export default function TeamStaffingSection({
   openTeams,
   setOpenTeams,
   onDeleteTeam,
+  onEditTeam,
   onAddTeam,
   onUploadCSV,
 }: Props) {
@@ -64,8 +66,27 @@ export default function TeamStaffingSection({
                 className="flex items-center justify-between px-3 py-2 gap-2 cursor-pointer"
                 onClick={() => setOpenTeams((prev) => ({ ...prev, [idx]: !prev[idx] }))}
               >
-                <span className="text-surface-light font-medium truncate">{team.team}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-surface-light font-medium truncate">{team.team}</span>
+                  {team.takCallsign && (
+                    <span className="flex-shrink-0 rounded-full border border-surface-liner bg-surface-deep px-2 py-0.5 text-xs text-surface-faint truncate">
+                      {team.takCallsign}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditTeam(idx);
+                    }}
+                    className="p-1 rounded bg-transparent"
+                    aria-label="Edit team"
+                    title="Edit team"
+                  >
+                    <Pencil className="h-4 w-4 text-surface-light" />
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => {

@@ -6,6 +6,7 @@ import { HeroUIProvider } from "@heroui/react";
 import DevServiceWorkerCleanup from "@/components/devServiceWorkerCleanup";
 import ProgressBarProvider from "@/components/ProgressBarProvider";
 import AppShell from "../components/layout/appshell";
+import ToastProvider from "@/components/ui/toast-provider";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -106,6 +107,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <HeroUIProvider>
           <AppShell>{children}</AppShell>
         </HeroUIProvider>
+        <ToastProvider />
       </body>
     </html>
   );

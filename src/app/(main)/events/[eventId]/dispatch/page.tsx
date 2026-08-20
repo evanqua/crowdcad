@@ -1435,6 +1435,21 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     [event?.staff, takPositions],
   );
 
+  // Dismissing the TAK error notice is per-failure: keyed on the event and
+  // the error kind, so a *different* failure (e.g. the feed going from
+  // permission-denied to unavailable) surfaces again even if the operator
+  // already dismissed an earlier one.
+  const [dismissedTakErrorKey, setDismissedTakErrorKey] = useState<string | null>(null);
+  const takErrorKey = takPositions.error ? `${eventId}:${takPositions.error.kind}` : null;
+  const showTakErrorNotice = takErrorKey !== null && dismissedTakErrorKey !== takErrorKey;
+  const takErrorSummary = takPositions.error
+    ? takPositions.error.kind === 'permission-denied'
+      ? 'the server rejected the read'
+      : takPositions.error.kind === 'unavailable'
+        ? 'the connection is down'
+        : 'an unexpected error occurred'
+    : '';
+
   useEffect(() => {
     const handleHotkey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'Enter') {
@@ -3148,7 +3163,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
 
           {isAdmin && (
-            <button 
+            <button
               onClick={() => setShowDebugModal(true)}
               className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/50 rounded hover:bg-red-500 hover:text-surface-light transition-all text-sm font-bold"
             >
@@ -3156,7 +3171,29 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               Debug View
             </button>
           )}
-          
+
+          {/* RC-2: a denied read used to look identical to an idle feed. This is
+              the distinct, non-blocking notice for the case where the
+              tak_positions subscription is actually failing — not just empty. */}
+          {showTakErrorNotice && takPositions.error && (
+            <div className="flex items-center justify-between gap-3 mt-2 px-3 py-2 rounded-lg border border-status-card-red/40 bg-surface-deeper text-sm">
+              <div className="flex items-center gap-2 min-w-0 text-surface-light">
+                <ShieldAlert className="w-4 h-4 text-status-red shrink-0" />
+                <span className="truncate">
+                  Live TAK positions unavailable — {takErrorSummary}
+                  <span className="text-surface-faint"> ({takPositions.error.message})</span>
+                </span>
+              </div>
+              <button
+                onClick={() => setDismissedTakErrorKey(takErrorKey)}
+                className="shrink-0 text-xs text-surface-faint hover:text-surface-light transition-colors"
+                aria-label="Dismiss TAK positions warning"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Desktop Layout - Left Sidebar with Select, Right Side with Calls & Clinic */}
           <div className="hidden lg:block h-full">
             <ResizablePanelGroup direction="horizontal" className="gap-2 h-full">

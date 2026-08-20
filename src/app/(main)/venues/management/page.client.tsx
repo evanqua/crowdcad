@@ -15,8 +15,9 @@ import { georeferenceMapMatch, layerPostsLatLon, postGeoPosition, postPercentOnL
 import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import { isBasemapConfigured } from '@/lib/basemap/config';
-import { sanitizeBasemapCameraForSave } from '@/lib/basemapCameraUtils';
+import { sanitizeBasemapCameraForSave } from '@/lib/basemap/camera';
 import BasemapView from '@/components/dispatch/BasemapView';
+import { toast } from 'react-toastify';
 import NewLayerModal from '@/components/modals/venue/newlayer';
 import LocationEditModal from '@/components/modals/venue/locationedit';
 import EquipmentManagementSection from '@/components/venue-management/EquipmentManagementSection';
@@ -142,6 +143,17 @@ function buildGeoreferenceForSave(
   }
 
   return result;
+}
+
+// Legible readout for "Set default view" (§4.2): lat/lon to ~5 decimals
+// (~1m precision, plenty for "does this look like the right spot") and zoom
+// to 1-2 decimals (matches how MapLibre/venuemapmodal.tsx report zoom
+// elsewhere). No existing formatter in this file covers a BasemapCamera --
+// the one lat/lon precedent (derivedLatLon below) is for POST positions and
+// uses 6dp for a different reason (georeference residual math), so this is a
+// distinct, deliberately looser formatter rather than a duplicate of it.
+function formatBasemapCameraReadout(camera: BasemapCamera): string {
+  return `${camera.center.lat.toFixed(5)}, ${camera.center.lon.toFixed(5)} · z${camera.zoom.toFixed(2)}`;
 }
 
 export default function VenueManagementPageClient() {
@@ -319,15 +331,52 @@ export default function VenueManagementPageClient() {
     setHasLiveCamera(true);
   }, []);
 
+  // True while handleSetDefaultView's own write is in flight. Doubles as the
+  // race guard against the main Save: the button below is disabled on both
+  // this AND `isUploading`, and `handleSubmit`'s Save button is disabled on
+  // this too (see its isDisabled prop), so the two writes to the same
+  // `basemapCamera` field can never be in flight at once.
+  const [isSavingDefaultView, setIsSavingDefaultView] = useState(false);
+
   // Captures the CURRENT basemap camera as this venue's default opening view.
   // View state only, per §8.C -- this never touches a post/marker position,
   // only Venue.basemapCamera. No-ops if BasemapView hasn't reported a camera
   // yet (see handleBasemapCameraChange above); the button is disabled in
   // that state so this branch should be unreachable in practice.
-  const handleSetDefaultView = () => {
+  //
+  // Persists immediately rather than only staging for the main Save -- the
+  // whole point of this control is a save an operator can trust happened,
+  // and staging it silently into `venueData` (as this used to do) gave no
+  // feedback at either the button press or the eventual Save. When the venue
+  // doesn't have a document id yet (still being created), there is nothing
+  // to write to yet, so this falls back to the old stage-only behavior --
+  // but says so, rather than leaving the operator to guess.
+  const handleSetDefaultView = async () => {
     const camera = liveBasemapCameraRef.current;
     if (!camera) return;
-    setVenueData((prev) => ({ ...prev, basemapCamera: sanitizeBasemapCameraForSave(camera) }));
+    const sanitized = sanitizeBasemapCameraForSave(camera);
+
+    if (!venueId) {
+      setVenueData((prev) => ({ ...prev, basemapCamera: sanitized }));
+      toast.success('Default view staged — it will save when you save this venue.');
+      return;
+    }
+
+    setIsSavingDefaultView(true);
+    try {
+      await dbService.updateDocument('venues', venueId, { basemapCamera: sanitized });
+      // Sync local state so the UI reflects the saved value without a
+      // refetch -- no need to touch georeferenceDirtyLayerIds or anything
+      // else the main Save reconciles, since this write only ever touches
+      // basemapCamera.
+      setVenueData((prev) => ({ ...prev, basemapCamera: sanitized }));
+      toast.success('Default view saved.');
+    } catch (error) {
+      console.error('Error saving default view:', error);
+      toast.error('Failed to save default view. Please try again.');
+    } finally {
+      setIsSavingDefaultView(false);
+    }
   };
   // Firestore rejects `undefined` at any depth -- OMIT the key entirely
   // rather than setting it undefined, matching buildGeoreferenceForSave's
@@ -1531,7 +1580,7 @@ export default function VenueManagementPageClient() {
                   <Button
                     onPress={() => handleSubmit()}
                     isLoading={isUploading}
-                    isDisabled={!venueData.name.trim()}
+                    isDisabled={!venueData.name.trim() || isSavingDefaultView}
                     className="flex-1 bg-accent hover:bg-accent/90 text-surface-light px-10"
                   >
                     {isUploading ? (venueId ? 'Updating...' : 'Creating...') : (venueId ? 'Update Venue' : 'Create Venue')}
@@ -1684,22 +1733,29 @@ export default function VenueManagementPageClient() {
                           Basemap-only: a raster view has no camera to save. */}
                       <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2">
                         {venueData.basemapCamera && (
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            onPress={handleClearDefaultView}
-                            startContent={<X className="h-3.5 w-3.5" />}
-                            className="bg-surface-deepest/90 backdrop-blur text-xs"
-                          >
-                            Clear default view
-                          </Button>
+                          <>
+                            <span className="rounded-lg border border-surface-liner bg-surface-deepest/90 px-2 py-1 text-xs text-surface-faint backdrop-blur">
+                              {formatBasemapCameraReadout(venueData.basemapCamera)}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              isDisabled={isSavingDefaultView}
+                              onPress={handleClearDefaultView}
+                              startContent={<X className="h-3.5 w-3.5" />}
+                              className="bg-surface-deepest/90 backdrop-blur text-xs"
+                            >
+                              Clear default view
+                            </Button>
+                          </>
                         )}
                         <Button
                           size="sm"
                           variant="flat"
-                          isDisabled={!hasLiveCamera}
+                          isDisabled={!hasLiveCamera || isSavingDefaultView || isUploading}
+                          isLoading={isSavingDefaultView}
                           onPress={handleSetDefaultView}
-                          startContent={<Compass className="h-3.5 w-3.5" />}
+                          startContent={isSavingDefaultView ? undefined : <Compass className="h-3.5 w-3.5" />}
                           className="bg-surface-deepest/90 backdrop-blur text-xs"
                           title={
                             hasLiveCamera
@@ -1707,7 +1763,11 @@ export default function VenueManagementPageClient() {
                               : 'Waiting on BasemapView to report the current camera'
                           }
                         >
-                          Set default view
+                          {isSavingDefaultView
+                            ? 'Saving…'
+                            : venueData.basemapCamera
+                              ? 'Update default view'
+                              : 'Set default view'}
                         </Button>
                       </div>
                     </div>
@@ -1908,6 +1968,31 @@ export default function VenueManagementPageClient() {
                           </Button>
                         </div>
                       )}
+
+                      {/* §4.3: the raster view has no camera of its own to
+                          set a default for -- Venue.basemapCamera is always a
+                          basemap framing (see BasemapCamera's doc comment).
+                          A second "Set default view" button here would imply
+                          this DOES set one, so instead: a one-line hint
+                          pointing at Map view, with an inline control that
+                          switches there. Same gate as the toggle above -- no
+                          point suggesting a basemap that isn't configured or
+                          just failed. */}
+                      {isBasemapConfigured() && !basemapFailed && (
+                        <div className="absolute bottom-3 right-3 z-20 rounded-lg border border-surface-liner bg-surface-deepest/90 px-2.5 py-1.5 backdrop-blur">
+                          <p className="text-xs text-surface-faint">
+                            Default map view is set in{' '}
+                            <button
+                              type="button"
+                              onClick={() => setViewMode('basemap')}
+                              className="text-accent hover:underline"
+                            >
+                              Map view
+                            </button>
+                            .
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Bottom Info Bar - Now OUTSIDE and BELOW the image container */}
@@ -2017,6 +2102,24 @@ export default function VenueManagementPageClient() {
                         >
                           Map
                         </Button>
+                      </div>
+                    )}
+                    {/* §4.3, same hint as the loaded-image raster panel above
+                        -- this dropzone is still the raster branch, just with
+                        nothing uploaded yet. */}
+                    {isBasemapConfigured() && !basemapFailed && (
+                      <div className="absolute bottom-3 right-3 z-20 rounded-lg border border-surface-liner bg-surface-deepest/90 px-2.5 py-1.5 backdrop-blur">
+                        <p className="text-xs text-surface-faint">
+                          Default map view is set in{' '}
+                          <button
+                            type="button"
+                            onClick={() => setViewMode('basemap')}
+                            className="text-accent hover:underline"
+                          >
+                            Map view
+                          </button>
+                          .
+                        </p>
                       </div>
                     )}
                   </Card>

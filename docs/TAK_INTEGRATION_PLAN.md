@@ -222,10 +222,10 @@ from the phase section it affects.
 | **8.I** | **`Venue.basemapCamera` + the 4-level initial-camera precedence chain (saved camera → raster corners → located markers → archive coverage bounds → MapLibre default), `resolveInitialCamera()`, `parseArchiveCoverage`/`isOutsideCoverage`, `onCoverageWarning`. Shipped contract-first as two commits eight minutes apart so the shared type could not be a moving target. 22 tests in `camera.test.ts` — note the commit message's "26" is wrong; `npx vitest run` counts 22** | **Done** | `b6d3dc9` + `a78421a` |
 | **8.J** | **Basemap in the *venue editor* — the raster/basemap toggle ported across from the dispatch modal, plus "Set default view" / "Clear default view" writing `Venue.basemapCamera` through the new `sanitizeBasemapCameraForSave()` (Firestore rejects `undefined` at any depth). 4 tests. Shipped together with 10.D because without it the button was inert** | **Done** | `40342f5` |
 | **10.D** | **`onCameraChange` on `BasemapView` — fires on `moveend` and once when the map first becomes ready, held through a ref. Closes 8.J's inert "Set default view" button, which had been passing a callback through a type cast to a prop that did not exist. The mount emit was added during implementation and was not in the scoping: without it an operator cannot save a camera §8.I already resolved for them. The type cast at the editor call site is gone** | **Done** | `40342f5` |
-| **10.C** | **`Post.lat`/`Post.lon` — a coordinate of record for the object form, following `CallPosition`'s convention rather than inventing a second one. `postGeoPosition()` added as the validating reader; `postLatLon`/`layerPostsLatLon` now let a stored coordinate win before the georeference is consulted, and solve it lazily so an all-coordinate-native layer performs zero solves. `postPercentOnLayer()` added (not in the scoping) as the read path for drawing a coordinate-native post on a raster — returns `null`, never a clamped value, off-image. No backfill migration. `geoUtils.test.ts` 70 → 85 tests** | **Done (uncommitted)** | this session |
-| **10.E** | **Placement against the basemap in the editor. The marker-tool gate was *split*, not widened: "Add Markers" is now `previewUrl \|\| effectiveBasemap`, while "Add Control Point" stays raster-only because a control point is by definition an image-pixel↔ground correspondence. `handleBasemapMapClick` builds `{ name: '', x: null, y: null, lat, lon }` with every key explicitly present (post objects are written to Firestore verbatim). `pendingMarker` widened; `PendingMarkerDialog` shows the captured lat/lon to 6 dp. Both raster renderers now resolve through `postPercentOnLayer` so a map-placed post is not invisible in venue-image view. Dragging a coordinate-native post is deliberately disabled** | **Done (uncommitted)** | this session |
-| **10.E(1)** | **Pre-existing, live, silently destructive: the editor's raster marker renderer used the post-`.filter()` index as if it were the index into the full `posts` array, so with any text-only or bare-string post present, dragging or renaming a marker acted on a *different* post. Fixed by capturing the original index before the filter** | **Done (uncommitted)** | this session |
-| **10.E(2)** | **A venue with no image made the dispatch modal render `<Image src="">`, which Next.js reports as two console errors. Now omitted entirely with a muted empty-state in its place** | **Done (uncommitted)** | this session |
+| **10.C** | **`Post.lat`/`Post.lon` — a coordinate of record for the object form, following `CallPosition`'s convention rather than inventing a second one. `postGeoPosition()` added as the validating reader; `postLatLon`/`layerPostsLatLon` now let a stored coordinate win before the georeference is consulted, and solve it lazily so an all-coordinate-native layer performs zero solves. `postPercentOnLayer()` added (not in the scoping) as the read path for drawing a coordinate-native post on a raster — returns `null`, never a clamped value, off-image. No backfill migration. `geoUtils.test.ts` 70 → 85 tests** | **Done** | `6b42e79` |
+| **10.E** | **Placement against the basemap in the editor. The marker-tool gate was *split*, not widened: "Add Markers" is now `previewUrl \|\| effectiveBasemap`, while "Add Control Point" stays raster-only because a control point is by definition an image-pixel↔ground correspondence. `handleBasemapMapClick` builds `{ name: '', x: null, y: null, lat, lon }` with every key explicitly present (post objects are written to Firestore verbatim). `pendingMarker` widened; `PendingMarkerDialog` shows the captured lat/lon to 6 dp. Both raster renderers now resolve through `postPercentOnLayer` so a map-placed post is not invisible in venue-image view. Dragging a coordinate-native post is deliberately disabled** | **Done** | `6b42e79` |
+| **10.E(1)** | **Pre-existing, live, silently destructive: the editor's raster marker renderer used the post-`.filter()` index as if it were the index into the full `posts` array, so with any text-only or bare-string post present, dragging or renaming a marker acted on a *different* post. Fixed by capturing the original index before the filter** | **Done** | `6b42e79` |
+| **10.E(2)** | **A venue with no image made the dispatch modal render `<Image src="">`, which Next.js reports as two console errors. Now omitted entirely with a muted empty-state in its place** | **Done** | `6b42e79` |
 
 Everything in the first block above (rows through the vitest harness) was built in
 earlier sessions and sat **uncommitted** on `feature/tak-georeference`; the first act
@@ -255,6 +255,25 @@ so an isolated branch could be cut from it.
 > anything looked wrong, but because §0.1's own record said this had already happened
 > twice. Verify by the commands in the evidence column, never by SHA: this document is
 > amended in place, so tips move.
+
+> ⚠️ **Third recurrence, 2026-08-19 — still open.** The pattern above has happened a
+> third time, this time in the **root wrapper** rather than `core`. `core` itself is
+> clean at `6b42e79` — everything this table marks `Done` really is committed there.
+> The root wrapper is not:
+>
+> | Item | Where | Evidence |
+> |---|---|---|
+> | Phase 8 basemap dependencies — `maplibre-gl@^5.24.0`, `pmtiles`, `@protomaps/basemaps` | root `package.json` / `package-lock.json` | `git status` (root): modified |
+> | Phase 8 `.env.example` block (`NEXT_PUBLIC_BASEMAP_PMTILES_URL` and neighbours) | root `.env.example` | modified |
+> | basemap build-artifact ignore rules | root `.gitignore` | modified |
+> | the `core` submodule pointer itself | root wrapper | modified |
+>
+> Lower stakes than the first two occurrences — nobody working purely inside `core` is
+> affected, and this is not two branches independently reinventing the same design —
+> but it is the same shape of failure: work that is finished and sitting in a working
+> tree nobody has committed. Recorded here rather than fixed here, because committing
+> the root wrapper's package/env changes is a call for whoever owns that commit, not
+> something to decide inside a `core/docs/` edit.
 
 **Verification at the close of the 2026-08-15 session:** `npm run type-check` clean,
 `npm run test:unit` 81/81 passing (up from 34), `npm run build` succeeds with all
@@ -290,6 +309,11 @@ additions as part of its own baseline. The real counts above come from re-runnin
 suite and reading the `describe` blocks directly. **Do not accept a test count from an
 agent report when another agent has touched the same suite concurrently.**
 
+**Verification 2026-08-19 (post field-report correction).** `npm run test:unit` now
+reports **372 passed across 17 files** — the last figure recorded in this table was
+260 (7.E(3), above); the 2026-08-19 field report's own drafting-time verification put
+it at 361 across 16 files, and the work landed since then added 11 more.
+
 ### 0.2 Explicitly NOT done, and why
 
 - **`kml.ts` and the `/api/tak/...` feed routes.** Still deferred. §1.5 gates these
@@ -315,6 +339,20 @@ agent report when another agent has touched the same suite concurrently.**
 - **`positions` collection security rules** (`firestore.rules`, `scripts/setup-pocketbase.js`).
   Not written. `TakPosition` (née `TeamPosition`) is wired to the bridge; security rules belong with
   Phase 2/3. See §0.45.
+- **`tak_positions` has no Firestore rule at all — sharper than the bullet above.**
+  `firestore.rules` scopes everything to `organizations/{orgId}` and matches `venues`,
+  `events`, `users`, `liteModeInterest`; there is no `tak_positions` match block, and
+  Firestore denies by default. So the collection isn't thinly covered, it's unreadable
+  on the Firebase backend, full stop. **Moot for the path actually chosen** — the app
+  runs on PocketBase, and the bridge only ever writes there (§0.6.1, Phase 2) — but it
+  remains a live blocker for any future Firebase deployment of TAK, and nothing today
+  would catch that until someone tried it and got an empty collection with no error.
+- **No `<ToastContainer />` was mounted — now fixed.** `react-toastify` has been a
+  dependency with roughly 24 `toast.*()` call sites across `core/src`, but only its CSS
+  was ever imported — no container, anywhere, to render what those calls queued. Every
+  one of those toasts fired into nothing. This was live and unreported for as long as
+  the call sites existed. **Fixed:** a `ToastProvider` client wrapper is now mounted in
+  both `core/src/app/layout.tsx` and the root `src/app/layout.tsx`.
 - **Phase 2 — INBOUND bridge (TAK → CrowdCAD).** ✅ Built and proven on real hardware.
   Lives in the root wrapper at `dev/crowdcad-tak-bridge/` and `dev/freetakserver/`. See §0.45.
 - **Phase 2 — OUTBOUND publishing (CrowdCAD → TAK).** ⛔ Still not done, and easy to
@@ -1311,15 +1349,34 @@ writing pins somewhere with no consumer.
 >   lowest-risk item in either phase, and it is what stops a 134-location venue from
 >   being hand-clicked.
 >
-> The §7.3 type-code spike (item 1) is still the top priority for the *TAK* half of this
-> project. Phase 10 is the top priority for the *map* half. They need different people
-> and different equipment, and neither blocks the other.
+> ~~The §7.3 type-code spike (item 1) is still the top priority for the *TAK* half of
+> this project.~~ **Superseded, 2026-08-19.** The field report at §0.7 puts its own
+> Stage 0 (prove the inbound pipe) and Stage 1 (make failure visible) ahead of the
+> spike, and the reasoning is cost, not importance: both stages are hours of work with
+> nothing but a keyboard, and they make every later failure this plan already
+> documents legible to whoever is actually running the product — which, per §0.6.1,
+> nobody has reliably been doing. The spike needs a person, a phone and an afternoon
+> before it can move at all. It stays on the list below, still the gate on Phase 5
+> outbound work — it is simply no longer first. Phase 10 is unchanged as the top
+> priority for the *map* half. They need different people and different equipment,
+> and neither blocks the other.
 
 
 0. **Confirm you are on `feature/tak-integration`** and that both halves are present
    (see "Verify the state you inherited"). Read §0.45 for what the inbound half is —
    it is described nowhere else here.
-1. **Run the §7.3 type-code spike.** This is the top priority and it is now cheaper
+S0. **Stage 0 — prove the inbound pipe.** From the 2026-08-19 field report; see §0.7
+    for the full write-up. Outranks the spike below on cost alone. **Still open** —
+    §0.7.2 found the `tak_positions` collection missing on the running PocketBase
+    instance, so the pipe has not in fact been proved yet.
+S1. **Stage 1 — make failure visible.** Same report, same section. Built (§0.7.3).
+    Together with S0, hours of keyboard work that make every later ✅ in this document
+    mean what it claims to mean, instead of "the tests pass" — see §0.6.1's naming of
+    that gap. (These two carry the field report's own stage numbering rather than
+    continuing `0a`/`0b`, which the 2026-08-18 amendment below already uses for two
+    unrelated items.)
+1. **Run the §7.3 type-code spike.** No longer the first thing to do — see S0/S1 above
+   — but still the top priority for the *TAK* half specifically, and it is now cheaper
    than it has ever been: the merged branch has a Dockerized FTS and a working TLS
    iTAK package, so the missing ingredient is one person, one phone, and an
    afternoon — *not* a TAK.gov registration or a WinTAK licence. Publish one marker
@@ -2712,6 +2769,183 @@ applies. It does not remove it.
 
 ---
 
+### 0.7 The 2026-08-19 field report — what it got right, and the cause it missed
+
+§0.6 established the form: report first, then what is actually true, then the plan.
+This section closes the 2026-08-19 report (`docs/TAK_FIELD_REPORT_2026-08-19.md`),
+which diagnosed nine root causes across three reports from the running app. Eight of
+the nine held up. **The report's own Stage 0 gate — "prove the pipe before building
+anything" — is the reason a tenth was found, and RC-10 turns out to be the one that
+was actually stopping positions from reaching anybody.**
+
+#### 0.7.1 The decision: Option B, PocketBase
+
+§B of the field report forked on RC-1 and asked for a decision. It came back
+**Option B — run the app on PocketBase** — and that decision is now in effect:
+`NEXT_PUBLIC_BACKEND=pocketbase` and `NEXT_PUBLIC_POCKETBASE_URL` are set in both
+`.env.local` and `core/.env.local`, with a comment recording why and how to revert.
+
+What Option B costs, stated plainly so it is not rediscovered: the Firestore project
+`dispatch-60ca7` holds the real events, venues and org, and **none of it is visible
+while the app runs on PocketBase.** This is a separate data island, exactly as §B
+warned. It is the right trade for making TAK work end-to-end, and it is the wrong
+trade for a deployment. Option A — teaching the bridge to write Firebase — is not
+cancelled, it is deferred, and §0.7.5 records what it still needs.
+
+Because the decision was B, **Stage 2 of the field report's plan is superseded, not
+completed.** Tasks 2.1 (extract the `TakPositionStore` seam), 2.2 (`firebase.js`) and
+2.3 (a `--backend` flag) existed only to close RC-1 by writing Firebase. Setting one
+environment variable closed it instead. Building the seam now would be speculative
+work against a backend nothing currently writes to.
+
+#### 0.7.2 RC-10 — the collection does not exist, and the bridge does not care
+
+Stage 0 said: run the app against the bridge's live event and confirm a marker moves,
+and **do not start Stage 2 until 0.1 has a recorded answer.** Here is the answer.
+
+The live diagnosis in §A.1 was correct as far as it went. FreeTAKServer is up, `8087`
+and `8089` are open, PocketBase is healthy on `:8090`, and the bridge process is alive
+with an ESTABLISHED connection to `127.0.0.1:8087`, receiving CoT. Every one of those
+checks passes today.
+
+**And the `tak_positions` collection does not exist on that PocketBase instance.**
+
+| Request (all unauthenticated, same instance) | Result |
+|---|---|
+| `GET /api/collections/venues/records` | `200` |
+| `GET /api/collections/dispatchLogs/records` | `200` |
+| `GET /api/collections/tak_positions/records` | `404 {"message":"Missing collection context."}` |
+
+PocketBase emits `Missing collection context` during collection *resolution*, before
+any API rule is evaluated. Against two sibling collections answering `200` on the
+identical request, it does not mean "denied" — it means **there is no such
+collection.** `setup-pocketbase.js` has always contained the `ensureCollection(...,
+'tak_positions', ...)` block; it has simply never been run against this instance since
+that block was added, and `ensureCollection` skips collections that already exist, so
+a partially-provisioned instance never self-heals.
+
+The reason this survived §A.1's inspection is the same reason RC-2 survived everything
+before it, and it is worth naming as a pattern rather than an incident:
+
+> **§A.1 verified that the bridge was *running*. It never verified that a write
+> *landed*.** A live process, an ESTABLISHED socket and arriving CoT are all
+> consistent with persisting absolutely nothing.
+
+The code path makes this exact. In `pocketbase.js`, `TakPositionStore.write()` catches
+a `404` on **only** the cached `updateRecord` PATCH — a legitimate retry-as-create for
+a record someone deleted mid-run. The `listRecords('tak_positions', …)` and
+`createRecord` calls beneath it are unguarded, so a missing collection rejects. In
+`bridge.js` those rejections land in a `Promise.allSettled` and are logged per flush.
+The bridge therefore runs forever, reports healthy, and silently stores nothing.
+
+**RC-10 is RC-2 wearing different clothes.** RC-2 was the app rendering a denied read
+as an idle one; RC-10 is the bridge rendering a fatal misconfiguration as routine log
+noise. Both make a hard failure indistinguishable from "nobody is transmitting". The
+field report's own rule — *never again let a denied read look like an idle one* —
+applies on the write side too, and §0.7.3 now enforces it there.
+
+Consequence for the plan's ordering: **Option B alone would not have produced a moving
+marker.** Had Stage 2 been built first, as §B explicitly warned against, the work would
+have been debugged against a backend that had nowhere to put a row.
+
+#### 0.7.3 What shipped
+
+Stage 1 — make failure visible.
+
+| # | Outcome |
+|---|---|
+| 1.1 | `<ToastContainer />` mounted. `react-toastify@11` was a dependency of both repos with ~24 `toast.*()` call sites in `core/src` and only the CSS imported, so **every toast in the dispatch dashboard rendered nothing** — live, unreported, and a prerequisite for 4.1. Fixed with a `ToastProvider` client wrapper (`core/src/components/ui/toast-provider.tsx`, re-exported at root) so neither layout has to become a client component. Themed to the surface tokens. |
+| 1.2 | `useTakPositions` no longer swallows every error. `classifySubscriptionError()` returns `null` for the genuinely benign missing/empty collection and a typed `TakPositionsError` (`permission-denied` \| `unavailable` \| `unknown`) for everything else; the dispatch page renders a small inline degraded-state notice, dismissable per `eventId:kind` so a *different* failure re-surfaces. The error clears on the next good snapshot. **Design note worth keeping:** both adapters already normalise native errors into a `ServiceError` with a `.code` before calling `onError`, so one classifier covers both backends — no Firebase/PocketBase branching was needed. |
+| 1.3 | **Deferred, deliberately.** The Firestore `tak_positions` rule is moot while the app runs on PocketBase, and PocketBase's own collection rules come from `setup-pocketbase.js` (authenticated-user default). It remains a hard blocker for Option A — see §0.7.5. |
+
+Stage 2 — superseded by the Option B decision (§0.7.1).
+
+Unscheduled, and the reason it was added — **the bridge now refuses to start when
+`tak_positions` is missing.** RC-10 was found by inspection, not by a failing check,
+and nothing in Stages 1–5 would have caught it next time. The bridge does a cheap
+`listRecords('tak_positions', { perPage: 1 })` after login and before it consumes any
+CoT, and distinguishes the three failures that need three different fixes: `404` (no
+such collection — names `setup-pocketbase.js` in the message), `403` (collection exists,
+this principal cannot use it — points at the API rules), and a transport failure (is
+PocketBase running at all). `TakPositionStore.write()` also now rethrows a `404` from
+its `listRecords`/`createRecord` path as an explicit collection-missing error instead of
+a bare `Missing collection context` that reads like a transient miss; the legitimate
+cached-PATCH-404 retry-as-create recovery is untouched and has a regression test
+pinning it. Bridge suite: 26 → **29 tests**.
+
+This is 1.2's rule applied to the write side. **A component that cannot do its job
+should say so at startup, not once per flush at log level.**
+
+Stage 3 — callsign binding where it belongs.
+
+| # | Outcome |
+|---|---|
+| 3.1 | `takCallsign`/`setTakCallsign` wired into the create page's `AddTeamModal` mount, and `takCallsign` set on the `Staff` built by `handleAddTeam` (only when non-empty — no empty strings written onto every team). The modal already rendered the field; it was never passed the props. |
+| 3.2 | Team editing ported to the create page: `handleEditTeam` / `handleSaveEditedTeam`, a second `AddTeamModal` mount in `mode="edit"` mirroring the dispatch page rather than a second modal, collision rejection on rename, and an edit affordance in `TeamStaffingSection`. |
+| 3.3 | The bound callsign now renders as a muted pill on each team row, so an operator can confirm a binding without opening the modal. |
+| 3.4 | Decided — see §0.7.4. |
+
+**A correction to RC-8's premise.** The field report expected create-page editing to
+become "a third rename-propagation site". It did not. `eventData.calls` is initialised
+to `[]` and is never populated on the create page — there are no calls, no post
+assignments and no equipment bound to a team name before submit — so the only site to
+propagate is the team's own entry in `eventData.staff[]`. A comment now sits at that
+propagation site, because the moment calls can be staged before submit, that stops
+being true silently.
+
+Stage 4 — "Set default view".
+
+| # | Outcome |
+|---|---|
+| 4.1 | The camera now persists on click through `dbService.updateDocument`, sanitised by `sanitizeBasemapCameraForSave` exactly as the main Save path does, with success and failure toasts — which required 1.1 to render at all. An `isSavingDefaultView` flag disables **both** this button and the main Save while the write is in flight, so the two writers to `basemapCamera` cannot race. A venue with no id yet still stages, but now *says* it is staging instead of doing it silently. |
+| 4.2 | Labels "Set default view" / "Update default view" by whether one exists, with the saved centre/zoom shown as a readout so the operator can verify what will reopen. |
+| 4.3 | Decided: **a hint, not a duplicate button.** A second button in the raster branch would imply it sets a *raster* default view, which is not what it does — the default view is a basemap camera. Both raster sub-branches (the loaded-image panel and the empty dropzone) now carry a one-line muted pointer with an inline control that switches to Map view, gated the same way the existing view toggle is. The silence was the reported bug; a misleading button would have been worse than the silence. |
+| 4.4 | The two parallel camera modules are reconciled — `basemapCameraUtils.ts` folded into `lib/basemap/camera.ts`, a pure move with every importer updated. |
+
+Stage 5 — not started, correctly. It is a feature that does not exist, it is gated on
+the §7.3 type-code spike, and the field report was right that it does not belong in the
+same sitting as Stages 1–4. Its topology decision is recorded in §0.7.4 so the spike is
+the only thing left blocking it.
+
+#### 0.7.4 Decisions taken
+
+**3.4 — should `Staff` finally get a stable `id`? Not yet, and here is the trigger.**
+The case for an id rested on create-page editing becoming a third rename-propagation
+site. It did not (§0.7.3), so the accretion the question was guarding against has not
+happened, and a migration of a name-keyed type that is written verbatim into event
+records is not worth paying for on two sites. **The trigger to revisit is explicit:**
+the first of either (a) a fourth name-keyed reference to a team, or (b) calls becoming
+stageable on the create page. There is also a quieter warning to watch — `takCallsign`
+is now a second, name-independent identity for a team, and if anything starts keying
+off it, the codebase has grown a de facto stable id without deciding to.
+
+**5.1 — transmit topology: bridge-as-publisher.** Confirmed as the field report
+recommended. The bridge already holds the FTS connection, already owns the
+georeference, and keeping CoT-on-the-wire out of the browser keeps a PHI-bearing
+payload off the client entirely. A Next.js `/api/tak` route would have to rebuild all
+three and would put the transmit boundary — where §5.4's redaction gate and §5.5's
+`COT_TYPE_CODES_VERIFIED` enforcement live — inside the web tier.
+
+#### 0.7.5 What is still open
+
+1. **Create the `tak_positions` collection.** Nothing about TAK works until this is
+   done, and it needs PocketBase superuser credentials this session did not have:
+   `PB_ADMIN_EMAIL=… PB_ADMIN_PASSWORD=… node core/scripts/setup-pocketbase.js`
+   The bridge now refuses to start without the collection rather than pretending to
+   work, so the failure is loud from here on.
+2. **Then re-run Stage 0.1 for real** — a phone, the bridge's live event, and a marker
+   observed to move. **The gate is still open until that is recorded.** Everything in
+   §0.7.3 is built and type-checked; none of it is field-verified.
+3. **The §7.3 CoT type-code spike.** Still the sole gate on Stage 5. One person, one
+   phone, one afternoon. Publishing before it runs ships markers whose icons are a guess.
+4. **Option A, if TAK is ever wanted against Firestore.** Needs `firebase.js` behind the
+   store seam, a bridge-side credential, and the `tak_positions` Firestore rule (1.3)
+   that does not exist. Until then, TAK and the production data set are separate islands.
+5. **The root wrapper is still uncommitted** — third recurrence of the pattern §0.1
+   documents.
+
+---
+
 ## 1. Executive summary
 
 > *Everything from here on is the original plan as drafted on 2026-08-11, annotated
@@ -3313,16 +3547,21 @@ and team positions with correct status colors.
 
 ---
 
-### Phase 2 — The bridge (`crowdcad-tak-bridge`) — 🟡 INBOUND BUILT, OUTBOUND NOT WIRED
+### Phase 2 — The bridge (`crowdcad-tak-bridge`) — 🟡 INBOUND BUILT, COULDN'T REACH THE DEFAULT BACKEND; OUTBOUND NOT WIRED
 
 **Read the direction carefully — the two halves are at completely different stages.**
 
-**INBOUND (TAK → CrowdCAD) is built and proven on real hardware.** It lives in the
-ROOT WRAPPER at `dev/crowdcad-tak-bridge/` and `dev/freetakserver/`, *not* in `core/`,
-and arrived via the 2026-08-16 merge (§0.45). A real iPhone running iTAK over TLS had
-its GPS relayed by FreeTAKServer into the `tak_positions` collection. Read
-`dev/TAK_DECISIONS.md` in the root wrapper for the FreeTAKServer and iTAK constraints
-that drove its design — several look arbitrary and are load-bearing.
+**INBOUND (TAK → CrowdCAD) is built and proven on real hardware — and could not reach
+the app running on its default configuration.** It lives in the ROOT WRAPPER at
+`dev/crowdcad-tak-bridge/` and `dev/freetakserver/`, *not* in `core/`, and arrived via
+the 2026-08-16 merge (§0.45). A real iPhone running iTAK over TLS had its GPS relayed
+by FreeTAKServer into the `tak_positions` collection. Read `dev/TAK_DECISIONS.md` in
+the root wrapper for the FreeTAKServer and iTAK constraints that drove its design —
+several look arbitrary and are load-bearing. **The catch, and it is not a small one:**
+the bridge writes `tak_positions` to PocketBase only, while the app defaults to
+`NEXT_PUBLIC_BACKEND=firebase`. Those are two different databases. A positions feed can
+be built, proven on hardware, and merged, and still have every fix it relays land
+somewhere the running app never queries — see §0.6.1.
 
 **OUTBOUND (CrowdCAD → TAK) is NOT wired.** The pure modules exist and are tested
 (`core/src/lib/tak/`), but `eventToCotEvents` currently has **no non-test callers** —
@@ -4532,6 +4771,18 @@ landed together with §10.D rather than on its own**: committing the editor togg
 would have shipped a visible control that could not work, and a disabled button with no
 explanation is indistinguishable from a broken one. §10.D added the prop, the cast is
 gone, and the capture path now runs end to end.
+
+**Correction, 2026-08-19: 8.J shipped stage-only, with no feedback.** "Set default
+view" writes `venueData.basemapCamera` — local React state, nothing more. The only
+path from there to the backend is the venue's main Save, and Save itself gives no
+success confirmation and navigates away once it finishes. An operator who clicks "Set
+default view" sees no acknowledgment that anything happened, and an operator who
+closes the editor without an unrelated Save loses the capture with no warning that
+it was never persisted. The sharper point: **10.D closed the *inert* button but not
+the *silent* one.** Wiring `onCameraChange` made the button do something; it did not
+make that something visible. It is the same shape of defect §0.6.4 names for the TAK
+publish toggle — a control that presents as working and gives the operator nothing to
+check it against.
 ---
 
 ### Phase 9 — Multi-level venues, and what TAK can honestly carry — ⛔ NOT STARTED
@@ -4686,7 +4937,7 @@ or swapping a raster. **The correct move is to give `Post` the `CallPosition` tr
 not to invent a second convention.** Two coordinate philosophies in one document is a bug
 factory; three is a rewrite.
 
-#### 10.C — `Post` gains a coordinate of record — ✅ BUILT (uncommitted)
+#### 10.C — `Post` gains a coordinate of record — ✅ BUILT
 
 Propose extending the object form of `Post` with an optional geographic position, leaving
 both the bare-string form and the percent-only form untouched:
@@ -4780,7 +5031,7 @@ component-test harness (§8.I) — the emit is four `map.get*()` calls behind a 
 pure part it feeds (`sanitizeBasemapCameraForSave`) is already covered. Verified in a
 browser instead; see the note at the end of this phase.
 
-#### 10.E — Placement against the basemap in the editor — ✅ BUILT (uncommitted)
+#### 10.E — Placement against the basemap in the editor — ✅ BUILT
 
 `BasemapView` already delivers what is needed: a map click hands
 `{ lat: e.lngLat.lat, lon: e.lngLat.lng }` to `onMapClick` (`BasemapView.tsx:717`), and
@@ -4848,7 +5099,7 @@ drop point through the layer's georeference and writing *that* back — real wor
 scope here. Until then a coordinate-native post renders, hovers and renames normally but
 does not drag, and the cursor says so. This is a stated limitation, not an oversight.
 
-#### 10.E(1) — A pre-existing index bug, found while wiring the above — ✅ FIXED (uncommitted)
+#### 10.E(1) — A pre-existing index bug, found while wiring the above — ✅ FIXED
 
 Not caused by this phase, and worth recording separately because it was **live in
 production and silently destructive**.
@@ -4878,7 +5129,7 @@ Fixed by capturing the original index *before* the filter
 it through every consumer. Coordinate-native posts made this worse — they are dropped from
 the raster too — which is how it surfaced, but the bug predates them entirely.
 
-#### 10.E(2) — A no-image venue crashed the dispatch modal's console — ✅ FIXED (uncommitted)
+#### 10.E(2) — A no-image venue crashed the dispatch modal's console — ✅ FIXED
 
 Reported from the running app on 2026-08-19, alongside the "cannot mark locations" report.
 `VenueMapWithPosts` rendered `<Image src={mapUrl} />` where `mapUrl` is
@@ -5446,7 +5697,7 @@ rendering per type code, stale behavior, network-link refresh, callsign display.
 | 5 — ops docs | ⛔ | S | 2 | Deployers can self-serve |
 | 6 — ATAK plugin | ⛔ deferred | XL | — | Revisit after a full season |
 | **7 — call pins + coordinate-first map** | 🟡 7.A–7.C, 7.E(1), 7.E(2) ✅ | **M** | **0 only** (7.D also on spike b) | **Calls have real positions, in both directions** |
-| **8 — a real basemap** | 🟡 8.A–8.F ✅ + visually verified (uncommitted), 8.G partial | **M–L** | **nothing** | A map with context under the venue raster, offline-capable |
+| **8 — a real basemap** | 🟡 8.A–8.F ✅ + visually verified, 8.G partial | **M–L** | **nothing** | A map with context under the venue raster, offline-capable |
 | **9 — multi-level venues** | ⛔ NOT STARTED | **M** | 9.A nothing; 9.C(ii) on 8 | Floors modelled, filterable in TAK, stackable in CrowdCAD |
 
 **Phases 7, 8 and 9 are the exception to the "everything is gated" reading of this
@@ -5560,54 +5811,57 @@ and it is a standalone Node sidecar rather than part of the Next.js app):
 `fts-local-tcp.zip` — they contain a private CA key that can mint client
 certificates the server will trust. They are gitignored; keep it that way.
 
-Phase 8 (basemap, §8.F/§8.G) — new. **✅ (uncommitted)** below means built and
-type-checked/tested this session per §0.1, but not yet `git add`-ed — distinct from
-the ✅ = "landed as of 2026-08-16" legend at the top of this section:
+Phase 8 (basemap, §8.F/§8.G) — new. **✅** below means committed, same convention as
+the ✅ = "landed as of 2026-08-16" legend at the top of this section — these files
+landed in `0e030bc` and are confirmed clean at `6b42e79` (§0.1):
 
 ```
-✅ (uncommitted) src/lib/basemap/config.ts                 PMTiles URL config, presence check, degrade-to-nothing gate — §8.B
-✅ (uncommitted) src/lib/basemap/style.ts                  buildBasemapStyle() — base/raster/labels layer order — §8.C.
-                                                            Also holds absoluteUrl(), added during §8.H verification to fix
-                                                            sprite/glyph URLs — §0.3(60)
-✅ (uncommitted) src/components/dispatch/BasemapView.tsx   the second, selectable map view — §8.D. Accepts an unwired
-                                                            `deviceLocation` prop for the §8.G self-marker — see below.
-                                                            Also fixed during §8.H verification: container sizing
-                                                            (§0.3(61)) and constructor-time camera bounds, which removed
-                                                            reducedMotionEnabledRef as dead code (§0.3(62))
-✅ (uncommitted) src/hooks/useDeviceLocation.ts            navigator.geolocation wrapper, exposes coords.accuracy — §8.G
-✅ (uncommitted) src/lib/__tests__/basemap/config.test.ts  30 tests
-✅ (uncommitted) src/lib/__tests__/deviceLocation.test.ts  11 tests
-   scripts/fetch-basemap.sh                                builds public/basemap/ (gitignored) — not a source file,
-                                                            listed here for completeness; nothing it produces is committed
+✅ src/lib/basemap/config.ts                 PMTiles URL config, presence check, degrade-to-nothing gate — §8.B
+✅ src/lib/basemap/style.ts                  buildBasemapStyle() — base/raster/labels layer order — §8.C.
+                                             Also holds absoluteUrl(), added during §8.H verification to fix
+                                             sprite/glyph URLs — §0.3(60)
+✅ src/components/dispatch/BasemapView.tsx   the second, selectable map view — §8.D. Accepts an unwired
+                                             `deviceLocation` prop for the §8.G self-marker — see below.
+                                             Also fixed during §8.H verification: container sizing
+                                             (§0.3(61)) and constructor-time camera bounds, which removed
+                                             reducedMotionEnabledRef as dead code (§0.3(62))
+✅ src/hooks/useDeviceLocation.ts            navigator.geolocation wrapper, exposes coords.accuracy — §8.G
+✅ src/lib/__tests__/basemap/config.test.ts  30 tests
+✅ src/lib/__tests__/deviceLocation.test.ts  11 tests
+   scripts/fetch-basemap.sh                 builds public/basemap/ (gitignored) — not a source file,
+                                             listed here for completeness; nothing it produces is committed
 ```
 
 Phase 8 — modified:
 
 ```
-✅ (uncommitted) src/lib/geoUtils.ts                                      layerImageCorners(transform) — §8.C
-✅ (uncommitted) src/lib/__tests__/geoUtils.test.ts                       dedicated layerImageCorners tests — §8.C
-                                                                          (Mercator-conformance is covered separately by
-                                                                          the pre-existing geoUtils.mercator-conformance.test.ts)
-✅ (uncommitted) src/lib/callPositionUtils.ts                             placeCallPinFromLatLon() — §8.F basemap-side writer
-✅ (uncommitted) src/components/modals/event/venuemapmodal.tsx           raster/basemap view toggle; the 8.F gate,
-                                                                          `effectiveBasemap || currentLayerCalibrated`
-                                                                          (equivalent to the planned
-                                                                          `viewMode === 'raster' && !currentLayerCalibrated`).
-                                                                          Does NOT wire `deviceLocation` into BasemapView — §8.G gap
-✅ (uncommitted) src/components/venue-management/GeoreferenceSection.tsx  "Use my location" + accuracy display — §8.G
-✅ (uncommitted) src/app/(main)/venues/management/page.client.tsx         wiring for the above; also fixes a pre-existing bug
-                                                                          where buildGeoreferenceForSave silently dropped
-                                                                          ControlPoint.accuracy on save
-✅ (uncommitted) src/app/types.ts                                         ControlPoint.accuracy — §8.G
-✅ (uncommitted) package.json                                             BOTH root and core — maplibre-gl (pinned ^5.24.0,
-                                                                          NOT 6.x — §0.3(59)), pmtiles, @protomaps/basemaps
-✅ (uncommitted) .gitignore                                               BOTH root and core — public/basemap/, .cache/
+✅ src/lib/geoUtils.ts                                      layerImageCorners(transform) — §8.C
+✅ src/lib/__tests__/geoUtils.test.ts                       dedicated layerImageCorners tests — §8.C
+                                                           (Mercator-conformance is covered separately by
+                                                           the pre-existing geoUtils.mercator-conformance.test.ts)
+✅ src/lib/callPositionUtils.ts                             placeCallPinFromLatLon() — §8.F basemap-side writer
+✅ src/components/modals/event/venuemapmodal.tsx           raster/basemap view toggle; the 8.F gate,
+                                                           `effectiveBasemap || currentLayerCalibrated`
+                                                           (equivalent to the planned
+                                                           `viewMode === 'raster' && !currentLayerCalibrated`).
+                                                           Does NOT wire `deviceLocation` into BasemapView — §8.G gap
+✅ src/components/venue-management/GeoreferenceSection.tsx  "Use my location" + accuracy display — §8.G
+✅ src/app/(main)/venues/management/page.client.tsx         wiring for the above; also fixes a pre-existing bug
+                                                           where buildGeoreferenceForSave silently dropped
+                                                           ControlPoint.accuracy on save
+✅ src/app/types.ts                                         ControlPoint.accuracy — §8.G
+✅ package.json                                             BOTH root and core — maplibre-gl (pinned ^5.24.0,
+                                                           NOT 6.x — §0.3(59)), pmtiles, @protomaps/basemaps
+✅ .gitignore                                               BOTH root and core — public/basemap/, .cache/
 ```
 
-**Correction, 2026-08-19.** Every `✅ (uncommitted)` marker in the two Phase 8 blocks
-above is now stale: those files landed in `0e030bc`. They are left as written so the
-session history reads honestly, but read them as committed. The 8.I entries below are
-committed; only the 8.J entries are genuinely still uncommitted.
+**Correction, 2026-08-19.** The two Phase 8 blocks above carried a `✅ (uncommitted)`
+marker for several sessions after the files it described had actually landed in
+`0e030bc` — stale from the moment they landed, and left that way at the time so the
+session history read honestly. Cleaned up here to plain `✅`, matching the rest of
+this manifest. The 8.I and 8.J entries below were already marked plain `✅` with their
+landing commits; nothing in this section is uncommitted anymore, per the clean
+`core` checkout at `6b42e79` recorded in §0.1.
 
 Phase 8 — §8.I and §8.J:
 
