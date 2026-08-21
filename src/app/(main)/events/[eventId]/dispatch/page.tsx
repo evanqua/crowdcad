@@ -3398,9 +3398,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
           {/* Mobile/Tablet Layout - Bottom Tabs */}
           <div className="lg:hidden">
+            {event && <AvailabilitySurgeStrip event={event} />}
             {/* Background rectangle to cover bottom radius space */}
             <div className="fixed bottom-0 left-0 right-0 h-5 bg-surface-deep z-40"></div>
-            <Tabs 
+            <Tabs
               aria-label="Dispatch sections" 
               placement="bottom"
               radius="full"
