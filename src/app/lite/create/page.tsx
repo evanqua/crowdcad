@@ -716,6 +716,27 @@ function LiteCreateContent() {
                 size="lg"
               />
             </div>
+            <div style={{ flex: 2 }}>
+              <Input
+                type="number"
+                label="Surge Limit"
+                labelPlacement="outside"
+                placeholder="70"
+                min={1}
+                max={100}
+                value={String(eventDraft.surgeLimitPercent ?? 70)}
+                onValueChange={(value) => {
+                  const parsed = Number(value);
+                  updateDraft((current) => ({
+                    ...current,
+                    surgeLimitPercent: Number.isFinite(parsed) ? Math.min(100, Math.max(1, parsed)) : current.surgeLimitPercent,
+                  }));
+                }}
+                endContent={<span className="text-surface-faint text-sm">%</span>}
+                classNames={inputClassNames}
+                size="lg"
+              />
+            </div>
             <div className="flex-shrink-0">
               <Button
                 onPress={handleCreateLiteEvent}

@@ -63,6 +63,9 @@ export interface Event {
   end?: string | number;
 
   interactionSessions?: InteractionSession[];
+
+  /** Percent of teams actively on calls at which the surge display turns red. Defaults to 70 when unset. */
+  surgeLimitPercent?: number;
 }
 
 export interface TeamLogEntry {

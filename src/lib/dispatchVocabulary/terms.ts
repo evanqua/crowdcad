@@ -165,6 +165,9 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'Venues',
     'Clear Event',
     'Export Summary',
+    'On Calls',
+    'On Break/Clinic',
+    'Surge limit reached',
   ]),
 ];
 

@@ -10,7 +10,7 @@ import AddSupervisorModal from "@/components/modals/event/addsupervisormodal";
 import React from 'react';
 import { dbService, ServiceError } from '@/lib/services';
 import { PostAssignment, Event, Staff, Supervisor, Call, EquipmentStatus, CallLogEntry, TeamLogEntry, EquipmentItem, EventEquipment, ClinicOutcome, Clinic } from '@/app/types';
-import { toast, Slide } from 'react-toastify';
+import { toast, Slide, ToastContainer } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
 import { useAuth } from '@/hooks/useauth';
@@ -29,6 +29,8 @@ import DebugModal from '@/components/modals/debugmodal';
 import { ShieldAlert } from 'lucide-react';
 import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip } from "@heroui/react"
 import EquipmentCard from '@/components/dispatch/equipmentcard';
+import AvailabilitySurgeStrip from '@/components/dispatch/availabilitysurgestrip';
+import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging } from '@/lib/teamAvailability';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
@@ -79,6 +81,29 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const vocabularyTerms = dispatchVocabularyPreset.terms;
   const t = useCallback((key: string) => vocabularyTerms[key] ?? key, [vocabularyTerms]);
   const router = useRouter();
+
+  const wasSurgingRef = useRef(false);
+  useEffect(() => {
+    if (!event) return;
+    const summary = getTeamAvailabilitySummary(event);
+    if (summary.total === 0) {
+      wasSurgingRef.current = false;
+      return;
+    }
+    const surging = isSurging(summary.percentOnCalls, getSurgeLimitPercent(event));
+    if (surging && !wasSurgingRef.current) {
+      toast.warning(`${t('Surge limit reached')} (${summary.percentOnCalls}%)`, {
+        position: 'top-right',
+        autoClose: 10000,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        transition: Slide,
+      });
+    }
+    wasSurgingRef.current = surging;
+  }, [event, t]);
+
   const [openCallId, setOpenCallId] = useState<string | null>(null);
   const [openClinicCallId, setOpenClinicCallId] = useState<string | null>(null);
   const [, setTeamToAdd] = useState<{ [callId: string]: string }>({});
@@ -2964,6 +2989,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   return (
     <DispatchVocabularyProvider terms={vocabularyTerms}>
+      <ToastContainer
+        theme="dark"
+        toastClassName="!bg-surface-deep !border !border-surface-liner !rounded-2xl !text-surface-light !shadow-lg"
+        progressClassName="!bg-accent"
+      />
       {/* All your modals first - unchanged */}
       <QuickCallModal
         isOpen={showQuickCallForm}
@@ -3102,6 +3132,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
                     <TeamActionButtonGroup selectedTab={selectedLeftTab as 'teams' | 'supervisors' | 'equipment'} />
                   </div>
+
+                  {event && <AvailabilitySurgeStrip event={event} />}
 
                   {/* Content with ScrollShadow */}
                   <div className="h-full overflow-auto scrollbar-hide">
@@ -3366,9 +3398,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
           {/* Mobile/Tablet Layout - Bottom Tabs */}
           <div className="lg:hidden">
+            {event && <AvailabilitySurgeStrip event={event} />}
             {/* Background rectangle to cover bottom radius space */}
             <div className="fixed bottom-0 left-0 right-0 h-5 bg-surface-deep z-40"></div>
-            <Tabs 
+            <Tabs
               aria-label="Dispatch sections" 
               placement="bottom"
               radius="full"
