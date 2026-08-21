@@ -52,6 +52,7 @@ export default function EventCreation() {
     calls: [],
     eventPosts: [],
     eventEquipment: [],
+    surgeLimitPercent: 70,
   });
 
   const [selectedTab, setSelectedTab] = useState<'teams' | 'supervisors' | 'posts' | 'equipment'>('teams');

@@ -48,6 +48,7 @@ export function normalizeLiteDraftToEvent(draft: LiteEventDraft): Event {
     eventEquipment: draft.eventEquipment || [],
     postAssignments: draft.postAssignments || {},
     pendingAssignments: draft.pendingAssignments || {},
+    surgeLimitPercent: draft.surgeLimitPercent,
   };
 }
 
@@ -72,6 +73,7 @@ export function toLiteDraftFromEvent(nextEvent: Event, previousDraft: LiteEventD
     status: nextEvent.status ?? previousDraft.status ?? 'active',
     postAssignments: nextEvent.postAssignments || {},
     pendingAssignments: nextEvent.pendingAssignments || {},
+    surgeLimitPercent: nextEvent.surgeLimitPercent ?? previousDraft.surgeLimitPercent,
     createdAt:
       typeof nextEvent.createdAt === 'string' ? nextEvent.createdAt : previousDraft.createdAt,
     updatedAt: new Date().toISOString(),

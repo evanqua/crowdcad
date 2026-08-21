@@ -52,6 +52,7 @@ export interface LiteEventDraft {
   status: 'draft' | 'active';
   createdAt: string;
   updatedAt: string;
+  surgeLimitPercent?: number;
 }
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
@@ -169,6 +170,7 @@ export function createDefaultLiteEventDraft(eventId: string, eventName = ''): Li
     status: 'draft',
     createdAt: now,
     updatedAt: now,
+    surgeLimitPercent: 70,
   };
 }
 

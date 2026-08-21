@@ -49,6 +49,28 @@ export default function MetadataSection({
           size="lg"
         />
       </div>
+      <div>
+        <Input
+          type="number"
+          label="Surge Limit"
+          labelPlacement="outside"
+          placeholder="70"
+          min={1}
+          max={100}
+          value={String(eventData.surgeLimitPercent ?? 70)}
+          onValueChange={(value) => {
+            const parsed = Number(value);
+            setEventData((prev) => ({
+              ...prev,
+              surgeLimitPercent: Number.isFinite(parsed) ? Math.min(100, Math.max(1, parsed)) : prev.surgeLimitPercent,
+            }));
+          }}
+          endContent={<span className="text-surface-faint text-sm">%</span>}
+          description="Percent of teams on calls at which the dispatch board's surge display turns red."
+          classNames={inputClassNames}
+          size="lg"
+        />
+      </div>
     </div>
   );
 }
