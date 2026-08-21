@@ -23,11 +23,18 @@ function surgeColor(positionPercent: number, surgeLimitPercent: number): string 
   return `rgb(${r} ${g} ${b})`;
 }
 
-const BAR_COUNT = 20;
-// Deterministic height pattern so the meter reads as an equalizer rather than a flat volume bar.
-const BAR_HEIGHTS = Array.from({ length: BAR_COUNT }, (_, i) => 40 + Math.round(30 * Math.abs(Math.sin(i * 0.85))));
+const BAR_COUNT = 14;
 
 type Props = { event: Event };
+
+function CountPill({ colorClass, count, label }: { colorClass: string; count: number; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5" aria-label={`${count} ${label}`}>
+      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorClass}`} />
+      <span className="text-sm font-bold text-surface-light tabular-nums">{count}</span>
+    </div>
+  );
+}
 
 export default function AvailabilitySurgeStrip({ event }: Props) {
   const { t } = useDispatchTerms();
@@ -37,31 +44,28 @@ export default function AvailabilitySurgeStrip({ event }: Props) {
 
   return (
     <div
-      className="w-full flex items-center justify-between gap-4 px-3 py-2 border-b border-surface-liner"
+      className="w-full flex items-center justify-between gap-4 pl-2 pr-3 py-2 border-b border-surface-liner"
       data-testid="availability-surge-strip"
     >
-      <div className="flex items-center gap-2 text-xs text-surface-faint whitespace-nowrap min-w-0 overflow-hidden">
-        <span>{summary.available} {t('Available')}</span>
-        <span className="text-surface-liner">·</span>
-        <span>{summary.onBreakOrClinic} {t('On Break/Clinic')}</span>
-        <span className="text-surface-liner">·</span>
-        <span>{summary.onCalls} {t('On Calls')}</span>
+      <div className="flex items-center gap-3 shrink-0">
+        <CountPill colorClass="bg-status-green" count={summary.available} label={t('Available')} />
+        <CountPill colorClass="bg-status-blue" count={summary.onBreakOrClinic} label={t('On Break/Clinic')} />
+        <CountPill colorClass="bg-status-red" count={summary.onCalls} label={t('On Calls')} />
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-sm font-semibold tabular-nums" style={{ color: percentColor }}>
+        <span className="text-sm font-bold tabular-nums" style={{ color: percentColor }}>
           {summary.percentOnCalls}%
         </span>
-        <div className="flex items-end gap-[2px] h-4" aria-hidden="true">
-          {BAR_HEIGHTS.map((height, i) => {
+        <div className="flex items-center gap-[3px] h-5" aria-hidden="true">
+          {Array.from({ length: BAR_COUNT }, (_, i) => {
             const positionPercent = ((i + 1) / BAR_COUNT) * 100;
             const lit = positionPercent <= summary.percentOnCalls;
             return (
               <div
                 key={i}
-                className="w-[3px] rounded-full transition-opacity duration-300"
+                className="w-[4px] h-full rounded-sm transition-opacity duration-300"
                 style={{
-                  height: `${height}%`,
                   backgroundColor: surgeColor(positionPercent, surgeLimitPercent),
                   opacity: lit ? 1 : 0.25,
                 }}
