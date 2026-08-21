@@ -75,6 +75,6 @@ Help & Support
 
 - For bugs or feature requests, open a GitHub issue describing the problem.
 - For security issues, follow `SECURITY.md` and report via `support@crowdcad.org` or GitHub Security Advisories.
-- For deployment questions, consult `docs/FIREBASE_SETUP.md` and `docs/DEPLOYMENT.md`.
+- For deployment questions, consult `docs/DEPLOYMENT.md` (choosing a backend), `docs/SETUP_FIREBASE.md`, or `docs/SETUP_POCKETBASE.md`.
 
 More information and screenshots: https://crowdcad.org/features

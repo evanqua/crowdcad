@@ -46,7 +46,7 @@ Data model and types
 Authentication & security
 
 - Firebase Authentication is used for user identity; `useauth.ts` in `src/hooks` wraps auth state for components.
-- Sensitive production configuration (service accounts, BAAs) must be handled per-organization — see `docs/FIREBASE_SETUP.md` and `docs/DEPLOYMENT.md` for guidance.
+- Sensitive production configuration (service accounts, BAAs) must be handled per-organization — see `docs/SETUP_FIREBASE.md`, `docs/SETUP_POCKETBASE.md`, and `docs/DEPLOYMENT.md` for guidance.
 
 Development & testing
 

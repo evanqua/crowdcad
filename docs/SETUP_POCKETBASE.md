@@ -1,6 +1,6 @@
 # PocketBase Setup for CrowdCAD
 
-This guide explains how to configure PocketBase for local development and self-hosted/LAN deployments — the recommended backend when you want all data to stay on your own machine with no cloud account required. It complements `src/lib/services/pocketbase/client.ts` and `src/lib/services/pocketbase/PocketbaseAuthService.ts`, which contain the runtime client and auth adapter, and `docker-compose.yml` / `Dockerfile.pocketbase`, which define the recommended Docker setup path.
+This guide explains how to configure PocketBase for local development and self-hosted/LAN deployments — one of two supported backends, alongside Firebase (see [`SETUP_FIREBASE.md`](SETUP_FIREBASE.md)). PocketBase is a good fit when you want all data to stay on your own machine or LAN with no cloud account required; see [`DEPLOYMENT.md`](DEPLOYMENT.md) for a side-by-side comparison to help you choose. This guide complements `src/lib/services/pocketbase/client.ts` and `src/lib/services/pocketbase/PocketbaseAuthService.ts`, which contain the runtime client and auth adapter, and `docker-compose.yml` / `Dockerfile.pocketbase`, which define the Docker setup path used below.
 
 Important: do not commit secrets (admin passwords or `.env.local`) to the repository. Use environment files for local development and your own secret store for production.
 
@@ -137,4 +137,4 @@ Two things must be configured before "forgot password" actually works for your u
 - **Sign-up rejects an otherwise-valid password** — PocketBase's default auth collection requires passwords to be at least 8 characters. This isn't currently enforced client-side, so a shorter password will fail at the PocketBase API instead of showing until submitted.
 - **`docker exec pocketbase /pb/pocketbase superuser upsert ...` fails or behaves unexpectedly on Windows** — Git Bash is rewriting the `/pb/...` path. Prefix the command with `MSYS_NO_PATHCONV=1` as shown in step 4.
 
-For more deployment guidance see `docs/DEPLOYMENT.md`, `README.md`'s Quickstart section, and the top-level `README.md`.
+For a comparison against the Firebase path, see [`DEPLOYMENT.md`](DEPLOYMENT.md). For more guidance see `README.md`'s Quickstart section.

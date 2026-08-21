@@ -13,10 +13,9 @@ CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system f
 - **User guide:** [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 - **Architecture:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - **Component patterns:** [docs/COMPONENTS.md](docs/COMPONENTS.md)
-- **Firebase & setup:** [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md)
-- **PocketBase & setup:** [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md)
-- **Self-hosting (Firebase):** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-- **Self-hosting (PocketBase):** [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md)
+- **Choosing a backend:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- **Firebase setup:** [docs/SETUP_FIREBASE.md](docs/SETUP_FIREBASE.md)
+- **PocketBase setup:** [docs/SETUP_POCKETBASE.md](docs/SETUP_POCKETBASE.md)
 - **Contributing guide:** [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Code of Conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - **Changelog / Releases:** [CHANGELOG.md](CHANGELOG.md)
@@ -25,7 +24,50 @@ CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system f
 
 #### Quickstart
 
-**With Docker + PocketBase (Recommended for local/LAN, no cloud account required)** — see [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md) for the full walkthrough, including Windows/Git Bash notes and SMTP configuration for "forgot password" emails.
+CrowdCAD supports two backends, maintained as equal alternatives: **Firebase** (managed cloud) and **PocketBase** (self-hosted, no cloud account required). Pick whichever fits your organization's requirements and preferences — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for a side-by-side comparison. Each option below is fully self-contained; you only need to follow one.
+
+**Fork first (recommended for either option)** — preserves attribution and lets you receive upstream updates:
+
+```bash
+# Fork via GitHub first: https://github.com/evanqua/crowdcad
+# Then clone your fork:
+git clone https://github.com/<your-github-username>/crowdcad.git
+cd crowdcad
+```
+
+Or clone directly without forking: `git clone https://github.com/evanqua/crowdcad.git && cd crowdcad`
+
+---
+
+**Option A — Firebase**
+
+Full walkthrough, including service accounts, security rules, and CI deploys: [docs/SETUP_FIREBASE.md](docs/SETUP_FIREBASE.md).
+
+*With Docker:*
+```bash
+cp .env.example .env.local
+# Edit .env.local and paste values from your Firebase project settings
+# Leave NEXT_PUBLIC_BACKEND unset or set it to "firebase"
+docker compose --env-file .env.local up --build -d
+```
+The dev server runs at `http://localhost:3000`. To stop it, run `docker compose down`.
+
+*Without Docker:*
+```bash
+cp .env.example .env.local
+# edit .env.local and paste values from your Firebase project settings
+npm install
+npm run dev
+```
+The dev server runs at `http://localhost:3000`. The runtime initializer is at `src/app/firebase.ts`.
+
+---
+
+**Option B — PocketBase**
+
+Full walkthrough, including Windows/Git Bash notes and SMTP configuration for "forgot password" emails: [docs/SETUP_POCKETBASE.md](docs/SETUP_POCKETBASE.md).
+
+*With Docker (recommended for this option):*
 
 1. Copy and configure the environment file:
 ```bash
@@ -70,67 +112,9 @@ node scripts/setAdminPocketbase.js you@example.com
 
 To stop the stack: `docker compose down`. Your data is preserved in `.pb-data/` and will be available on the next `docker compose up`.
 
-**With Docker + Firebase**
+*Without Docker (download-the-binary setup):*
 
-1. Secure your environment variables (see Firebase setup below):
-```bash
-cp .env.example .env.local
-# Edit .env.local and paste values from your Firebase project settings
-# Leave NEXT_PUBLIC_BACKEND unset or set it to "firebase"
-```
-
-2. Build and run the container:
-```bash
-docker compose --env-file .env.local up --build -d
-```
-
-3. The dev server will run at `http://localhost:3000`. To stop it, run `docker compose down`.
-
-**Without Docker**
-
-1. Fork then clone (recommended — preserves attribution and lets you receive upstream updates):
-
-```bash
-# Fork via GitHub first: https://github.com/evanqua/crowdcad
-# Then clone your fork:
-git clone https://github.com/<your-github-username>/crowdcad.git
-cd crowdcad
-npm install
-npm run dev
-```
-
-Or clone directly without forking:
-
-```bash
-git clone https://github.com/evanqua/crowdcad.git
-cd crowdcad
-npm install
-npm run dev
-```
-
-2. The dev server runs at `http://localhost:3000`.
-
-3. For Firebase configuration, follow the instructions in [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md). The runtime initializer is at `src/app/firebase.ts`.
-
-Environment example
-
-Copy `.env.example` to `.env.local` and fill your Firebase values before running locally. Do not commit your `.env.local`:
-
-```bash
-cp .env.example .env.local
-# edit .env.local and paste values from your Firebase project settings
-```
-
-
-#### PocketBase (self-hosted / LAN)
-
-PocketBase is the recommended backend for local or LAN deployments — no cloud account required and all data stays on your machine. This section covers a non-Docker, download-the-binary setup; for the recommended Docker path (including Windows/Git Bash notes, troubleshooting, and SMTP configuration for password-reset emails) see [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md).
-
-**1. Download PocketBase**
-
-Download the binary for your platform from [pocketbase.io/docs](https://pocketbase.io/docs) and place it at the root of the project (or anywhere — adjust the path accordingly).
-
-**2. Create the superadmin and start the server**
+Download the PocketBase binary for your platform from [pocketbase.io/docs](https://pocketbase.io/docs) and place it at the root of the project (or anywhere — adjust the path accordingly), then:
 
 ```bash
 # Create (or update) the superadmin account
@@ -140,16 +124,10 @@ Download the binary for your platform from [pocketbase.io/docs](https://pocketba
 ./pocketbase serve --http=0.0.0.0:8090
 ```
 
-The admin UI is available at `http://<LAN-IP>:8090/_/`.
-
-**3. Set environment variables**
-
+Set environment variables:
 ```bash
 cp .env.example .env.local
 ```
-
-In `.env.local`:
-
 ```env
 NEXT_PUBLIC_BACKEND=pocketbase
 NEXT_PUBLIC_POCKETBASE_URL=http://192.168.x.x:8090   # LAN IP of the machine running PocketBase
@@ -160,42 +138,17 @@ PB_URL=http://192.168.x.x:8090
 PB_ADMIN_EMAIL=admin@example.com
 PB_ADMIN_PASSWORD=YourPassword!
 ```
-
 Use the LAN IP address (not `localhost`) so every device on the network can connect.
 
-**4. Create collections**
-
-Run the setup script once after PocketBase starts. It creates all required collections and is fully idempotent (safe to run multiple times):
-
+Then create collections and run the app:
 ```bash
 node scripts/setup-pocketbase.js
-```
-
-**5. Run the app**
-
-```bash
 npm install
 npm run dev
 # or for production:
 npm run build && npm start
 ```
-
-The app will be available at `http://localhost:3000` and will communicate with PocketBase via the URL you configured.
-
-**6. Grant yourself admin access**
-
-One-time bootstrap step for Profile > Admin (e.g. managing the certification list):
-
-```bash
-PB_URL=http://192.168.x.x:8090 PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASSWORD=YourPassword! \
-node scripts/setAdminPocketbase.js you@example.com
-```
-
-After signing in, that user can grant/revoke admin access for others from Profile > Admin > Manage Admins.
-
-**7. (Optional) Enable "Forgot password" emails**
-
-Configure **Settings > Mail settings** in the PocketBase admin UI with real SMTP credentials, then update the **Collections > users > Options > Email templates > Reset password** action URL to `{APP_URL}/reset-password?token={TOKEN}` so the link opens this app instead of PocketBase's own admin UI.
+The app will be available at `http://localhost:3000` and will communicate with PocketBase via the URL you configured. See [docs/SETUP_POCKETBASE.md](docs/SETUP_POCKETBASE.md) for granting yourself admin access and enabling "forgot password" emails.
 
 #### Testing
 
@@ -238,8 +191,9 @@ npx playwright show-report
 
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making cross-cutting changes.
 - Read [docs/COMPONENTS.md](docs/COMPONENTS.md) before adding UI components or modals.
-- Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) for self-hosting and compliance guidance (BAA, rules, backups).
-- Follow [docs/POCKETBASE_SETUP.md](docs/POCKETBASE_SETUP.md) for self-hosted/LAN deployments backed by PocketBase instead of Firebase.
+- Read [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) first if you haven't chosen a backend yet — it compares Firebase and PocketBase.
+- Follow [docs/SETUP_FIREBASE.md](docs/SETUP_FIREBASE.md) for Firebase setup, compliance guidance (BAA), rules, and CI deploys.
+- Follow [docs/SETUP_POCKETBASE.md](docs/SETUP_POCKETBASE.md) for self-hosted/LAN deployments backed by PocketBase.
 - See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for operator-facing workflows and screenshots.
 
 #### Reporting and policies

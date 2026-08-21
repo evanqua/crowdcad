@@ -1,6 +1,6 @@
 # Firebase Setup for CrowdCAD
 
-This guide explains how to configure Firebase for local development and production deployments. It complements `src/app/firebase.ts` which contains the runtime initialization code.
+This guide explains how to configure Firebase for local development and production deployments — one of two supported backends, alongside PocketBase (see [`SETUP_POCKETBASE.md`](SETUP_POCKETBASE.md)). Firebase is a good fit when your organization wants a managed cloud backend with HIPAA-eligible infrastructure (via a signed Google BAA); see [`DEPLOYMENT.md`](DEPLOYMENT.md) for a side-by-side comparison to help you choose. This guide complements `src/app/firebase.ts`, which contains the runtime initialization code.
 
 Important: do not commit secrets (API keys or service account JSON) to the repository. Use environment files for local development and CI secrets for production.
 
@@ -100,27 +100,74 @@ This requires a service account JSON (Firebase Console > Project Settings > Serv
 
 The "Forgot password?" link on the login screen uses Firebase Auth's built-in `sendPasswordResetEmail` — Firebase sends and delivers the email itself, no SMTP config needed. The only requirement is that your deployed domain (and `localhost` for local dev) is listed under **Authentication > Settings > Authorized domains** in the Firebase Console — this is usually already the case for any domain you're using to sign in, since Firebase Auth requires it for sign-in to work at all.
 
-## CI & production deploys
+## Deploy to Firebase Hosting
 
-- Store `FIREBASE_PROJECT` and `FIREBASE_TOKEN` (or use Workload Identity Federation) in your CI secrets.
-- Use the GitHub Actions snippet in `docs/DEPLOYMENT.md` or your preferred CI provider to run `npm run build` and `firebase deploy` from the project root.
+Once local development is working, deploy with the Firebase CLI, setting the project explicitly:
+
+```bash
+firebase login
+firebase use --add <PROJECT_ID>
+npm run build
+firebase deploy --project <PROJECT_ID>
+```
+
+**CI & production deploys**
+
+- Store `FIREBASE_PROJECT` and `FIREBASE_TOKEN` (generated with `firebase login:ci`, or use Workload Identity Federation for tighter security) in your CI secrets.
+- Keep the deployable build deterministic by pinning dependencies (`package-lock.json`).
+
+Example GitHub Actions deploy snippet (minimal):
+
+```yaml
+name: Deploy
+on:
+  push:
+    branches: [ main ]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - run: npm ci
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+      - name: Deploy to Firebase Hosting
+        run: npx firebase-tools deploy --only hosting --project ${{ secrets.FIREBASE_PROJECT }} --token ${{ secrets.FIREBASE_TOKEN }}
+```
+
+**Post-deploy checks**
+
+- Verify Firestore rules and Storage rules are active in the production project.
+- Confirm the hosting URL and environment variables are correct.
+- Run basic end-to-end checks: sign in, create an event, and create a sample dispatch log.
 
 ## Firewalls, BAAs, and compliance
 
-- If you will manage PHI in Firestore/Storage, obtain a signed Google BAA for the Firebase/GCP project and ensure all third-party integrations are covered by BAAs.
+- If you will manage PHI in Firestore/Storage, obtain a signed Google BAA for the Firebase/GCP project and ensure all third-party integrations are covered by BAAs. This managed-BAA path is the main reason organizations choose Firebase over PocketBase for PHI-handling deployments — see [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full comparison.
+- Do not send PHI to analytics, crash-reporting, or third-party services unless there's a signed BAA covering them.
 
 ## Production checklist
 
 - Signed Google BAA (if processing PHI).
 - Firestore & Storage rules reviewed and tested.
-- Admin accounts enforce MFA.
-- Service accounts follow least privilege.
-- Telemetry disabled or sanitized.
-- Backups and exports configured and encrypted.
+- Admin accounts enforce MFA; service accounts follow least privilege.
+- Telemetry disabled (`DISABLE_TELEMETRY=true`) or sanitized.
+- Backups and exports configured, encrypted, and covered by BAAs where applicable.
+- Documented incident response and breach notification plans; workforce HIPAA training as needed.
 
 ## Troubleshooting
 
 - If Auth fails locally, ensure the emulator is running and your app is pointed at emulator endpoints.
 - If Firestore rules block valid operations, run the Emulator with `FIREBASE_DEBUG=true` to collect logs.
 
-For more deployment guidance see `docs/DEPLOYMENT.md` and the top-level `README.md`.
+For a comparison against the PocketBase path, see [`DEPLOYMENT.md`](DEPLOYMENT.md). For more guidance see the top-level `README.md`.
