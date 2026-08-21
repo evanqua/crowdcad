@@ -232,7 +232,7 @@ export default function ClinicTrackingTable({
                   return (
                 <tr
                   key={rowRenderKey}
-                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${isOpen || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors ${isResolvedClinicCall && !isClinicCallVisible(call) ? '[&>td]:!border-b-0 pointer-events-none' : ''} ${isOpen ? '[&>td]:!border-b-0' : ''}`}
+                  className={`cursor-pointer min-h-3.25rem bg-transparent rounded-none ${getCallRowClass(call)} ${isOpen || getCallRowClass(call) ? '' : TEAM_CARD_ROW_HOVER_CLASS} transition-colors ${isResolvedClinicCall && !isClinicCallVisible(call) ? '[&>td]:!border-b-0 pointer-events-none' : ''} ${openClinicCallId === call.id ? '[&>td]:!border-b-0' : ''}`}
                   aria-hidden={isResolvedClinicCall && !isClinicCallVisible(call)}
                   onClick={(e) => {
                     const t = e.target as HTMLElement;
@@ -365,7 +365,7 @@ export default function ClinicTrackingTable({
                           <Button
                             size="sm"
                             variant="flat"
-                            className="min-w-0 h-7 px-2 text-xs justify-start bg-surface-liner hover:bg-surface-muted"
+                            className="min-w-0 h-8 px-2 text-xs justify-start bg-surface-liner hover:bg-surface-muted"
                           >
                             {t(call.outcome || 'In Clinic')}
                           </Button>
