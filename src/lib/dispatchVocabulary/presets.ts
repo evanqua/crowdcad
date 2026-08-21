@@ -150,6 +150,9 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   Venues: 'Sites',
   'Clear Event': "Réinitialiser l'événement",
   'Export Summary': 'Exporter le résumé',
+  'On Calls': 'En intervention',
+  'On Break/Clinic': 'En pause/clinique',
+  'Surge limit reached': "Seuil d'affluence atteint",
 };
 
 export const BUILTIN_PRESETS: Record<BuiltinPresetId, DispatchVocabularyPresetSummary> = {

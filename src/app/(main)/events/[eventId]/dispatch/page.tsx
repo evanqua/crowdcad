@@ -29,6 +29,7 @@ import DebugModal from '@/components/modals/debugmodal';
 import { ShieldAlert } from 'lucide-react';
 import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip } from "@heroui/react"
 import EquipmentCard from '@/components/dispatch/equipmentcard';
+import AvailabilitySurgeStrip from '@/components/dispatch/availabilitysurgestrip';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
@@ -3102,6 +3103,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
                     <TeamActionButtonGroup selectedTab={selectedLeftTab as 'teams' | 'supervisors' | 'equipment'} />
                   </div>
+
+                  {event && <AvailabilitySurgeStrip event={event} />}
 
                   {/* Content with ScrollShadow */}
                   <div className="h-full overflow-auto scrollbar-hide">
