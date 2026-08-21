@@ -31,7 +31,7 @@ function CountPill({ colorClass, count, label }: { colorClass: string; count: nu
   return (
     <div className="flex items-center gap-1.5" aria-label={`${count} ${label}`}>
       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorClass}`} />
-      <span className="text-sm font-bold text-surface-light tabular-nums">{count}</span>
+      <span className="text-sm text-surface-light tabular-nums">{count}</span>
     </div>
   );
 }
