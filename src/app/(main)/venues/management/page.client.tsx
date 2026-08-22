@@ -10,6 +10,8 @@ import { dbService, storageService } from '@/lib/services';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
+import { hasDuplicateClinicName, isClinicPost } from '@/lib/clinics';
+import { stripUndefined } from '@/lib/utils';
 import { uploadWithRetry } from '@/lib/uploadUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import NewLayerModal from '@/components/modals/venue/newlayer';
@@ -36,6 +38,7 @@ import {
   Trash2, 
   Edit2,
   MapPinned,
+  HousePlus,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -353,12 +356,23 @@ export default function VenueManagementPageClient() {
       return;
     }
 
+    if (markerIsClinicInput && hasDuplicateClinicName(name, allPosts, { layerIdx: pendingMarker.layerIdx, postIdx: pendingMarker.postIdx })) {
+      alert('Another clinic already uses this name. Give each clinic a unique name.');
+      return;
+    }
+
     setVenueData((prev) => {
       const newLayers = [...prev.layers];
       const copy = [...newLayers[pendingMarker.layerIdx].posts];
       const currentPost = copy[pendingMarker.postIdx];
       if (typeof currentPost !== 'string') {
-        copy[pendingMarker.postIdx] = { ...currentPost, name, isClinic: markerIsClinicInput };
+        const clinicId = markerIsClinicInput ? (currentPost.clinicId || crypto.randomUUID()) : currentPost.clinicId;
+        copy[pendingMarker.postIdx] = {
+          ...currentPost,
+          name,
+          isClinic: markerIsClinicInput,
+          ...(clinicId ? { clinicId } : {}),
+        };
       }
       newLayers[pendingMarker.layerIdx] = { ...newLayers[pendingMarker.layerIdx], posts: copy };
       return { ...prev, layers: newLayers };
@@ -398,18 +412,26 @@ export default function VenueManagementPageClient() {
   const handleEditLocation = (name: string, newLayerIdx: number, isClinic: boolean) => {
     if (!editingLocation) return;
     const { layerIdx, postIdx } = editingLocation;
+
+    if (isClinic && hasDuplicateClinicName(name, allPosts, { layerIdx, postIdx })) {
+      alert('Another clinic already uses this name. Give each clinic a unique name.');
+      return;
+    }
+
     setVenueData((prev) => {
       const newLayers = [...prev.layers];
       const post = newLayers[layerIdx].posts[postIdx];
       if (typeof post === 'string') return prev;
+      const clinicId = isClinic ? (post.clinicId || crypto.randomUUID()) : post.clinicId;
+      const clinicIdField = clinicId ? { clinicId } : {};
       if (newLayerIdx !== layerIdx) {
         // Move to new layer
-        const newPost = { ...post, name, isClinic };
+        const newPost = { ...post, name, isClinic, ...clinicIdField };
         newLayers[layerIdx].posts.splice(postIdx, 1);
         newLayers[newLayerIdx].posts.push(newPost);
       } else {
         // Same layer, just rename
-        newLayers[layerIdx].posts[postIdx] = { ...post, name, isClinic };
+        newLayers[layerIdx].posts[postIdx] = { ...post, name, isClinic, ...clinicIdField };
       }
       return { ...prev, layers: newLayers };
     });
@@ -467,6 +489,7 @@ export default function VenueManagementPageClient() {
       name: string;
       x: number;
       y: number;
+      isClinic?: boolean;
     };
 
     return venueData.layers[currentLayer].posts
@@ -506,7 +529,11 @@ export default function VenueManagementPageClient() {
                 renamePost(currentLayer, idx);
               }}
             >
-              <MapPin className="h-4 w-4 text-accent" strokeWidth={2.5} />
+              {post.isClinic ? (
+                <HousePlus className="h-4 w-4 text-accent" strokeWidth={2.5} />
+              ) : (
+                <MapPin className="h-4 w-4 text-accent" strokeWidth={2.5} />
+              )}
             </div>
             {isHover && !isPending && post.name && (
               <div
@@ -576,10 +603,12 @@ export default function VenueManagementPageClient() {
         dataToSave.mapUrl = venueData.layers[0].mapUrl;
       }
 
+      const sanitizedDataToSave = stripUndefined(dataToSave);
+
       if (venueId) {
-        await dbService.updateDocument('venues', venueId, dataToSave);
+        await dbService.updateDocument('venues', venueId, sanitizedDataToSave);
       } else {
-        await dbService.addDocument('venues', dataToSave);
+        await dbService.addDocument('venues', sanitizedDataToSave);
       }
       router.push('/venues/selection')
     } catch (error: unknown) {
@@ -737,7 +766,9 @@ export default function VenueManagementPageClient() {
                               >
                                 <div className="flex items-center justify-between px-3 py-2">
                                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    {hasCoordinates ? (
+                                    {isClinicPost(post) ? (
+                                      <HousePlus className="h-4 w-4 flex-shrink-0 text-accent" />
+                                    ) : hasCoordinates ? (
                                       <MapPinned className="h-4 w-4 flex-shrink-0 text-accent" />
                                     ) : (
                                       <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />

@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Modal, ModalContent, ModalBody, Button, Card } from '@heroui/react';
 import { ZoomIn, ZoomOut, RotateCcw, MapPin, ShieldPlus, Briefcase, HousePlus } from 'lucide-react';
-import { Post, Staff, Equipment, Layer } from '@/app/types';
+import { Post, Staff, Equipment, Layer, Call, Clinic } from '@/app/types';
+import { isClinicPost, getTransportingLabel } from '@/lib/clinics';
 
 function StatusTimer({ since }: { since: number }) {
   const [elapsed, setElapsed] = React.useState(0);
@@ -60,7 +61,7 @@ function PostMarker({ post, rect }: PostMarkerProps) {
   const top = y + (post.y / 100) * height;
   
   // Check if this is a clinic location
-  const isClinic = post.name.toLowerCase().includes('clinic');
+  const isClinic = isClinicPost(post);
   const Icon = isClinic ? HousePlus : MapPin;
   const size = isClinic ? 'h-5 w-5' : 'h-4 w-4';
   const containerSize = isClinic ? 'h-7 w-7' : 'h-6 w-6';
@@ -321,6 +322,8 @@ interface TeamMarkerProps {
   post: Post;
   rect: ImageRect;
   teamTimers: { [team: string]: number };
+  calls: Call[];
+  clinics: Clinic[];
 }
 
 function TeamMarker({
@@ -328,6 +331,8 @@ function TeamMarker({
   post,
   rect,
   teamTimers,
+  calls,
+  clinics,
 }: TeamMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -341,6 +346,13 @@ function TeamMarker({
   const top = rect.y + (post.y / 100) * rect.height - 16;
 
   const { color } = getTeamMarkerColors(team);
+
+  const activeCall = calls.find(c =>
+    c.assignedTeam?.includes(team.team) && !['Resolved', 'Delivered', 'Refusal', 'NMM'].includes(c.status)
+  );
+  const statusLabel = team.status === 'Transporting'
+    ? getTransportingLabel((key) => key, clinics, activeCall?.clinicId)
+    : (team.status || 'Unknown');
 
   const handleMouseEnter = () => {
     setHovered(true);
@@ -401,7 +413,7 @@ function TeamMarker({
             <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}>
               {team.team}
             </div>
-            <div><strong>Status:</strong> {team.status || 'Unknown'}</div>
+            <div><strong>Status:</strong> {statusLabel}</div>
             <div><strong>Post:</strong> {team.location || 'Unassigned'}</div>
             <div><strong>Status Timer:</strong> {
               typeof teamTimers[team.team] === 'number'
@@ -422,6 +434,8 @@ interface VenueMapWithPostsProps {
   staff: Staff[];
   equipment?: Equipment[];
   teamTimers: { [team: string]: number };
+  calls?: Call[];
+  clinics?: Clinic[];
   onNaturalSize?: (w: number, h: number) => void;
   isOpen?: boolean;
   scale: number;
@@ -440,6 +454,8 @@ function VenueMapWithPosts({
   staff,
   equipment = [],
   teamTimers,
+  calls = [],
+  clinics = [],
   onNaturalSize,
   isOpen,
   scale,
@@ -646,6 +662,8 @@ function VenueMapWithPosts({
                   post={postObj}
                   rect={rect}
                   teamTimers={teamTimers}
+                  calls={calls}
+                  clinics={clinics}
                 />
               );
             })}
@@ -664,6 +682,8 @@ interface VenueMapModalProps {
   staff: Staff[];
   equipment?: Equipment[];
   teamTimers: { [team: string]: number };
+  calls?: Call[];
+  clinics?: Clinic[];
 }
 
 export default function VenueMapModal({
@@ -673,6 +693,8 @@ export default function VenueMapModal({
   staff,
   equipment = [],
   teamTimers,
+  calls = [],
+  clinics = [],
 }: VenueMapModalProps) {
   const [currentLayer, setCurrentLayer] = useState(0);
   const [scale, setScale] = useState(1);
@@ -822,6 +844,8 @@ export default function VenueMapModal({
                 staff={staff}
                 equipment={equipment}
                 teamTimers={teamTimers}
+                calls={calls}
+                clinics={clinics}
                 isOpen={isOpen}
                 scale={scale}
                 position={position}

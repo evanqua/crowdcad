@@ -151,8 +151,11 @@ PocketBase stores these as opaque `json` fields with no server-side schema; the 
 | `name` | string | Post name. |
 | `x`, `y` | number \| null | Position as a percentage of map width/height. |
 | `isClinic` | bool (optional) | Marks this post as a clinic. |
+| `clinicId` | string (optional) | Stable id, generated once when `isClinic` first becomes true. Survives the post being renamed later; used to match this post against `events.clinics` entries. |
 
 **`Layer`**: `id`, `name`, `mapUrl?`, `posts: Post[]`.
+
+**`Clinic`**: `id` (matches a clinic-flagged `Post.clinicId`), `name` (kept in sync with that post's current name). `events.clinics: Clinic[]` is populated additively from the event's `venue.posts` — see `src/lib/clinics.ts`'s `syncClinicsFromVenue`.
 
 **`Equipment`** (venue-level): `id`, `name`, `status` (free-text status string), `assignedTeam?`, `location?`.
 
@@ -196,7 +199,9 @@ PocketBase stores these as opaque `json` fields with no server-side schema; the 
 
 ## 4. Fields present in the app's TypeScript types but not in this PocketBase schema
 
-`src/app/types.ts`'s `Event` interface also declares `createdAt`, `ended`, `clinics`, `postingStart`/`postingEnd`, `scheduleStart`/`scheduleEnd`, `startTime`/`endTime`, and `start`/`end`. None of these appear in the `events` collection's actual field list (`scripts/setup-pocketbase.js`, `tests/e2e/pb_migrations/…created_events.js`). CrowdCAD supports both a Firebase and a PocketBase backend behind a common interface, and these fields appear to be write-only leftovers for the Firebase path: since PocketBase silently drops unknown fields on create/update (§2.2), sending them to a PocketBase-backed deployment has no effect — they will not be persisted or returned. Do not rely on them being present in PocketBase `events` records.
+`src/app/types.ts`'s `Event` interface also declares `createdAt`, `ended`, `postingStart`/`postingEnd`, `scheduleStart`/`scheduleEnd`, `startTime`/`endTime`, and `start`/`end`. None of these appear in the `events` collection's actual field list (`scripts/setup-pocketbase.js`, `tests/e2e/pb_migrations/…created_events.js`). CrowdCAD supports both a Firebase and a PocketBase backend behind a common interface, and these fields appear to be write-only leftovers for the Firebase path: since PocketBase silently drops unknown fields on create/update (§2.2), sending them to a PocketBase-backed deployment has no effect — they will not be persisted or returned. Do not rely on them being present in PocketBase `events` records.
+
+`clinics` **is** a schema-backed `json` field on `events` (added alongside multi-clinic support) — it does persist on PocketBase.
 
 ## 5. Notes
 
