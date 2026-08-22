@@ -9,6 +9,7 @@ import { Tabs, Tab, Button, Card, ScrollShadow } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
+import { syncClinicsFromVenue } from '@/lib/clinics';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
@@ -355,6 +356,9 @@ export default function EventCreation() {
       const computedTimes = postingTimes;
       console.log('handleSubmit computed postingTimes:', computedTimes, 'eventData.postingTimes:', eventData.postingTimes);
 
+      // Populate clinics from venue-designated clinic posts right before save.
+      const computedClinics = syncClinicsFromVenue(eventData.venue, eventData.clinics);
+
       let eventDocId = eventId;
       if (eventDocId) {
         try {
@@ -363,6 +367,7 @@ export default function EventCreation() {
             await dbService.updateDocument('events', eventDocId, stripUndefined({
               ...eventData,
               postingTimes: computedTimes.length > 0 ? computedTimes : eventData.postingTimes,
+              clinics: computedClinics,
               userId: user.uid,
               date: dateValue.toISOString(),
               updatedAt: new Date().toISOString(),
@@ -374,6 +379,7 @@ export default function EventCreation() {
             eventDocId = await dbService.addDocument('events', stripUndefined({
               ...eventData,
               postingTimes: computedTimes.length > 0 ? computedTimes : eventData.postingTimes,
+              clinics: computedClinics,
               userId: user.uid,
               date: dateValue.toISOString(),
               createdAt: new Date().toISOString(),
@@ -386,6 +392,7 @@ export default function EventCreation() {
           console.error('Error checking/updating document:', error);
           eventDocId = await dbService.addDocument('events', stripUndefined({
             ...eventData,
+            clinics: computedClinics,
             userId: user.uid,
             date: dateValue.toISOString(),
             createdAt: new Date().toISOString(),
@@ -397,6 +404,7 @@ export default function EventCreation() {
       } else {
         eventDocId = await dbService.addDocument('events', stripUndefined({
           ...eventData,
+          clinics: computedClinics,
           userId: user.uid,
           date: dateValue.toISOString(),
           createdAt: new Date().toISOString(),

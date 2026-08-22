@@ -32,6 +32,7 @@ import {
   saveLiteEvent,
 } from '@/lib/liteEventStore';
 import { formatTimeValue, parseTimeValue } from '@/lib/scheduleUtils';
+import { syncClinicsFromVenue } from '@/lib/clinics';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { useTeamForm } from '@/hooks/useTeamForm';
 
@@ -661,6 +662,7 @@ function LiteCreateContent() {
       ...eventDraft,
       status: 'active',
       updatedAt: new Date().toISOString(),
+      clinics: syncClinicsFromVenue(eventDraft.venue, eventDraft.clinics),
     };
 
     await saveLiteEvent(finalized);

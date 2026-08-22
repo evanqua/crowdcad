@@ -4,20 +4,21 @@
 import React, {useEffect, useMemo, useState, useRef} from 'react';
 import {
   Card, CardHeader, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Select, SelectItem, Autocomplete, AutocompleteItem
+  Select, SelectItem, Autocomplete, AutocompleteItem, Button
 } from '@heroui/react';
-import {ChevronDown, ChevronUp, MapPin, MoreVertical} from 'lucide-react';
+import {ChevronDown, ChevronUp, MapPin, MoreVertical, ArrowRight} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 import DispatchMotionCell from './motioncell';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
+import { getEventClinics, getClinicName } from '@/lib/clinics';
 
 type TeamCardProps = {
   staff: Staff;
   event: Event;
   sinceMs?: number;
-  onStatusChange: (staff: Staff, newStatus: string) => void;
+  onStatusChange: (staff: Staff, newStatus: string, clinicId?: string) => void;
   onLocationChange: (staff: Staff, newLocation: string) => void;
   onEdit?: (staff: Staff) => void;
   onDelete?: (teamName: string) => void;
@@ -91,12 +92,16 @@ export default function TeamCard({
   }, [staff.members, t]);
   const timer = useMMSS(sinceMs);
 
+  const [showClinicPicker, setShowClinicPicker] = useState(false);
+  const clinics = getEventClinics(event.clinics);
+
   // Status options
-  const isOnAnyActiveCall = !!event.calls?.some(c =>
+  const activeCall = event.calls?.find(c =>
     c.assignedTeam?.includes(staff.team) && !['Resolved','Delivered','Refusal','NMM'].includes(c.status)
   );
+  const isOnAnyActiveCall = !!activeCall;
 
-  const isOnEq = !!event.calls?.some(c => 
+  const isOnEq = !!event.calls?.some(c =>
     c.equipmentTeams?.includes(staff.team) && !['Resolved','Delivered Eq','Refusal','NMM'].includes(c.status)
   ) || ['En Route Eq', 'Assisting'].includes(staff.status);
 
@@ -181,6 +186,34 @@ export default function TeamCard({
         <div className="flex items-center gap-3">
           {/* Status */}
           <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1]">
+            {showClinicPicker ? (
+              <Dropdown
+                isOpen
+                onOpenChange={(isOpen) => {
+                  if (!isOpen) setShowClinicPicker(false);
+                }}
+              >
+                <DropdownTrigger>
+                  <Button
+                    size="sm"
+                    className={`w-full min-w-0 justify-start ${statusTone.fillClass} text-surface-light border ${statusTone.borderClass} rounded-full transition-colors`}
+                  >
+                    {t('Select clinic')}
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu
+                  aria-label="Select destination clinic"
+                  onAction={(key) => {
+                    setShowClinicPicker(false);
+                    onStatusChange(staff, 'Transporting', key as string);
+                  }}
+                >
+                  {clinics.map((clinic) => (
+                    <DropdownItem key={clinic.id}>{clinic.name}</DropdownItem>
+                  ))}
+                </DropdownMenu>
+              </Dropdown>
+            ) : (
             <Select
               aria-label="Status"
               selectedKeys={new Set([staff.status ?? ''])}
@@ -188,19 +221,40 @@ export default function TeamCard({
                 const val = Array.from(keys as Set<string>)[0] || '';
                 if (val) {
                   if (val === 'Available') {
-                    const targetLocation = 
-                      staff.originalPost || 
-                      event.pendingAssignments?.[staff.team]?.post || 
+                    const targetLocation =
+                      staff.originalPost ||
+                      event.pendingAssignments?.[staff.team]?.post ||
                       lastValidLocation.current;
 
                     if (targetLocation && targetLocation !== staff.location) {
                       onLocationChange(staff, targetLocation);
                     } else if (staff.location === 'Clinic') {
-                      onLocationChange(staff, ''); 
+                      onLocationChange(staff, '');
                     }
                   }
-                  onStatusChange(staff, val);
+                  if (val === 'Transporting' && clinics.length > 1) {
+                    setShowClinicPicker(true);
+                    return;
+                  }
+                  onStatusChange(staff, val, val === 'Transporting' ? clinics[0]?.id : undefined);
                 }
+              }}
+              renderValue={(items) => {
+                const key = items[0]?.key as string | undefined;
+                if (!key) return null;
+                if (key === 'Transporting') {
+                  const clinicName = getClinicName(clinics, activeCall?.clinicId);
+                  if (clinicName) {
+                    return (
+                      <span className="inline-flex items-center gap-1 min-w-0">
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
+                        <span className="truncate">{clinicName}</span>
+                      </span>
+                    );
+                  }
+                  return t('Transporting');
+                }
+                return t(key);
               }}
               classNames={{
                 base: 'min-w-0',
@@ -211,6 +265,7 @@ export default function TeamCard({
                 <SelectItem key={s}>{t(s)}</SelectItem>
               ))}
             </Select>
+            )}
           </div>
           {/* Location */}
           <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="min-w-0 flex-[1.5]">

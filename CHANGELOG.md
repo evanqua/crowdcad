@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Multiple named clinics (complete)** — follow-up to the 1.4.0 foundation. `events.clinics` is now a real, schema-backed field (was silently dropped on PocketBase before) and is kept in sync with the venue's clinic-flagged posts via stable per-post `clinicId`s that survive a clinic being renamed. When a team is marked Transporting on a multi-clinic event, dispatch now prompts for which clinic the team is heading to instead of always routing to the first one; the chosen clinic is written onto the call immediately. Team-status pills, call chips, resolved/"Delivered" chips, activity logs, and the venue map's team tooltip all reflect the destination clinic; single-clinic events are visually unchanged. Map-builder clinic markers (canvas, location list, and the dispatch-side venue map) now consistently use a clinic icon driven by the real `isClinic` flag instead of a name-string heuristic in one of the three spots.
+
 ---
 
 ## [1.4.0] - 2026-08-11

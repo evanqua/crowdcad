@@ -18,6 +18,7 @@ import DispatchMotionCell from './motioncell';
 import TrackingTableBase from './trackingtablebase';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
+import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
 
 import {
   Dropdownmenu,
@@ -52,7 +53,7 @@ interface CallTrackingTableProps {
   handleMarkDuplicate: (callId: string) => void;
   handleTogglePriorityFromMenu: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
-  handleTeamStatusChange: (callId: string, team: string, newStatus: string) => void;
+  handleTeamStatusChange: (callId: string, team: string, newStatus: string, clinicId?: string) => void;
   handleRemoveTeamFromCall: (callId: string, team: string) => Promise<void>;
   handleAddTeamToCall: (callId: string, team: string) => Promise<void>;
   getCallRowClass: (call: Call) => string;
@@ -116,6 +117,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   // never dismiss a menu that fast, so ignore closes inside this window
   // unless they came from an actual selection (onAction).
   const { t } = useDispatchTerms();
+  const clinics = getEventClinics(event.clinics);
   const TEAM_STATUS_MENU_CLOSE_GUARD_MS = 150;
   const teamStatusMenuOpenedAtRef = React.useRef<number>(0);
   const teamStatusMenuSelectedRef = React.useRef<boolean>(false);
@@ -406,47 +408,85 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 >
                                   <div className="flex items-center gap-2" data-testid={`team-chip-${team}`}>
                                     <span>{team}</span>
-                                    <Dropdown
-                                      motionProps={dropdownMotionProps}
-                                      isOpen={openMenuToken === `team-status:${call.id}:${team}` && isMotionVisible}
-                                      onOpenChange={(isOpen) => {
-                                        if (isOpen) {
-                                          if (isResolvedCall && !showResolvedCalls) return;
-                                          teamStatusMenuOpenedAtRef.current = Date.now();
-                                          setOpenMenuToken(`team-status:${call.id}:${team}`);
-                                          return;
-                                        }
-                                        const selected = teamStatusMenuSelectedRef.current;
-                                        teamStatusMenuSelectedRef.current = false;
-                                        if (!selected && Date.now() - teamStatusMenuOpenedAtRef.current < TEAM_STATUS_MENU_CLOSE_GUARD_MS) {
-                                          return;
-                                        }
-                                        setOpenMenuToken((current) =>
-                                          current === `team-status:${call.id}:${team}` ? null : current
-                                        );
-                                      }}
-                                    >
-                                      <DropdownTrigger>
-                                        <Button
-                                          size="sm"
-                                          variant="light"
-                                          className="min-w-0 h-6 px-2 text-xs shrink-0"
-                                        >
-                                          {t(currentTeamStatus)}
-                                        </Button>
-                                      </DropdownTrigger>
-                                      <DropdownMenu
-                                        aria-label="Team status"
-                                        onAction={(key) => {
-                                          teamStatusMenuSelectedRef.current = true;
-                                          handleTeamStatusChange(call.id, team, key as string);
+                                    {openMenuToken === `team-clinic-pick:${call.id}:${team}` ? (
+                                      <Dropdown
+                                        motionProps={dropdownMotionProps}
+                                        isOpen={isMotionVisible}
+                                        onOpenChange={(isOpen) => {
+                                          if (isOpen) return;
+                                          setOpenMenuToken((current) =>
+                                            current === `team-clinic-pick:${call.id}:${team}` ? null : current
+                                          );
                                         }}
                                       >
-                                        {statusOptions.map((status: string) => (
-                                          <DropdownItem key={status}>{t(status)}</DropdownItem>
-                                        ))}
-                                      </DropdownMenu>
-                                    </Dropdown>
+                                        <DropdownTrigger>
+                                          <Button
+                                            size="sm"
+                                            variant="light"
+                                            className="min-w-0 h-6 px-2 text-xs shrink-0"
+                                          >
+                                            {t('Select clinic')}
+                                          </Button>
+                                        </DropdownTrigger>
+                                        <DropdownMenu
+                                          aria-label="Select destination clinic"
+                                          onAction={(key) => {
+                                            setOpenMenuToken(null);
+                                            handleTeamStatusChange(call.id, team, 'Transporting', key as string);
+                                          }}
+                                        >
+                                          {clinics.map((clinic) => (
+                                            <DropdownItem key={clinic.id}>{clinic.name}</DropdownItem>
+                                          ))}
+                                        </DropdownMenu>
+                                      </Dropdown>
+                                    ) : (
+                                      <Dropdown
+                                        motionProps={dropdownMotionProps}
+                                        isOpen={openMenuToken === `team-status:${call.id}:${team}` && isMotionVisible}
+                                        onOpenChange={(isOpen) => {
+                                          if (isOpen) {
+                                            if (isResolvedCall && !showResolvedCalls) return;
+                                            teamStatusMenuOpenedAtRef.current = Date.now();
+                                            setOpenMenuToken(`team-status:${call.id}:${team}`);
+                                            return;
+                                          }
+                                          const selected = teamStatusMenuSelectedRef.current;
+                                          teamStatusMenuSelectedRef.current = false;
+                                          if (!selected && Date.now() - teamStatusMenuOpenedAtRef.current < TEAM_STATUS_MENU_CLOSE_GUARD_MS) {
+                                            return;
+                                          }
+                                          setOpenMenuToken((current) =>
+                                            current === `team-status:${call.id}:${team}` ? null : current
+                                          );
+                                        }}
+                                      >
+                                        <DropdownTrigger>
+                                          <Button
+                                            size="sm"
+                                            variant="light"
+                                            className="min-w-0 h-6 px-2 text-xs shrink-0"
+                                          >
+                                            {currentTeamStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentTeamStatus)}
+                                          </Button>
+                                        </DropdownTrigger>
+                                        <DropdownMenu
+                                          aria-label="Team status"
+                                          onAction={(key) => {
+                                            teamStatusMenuSelectedRef.current = true;
+                                            if (key === 'Transporting' && clinics.length > 1) {
+                                              setOpenMenuToken(`team-clinic-pick:${call.id}:${team}`);
+                                              return;
+                                            }
+                                            handleTeamStatusChange(call.id, team, key as string, key === 'Transporting' ? clinics[0]?.id : undefined);
+                                          }}
+                                        >
+                                          {statusOptions.map((status: string) => (
+                                            <DropdownItem key={status}>{t(status)}</DropdownItem>
+                                          ))}
+                                        </DropdownMenu>
+                                      </Dropdown>
+                                    )}
                                   </div>
                                 </Chip>
                               );
@@ -465,7 +505,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   {detachedTeam.team}
                                 </span>
                                 <span className="text-xs">
-                                  {t(detachedTeam.reason)}
+                                  {detachedTeam.reason === 'Delivered' ? getDeliveredLabel(t, clinics, call.clinicId) : t(detachedTeam.reason)}
                                 </span>
                               </Chip>
                             ))}

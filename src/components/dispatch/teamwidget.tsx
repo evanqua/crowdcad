@@ -8,7 +8,7 @@ type TeamWidgetProps = {
   event: Event;
   callDisplayNumberMap: Map<string, number>;
   teamTimers: { [team: string]: number };
-  onStatusChange: (staff: Staff, newStatus: string) => void;
+  onStatusChange: (staff: Staff, newStatus: string, clinicId?: string) => void;
   onLocationChange: (staff: Staff, newLocation: string) => void;
   onEditTeam?: (staff: Staff) => void;
   onDeleteTeam?: (team: string) => void;

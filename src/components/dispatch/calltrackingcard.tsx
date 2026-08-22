@@ -19,6 +19,7 @@ import {
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
+import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
 
 type CallTrackingCardProps = {
   call: Call;
@@ -29,7 +30,7 @@ type CallTrackingCardProps = {
   onChiefComplaintChange: (callId: string, chiefComplaint: string) => void;
   onRemoveTeamFromCall: (callId: string, team: string) => Promise<void>;
   onAddTeamToCall: (callId: string, team: string) => Promise<void>;
-  handleTeamStatusChange: (callId: string, team: string, newStatus: string) => void;
+  handleTeamStatusChange: (callId: string, team: string, newStatus: string, clinicId?: string) => void;
   handleMarkDuplicate: (callId: string) => void;
   handleTogglePriority: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
@@ -92,6 +93,8 @@ export default function CallTrackingCard({
   updateEvent,
 }: CallTrackingCardProps) {
   const { t } = useDispatchTerms();
+  const clinics = getEventClinics(event.clinics);
+  const [clinicPickTeam, setClinicPickTeam] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [locationInput, setLocationInput] = useState(call.location || '');
   const [ageSexInput, setAgeSexInput] = useState(formatAgeSex(call.age, call.gender) || '');
@@ -341,26 +344,64 @@ export default function CallTrackingCard({
               >
                 <div className="flex items-center gap-2" data-testid={`team-chip-${team}`}>
                   <span className="font-medium">{team}</span>
-                  <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={2}>
-                    <DropdownTrigger>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                        className="text-xs text-surface-faint hover:text-surface-light transition-colors"
-                      >
-                        {t(currentStatus)} ▼
-                      </button>
-                    </DropdownTrigger>
-                    <DropdownMenu
-                      aria-label="Team Status"
-                      onAction={(key) => handleTeamStatusChange(call.id, team, key as string)}
+                  {clinicPickTeam === team ? (
+                    <Dropdown
+                      motionProps={dropdownMotionProps}
+                      placement="bottom-end"
+                      offset={2}
+                      isOpen
+                      onOpenChange={(isOpen) => {
+                        if (!isOpen) setClinicPickTeam(null);
+                      }}
                     >
-                      {statusOptions.map(status => (
-                        <DropdownItem key={status}>{t(status)}</DropdownItem>
-                      ))}
-                    </DropdownMenu>
-                  </Dropdown>
+                      <DropdownTrigger>
+                        <button
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-surface-faint hover:text-surface-light transition-colors"
+                        >
+                          {t('Select clinic')} ▼
+                        </button>
+                      </DropdownTrigger>
+                      <DropdownMenu
+                        aria-label="Select destination clinic"
+                        onAction={(key) => {
+                          setClinicPickTeam(null);
+                          handleTeamStatusChange(call.id, team, 'Transporting', key as string);
+                        }}
+                      >
+                        {clinics.map((clinic) => (
+                          <DropdownItem key={clinic.id}>{clinic.name}</DropdownItem>
+                        ))}
+                      </DropdownMenu>
+                    </Dropdown>
+                  ) : (
+                    <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={2}>
+                      <DropdownTrigger>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="text-xs text-surface-faint hover:text-surface-light transition-colors"
+                        >
+                          {currentStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentStatus)} ▼
+                        </button>
+                      </DropdownTrigger>
+                      <DropdownMenu
+                        aria-label="Team Status"
+                        onAction={(key) => {
+                          if (key === 'Transporting' && clinics.length > 1) {
+                            setClinicPickTeam(team);
+                            return;
+                          }
+                          handleTeamStatusChange(call.id, team, key as string, key === 'Transporting' ? clinics[0]?.id : undefined);
+                        }}
+                      >
+                        {statusOptions.map(status => (
+                          <DropdownItem key={status}>{t(status)}</DropdownItem>
+                        ))}
+                      </DropdownMenu>
+                    </Dropdown>
+                  )}
                 </div>
               </Chip>
             );
@@ -379,7 +420,7 @@ export default function CallTrackingCard({
                 {detachedTeam.team}
               </span>
               <span className="text-xs">
-                {t(detachedTeam.reason)}
+                {detachedTeam.reason === 'Delivered' ? getDeliveredLabel(t, clinics, call.clinicId) : t(detachedTeam.reason)}
               </span>
             </Chip>
           ))}

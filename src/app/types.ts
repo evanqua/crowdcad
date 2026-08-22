@@ -5,6 +5,7 @@ export type Post =
     x: number | null; // percentage of width
     y: number | null; // percentage of height
     isClinic?: boolean;
+    clinicId?: string; // stable id, set once when isClinic first becomes true
   };
 
 export interface Clinic {

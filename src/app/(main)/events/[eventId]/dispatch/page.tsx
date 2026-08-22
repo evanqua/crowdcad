@@ -34,10 +34,9 @@ import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging } from '@/l
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
+import { syncClinicsFromVenue, getEventClinics, getClinicName } from '@/lib/clinics';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
-
-const DEFAULT_CLINICS: Clinic[] = [{ id: 'clinic', name: 'Clinic' }];
 
 interface DispatchRoutePageProps {
   params: Promise<{ eventId: string }>;
@@ -1111,7 +1110,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   }, [event]);
 
 
-  const handleTeamStatusChange = (callId: string, team: string, newStatus: string) => {
+  const handleTeamStatusChange = (callId: string, team: string, newStatus: string, clinicId?: string) => {
     console.log("FUNCTION CALLED", { callId, team, newStatus });
     setTeamStatusMap(prev => {
       const updatedStatusMap = { ...prev };
@@ -1135,8 +1134,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
     const now = new Date();
     const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-    const logMessage = `${hhmm} - ${team} set to ${newStatus}`;
-    
+    const resolvedClinicId = clinicId ?? latestCall.clinicId ?? (event?.clinics?.[0]?.id || 'clinic');
+    const destinationClinicName = ['Transporting', 'Delivered'].includes(newStatus)
+      ? getClinicName(clinics, resolvedClinicId)
+      : undefined;
+    const logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
+
     // DECLARE newCallStatus here with proper initialization
     let newCallStatus = latestCall.status; // Initialize with current status
     
@@ -1242,7 +1245,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         ...c,
         status: displayStatus,
         clinic: clinicFlag,
-        clinicId: c.clinicId ?? (event?.clinics?.[0]?.id || 'clinic'),
+        clinicId: resolvedClinicId,
         log: updatedLog,
         assignedTeam: updatedAssignedTeam,
         equipmentTeams: updatedEquipmentTeams,
@@ -1554,7 +1557,17 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     );
     return () => unsubscribe();
   }, [eventId, user, router, isAdmin, isLiteMode]);
-  
+
+  // Lazily backfill/refresh event.clinics from the venue's clinic-flagged posts
+  // (additive — never removes an entry, so existing calls' clinicId never orphans).
+  useEffect(() => {
+    if (!event) return;
+    const synced = syncClinicsFromVenue(event.venue, event.clinics);
+    if (!isEqual(synced, event.clinics || [])) {
+      void updateEvent({ clinics: synced });
+    }
+  }, [event, updateEvent]);
+
   const handleRemoveTeamFromCall = async (callId: string, teamToRemove: string) => {
     if (!event) return;
     
@@ -1809,21 +1822,28 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     };
   }, []);
 
-  const handleStatusChange = useCallback(async (staff: Staff, newStatus: string) => {
+  const handleStatusChange = useCallback(async (staff: Staff, newStatus: string, clinicId?: string) => {
     const team = staff.team;
 
     setTeamTimers(prev => ({ ...prev, [team]: Date.now() }));
 
     await updateEvent((currentEvent) => {
 
-      const callId = currentEvent.calls.find(c => 
-        c.assignedTeam?.includes(team) && 
-        !['Resolved', 'Available'].includes(c.status) 
-      )?.id;
+      const activeCall = currentEvent.calls.find(c =>
+        c.assignedTeam?.includes(team) &&
+        !['Resolved', 'Available'].includes(c.status)
+      );
+      const callId = activeCall?.id;
 
       const now = new Date();
       const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-      const logMessage = `${hhmm} - ${team} set to ${newStatus}`;
+      const resolvedClinicId = newStatus === 'Transporting'
+        ? (clinicId ?? activeCall?.clinicId ?? currentEvent.clinics?.[0]?.id ?? 'clinic')
+        : activeCall?.clinicId;
+      const destinationClinicName = newStatus === 'Transporting'
+        ? getClinicName(getEventClinics(currentEvent.clinics), resolvedClinicId)
+        : undefined;
+      const logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
 
       const updatedStaff = (currentEvent.staff || []).map(s => {
         if (s.team !== team) return s;
@@ -1860,6 +1880,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             return {
                 ...c,
                 status: newCallStatus,
+                clinicId: newStatus === 'Transporting' ? resolvedClinicId : c.clinicId,
                 log: [...(c.log || []), { timestamp: now.getTime(), message: logMessage }]
             };
          });
@@ -2787,7 +2808,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   // Venue-designated clinics, falling back to a single default "Clinic" for
   // events created before multi-clinic support existed.
-  const clinics: Clinic[] = event.clinics && event.clinics.length > 0 ? event.clinics : DEFAULT_CLINICS;
+  const clinics: Clinic[] = getEventClinics(event.clinics);
 
   // Calls delivered before per-clinic routing existed (or with no clinicId set) all
   // land in the first/default clinic, so nothing gets silently hidden or duplicated.
@@ -3810,6 +3831,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               staff={event.staff || []}
               equipment={event.eventEquipment || []}
               teamTimers={teamTimers}
+              calls={event.calls || []}
+              clinics={clinics}
             />
           )}
 

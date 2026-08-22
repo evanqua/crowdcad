@@ -169,7 +169,12 @@ async function main() {
     { name: 'pendingAssignments', type: 'json' },
     { name: 'postAssignments', type: 'json' },
     { name: 'interactionSessions', type: 'json' },
+    { name: 'clinics', type: 'json' },
   ]);
+
+  // `clinics` on `events` — set for deployments where this collection
+  // already existed before the field was added above.
+  await ensureField(headers, 'events', { name: 'clinics', type: 'json' });
 
   await ensureCollection(headers, 'dispatchLogs', [
     { name: 'eventId', type: 'text' },

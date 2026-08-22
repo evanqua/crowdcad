@@ -2,6 +2,7 @@
 
 import type {
   Call,
+  Clinic,
   Equipment,
   EventEquipment,
   PostAssignment,
@@ -49,6 +50,7 @@ export interface LiteEventDraft {
   };
   eventEquipment: EventEquipment[];
   calls: Call[];
+  clinics?: Clinic[];
   status: 'draft' | 'active';
   createdAt: string;
   updatedAt: string;

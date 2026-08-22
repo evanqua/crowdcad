@@ -183,6 +183,16 @@ migrate((app) => {
         "required": false,
         "system": false,
         "type": "json"
+      },
+      {
+        "hidden": false,
+        "id": "json2091837456",
+        "maxSize": 0,
+        "name": "clinics",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "json"
       }
     ],
     "id": "pbc_1687431684",
