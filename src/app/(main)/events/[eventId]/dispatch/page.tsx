@@ -7,6 +7,7 @@ import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
 import AddTeamModal from "@/components/modals/event/addteammodal";
 import AddSupervisorModal from "@/components/modals/event/addsupervisormodal";
+import TransportUnitModal from "@/components/modals/event/transportunitmodal";
 import React from 'react';
 import { dbService, ServiceError } from '@/lib/services';
 import { PostAssignment, Event, Staff, Supervisor, Call, EquipmentStatus, CallLogEntry, TeamLogEntry, EquipmentItem, EventEquipment, ClinicOutcome, Clinic } from '@/app/types';
@@ -150,6 +151,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [editSupervisorOriginalName, setEditSupervisorOriginalName] = useState<string | null>(null);
   const [showQuickClinicCallForm, setShowQuickClinicCallForm] = useState(false);
   const [showDebugModal, setShowDebugModal] = useState(false);
+
+  const [showTransportUnitModal, setShowTransportUnitModal] = useState(false);
+  const [transportUnitCallId, setTransportUnitCallId] = useState<string | null>(null);
+  const [transportUnitValue, setTransportUnitValue] = useState('');
   
   // Configure admin emails here or load from environment / Firestore for your deployment.
   const ADMIN_EMAILS: string[] = [];
@@ -1144,7 +1149,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     let newCallStatus = latestCall.status; // Initialize with current status
     
     const isEqDetaching = ['Delivered Eq'].includes(newStatus);
-    
+    // Status the team held immediately before this change, captured here (before teamStatusMap
+    // is overwritten above) so a later revert can restore it.
+    const priorTeamStatus = teamStatusMap[callId]?.[team];
+    const priorTeamLocation = event?.staff.find(s => s.team === team)?.location;
+
     const updatedCalls = (event?.calls || []).map(c => {
       console.log('call updated');
       if (c.id !== callId) return c;
@@ -1164,9 +1173,16 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         
         // Record detachment
         if (!updatedDetachedTeams.some(t => t.team === team)) {
-          updatedDetachedTeams.push({ 
-            team, 
-            reason: newStatus === 'Delivered Eq' ? 'Delivered Eq' : 'Detached' 
+          const equipmentNames = (event?.eventEquipment || [])
+            .filter(eq => eq.assignedTeam === team)
+            .map(eq => eq.name);
+          updatedDetachedTeams.push({
+            team,
+            reason: newStatus === 'Delivered Eq' ? 'Delivered Eq' : 'Detached',
+            kind: 'equipment',
+            previousStatus: priorTeamStatus || 'En Route Eq',
+            previousLocation: priorTeamLocation,
+            equipmentNames,
           });
         }
       } else if (isDetaching) {
@@ -1178,18 +1194,30 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
         // record one-time detachment
         if (!updatedDetachedTeams.some(t => t.team === team)) {
-          updatedDetachedTeams.push({ team, reason: newStatus });
+          updatedDetachedTeams.push({
+            team,
+            reason: newStatus,
+            kind: 'team',
+            previousStatus: priorTeamStatus || 'En Route',
+            previousLocation: priorTeamLocation,
+          });
         }
 
         // Auto-detach supervisors when any team is detached with resolving status
         if (['Delivered', 'Refusal', 'NMM'].includes(newStatus)) {
-          const supervisorsOnCall = event?.supervisor?.filter(s => 
+          const supervisorsOnCall = event?.supervisor?.filter(s =>
             c.assignedTeam?.includes(s.team)
           ) || [];
-          
+
           supervisorsOnCall.forEach(supervisor => {
             if (!updatedDetachedTeams.some(t => t.team === supervisor.team)) {
-              updatedDetachedTeams.push({ team: supervisor.team, reason: 'Auto-detached' });
+              updatedDetachedTeams.push({
+                team: supervisor.team,
+                reason: 'Auto-detached',
+                kind: 'supervisor',
+                previousStatus: supervisor.status,
+                previousLocation: supervisor.location,
+              });
             }
           });
           
@@ -1419,6 +1447,203 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       ...(updatedEquipment && { eventEquipment: updatedEquipment })
     });
   };
+
+  // Reverses a single detached-team entry (regular team, equipment run, or auto-detached
+  // supervisor): restores its prior status/location, re-attaches it to the call, and — for a
+  // regular team — recomputes the call's composite status and clears clinic membership if
+  // nothing else on the call is still Delivered.
+  const handleRevertDetachment = (callId: string, team: string) => {
+    const call = event?.calls.find(c => c.id === callId);
+    if (!call) return;
+    const detachedEntry = call.detachedTeams?.find(d => d.team === team);
+    if (!detachedEntry) return;
+
+    const kind = detachedEntry.kind || 'team';
+    const confirmMessage =
+      kind === 'equipment' ? t('Revert this equipment status and reattach it to the team?')
+      : kind === 'supervisor' ? t('Revert this supervisor detachment and reattach them to the call?')
+      : t('Revert this status and reopen the call?');
+
+    if (!confirm(confirmMessage)) return;
+
+    const restoredStatus = detachedEntry.previousStatus || (kind === 'equipment' ? 'En Route Eq' : 'En Route');
+    const now = new Date();
+    const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+    const logMessage = `${hhmm} - ${team} status reverted, ${kind === 'supervisor' ? 'supervisor reattached' : kind === 'equipment' ? 'equipment run reattached' : 'call reopened'}`;
+
+    setTeamStatusMap(prev => ({
+      ...prev,
+      [callId]: {
+        ...(prev[callId] || {}),
+        [team]: restoredStatus
+      }
+    }));
+
+    const updatedCalls = (event?.calls || []).map(c => {
+      if (c.id !== callId) return c;
+
+      const remainingDetached = (c.detachedTeams || []).filter(d => d.team !== team);
+      const updatedLog = [...(c.log || []), { timestamp: now.getTime(), message: logMessage }];
+
+      let updatedAssignedTeam = c.assignedTeam || [];
+      let updatedEquipmentTeams = c.equipmentTeams || [];
+
+      if (!updatedAssignedTeam.includes(team)) {
+        updatedAssignedTeam = [...updatedAssignedTeam, team];
+      }
+      if (kind === 'equipment' && !updatedEquipmentTeams.includes(team)) {
+        updatedEquipmentTeams = [...updatedEquipmentTeams, team];
+      }
+
+      let newCallStatus = c.status;
+      let clinicFlag = c.clinic;
+      let clinicId = c.clinicId;
+      let outcome = c.outcome;
+
+      if (kind === 'team') {
+        if (restoredStatus === 'Transporting') newCallStatus = 'Transporting';
+        else if (restoredStatus === 'On Scene') newCallStatus = 'On Scene';
+        else newCallStatus = 'En Route';
+
+        // If no other detached team on this call is still Delivered, the call is no longer
+        // clinic-bound.
+        const stillDelivered = remainingDetached.some(d => d.reason === 'Delivered');
+        if (!stillDelivered) {
+          clinicFlag = false;
+          clinicId = undefined;
+          outcome = undefined;
+        }
+      }
+
+      return {
+        ...c,
+        status: newCallStatus,
+        clinic: clinicFlag,
+        clinicId,
+        outcome,
+        log: updatedLog,
+        assignedTeam: updatedAssignedTeam,
+        equipmentTeams: updatedEquipmentTeams,
+        detachedTeams: remainingDetached,
+      };
+    });
+
+    let updatedStaff = event?.staff;
+    let updatedSupervisor = event?.supervisor;
+
+    if (kind === 'supervisor') {
+      updatedSupervisor = event?.supervisor?.map(s =>
+        s.team === team
+          ? {
+              ...s,
+              status: restoredStatus,
+              location: detachedEntry.previousLocation || s.location,
+              log: [...(s.log || []), { timestamp: now.getTime(), message: logMessage }],
+            }
+          : s
+      );
+    } else {
+      updatedStaff = event?.staff.map(t =>
+        t.team === team
+          ? {
+              ...t,
+              status: restoredStatus,
+              location: detachedEntry.previousLocation || call.location,
+            }
+          : t
+      );
+    }
+
+    let updatedEquipment = event?.eventEquipment;
+    if (kind === 'equipment' && detachedEntry.equipmentNames?.length) {
+      updatedEquipment = event?.eventEquipment?.map(eq =>
+        detachedEntry.equipmentNames?.includes(eq.name)
+          ? { ...eq, assignedTeam: team, status: 'In Use' as EquipmentStatus, location: call.location }
+          : eq
+      );
+    }
+
+    updateEvent({
+      calls: updatedCalls,
+      ...(updatedStaff && { staff: updatedStaff }),
+      ...(updatedSupervisor && { supervisor: updatedSupervisor }),
+      ...(updatedEquipment && { eventEquipment: updatedEquipment }),
+    });
+  };
+
+  // Shared clinic-outcome change handler used by both ClinicTrackingTable and
+  // ClinicTrackingCard. Selecting 'Transported' doesn't commit immediately — it opens
+  // TransportUnitModal to capture the ambulance/transport unit number first.
+  const handleClinicOutcomeChange = useCallback((callId: string, outcome: string) => {
+    if (outcome === 'Transported') {
+      setTransportUnitCallId(callId);
+      setTransportUnitValue('');
+      setShowTransportUnitModal(true);
+      return;
+    }
+
+    updateEvent((current) => {
+      const callToUpdate = current.calls.find(c => c.id === callId);
+      if (!callToUpdate) return {};
+
+      const now = new Date();
+      const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+      const updatedCall = {
+        ...callToUpdate,
+        outcome: outcome === 'In Clinic' ? undefined : outcome as ClinicOutcome,
+        transportUnit: outcome === 'In Clinic' ? undefined : callToUpdate.transportUnit,
+        log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Clinic Status: ${outcome}` }]
+      };
+      return { calls: current.calls.map(c => c.id === callId ? updatedCall : c) };
+    });
+  }, [updateEvent]);
+
+  const handleSubmitTransportUnit = useCallback(async () => {
+    if (!transportUnitCallId) return;
+    const callId = transportUnitCallId;
+    const unit = transportUnitValue.trim();
+
+    await updateEvent((current) => {
+      const callToUpdate = current.calls.find(c => c.id === callId);
+      if (!callToUpdate) return {};
+
+      const now = new Date();
+      const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+      const updatedCall = {
+        ...callToUpdate,
+        outcome: 'Transported' as ClinicOutcome,
+        transportUnit: unit || undefined,
+        log: [
+          ...(callToUpdate.log || []),
+          { timestamp: now.getTime(), message: unit ? `${hhmm} - Transported by ${unit}` : `${hhmm} - Clinic Status: Transported` }
+        ]
+      };
+      return { calls: current.calls.map(c => c.id === callId ? updatedCall : c) };
+    });
+
+    setShowTransportUnitModal(false);
+    setTransportUnitCallId(null);
+    setTransportUnitValue('');
+  }, [transportUnitCallId, transportUnitValue, updateEvent]);
+
+  const handleRevertClinicOutcome = useCallback(async (callId: string) => {
+    if (!confirm(t('Revert this clinic outcome?'))) return;
+
+    await updateEvent((current) => {
+      const callToUpdate = current.calls.find(c => c.id === callId);
+      if (!callToUpdate) return {};
+
+      const now = new Date();
+      const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+      const updatedCall = {
+        ...callToUpdate,
+        outcome: undefined,
+        transportUnit: undefined,
+        log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Clinic outcome reverted to In Clinic` }]
+      };
+      return { calls: current.calls.map(c => c.id === callId ? updatedCall : c) };
+    });
+  }, [updateEvent, t]);
 
   const [showResolvedCalls, setShowResolvedCalls] = useState(false);
 
@@ -3038,6 +3263,17 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         parseAgeSex={parseAgeSex}
         clinicId={clinics.find(c => c.id === selectedRightTab)?.id || clinics[0]?.id}
       />
+      <TransportUnitModal
+        isOpen={showTransportUnitModal}
+        onClose={() => {
+          setShowTransportUnitModal(false);
+          setTransportUnitCallId(null);
+          setTransportUnitValue('');
+        }}
+        onSubmit={handleSubmitTransportUnit}
+        value={transportUnitValue}
+        onValueChange={setTransportUnitValue}
+      />
       <AddTeamModal
         isOpen={showAddTeamModal}
         onClose={() => setShowAddTeamModal(false)}
@@ -3363,6 +3599,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           handleTeamStatusChange={handleTeamStatusChange}
                           handleRemoveTeamFromCall={handleRemoveTeamFromCall}
                           handleAddTeamToCall={handleAddTeamToCall}
+                          handleRevertDetachment={handleRevertDetachment}
                           getCallRowClass={getCallRowClass}
                           formatAgeSex={formatAgeSex}
                           TableColGroup={TableColGroup}
@@ -3406,6 +3643,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           handleCellClick={handleCellClick}
                           handleCellBlur={handleCellBlur}
                           handleAgeSexBlur={handleAgeSexBlur}
+                          onOutcomeChange={handleClinicOutcomeChange}
+                          onRevertOutcome={handleRevertClinicOutcome}
                           getCallRowClass={getCallRowClass}
                           formatAgeSex={formatAgeSex}
                         />
@@ -3652,6 +3891,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           onRemoveTeamFromCall={handleRemoveTeamFromCall}
                           onAddTeamToCall={handleAddTeamToCall}
                           handleTeamStatusChange={handleTeamStatusChange}
+                          handleRevertDetachment={handleRevertDetachment}
                           handleMarkDuplicate={handleMarkDuplicate}
                           handleTogglePriority={handleTogglePriorityFromMenu}
                           handleDeleteCall={handleDeleteCall}
@@ -3748,20 +3988,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
                             await updateEvent({ calls: updatedCalls });
                           }}
-                          onOutcomeChange={async (callId, outcome) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              outcome: outcome === 'In Clinic' ? undefined : outcome as ClinicOutcome,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Clinic Status: ${outcome}` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
+                          onOutcomeChange={handleClinicOutcomeChange}
+                          onRevertOutcome={handleRevertClinicOutcome}
                           handleDeleteCall={handleDeleteCall}
                           getCallRowClass={getCallRowClass}
                           formatAgeSex={formatAgeSex}

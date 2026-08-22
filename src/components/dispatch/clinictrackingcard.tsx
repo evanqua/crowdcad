@@ -6,7 +6,7 @@ import {
   Card, CardHeader, CardBody, Input, Button,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem
 } from '@heroui/react';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, RotateCw } from 'lucide-react';
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
@@ -19,6 +19,7 @@ type ClinicTrackingCardProps = {
   onAgeSexChange: (callId: string, ageSex: string) => void;
   onChiefComplaintChange: (callId: string, chiefComplaint: string) => void;
   onOutcomeChange: (callId: string, outcome: string) => void;
+  onRevertOutcome: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
   formatAgeSex: (age?: string | number, gender?: string) => string;
   getCallRowClass: (call: Call) => string;
@@ -58,6 +59,7 @@ export default function ClinicTrackingCard({
   onAgeSexChange,
   onChiefComplaintChange,
   onOutcomeChange,
+  onRevertOutcome,
   handleDeleteCall,
   formatAgeSex,
   getCallRowClass,
@@ -289,6 +291,17 @@ export default function ClinicTrackingCard({
               </DropdownMenu>
             </Dropdown>
           </div>
+
+          {call.outcome && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRevertOutcome(call.id); }}
+              className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center shrink-0 px-1"
+              aria-label={t('Reopen Call')}
+            >
+              <RotateCw className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Primary Team (read-only) */}
           <div className="flex-1">

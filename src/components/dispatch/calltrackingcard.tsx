@@ -6,7 +6,7 @@ import {
   Card, CardHeader, CardBody, Input, Chip, Button,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem
 } from '@heroui/react';
-import { Plus, MoreVertical } from 'lucide-react';
+import { Plus, MoreVertical, RotateCw } from 'lucide-react';
 import {
   Dropdownmenu,
   DropdownMenuContent,
@@ -16,7 +16,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { Event, Call } from '@/app/types';
+import type { Event, Call, DetachedTeam } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
@@ -31,6 +31,7 @@ type CallTrackingCardProps = {
   onRemoveTeamFromCall: (callId: string, team: string) => Promise<void>;
   onAddTeamToCall: (callId: string, team: string) => Promise<void>;
   handleTeamStatusChange: (callId: string, team: string, newStatus: string, clinicId?: string) => void;
+  handleRevertDetachment: (callId: string, team: string) => void;
   handleMarkDuplicate: (callId: string) => void;
   handleTogglePriority: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
@@ -85,6 +86,7 @@ export default function CallTrackingCard({
   onRemoveTeamFromCall,
   onAddTeamToCall,
   handleTeamStatusChange,
+  handleRevertDetachment,
   handleMarkDuplicate,
   handleTogglePriority,
   handleDeleteCall,
@@ -408,13 +410,15 @@ export default function CallTrackingCard({
           })}
 
           {/* Detached teams */}
-          {call.detachedTeams?.map((detachedTeam: { team: string; reason: string }) => (
+          {call.detachedTeams?.map((detachedTeam: DetachedTeam) => (
             <Chip
               key={detachedTeam.team}
               size="lg"
               variant="flat"
               color={detachedTeam.reason === 'Delivered' ? 'success' : 'default'}
               className="border border-surface-liner h-9"
+              onClose={() => handleRevertDetachment(call.id, detachedTeam.team)}
+              endContent={<RotateCw className="w-3.5 h-3.5" aria-label={t('Reopen Call')} />}
             >
               <span className="text-surface-light font-medium mr-2">
                 {detachedTeam.team}
