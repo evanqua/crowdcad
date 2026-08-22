@@ -39,8 +39,17 @@ Given('I have a venue with location {string} and equipment {string} and am on th
 
 When('I change equipment {string} status to {string}', async ({ page }, equipName: string, newStatus: string) => {
   const card = page.getByTestId(`equipment-card-${equipName}`);
-  await card.locator('[aria-label="Status"]').click();
-  await page.locator('[role="listbox"]').getByText(newStatus, { exact: true }).click();
+  const trigger = card.locator('[aria-label="Status"]');
+  const option = page.locator('[role="listbox"]').getByText(newStatus, { exact: true });
+
+  // HeroUI's Select popover can spuriously close/remount right after opening (a known
+  // react-aria Popover timing quirk — see the guard on the team-status Dropdown in
+  // calltracking.tsx for the same root cause). Retry the open+click as a unit instead of
+  // clicking once, so a mid-flight remount just triggers another attempt.
+  await expect(async () => {
+    await trigger.click();
+    await option.click({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
 });
 
 Then('the equipment {string} should show status {string}', async ({ page }, equipName: string, status: string) => {
