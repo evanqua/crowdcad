@@ -103,9 +103,17 @@ export interface CallLogEntry {
   message: string;
 }
 
-interface DetachedTeam {
+export interface DetachedTeam {
   team: string;
   reason: string;
+  /** What kind of assignment this was, so a revert knows how to restore it. Defaults to 'team' when absent (legacy data). */
+  kind?: 'team' | 'supervisor' | 'equipment';
+  /** Status the team/supervisor held immediately before this detachment, used to revert. */
+  previousStatus?: string;
+  /** Location the team/supervisor held immediately before this detachment, used to revert. */
+  previousLocation?: string;
+  /** Names of equipment items that moved off this team at detach time (kind === 'equipment' only), used to revert. */
+  equipmentNames?: string[];
 }
 
 export type ClinicOutcome = "Discharged" | "AMA" | "Rolled from Clinic" | "Transported";
@@ -131,6 +139,8 @@ export interface Call {
   clinic?: boolean;
   clinicId?: string;
   outcome?: ClinicOutcome;
+  /** Ambulance/transport unit number captured when outcome is set to 'Transported'. */
+  transportUnit?: string;
 }
 
 export interface CallLogEntry {

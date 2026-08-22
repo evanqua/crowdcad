@@ -9,8 +9,8 @@ import {
   DropdownMenu, 
   DropdownItem
 } from '@heroui/react';
-import { MoreVertical } from 'lucide-react';
-import type { Event, Call, CallLogEntry, ClinicOutcome, Clinic } from '@/app/types';
+import { MoreVertical, RotateCw } from 'lucide-react';
+import type { Event, Call, CallLogEntry, Clinic } from '@/app/types';
 import DispatchMotionCell from './motioncell';
 import TrackingTableBase from './trackingtablebase';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
@@ -36,6 +36,8 @@ interface ClinicTrackingTableProps {
   handleCellClick: <K extends keyof Call>(callId: string, field: K, value?: Call[K]) => void;
   handleCellBlur: <K extends keyof Call>(callId: string, field: K) => Promise<void>;
   handleAgeSexBlur: (callId: string) => Promise<void>;
+  onOutcomeChange: (callId: string, outcome: string) => void;
+  onRevertOutcome: (callId: string) => void;
   getCallRowClass: (call: Call) => string;
   formatAgeSex: (age?: string | number, gender?: string) => string;
 }
@@ -55,7 +57,7 @@ const TableColGroup = () => (
     <col className="w-40" />
     <col className="w-16" />
     <col className="w-48" />
-    <col className="w-28" />
+    <col className="w-40" />
     <col />
     <col className="w-12" />
   </colgroup>
@@ -78,6 +80,8 @@ export default function ClinicTrackingTable({
   handleCellClick,
   handleCellBlur,
   handleAgeSexBlur,
+  onOutcomeChange,
+  onRevertOutcome,
   getCallRowClass,
   formatAgeSex,
 }: ClinicTrackingTableProps) {
@@ -349,59 +353,52 @@ export default function ClinicTrackingTable({
                   {/* Status - Using HeroUI Dropdown */}
                   <td className="p-0" onClick={e => e.stopPropagation()}>
                     <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
-                      <Dropdown
-                        motionProps={dropdownMotionProps}
-                        isOpen={isStatusMenuOpen}
-                        onOpenChange={(isOpen) => {
-                          if (isOpen) {
-                            if (isResolvedClinicCall && !showResolvedClinicCalls) return;
-                            setOpenMenuToken(`status:${call.id}`);
-                            return;
-                          }
-                          setOpenMenuToken((current) => (current === `status:${call.id}` ? null : current));
-                        }}
-                      >
-                        <DropdownTrigger>
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            className="min-w-0 h-8 px-2 text-xs justify-start bg-surface-liner hover:bg-surface-muted"
-                          >
-                            {t(call.outcome || 'In Clinic')}
-                          </Button>
-                        </DropdownTrigger>
-                        <DropdownMenu
-                          aria-label="Clinic Status"
-                          onAction={async (key) => {
-                            setOpenMenuToken(null);
-                            const val = key as string;
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-
-                            const updatedCalls = event.calls.map((c: Call) => {
-                              if (c.id !== call.id) return c;
-                              return {
-                                ...c,
-                                outcome: val === 'In Clinic' ? undefined : val as ClinicOutcome,
-                                log: [
-                                  ...(c.log || []),
-                                  {
-                                    timestamp: now.getTime(),
-                                    message: `${hhmm} - Clinic Status: ${val}`
-                                  }
-                                ]
-                              } as Call;
-                            });
-
-                            await updateEvent({ calls: updatedCalls });
+                      <div className={`flex items-center h-8 w-fit max-w-full rounded-full border border-surface-liner bg-surface-liner/30 overflow-hidden ${call.outcome ? 'pr-1.5' : ''}`}>
+                        <Dropdown
+                          motionProps={dropdownMotionProps}
+                          isOpen={isStatusMenuOpen}
+                          onOpenChange={(isOpen) => {
+                            if (isOpen) {
+                              if (isResolvedClinicCall && !showResolvedClinicCalls) return;
+                              setOpenMenuToken(`status:${call.id}`);
+                              return;
+                            }
+                            setOpenMenuToken((current) => (current === `status:${call.id}` ? null : current));
                           }}
                         >
-                          <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
-                          <DropdownItem key="Transported">{t('Transported')}</DropdownItem>
-                          <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
-                          <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
+                          <DropdownTrigger>
+                            <Button
+                              size="sm"
+                              variant="light"
+                              className="min-w-0 h-8 px-2 text-xs justify-start bg-transparent hover:bg-surface-muted"
+                            >
+                              {t(call.outcome || 'In Clinic')}
+                            </Button>
+                          </DropdownTrigger>
+                          <DropdownMenu
+                            aria-label="Clinic Status"
+                            onAction={(key) => {
+                              setOpenMenuToken(null);
+                              onOutcomeChange(call.id, key as string);
+                            }}
+                          >
+                            <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
+                            <DropdownItem key="Transported">{t('Transported')}</DropdownItem>
+                            <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
+                            <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
+                        {call.outcome && (
+                          <button
+                            type="button"
+                            onClick={() => onRevertOutcome(call.id)}
+                            className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                            aria-label={t('Reopen Call')}
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </DispatchMotionCell>
                   </td>
 

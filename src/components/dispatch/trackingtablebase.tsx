@@ -32,7 +32,7 @@ export default function TrackingTableBase({
               <th className="px-3 py-2.5 text-left text-surface-faint w-40">{t('Chief Complaint')}</th>
               <th className="px-3 py-2.5 text-left text-surface-faint w-16">{t('A/S')}</th>
               <th className="px-3 py-2.5 text-left text-surface-faint w-48">{t('Location')}</th>
-              {showStatusColumn && <th className="px-3 py-2.5 text-left text-surface-faint w-28">{t('Status')}</th>}
+              {showStatusColumn && <th className="px-3 py-2.5 text-left text-surface-faint w-40">{t('Status')}</th>}
               <th className="px-3 py-2.5 text-left text-surface-faint">{t('Team')}</th>
               <th className="px-3 py-2.5 text-right text-surface-faint w-12"></th>
             </tr>

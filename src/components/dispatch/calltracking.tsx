@@ -10,8 +10,8 @@ import {
   DropdownMenu, 
   DropdownItem,
 } from '@heroui/react';
-import { Plus, MoreVertical } from "lucide-react";
-import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment } from '@/app/types';
+import { Plus, MoreVertical, RotateCw } from "lucide-react";
+import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment, DetachedTeam } from '@/app/types';
 import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
 import DispatchMotionCell from './motioncell';
@@ -56,14 +56,10 @@ interface CallTrackingTableProps {
   handleTeamStatusChange: (callId: string, team: string, newStatus: string, clinicId?: string) => void;
   handleRemoveTeamFromCall: (callId: string, team: string) => Promise<void>;
   handleAddTeamToCall: (callId: string, team: string) => Promise<void>;
+  handleRevertDetachment: (callId: string, team: string) => void;
   getCallRowClass: (call: Call) => string;
   formatAgeSex: (age?: string | number, gender?: string) => string;
   TableColGroup: React.ComponentType;
-}
-
-interface DetachedTeam {
-  team: string;
-  reason: string;
 }
 
 interface LogEntry {
@@ -103,6 +99,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   handleTeamStatusChange,
   handleRemoveTeamFromCall,
   handleAddTeamToCall,
+  handleRevertDetachment,
   getCallRowClass,
   formatAgeSex,
   TableColGroup,
@@ -500,6 +497,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 variant="flat"
                                 color={detachedTeam.reason === 'Delivered' ? 'success' : 'default'}
                                 className="border border-surface-liner h-8"
+                                onClose={() => handleRevertDetachment(call.id, detachedTeam.team)}
+                                endContent={<RotateCw className="w-3.5 h-3.5" aria-label={t('Reopen Call')} />}
                               >
                                 <span className="text-surface-light font-medium mr-2">
                                   {detachedTeam.team}

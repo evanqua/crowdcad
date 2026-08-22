@@ -168,6 +168,13 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'On Calls',
     'On Break/Clinic',
     'Surge limit reached',
+    'Reopen Call',
+    'Revert this status and reopen the call?',
+    'Revert this equipment status and reattach it to the team?',
+    'Revert this supervisor detachment and reattach them to the call?',
+    'Revert this clinic outcome?',
+    'Transport Unit #',
+    'Enter Transport Unit',
   ]),
 ];
 

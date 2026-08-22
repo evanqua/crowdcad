@@ -153,6 +153,13 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   'On Calls': 'En intervention',
   'On Break/Clinic': 'En pause/clinique',
   'Surge limit reached': "Seuil d'affluence atteint",
+  'Reopen Call': "Rouvrir l'appel",
+  'Revert this status and reopen the call?': "Annuler ce statut et rouvrir l'appel?",
+  'Revert this equipment status and reattach it to the team?': "Annuler ce statut d'équipement et le réattribuer à l'équipe?",
+  'Revert this supervisor detachment and reattach them to the call?': "Annuler le dégagement du superviseur et le réattribuer à l'appel?",
+  'Revert this clinic outcome?': 'Annuler ce résultat clinique?',
+  'Transport Unit #': "N° d'unité de transport",
+  'Enter Transport Unit': 'Unité de transport',
 };
 
 export const BUILTIN_PRESETS: Record<BuiltinPresetId, DispatchVocabularyPresetSummary> = {
