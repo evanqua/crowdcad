@@ -4,23 +4,47 @@ import React, { useMemo } from 'react';
 import type { Event } from '@/app/types';
 import { getTeamAvailabilitySummary, getSurgeLimitPercent } from '@/lib/teamAvailability';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
+import { STATUS_COLORS_HEX, hexToRgb } from '@/lib/colorTokens';
 
-// Must stay in sync with tailwind.config.js `status.green` / `status.red`.
-// Used raw (not as Tailwind classes) because the strip needs a continuous
-// interpolation between the two, not one of the discrete STATUS_COLORS entries.
-const STATUS_GREEN = { r: 0x98, g: 0xc3, b: 0x79 };
-const STATUS_RED = { r: 0xe5, g: 0x6a, b: 0x6a };
+// Sourced from src/lib/colorTokens.js (the shared source of truth also used
+// by tailwind.config.js) rather than duplicated here, because the strip
+// needs a continuous interpolation between colors, not one of the discrete
+// Tailwind status-* classes.
+const STATUS_GREEN = hexToRgb(STATUS_COLORS_HEX.green);
+const STATUS_ORANGE = hexToRgb(STATUS_COLORS_HEX.orange);
+const STATUS_RED = hexToRgb(STATUS_COLORS_HEX.red);
 
+// How many percentage points before the surge threshold the green→red ramp
+// begins. Adjust this to make the warning transition longer or shorter.
+const SURGE_RAMP_PERCENT = 20;
+
+function rgbString(c: { r: number; g: number; b: number }): string {
+  return `rgb(${c.r} ${c.g} ${c.b})`;
+}
+
+function lerpColor(a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }, t: number): string {
+  return rgbString({
+    r: Math.round(a.r + (b.r - a.r) * t),
+    g: Math.round(a.g + (b.g - a.g) * t),
+    b: Math.round(a.b + (b.b - a.b) * t),
+  });
+}
+
+// Ramps green → orange → red so the color reaches full red exactly at
+// surgeLimitPercent (instead of only starting to warm up there), with the
+// green→orange leg starting SURGE_RAMP_PERCENT points before the threshold.
 function surgeColor(positionPercent: number, surgeLimitPercent: number): string {
-  if (positionPercent <= surgeLimitPercent) {
-    return `rgb(${STATUS_GREEN.r} ${STATUS_GREEN.g} ${STATUS_GREEN.b})`;
+  const rampStart = Math.max(0, surgeLimitPercent - SURGE_RAMP_PERCENT);
+  if (positionPercent <= rampStart) {
+    return rgbString(STATUS_GREEN);
   }
-  const span = Math.max(1, 100 - surgeLimitPercent);
-  const t = Math.min(1, (positionPercent - surgeLimitPercent) / span);
-  const r = Math.round(STATUS_GREEN.r + (STATUS_RED.r - STATUS_GREEN.r) * t);
-  const g = Math.round(STATUS_GREEN.g + (STATUS_RED.g - STATUS_GREEN.g) * t);
-  const b = Math.round(STATUS_GREEN.b + (STATUS_RED.b - STATUS_GREEN.b) * t);
-  return `rgb(${r} ${g} ${b})`;
+  if (positionPercent >= surgeLimitPercent) {
+    return rgbString(STATUS_RED);
+  }
+  const t = (positionPercent - rampStart) / Math.max(1, surgeLimitPercent - rampStart);
+  return t <= 0.5
+    ? lerpColor(STATUS_GREEN, STATUS_ORANGE, t / 0.5)
+    : lerpColor(STATUS_ORANGE, STATUS_RED, (t - 0.5) / 0.5);
 }
 
 const BAR_COUNT = 14;

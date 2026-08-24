@@ -20,6 +20,7 @@ import type { Event, Call, DetachedTeam } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
+import { getStatusColor } from '@/lib/statusColors';
 
 type CallTrackingCardProps = {
   call: Call;
@@ -415,8 +416,8 @@ export default function CallTrackingCard({
               key={detachedTeam.team}
               size="lg"
               variant="flat"
-              color={detachedTeam.reason === 'Delivered' ? 'success' : 'default'}
-              className="border border-surface-liner h-9"
+              color="default"
+              className={`h-9 ${getStatusColor(detachedTeam.reason).chipClass}`}
               onClose={() => handleRevertDetachment(call.id, detachedTeam.team)}
               endContent={<RotateCw className="w-3.5 h-3.5" aria-label={t('Reopen Call')} />}
             >

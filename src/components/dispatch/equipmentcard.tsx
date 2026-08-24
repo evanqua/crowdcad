@@ -25,14 +25,14 @@ type EquipmentCardProps = {
 function equipmentStatusTone(status: string) {
   if (status === 'In Clinic') {
     return {
-      borderClass: 'border-status-card-blue',
-      fillClass: 'bg-status-card-blue/20'
+      borderClass: 'border-status-card-ring-blue',
+      fillClass: 'bg-status-card-blue'
     };
   }
   if (status.startsWith('Call ') || status === 'In Use') {
     return {
-      borderClass: 'border-status-card-red',
-      fillClass: 'bg-status-card-red/20'
+      borderClass: 'border-status-card-ring-red',
+      fillClass: 'bg-status-card-red'
     };
   }
   return {

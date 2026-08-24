@@ -314,7 +314,7 @@ export default function TeamCard({
               inputProps={{
                 classNames: {
                   inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner rounded-full pl-3 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
-                  input: 'bg-surface-deep pl-1 pe-0 !pe-0 w-full min-w-0 data-[has-end-content=true]:pe-0 group-data-[has-end-content=true]:pe-0 data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
+                  input: 'bg-surface-deep pl-1 pe-0 !pe-0 w-full min-w-0 truncate data-[has-end-content=true]:pe-0 group-data-[has-end-content=true]:pe-0 data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
                 }
               }}
             >
@@ -326,7 +326,7 @@ export default function TeamCard({
         </div>
 
         {/* Expanded section — animated in normal flow */}
-        <DispatchMotionCell isOpen={expanded} animate={true} className="mt-3" >
+        <DispatchMotionCell isOpen={expanded} animate={true} className="mt-3" overflowVisibleWhenOpen>
           <div
             onClick={e => e.stopPropagation()}
             aria-hidden={!expanded}
