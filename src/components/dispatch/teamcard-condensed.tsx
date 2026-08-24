@@ -189,7 +189,7 @@ export default function TeamCardCondensed({
       </CardHeader>
 
       {/* EXPANDED BODY */}
-      <DispatchMotionCell isOpen={expanded} animate={true} className="px-3 pb-3 pt-0 space-y-3">
+      <DispatchMotionCell isOpen={expanded} animate={true} className="px-3 pb-3 pt-0 space-y-3" overflowVisibleWhenOpen>
           <CardBody
             className="px-0 py-0"
             aria-hidden={!expanded}
@@ -322,7 +322,7 @@ export default function TeamCardCondensed({
                 inputProps={{
                   classNames: {
                     inputWrapper: 'bg-surface-deep text-surface-light border border-surface-liner rounded-full pl-3 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
-                    input: 'bg-surface-deep pl-1 data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
+                    input: 'bg-surface-deep pl-1 w-full min-w-0 truncate data-[focus-visible=true]:ring-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none data-[focus=true]:outline-none'
                   }
                 }}
               >

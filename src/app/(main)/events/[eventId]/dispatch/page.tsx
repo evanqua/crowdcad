@@ -3813,7 +3813,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             <Button
                               isIconOnly
                               size="md"
-                              variant="flat"
+                              variant="light"
+                              className="!bg-surface-liner"
                               aria-label={t('Add Call')}
                               onPress={() => setShowQuickCallForm(true)}
                             >

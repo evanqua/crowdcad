@@ -8,6 +8,12 @@ type DispatchMotionCellProps = {
   animate?: boolean;
   className?: string;
   children: React.ReactNode;
+  // Opt-in only: most consumers (call/clinic tracking rows) rely on the
+  // permanent overflow:hidden here to keep truncated text clipped to width,
+  // not just height. Only set this for content whose OWN bottom edge can get
+  // clipped by height rounding once open (e.g. a bordered/rounded box like a
+  // textarea) and that doesn't need horizontal clipping.
+  overflowVisibleWhenOpen?: boolean;
 };
 
 export default function DispatchMotionCell({
@@ -16,6 +22,7 @@ export default function DispatchMotionCell({
   animate = false,
   className = '',
   children,
+  overflowVisibleWhenOpen = false,
 }: DispatchMotionCellProps) {
   const [mounted, setMounted] = React.useState(false);
 
@@ -45,7 +52,7 @@ export default function DispatchMotionCell({
       }}
       aria-hidden={!open}
     >
-      <div className="dispatch-expand-inner">
+      <div className={`dispatch-expand-inner ${open && overflowVisibleWhenOpen ? 'dispatch-expand-inner--open' : ''}`}>
         <div className={`dispatch-expand-fade ${open ? 'dispatch-expand-fade--open' : ''} ${className}`}>
           {children}
         </div>

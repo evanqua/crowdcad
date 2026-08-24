@@ -1,11 +1,44 @@
 /** @type {import('tailwindcss').Config} */
 const { heroui } = require("@heroui/react");
+const {
+  STATUS_COLORS_HEX,
+  STATUS_CARD_FILL_OPACITY,
+  STATUS_CARD_RING_OPACITY,
+  hexToRgb,
+} = require("./src/lib/colorTokens");
 
-const CARD_BACKGROUND_OPACITY = {
-  red: "0.20",
-  blue: "0.20",
-  yellow: "0.15",
-};
+// "r g b" triplet for the space-separated rgb() syntax Tailwind expects.
+function rgbTriplet(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  return `${r} ${g} ${b}`;
+}
+
+// Turns an opacity map's { light, dark } pairs (STATUS_CARD_FILL_OPACITY,
+// STATUS_CARD_RING_OPACITY) into CSS custom properties named
+// `--{varPrefix}-{key}`, read via var() by the corresponding status-card-*
+// / status-card-ring-* Tailwind colors, declared once on :root and
+// overridden on .dark — same light/dark pattern globals.css uses for the
+// surface-* tokens.
+function themedOpacityVars(varPrefix, opacityMap) {
+  const root = {};
+  const dark = {};
+  for (const [key, { light, dark: darkValue }] of Object.entries(opacityMap)) {
+    // String, not number — addBase appends "px" to bare numeric values,
+    // which would make these invalid as an rgb() alpha component.
+    root[`--${varPrefix}-${key}`] = String(light);
+    dark[`--${varPrefix}-${key}`] = String(darkValue);
+  }
+  return { root, dark };
+}
+
+function statusCardOpacityBase() {
+  const fill = themedOpacityVars('status-card-fill-opacity', STATUS_CARD_FILL_OPACITY);
+  const ring = themedOpacityVars('status-card-ring-opacity', STATUS_CARD_RING_OPACITY);
+  return {
+    ':root': { ...fill.root, ...ring.root },
+    '.dark': { ...fill.dark, ...ring.dark },
+  };
+}
 
 module.exports = {
   darkMode: ["class"],
@@ -38,15 +71,25 @@ module.exports = {
           foreground: '#ffffff',  // text on accent backgrounds
         },
 
-        // Semantic status colours
+        // Semantic status colours — see src/lib/colorTokens.js for the
+        // central place to adjust these hex values and their card opacities.
+        // The 'card-*' fills and 'card-ring-*' borders each read their own
+        // opacity from a CSS custom property (see the statusCardOpacityBase
+        // plugin below) so the same classes render different fill/ring
+        // opacities, independently, in light vs. dark mode.
         status: {
-          red:    '#e56a6a',  // errors, danger, destructive actions
-          green:  '#98c379',  // success, active indicators
-          blue:   '#5eaae8',  // informational, selected states
-          orange: '#e2c93d',  // non-lead members, equipment runs (gold/amber)
-          'card-red': `rgb(229 106 106 / ${CARD_BACKGROUND_OPACITY.red})`,
-          'card-blue': `rgb(94 170 232 / ${CARD_BACKGROUND_OPACITY.blue})`,
-          'card-yellow': `rgb(226 201 61 / ${CARD_BACKGROUND_OPACITY.yellow})`,
+          red:    STATUS_COLORS_HEX.red,     // errors, danger, destructive actions
+          green:  STATUS_COLORS_HEX.green,   // success, active indicators
+          blue:   STATUS_COLORS_HEX.blue,    // informational, selected states
+          orange: STATUS_COLORS_HEX.orange,  // non-lead members, equipment runs (gold/amber)
+          'card-red': `rgb(${rgbTriplet(STATUS_COLORS_HEX.red)} / var(--status-card-fill-opacity-red))`,
+          'card-blue': `rgb(${rgbTriplet(STATUS_COLORS_HEX.blue)} / var(--status-card-fill-opacity-blue))`,
+          'card-green': `rgb(${rgbTriplet(STATUS_COLORS_HEX.green)} / var(--status-card-fill-opacity-green))`,
+          'card-yellow': `rgb(${rgbTriplet(STATUS_COLORS_HEX.orange)} / var(--status-card-fill-opacity-yellow))`,
+          'card-ring-red': `rgb(${rgbTriplet(STATUS_COLORS_HEX.red)} / var(--status-card-ring-opacity-red))`,
+          'card-ring-blue': `rgb(${rgbTriplet(STATUS_COLORS_HEX.blue)} / var(--status-card-ring-opacity-blue))`,
+          'card-ring-green': `rgb(${rgbTriplet(STATUS_COLORS_HEX.green)} / var(--status-card-ring-opacity-green))`,
+          'card-ring-yellow': `rgb(${rgbTriplet(STATUS_COLORS_HEX.orange)} / var(--status-card-ring-opacity-yellow))`,
         },
 
         /* ── Radix / shadcn-ui primitives (CSS-variable based) ── */
@@ -93,6 +136,9 @@ module.exports = {
     },
   },
   plugins: [
+    function ({ addBase }) {
+      addBase(statusCardOpacityBase());
+    },
     heroui({
       themes: {
         light: {

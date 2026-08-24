@@ -495,8 +495,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 key={detachedTeam.team}
                                 size="lg"
                                 variant="flat"
-                                color={detachedTeam.reason === 'Delivered' ? 'success' : 'default'}
-                                className="border border-surface-liner h-8"
+                                color="default"
+                                className={`h-8 ${getStatusColor(detachedTeam.reason).chipClass}`}
                                 onClose={() => handleRevertDetachment(call.id, detachedTeam.team)}
                                 endContent={<RotateCw className="w-3.5 h-3.5" aria-label={t('Reopen Call')} />}
                               >

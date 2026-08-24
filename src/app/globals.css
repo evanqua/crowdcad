@@ -9,16 +9,16 @@
 /* note: canonical nprogress styles appear later in this file; the early duplicate was removed */
 
 :root {
-  --surface-bg-0: 0 0% 100%;
-  --surface-bg-1: 220 22% 95%;
-  --surface-bg-2: 220 18% 87%;
-  --surface-bg-3: 220 16% 83%;
+  --surface-bg-0: 35 2% 94%;
+  --surface-bg-1: 35 3% 88%;
+  --surface-bg-2: 35 2% 78%;
+  --surface-bg-3: 35 2% 70%;
 
   /* Surface text & border variables used by Tailwind surface.* tokens (light theme) */
   --surface-text: 240 10% 3.9%;
   --surface-text-strong: 240 6% 2.5%;
   --surface-text-muted: 240 3.8% 46.1%;
-  --surface-border: 240 5.9% 90%;
+  --surface-border: 240 5.9% 80%;
 
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
@@ -30,8 +30,8 @@
     --muted-foreground: 240 3.8% 46.1%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
+    --border: 240 5.9% 80%;
+    --input: 240 5.9% 80%;
     --ring: 240 10% 3.9%;
     --radius: 0.5rem;
 
@@ -158,6 +158,15 @@
 .dispatch-expand-inner {
   min-height: 0;
   overflow: hidden;
+}
+
+/* Once fully open, the 1fr grid track has already sized to fit its content,
+   so clipping is no longer needed — and keeping it on risks shaving a pixel
+   or two off the bottom of bordered content (e.g. a textarea) on any
+   sub-pixel rounding mismatch between the track's computed height and the
+   child's actual rendered box. */
+.dispatch-expand-inner--open {
+  overflow: visible;
 }
 
 .dispatch-expand-fade {
