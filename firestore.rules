@@ -86,19 +86,25 @@ service cloud.firestore {
       );
     }
 
+    // `let` bindings in Firestore Rules are only valid as top-level
+    // statements before a function's `return`, not nested inside a
+    // parenthesized boolean expression (that's a compile error, not just a
+    // style issue: `firebase deploy --only firestore:rules` rejects it).
+    // `let` is also lazily evaluated, only the first time the bound name is
+    // actually referenced, so declaring it before the `exists()` check
+    // below is safe: the `get()` never runs unless `exists()` is true, since
+    // `&&` short-circuits before `v`/`e` would otherwise be read.
     function isVenueVisibleToUser(venueId) {
+      let v = get(/databases/$(database)/documents/venues/$(venueId)).data;
       return exists(/databases/$(database)/documents/venues/$(venueId)) &&
-        (let v = get(/databases/$(database)/documents/venues/$(venueId)).data;
-          // if venue has orgId, require membership; otherwise public
-          !(v.orgId is string) || isOrgMember(v.orgId)
-        );
+        // if venue has orgId, require membership; otherwise public
+        (!(v.orgId is string) || isOrgMember(v.orgId));
     }
 
     function isEventVisibleToUser(eventId) {
+      let e = get(/databases/$(database)/documents/events/$(eventId)).data;
       return exists(/databases/$(database)/documents/events/$(eventId)) &&
-        (let e = get(/databases/$(database)/documents/events/$(eventId)).data;
-          !(e.orgId is string) || isOrgMember(e.orgId)
-        );
+        (!(e.orgId is string) || isOrgMember(e.orgId));
     }
 
     function isVenueOwner(venueId) {
@@ -107,10 +113,9 @@ service cloud.firestore {
     }
 
     function isEventOwnerOrOrgMember(eventId) {
+      let e = get(/databases/$(database)/documents/events/$(eventId)).data;
       return request.auth != null && exists(/databases/$(database)/documents/events/$(eventId)) &&
-        (let e = get(/databases/$(database)/documents/events/$(eventId)).data;
-          (e.userId == request.auth.uid) || (e.orgId is string && isOrgMember(e.orgId))
-        );
+        (e.userId == request.auth.uid || (e.orgId is string && isOrgMember(e.orgId)));
     }
   }
 }
