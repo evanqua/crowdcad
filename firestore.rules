@@ -20,13 +20,16 @@ service cloud.firestore {
       }
     }
 
-    // Venues: require org membership to read; writes only by org members.
-    // Admins may also update/delete any venue (needed to wipe a deleted
-    // user's data from Profile > Admin > Manage Administrator Access).
+    // Venues: any org member can read. Only the venue's creator or a site
+    // admin can update, share, or delete it; org membership alone is not
+    // enough (a non-admin org member should not be able to edit or delete
+    // another member's venue). Admins may update/delete any venue (also
+    // needed to wipe a deleted user's data from Profile > Admin > Manage
+    // Administrator Access).
     match /venues/{venueId} {
       allow read: if isVenueVisibleToUser(venueId);
       allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
-      allow update, delete: if isVenueOwnerOrOrgMember(venueId) || isRequestingUserAdmin();
+      allow update, delete: if isVenueOwner(venueId) || isRequestingUserAdmin();
     }
 
     // Events: require org membership to read; writes only by org members.
@@ -98,12 +101,9 @@ service cloud.firestore {
         );
     }
 
-    function isVenueOwnerOrOrgMember(venueId) {
+    function isVenueOwner(venueId) {
       return request.auth != null && exists(/databases/$(database)/documents/venues/$(venueId)) &&
-        (let v = get(/databases/$(database)/documents/venues/$(venueId)).data;
-          // owner check
-          (v.userId == request.auth.uid) || (v.orgId is string && isOrgMember(v.orgId))
-        );
+        get(/databases/$(database)/documents/venues/$(venueId)).data.userId == request.auth.uid;
     }
 
     function isEventOwnerOrOrgMember(eventId) {
