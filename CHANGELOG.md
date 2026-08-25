@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- Firestore rules: a non-admin organization member could previously update, share, or delete any other member's venue just by being in the same org. Only the venue's creator or a site admin can do that now; other org members still have read access.
+
 ---
 
 ## [1.5.0] - 2026-08-24
