@@ -20,23 +20,35 @@ service cloud.firestore {
       }
     }
 
-    // Venues: any org member can read. Only the venue's creator or a site
-    // admin can update, share, or delete it; org membership alone is not
-    // enough (a non-admin org member should not be able to edit or delete
-    // another member's venue). Admins may update/delete any venue (also
-    // needed to wipe a deleted user's data from Profile > Admin > Manage
+    // Venues: creating one needs no permission beyond being signed in — the
+    // real app never sets `orgId` on a venue at all (confirmed: it does not
+    // appear anywhere in core/src), so requiring `orgId is string` and org
+    // membership here, as this rule did until now, made venue creation
+    // impossible for every real user the moment these rules were actually
+    // deployed to production (they never had been before). The one thing
+    // required is that you can only create a venue naming yourself as its
+    // owner, not someone else. Reading a venue still requires org
+    // membership if the venue happens to have an orgId (see
+    // isVenueVisibleToUser). Only the venue's creator or a site admin can
+    // update, share, or delete it; org membership alone is not enough (a
+    // non-admin org member should not be able to edit or delete another
+    // member's venue). Admins may update/delete any venue (also needed to
+    // wipe a deleted user's data from Profile > Admin > Manage
     // Administrator Access).
     match /venues/{venueId} {
       allow read: if isVenueVisibleToUser(venueId);
-      allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
+      allow create: if request.auth != null && request.resource.data.get('userId', null) == request.auth.uid;
       allow update, delete: if isVenueOwner(venueId) || isRequestingUserAdmin();
     }
 
-    // Events: require org membership to read; writes only by org members.
-    // Admins may also update/delete any event (see venues comment above).
+    // Events: same reasoning as venues above — the app never sets `orgId`
+    // on an event either, so requiring it on create made event creation
+    // impossible too. Creating one just requires being signed in and
+    // naming yourself as the owner. Admins may also update/delete any event
+    // (see venues comment above).
     match /events/{eventId} {
       allow read: if isEventVisibleToUser(eventId);
-      allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
+      allow create: if request.auth != null && request.resource.data.get('userId', null) == request.auth.uid;
       allow update, delete: if isEventOwnerOrOrgMember(eventId) || isRequestingUserAdmin();
     }
 
