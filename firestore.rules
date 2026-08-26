@@ -36,9 +36,9 @@ service cloud.firestore {
     // wipe a deleted user's data from Profile > Admin > Manage
     // Administrator Access).
     match /venues/{venueId} {
-      allow read: if isVenueVisibleToUser(venueId);
+      allow read: if isVenueVisibleToUser();
       allow create: if request.auth != null && request.resource.data.get('userId', null) == request.auth.uid;
-      allow update, delete: if isVenueOwner(venueId) || isRequestingUserAdmin();
+      allow update, delete: if isVenueOwner() || isRequestingUserAdmin();
     }
 
     // Events: same reasoning as venues above — the app never sets `orgId`
@@ -47,9 +47,9 @@ service cloud.firestore {
     // naming yourself as the owner. Admins may also update/delete any event
     // (see venues comment above).
     match /events/{eventId} {
-      allow read: if isEventVisibleToUser(eventId);
+      allow read: if isEventVisibleToUser();
       allow create: if request.auth != null && request.resource.data.get('userId', null) == request.auth.uid;
-      allow update, delete: if isEventOwnerOrOrgMember(eventId) || isRequestingUserAdmin();
+      allow update, delete: if isEventOwnerOrOrgMember() || isRequestingUserAdmin();
     }
 
     // Dispatch logs: owner-scoped, with an admin override for the same
@@ -110,36 +110,37 @@ service cloud.firestore {
       );
     }
 
-    // `let` bindings in Firestore Rules are only valid as top-level
-    // statements before a function's `return`, not nested inside a
-    // parenthesized boolean expression (that's a compile error, not just a
-    // style issue: `firebase deploy --only firestore:rules` rejects it).
-    // `let` is also lazily evaluated, only the first time the bound name is
-    // actually referenced, so declaring it before the `exists()` check
-    // below is safe: the `get()` never runs unless `exists()` is true, since
-    // `&&` short-circuits before `v`/`e` would otherwise be read.
-    function isVenueVisibleToUser(venueId) {
-      let v = get(/databases/$(database)/documents/venues/$(venueId)).data;
-      return exists(/databases/$(database)/documents/venues/$(venueId)) &&
-        // if venue has orgId, require membership; otherwise public
-        (!('orgId' in v && v.orgId is string) || isOrgMember(v.orgId));
+    // These all use `resource.data` — the document already being evaluated
+    // — rather than an explicit `get()` back on that same path. Firestore
+    // binds `resource` for read/update/delete automatically; calling
+    // get() on your own path is redundant for a single `get`, and actively
+    // broken for a `list` (a collection query): confirmed against the
+    // Firestore emulator that a self-referential get() inside a venues/
+    // events read rule throws "Null value error. for 'list'" the moment a
+    // query (not a single-document read) hits that rule, even though the
+    // identical rule works fine for a plain get. That made every list
+    // query against venues/events fail outright (e.g. the admin panel's
+    // "delete user and their data" flow, which queries events/venues by
+    // userId). `resource.data` doesn't have this problem since it's not a
+    // get() call at all — it's the value Firestore already looked up to
+    // decide whether to run the rule in the first place.
+    function isVenueVisibleToUser() {
+      // if venue has orgId, require membership; otherwise public
+      return !('orgId' in resource.data && resource.data.orgId is string) || isOrgMember(resource.data.orgId);
     }
 
-    function isEventVisibleToUser(eventId) {
-      let e = get(/databases/$(database)/documents/events/$(eventId)).data;
-      return exists(/databases/$(database)/documents/events/$(eventId)) &&
-        (!('orgId' in e && e.orgId is string) || isOrgMember(e.orgId));
+    function isEventVisibleToUser() {
+      return !('orgId' in resource.data && resource.data.orgId is string) || isOrgMember(resource.data.orgId);
     }
 
-    function isVenueOwner(venueId) {
-      return request.auth != null && exists(/databases/$(database)/documents/venues/$(venueId)) &&
-        get(/databases/$(database)/documents/venues/$(venueId)).data.get('userId', null) == request.auth.uid;
+    function isVenueOwner() {
+      return request.auth != null && resource.data.get('userId', null) == request.auth.uid;
     }
 
-    function isEventOwnerOrOrgMember(eventId) {
-      let e = get(/databases/$(database)/documents/events/$(eventId)).data;
-      return request.auth != null && exists(/databases/$(database)/documents/events/$(eventId)) &&
-        (e.get('userId', null) == request.auth.uid || ('orgId' in e && e.orgId is string && isOrgMember(e.orgId)));
+    function isEventOwnerOrOrgMember() {
+      return request.auth != null &&
+        (resource.data.get('userId', null) == request.auth.uid ||
+          ('orgId' in resource.data && resource.data.orgId is string && isOrgMember(resource.data.orgId)));
     }
   }
 }
