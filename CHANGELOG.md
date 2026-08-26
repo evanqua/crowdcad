@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Venue and event actions gated by ownership (edit, delete, share, starting a new event at a venue you don't own) now disable themselves in the UI with an explanation, instead of failing after the fact.
+- Admins can designate an event as an "org event" from its 3-dot menu, making it visible to and dispatchable by every org member, the same way org venues already work.
+
 ### Fixed
 
 - Firestore rules: a non-admin organization member could previously update, share, or delete any other member's venue just by being in the same org. Only the venue's creator or a site admin can do that now; other org members still have read access.
