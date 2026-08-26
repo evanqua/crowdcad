@@ -17,24 +17,30 @@ export function useAdmin() {
       return;
     }
 
-    let cancelled = false;
     setLoading(true);
-    dbService
-      .getDocument<UserDoc>('users', user.uid)
-      .then((snap) => {
-        if (cancelled) return;
+    // A live subscription rather than a one-time get(): right after sign-in
+    // there's a window where the ID token Firestore uses hasn't finished
+    // propagating yet, so the very first read can fail with
+    // permission-denied even though the user really is signed in. A
+    // one-time fetch has no way to recover from that (it resolves to "not
+    // admin" and just stays that way until something re-triggers the
+    // effect, e.g. a full page reload) — a subscription keeps the
+    // connection open and the SDK retries automatically, so it corrects
+    // itself within the same page load once the token is ready.
+    const unsubscribe = dbService.subscribeToDocument<UserDoc>(
+      'users',
+      user.uid,
+      (snap) => {
         setIsAdmin(Boolean(snap.exists && snap.data?.isAdmin));
-      })
-      .catch(() => {
-        if (!cancelled) setIsAdmin(false);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        setLoading(false);
+      },
+      () => {
+        setIsAdmin(false);
+        setLoading(false);
+      }
+    );
 
-    return () => {
-      cancelled = true;
-    };
+    return unsubscribe;
   }, [user, ready]);
 
   return { isAdmin, loading };

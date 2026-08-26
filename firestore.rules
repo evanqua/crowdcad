@@ -20,24 +20,36 @@ service cloud.firestore {
       }
     }
 
-    // Venues: any org member can read. Only the venue's creator or a site
-    // admin can update, share, or delete it; org membership alone is not
-    // enough (a non-admin org member should not be able to edit or delete
-    // another member's venue). Admins may update/delete any venue (also
-    // needed to wipe a deleted user's data from Profile > Admin > Manage
+    // Venues: creating one needs no permission beyond being signed in — the
+    // real app never sets `orgId` on a venue at all (confirmed: it does not
+    // appear anywhere in core/src), so requiring `orgId is string` and org
+    // membership here, as this rule did until now, made venue creation
+    // impossible for every real user the moment these rules were actually
+    // deployed to production (they never had been before). The one thing
+    // required is that you can only create a venue naming yourself as its
+    // owner, not someone else. Reading a venue still requires org
+    // membership if the venue happens to have an orgId (see
+    // isVenueVisibleToUser). Only the venue's creator or a site admin can
+    // update, share, or delete it; org membership alone is not enough (a
+    // non-admin org member should not be able to edit or delete another
+    // member's venue). Admins may update/delete any venue (also needed to
+    // wipe a deleted user's data from Profile > Admin > Manage
     // Administrator Access).
     match /venues/{venueId} {
-      allow read: if isVenueVisibleToUser(venueId);
-      allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
-      allow update, delete: if isVenueOwner(venueId) || isRequestingUserAdmin();
+      allow read: if isVenueVisibleToUser();
+      allow create: if request.auth != null && request.resource.data.get('userId', null) == request.auth.uid;
+      allow update, delete: if isVenueOwner() || isRequestingUserAdmin();
     }
 
-    // Events: require org membership to read; writes only by org members.
-    // Admins may also update/delete any event (see venues comment above).
+    // Events: same reasoning as venues above — the app never sets `orgId`
+    // on an event either, so requiring it on create made event creation
+    // impossible too. Creating one just requires being signed in and
+    // naming yourself as the owner. Admins may also update/delete any event
+    // (see venues comment above).
     match /events/{eventId} {
-      allow read: if isEventVisibleToUser(eventId);
-      allow create: if request.auth != null && request.resource.data.orgId is string && isOrgMember(request.resource.data.orgId);
-      allow update, delete: if isEventOwnerOrOrgMember(eventId) || isRequestingUserAdmin();
+      allow read: if isEventVisibleToUser();
+      allow create: if request.auth != null && request.resource.data.get('userId', null) == request.auth.uid;
+      allow update, delete: if isEventOwnerOrOrgMember() || isRequestingUserAdmin();
     }
 
     // Dispatch logs: owner-scoped, with an admin override for the same
@@ -98,36 +110,37 @@ service cloud.firestore {
       );
     }
 
-    // `let` bindings in Firestore Rules are only valid as top-level
-    // statements before a function's `return`, not nested inside a
-    // parenthesized boolean expression (that's a compile error, not just a
-    // style issue: `firebase deploy --only firestore:rules` rejects it).
-    // `let` is also lazily evaluated, only the first time the bound name is
-    // actually referenced, so declaring it before the `exists()` check
-    // below is safe: the `get()` never runs unless `exists()` is true, since
-    // `&&` short-circuits before `v`/`e` would otherwise be read.
-    function isVenueVisibleToUser(venueId) {
-      let v = get(/databases/$(database)/documents/venues/$(venueId)).data;
-      return exists(/databases/$(database)/documents/venues/$(venueId)) &&
-        // if venue has orgId, require membership; otherwise public
-        (!('orgId' in v && v.orgId is string) || isOrgMember(v.orgId));
+    // These all use `resource.data` — the document already being evaluated
+    // — rather than an explicit `get()` back on that same path. Firestore
+    // binds `resource` for read/update/delete automatically; calling
+    // get() on your own path is redundant for a single `get`, and actively
+    // broken for a `list` (a collection query): confirmed against the
+    // Firestore emulator that a self-referential get() inside a venues/
+    // events read rule throws "Null value error. for 'list'" the moment a
+    // query (not a single-document read) hits that rule, even though the
+    // identical rule works fine for a plain get. That made every list
+    // query against venues/events fail outright (e.g. the admin panel's
+    // "delete user and their data" flow, which queries events/venues by
+    // userId). `resource.data` doesn't have this problem since it's not a
+    // get() call at all — it's the value Firestore already looked up to
+    // decide whether to run the rule in the first place.
+    function isVenueVisibleToUser() {
+      // if venue has orgId, require membership; otherwise public
+      return !('orgId' in resource.data && resource.data.orgId is string) || isOrgMember(resource.data.orgId);
     }
 
-    function isEventVisibleToUser(eventId) {
-      let e = get(/databases/$(database)/documents/events/$(eventId)).data;
-      return exists(/databases/$(database)/documents/events/$(eventId)) &&
-        (!('orgId' in e && e.orgId is string) || isOrgMember(e.orgId));
+    function isEventVisibleToUser() {
+      return !('orgId' in resource.data && resource.data.orgId is string) || isOrgMember(resource.data.orgId);
     }
 
-    function isVenueOwner(venueId) {
-      return request.auth != null && exists(/databases/$(database)/documents/venues/$(venueId)) &&
-        get(/databases/$(database)/documents/venues/$(venueId)).data.get('userId', null) == request.auth.uid;
+    function isVenueOwner() {
+      return request.auth != null && resource.data.get('userId', null) == request.auth.uid;
     }
 
-    function isEventOwnerOrOrgMember(eventId) {
-      let e = get(/databases/$(database)/documents/events/$(eventId)).data;
-      return request.auth != null && exists(/databases/$(database)/documents/events/$(eventId)) &&
-        (e.get('userId', null) == request.auth.uid || ('orgId' in e && e.orgId is string && isOrgMember(e.orgId)));
+    function isEventOwnerOrOrgMember() {
+      return request.auth != null &&
+        (resource.data.get('userId', null) == request.auth.uid ||
+          ('orgId' in resource.data && resource.data.orgId is string && isOrgMember(resource.data.orgId)));
     }
   }
 }
