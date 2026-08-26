@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Firestore rules: creating a venue or event required an `orgId` field the app never actually sets, which made creation impossible once these rules were deployed. Creating one now only requires being signed in and naming yourself as the owner.
 - Profile page: an admin account was sometimes not recognized as admin on first load, only appearing after a manual reload. The admin check now uses a live subscription instead of a one-time fetch, so it self-corrects instead of getting stuck.
 - Firestore rules: any query (as opposed to a single-document read) against venues or events — e.g. the admin "delete user and their data" flow — failed outright with a rules evaluation error. Caused by a rule that read its own document via `get()` instead of the already-bound `resource.data`, which Firestore doesn't support for list queries.
+- Dispatch page: a non-admin org member opening a show designated as an "org event" was booted to the login screen instead of the dispatch view. The page's own authorization check only recognized the event owner, admins, and users explicitly listed in `sharedWith` — it never accounted for `isOrgEvent`, even though Firestore rules and the venue selection screen already treated org events as visible to every member.
 
 ---
 

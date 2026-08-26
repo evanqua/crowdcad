@@ -1752,8 +1752,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
           const userEmail = user.email?.toLowerCase();
           const isSharedUser = eventData.sharedWith?.some(email => email.toLowerCase() === userEmail);
+          const isOrgShow = eventData.isOrgEvent === true;
 
-          if (eventData.userId && eventData.userId !== user.uid && !isAdmin && !isSharedUser) {
+          if (eventData.userId && eventData.userId !== user.uid && !isAdmin && !isSharedUser && !isOrgShow) {
             console.error('Unauthorized access to event');
             sessionStorage.setItem('redirectPath', `/events/${eventId}/dispatch`);
             router.push('/?login=true&error=unauthorized');
