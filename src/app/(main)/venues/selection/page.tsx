@@ -5,11 +5,12 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { dbService, type Unsubscribe } from '@/lib/services';
 import type { Venue, Event } from '@/app/types';
 import { useAuth } from '@/hooks/useauth';
+import { useAdmin } from '@/hooks/useAdmin';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { stripUndefined } from '@/lib/utils';
 import ShareModal from '@/components/modals/sharemodal';
-import { Share2 } from "lucide-react";
+import { Share2, Building2 } from "lucide-react";
 import { 
   Card, 
   CardBody, 
@@ -49,8 +50,10 @@ export default function VenueSelection() {
   const [orgVenuesList, setOrgVenuesList] = useState<Venue[]>([]);
   const [ownedEventsList, setOwnedEventsList] = useState<Event[]>([]);
   const [sharedEventsList, setSharedEventsList] = useState<Event[]>([]);
+  const [orgEventsList, setOrgEventsList] = useState<Event[]>([]);
   const [isStartingEvent, setIsStartingEvent] = useState(false);
   const { user, ready } = useAuth();
+  const { isAdmin } = useAdmin();
   const [shareModalData, setShareModalData] = useState<{
     id: string;
     name: string;
@@ -138,6 +141,26 @@ export default function VenueSelection() {
     }
   };
 
+  const handleToggleOrgEvent = async (event: Event) => {
+    try {
+      await dbService.updateDocument('events', event.id, { isOrgEvent: !event.isOrgEvent });
+      setRecentEvents(prev => prev.map(e => (e.id === event.id ? { ...e, isOrgEvent: !e.isOrgEvent } : e)));
+    } catch (error) {
+      console.error('Error updating event:', error);
+      alert('Failed to update event.');
+    }
+  };
+
+  // Mirrors firestore.rules exactly, so a button is only ever enabled when
+  // the write it triggers will actually succeed: venues/events can be
+  // edited, deleted, or shared by their creator or a site admin — never by
+  // any other member, org-venue or not. Starting a new event names the
+  // *venue's* owner (not whoever clicks the button) as the event's owner,
+  // so only the venue's own creator can currently start one there.
+  const canManageVenue = (venue: Venue) => venue.userId === user?.uid || isAdmin;
+  const canStartEventAt = (venue: Venue | undefined) => !!venue && venue.userId === user?.uid;
+  const canManageEvent = (event: Event) => event.userId === user?.uid || isAdmin;
+
   useEffect(() => {
     if (!user) {
       setVenues([]);
@@ -192,6 +215,14 @@ export default function VenueSelection() {
       setSharedEventsList([]);
     }
 
+    // 5. Organization Events Listener — admin-designated events visible to
+    // every org member, mirroring the Organization Venues listener above.
+    listeners.push(dbService.subscribeToQuery<Event>(
+      'events',
+      [{ field: 'isOrgEvent', op: '==', value: true }],
+      (snaps) => setOrgEventsList(snaps.map(s => ({ ...s.data, id: s.id } as Event))),
+    ));
+
     // Cleanup incomplete drafts (One-time check on mount/user load)
     const cleanupIncompleteEvents = async () => {
       try {
@@ -238,7 +269,7 @@ export default function VenueSelection() {
     });
 
     // Process Events
-    const rawEvents = [...ownedEventsList, ...sharedEventsList];
+    const rawEvents = [...ownedEventsList, ...sharedEventsList, ...orgEventsList];
     const processedEvents = rawEvents.map(event => {
       // Ensure shared events contribute their venues to the venue list
       if (event.venue && !venueMap.has(event.venue.id)) {
@@ -263,7 +294,7 @@ export default function VenueSelection() {
 
     setVenues(Array.from(venueMap.values()));
     setRecentEvents(uniqueEvents);
-  }, [ownedVenuesList, sharedVenuesList, orgVenuesList, ownedEventsList, sharedEventsList]);
+  }, [ownedVenuesList, sharedVenuesList, orgVenuesList, ownedEventsList, sharedEventsList, orgEventsList]);
 
   const venueStats = useMemo(() => {
     const byVenue: Record<string, { count: number; lastUsed: number | null }> = {};
@@ -420,17 +451,19 @@ export default function VenueSelection() {
                                   <MoreVertical className="w-4 h-4" />
                                 </button>
                               </DropdownTrigger>
-                              <DropdownMenu aria-label="Venue actions">
-                                <DropdownItem 
+                              <DropdownMenu aria-label="Venue actions" disabledKeys={canManageVenue(venue) ? [] : ['edit', 'share', 'delete']}>
+                                <DropdownItem
                                   key="edit"
                                   startContent={<Edit className="w-4 h-4" />}
+                                  description={canManageVenue(venue) ? undefined : 'Only the owner or an admin can edit'}
                                   onPress={() => router.push(`/venues/management?venueId=${venue.id}`)}
                                 >
                                   Edit
                                 </DropdownItem>
-                                <DropdownItem 
+                                <DropdownItem
                                   key="share"
                                   startContent={<Share2 className="w-4 h-4" />}
+                                  description={canManageVenue(venue) ? undefined : 'Only the owner or an admin can share'}
                                   onPress={() => setShareModalData({
                                     id: venue.id,
                                     name: venue.name,
@@ -440,11 +473,12 @@ export default function VenueSelection() {
                                 >
                                   Share
                                 </DropdownItem>
-                                <DropdownItem 
+                                <DropdownItem
                                   key="delete"
                                   className="text-danger"
                                   color="danger"
                                   startContent={<Trash2 className="w-4 h-4" />}
+                                  description={canManageVenue(venue) ? undefined : 'Only the owner or an admin can delete'}
                                   onPress={() => handleDeleteVenue(venue.id)}
                                 >
                                   Delete
@@ -492,10 +526,13 @@ export default function VenueSelection() {
                   className="w-full bg-accent hover:bg-accent/90 text-surface-light"
                   onPress={() => handleStartNewEvent(selectedVenueId)}
                   isLoading={isStartingEvent}
-                  isDisabled={isStartingEvent}
+                  isDisabled={isStartingEvent || !canStartEventAt(venues.find(v => v.id === selectedVenueId))}
                 >
                   Start New Event
                 </Button>
+                {!isStartingEvent && !canStartEventAt(venues.find(v => v.id === selectedVenueId)) && (
+                  <p className="text-xs text-surface-light/60 mt-1">Only this venue&apos;s owner can start a new event here.</p>
+                )}
               </div>
 
               <h2 className="text-lg font-semibold mb-3">Recent Events</h2>
@@ -540,8 +577,11 @@ export default function VenueSelection() {
                             {event.status === 'draft' && (
                               <Chip size="sm" color="warning" className="mt-2">Draft</Chip>
                             )}
+                            {event.isOrgEvent && (
+                              <Chip size="sm" variant="flat" className="mt-2 bg-accent/20 text-accent">Org</Chip>
+                            )}
                           </div>
-                          
+
                           <div
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
@@ -556,17 +596,18 @@ export default function VenueSelection() {
                                   <MoreVertical className="w-4 h-4" />
                                 </button>
                               </DropdownTrigger>
-                              <DropdownMenu aria-label="Event actions">
-                                <DropdownItem 
+                              <DropdownMenu aria-label="Event actions" disabledKeys={canManageEvent(event) ? [] : ['share', 'delete']}>
+                                <DropdownItem
                                   key="resume"
                                   startContent={<Play className="w-4 h-4" />}
                                   onPress={() => router.push(`/events/${event.id}/dispatch`)}
                                 >
                                   Resume
                                 </DropdownItem>
-                                <DropdownItem 
+                                <DropdownItem
                                   key="share"
                                   startContent={<Share2 className="w-4 h-4" />}
+                                  description={canManageEvent(event) ? undefined : 'Only the owner or an admin can share'}
                                   onPress={() => setShareModalData({
                                     id: event.id,
                                     name: event.name || 'Untitled',
@@ -576,11 +617,21 @@ export default function VenueSelection() {
                                 >
                                   Share
                                 </DropdownItem>
-                                <DropdownItem 
+                                {isAdmin ? (
+                                  <DropdownItem
+                                    key="org"
+                                    startContent={<Building2 className="w-4 h-4" />}
+                                    onPress={() => handleToggleOrgEvent(event)}
+                                  >
+                                    {event.isOrgEvent ? 'Remove from org events' : 'Designate as org event'}
+                                  </DropdownItem>
+                                ) : null}
+                                <DropdownItem
                                   key="delete"
                                   className="text-danger"
                                   color="danger"
                                   startContent={<Trash2 className="w-4 h-4" />}
+                                  description={canManageEvent(event) ? undefined : 'Only the owner or an admin can delete'}
                                   onPress={() => handleDeleteEvent(event.id)}
                                 >
                                   Delete
@@ -712,17 +763,19 @@ export default function VenueSelection() {
                                 <MoreVertical className="w-4 h-4" />
                               </button>
                             </DropdownTrigger>
-                            <DropdownMenu aria-label="Venue actions">
-                              <DropdownItem 
+                            <DropdownMenu aria-label="Venue actions" disabledKeys={canManageVenue(venue) ? [] : ['edit', 'share', 'delete']}>
+                              <DropdownItem
                                 key="edit"
                                 startContent={<Edit className="w-4 h-4" />}
+                                description={canManageVenue(venue) ? undefined : 'Only the owner or an admin can edit'}
                                 onPress={() => router.push(`/venues/management?venueId=${venue.id}`)}
                               >
                                 Edit
                               </DropdownItem>
-                              <DropdownItem 
+                              <DropdownItem
                                 key="share"
                                 startContent={<Share2 className="w-4 h-4" />}
+                                description={canManageVenue(venue) ? undefined : 'Only the owner or an admin can share'}
                                 onPress={() => setShareModalData({
                                   id: venue.id,
                                   name: venue.name,
@@ -732,11 +785,12 @@ export default function VenueSelection() {
                               >
                                 Share Venue
                               </DropdownItem>
-                              <DropdownItem 
+                              <DropdownItem
                                 key="delete"
                                 className="text-danger"
                                 color="danger"
                                 startContent={<Trash2 className="w-4 h-4" />}
+                                description={canManageVenue(venue) ? undefined : 'Only the owner or an admin can delete'}
                                 onPress={() => handleDeleteVenue(venue.id)}
                               >
                                 Delete
@@ -774,16 +828,21 @@ export default function VenueSelection() {
                         {selectedVenueEvents.length} {selectedVenueEvents.length === 1 ? 'event' : 'events'} recorded
                       </p>
                     </div>
-                    <Button
-                      size="lg"
-                      startContent={<Play className="w-5 h-5" />}
-                      className="bg-accent hover:bg-accent/90 text-surface-light"
-                      onPress={() => handleStartNewEvent(selectedVenueId)}
-                      isLoading={isStartingEvent}
-                      isDisabled={isStartingEvent}
-                    >
-                      Start New Event
-                    </Button>
+                    <div className="flex flex-col items-end gap-1">
+                      <Button
+                        size="lg"
+                        startContent={<Play className="w-5 h-5" />}
+                        className="bg-accent hover:bg-accent/90 text-surface-light"
+                        onPress={() => handleStartNewEvent(selectedVenueId)}
+                        isLoading={isStartingEvent}
+                        isDisabled={isStartingEvent || !canStartEventAt(venues.find(v => v.id === selectedVenueId))}
+                      >
+                        Start New Event
+                      </Button>
+                      {!isStartingEvent && !canStartEventAt(venues.find(v => v.id === selectedVenueId)) && (
+                        <p className="text-xs text-surface-light/60">Only this venue&apos;s owner can start a new event here.</p>
+                      )}
+                    </div>
                   </div>
 
                   <Card classNames={{ base: "flex-1 bg-surface-deep/50 border border-default overflow-hidden" }}>
@@ -816,7 +875,12 @@ export default function VenueSelection() {
                                   onClick={() => router.push(`/events/${event.id}/dispatch`)}
                                 >
                                   <td className="p-4">
-                                    <div className="font-medium">{event.name || 'Untitled Event'}</div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">{event.name || 'Untitled Event'}</span>
+                                      {event.isOrgEvent && (
+                                        <Chip size="sm" variant="flat" className="bg-accent/20 text-accent">Org</Chip>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="p-4 text-surface-light">
                                     <div className="flex items-center gap-2">
@@ -851,17 +915,18 @@ export default function VenueSelection() {
                                             <MoreVertical className="w-4 h-4" />
                                           </button>
                                         </DropdownTrigger>
-                                        <DropdownMenu aria-label="Event actions">
-                                          <DropdownItem 
+                                        <DropdownMenu aria-label="Event actions" disabledKeys={canManageEvent(event) ? [] : ['share', 'delete']}>
+                                          <DropdownItem
                                             key="resume"
                                             startContent={<Play className="w-4 h-4" />}
                                             onPress={() => router.push(`/events/${event.id}/dispatch`)}
                                           >
                                             Resume Event
                                           </DropdownItem>
-                                          <DropdownItem 
+                                          <DropdownItem
                                             key="share"
                                             startContent={<Share2 className="w-4 h-4" />}
+                                            description={canManageEvent(event) ? undefined : 'Only the owner or an admin can share'}
                                             onPress={() => setShareModalData({
                                               id: event.id,
                                               name: event.name || 'Untitled',
@@ -871,11 +936,21 @@ export default function VenueSelection() {
                                           >
                                             Share Event
                                           </DropdownItem>
-                                          <DropdownItem 
+                                          {isAdmin ? (
+                                            <DropdownItem
+                                              key="org"
+                                              startContent={<Building2 className="w-4 h-4" />}
+                                              onPress={() => handleToggleOrgEvent(event)}
+                                            >
+                                              {event.isOrgEvent ? 'Remove from org events' : 'Designate as org event'}
+                                            </DropdownItem>
+                                          ) : null}
+                                          <DropdownItem
                                             key="delete"
                                             className="text-danger"
                                             color="danger"
                                             startContent={<Trash2 className="w-4 h-4" />}
+                                            description={canManageEvent(event) ? undefined : 'Only the owner or an admin can delete'}
                                             onPress={() => handleDeleteEvent(event.id)}
                                           >
                                             Delete

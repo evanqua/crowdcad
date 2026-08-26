@@ -38,6 +38,7 @@ export interface Event {
   date: string;
   venue: Venue;
   sharedWith?: string[]; // Array of emails
+  isOrgEvent?: boolean; // Visible to every member of the org, set by an admin
   postingTimes: string[];
   staff: Staff[];
   supervisor: Supervisor[];
