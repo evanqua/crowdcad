@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Fixed
 
 - Firestore rules: a non-admin organization member could previously update, share, or delete any other member's venue just by being in the same org. Only the venue's creator or a site admin can do that now; other org members still have read access.
+- Firestore rules: creating a venue or event required an `orgId` field the app never actually sets, which made creation impossible once these rules were deployed. Creating one now only requires being signed in and naming yourself as the owner.
+- Profile page: an admin account was sometimes not recognized as admin on first load, only appearing after a manual reload. The admin check now uses a live subscription instead of a one-time fetch, so it self-corrects instead of getting stuck.
 
 ---
 
