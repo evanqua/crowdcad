@@ -38,6 +38,7 @@ export default function LayerControlBar({
           <span className="text-xs text-surface-light truncate max-w-[120px]">{mapFileName}</span>
           <Button
             size="sm"
+            radius="full"
             variant="flat"
             onPress={onReplaceMap}
             startContent={<Upload className="h-3 w-3" />}
@@ -50,6 +51,7 @@ export default function LayerControlBar({
           <Button
             isIconOnly
             size="sm"
+            radius="full"
             variant="flat"
             isDisabled={currentLayer <= 0}
             onPress={onPreviousLayer}
@@ -62,6 +64,7 @@ export default function LayerControlBar({
           <Button
             isIconOnly
             size="sm"
+            radius="full"
             variant="flat"
             isDisabled={totalLayers <= 1 || currentLayer >= totalLayers - 1}
             onPress={onNextLayer}
@@ -73,6 +76,7 @@ export default function LayerControlBar({
           <Button
             isIconOnly
             size="sm"
+            radius="full"
             variant="flat"
             color="danger"
             onPress={onDeleteLayer}
@@ -84,6 +88,7 @@ export default function LayerControlBar({
           <Button
             isIconOnly
             size="sm"
+            radius="full"
             variant="flat"
             onPress={onAddLayer}
             aria-label="Add layer"

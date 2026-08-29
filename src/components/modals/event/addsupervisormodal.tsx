@@ -58,7 +58,7 @@ export default function AddSupervisorModal({
 
   const selectClassNames = {
     label: "text-surface-light mb-1",
-    trigger: "rounded-2xl px-4 border border-surface-liner bg-transparent hover:bg-surface-deep data-[focus=true]:outline-none",
+    trigger: "rounded-2xl px-4 hover:bg-surface-deep data-[focus=true]:outline-none",
     value: "text-surface-light",
     popover: "bg-surface-deepest border border-surface-liner rounded-2xl",
     listbox: "p-1 [&_[data-hover=true]]:bg-surface-deep [&_[data-selected=true]]:bg-surface-deep",
@@ -95,7 +95,7 @@ export default function AddSupervisorModal({
               <Input
                 label={t("Supervisor Call Sign")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -108,7 +108,7 @@ export default function AddSupervisorModal({
               <Input
                 label={t("Supervisor Name (optional)")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -120,7 +120,7 @@ export default function AddSupervisorModal({
               <Select
                 label={t("Certification")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={selectClassNames}

@@ -51,6 +51,8 @@ export default function PostingScheduleSection({
         <TimeInput
           label="From"
           labelPlacement="inside"
+          variant="flat"
+          color="primary"
           value={scheduleFrom}
           onChange={(value) => value && setScheduleFrom(value)}
           hourCycle={24}
@@ -61,6 +63,8 @@ export default function PostingScheduleSection({
         <TimeInput
           label="To"
           labelPlacement="inside"
+          variant="flat"
+          color="primary"
           value={scheduleTo}
           onChange={(value) => value && setScheduleTo(value)}
           hourCycle={24}
@@ -71,6 +75,8 @@ export default function PostingScheduleSection({
         <Input
           label="By"
           labelPlacement="inside"
+          variant="flat"
+          color="primary"
           placeholder="75"
           value={scheduleBy}
           onValueChange={setScheduleBy}

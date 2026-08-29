@@ -45,7 +45,7 @@ export default function AdminCertificationsSection() {
       <CardBody className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-semibold">Certifications</h3>
-          <Button size="sm" variant="bordered" onPress={handleReset} isDisabled={loading || saving}>
+          <Button size="sm" radius="full" variant="bordered" onPress={handleReset} isDisabled={loading || saving}>
             Reset to defaults
           </Button>
         </div>

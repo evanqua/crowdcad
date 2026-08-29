@@ -862,6 +862,7 @@ export default function VenueMapModal({
                 <Button
                   isIconOnly
                   size="sm"
+                  radius="full"
                   variant="flat"
                   onPress={handleZoomIn}
                   className="bg-surface-deepest/90 backdrop-blur"
@@ -871,6 +872,7 @@ export default function VenueMapModal({
                 <Button
                   isIconOnly
                   size="sm"
+                  radius="full"
                   variant="flat"
                   onPress={handleZoomOut}
                   className="bg-surface-deepest/90 backdrop-blur"
@@ -880,6 +882,7 @@ export default function VenueMapModal({
                 <Button
                   isIconOnly
                   size="sm"
+                  radius="full"
                   variant="flat"
                   onPress={handleResetZoom}
                   className="bg-surface-deepest/90 backdrop-blur"
@@ -904,6 +907,7 @@ export default function VenueMapModal({
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
+                      radius="full"
                       variant="flat"
                       onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
                       isDisabled={currentLayer === 0}
@@ -916,6 +920,7 @@ export default function VenueMapModal({
                     </span>
                     <Button
                       size="sm"
+                      radius="full"
                       variant="flat"
                       onPress={() => setCurrentLayer(prev => Math.min(layers.length - 1, prev + 1))}
                       isDisabled={currentLayer === layers.length - 1}

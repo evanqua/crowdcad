@@ -8,8 +8,9 @@ const { Given, When, Then } = createBdd(test);
 
 /**
  * Background step: creates a venue, starts an event, adds a team, logs a call
- * through the full lifecycle (En Route → Transporting → Delivered), then ends
- * the event with "Quick summary" to navigate to the summary page.
+ * through the full lifecycle (En Route → Transporting → Delivered), then opens
+ * the event summary modal and clicks "View Full Summary" to navigate to the
+ * summary page.
  */
 Given('I have ended an event and am on the summary page', async ({ page }) => {
   // 1. Create a venue
@@ -59,11 +60,10 @@ Given('I have ended an event and am on the summary page', async ({ page }) => {
   await page.getByTestId('team-chip-SummaryTeam').locator('button').first().click();
   await page.getByRole('menuitem', { name: 'Delivered' }).click();
 
-  // 7. End event with quick summary
-  await page.getByRole('button', { name: 'End Event' }).click();
+  // 7. Open the event summary modal and navigate to the full summary page
+  await page.getByRole('button', { name: 'Event Summary' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByRole('dialog').getByRole('checkbox', { name: 'Quick summary' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'View Full Summary' }).click();
   await page.waitForURL(/\/events\/.*\/summary/, { timeout: NAV_TIMEOUT });
 });
 

@@ -121,18 +121,18 @@ Then('the quick call location field should be empty', async ({ page }) => {
   await expect(page.getByRole('dialog').getByLabel('Location')).toHaveValue('');
 });
 
-// End event modal
+// Event summary modal
 
-When('I open the end event modal', async ({ page }) => {
-  await page.getByRole('button', { name: 'End Event' }).click();
+When('I open the event summary modal', async ({ page }) => {
+  await page.getByRole('button', { name: 'Event Summary' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-When('I close the end event modal', async ({ page }) => {
+When('I close the event summary modal', async ({ page }) => {
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
 });
 
-Then('the end event modal should be closed', async ({ page }) => {
+Then('the event summary modal should be closed', async ({ page }) => {
   await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 });
 });
 
@@ -192,24 +192,6 @@ When('I change team {string} status on the call to {string}', async ({ page }, t
   await page.getByRole('menuitem', { name: newStatus }).click();
 });
 
-// End event Continue button state
-
-Then('the end event continue button should be disabled', async ({ page }) => {
-  await expect(
-    page.getByRole('dialog').getByRole('button', { name: 'Continue' })
-  ).toBeDisabled({ timeout: 5_000 });
-});
-
-When('I select the {string} option', async ({ page }, option: string) => {
-  await page.getByRole('dialog').getByRole('checkbox', { name: option }).click();
-});
-
-Then('the end event continue button should be enabled', async ({ page }) => {
-  await expect(
-    page.getByRole('dialog').getByRole('button', { name: 'Continue' })
-  ).toBeEnabled({ timeout: 5_000 });
-});
-
 // Team deletion
 
 When('I delete the team {string}', async ({ page }, teamName: string) => {
@@ -231,8 +213,3 @@ When('I delete the supervisor {string}', async ({ page }, callSign: string) => {
   await page.getByRole('menuitem', { name: 'Delete' }).click();
 });
 
-// End event continue button
-
-When('I click the end event continue button', async ({ page }) => {
-  await page.getByRole('dialog').getByRole('button', { name: 'Continue' }).click();
-});

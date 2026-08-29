@@ -7,7 +7,6 @@ import type { Venue, Event } from '@/app/types';
 import { useAuth } from '@/hooks/useauth';
 import { useAdmin } from '@/hooks/useAdmin';
 import LoadingScreen from '@/components/ui/loading-screen';
-import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { stripUndefined } from '@/lib/utils';
 import ShareModal from '@/components/modals/sharemodal';
 import { Share2, Building2 } from "lucide-react";
@@ -382,8 +381,6 @@ export default function VenueSelection() {
   if (isMobile) {
     return (
       <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3.5rem)]">
-        <DiagonalStreaksFixed />
-        
         <div className="relative z-10 pt-10 px-4 pb-8">
           {/* Mobile: Venue List View */}
           {!selectedVenueId && (
@@ -398,9 +395,11 @@ export default function VenueSelection() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 startContent={<Search className="w-4 h-4 text-surface-light" />}
+                variant="flat"
+                color="primary"
                 classNames={{
                   base: "mb-4",
-                  inputWrapper: "bg-surface-deep border border-default",
+                  inputWrapper: "bg-surface-deep",
                   input: "outline-none focus:outline-none data-[focus=true]:outline-none"
                 }}
               />
@@ -412,9 +411,10 @@ export default function VenueSelection() {
                     <Card
                       key={venue.id}
                       isPressable
+                      radius="none"
                       onPress={() => setSelectedVenueId(venue.id)}
                       classNames={{
-                        base: "bg-surface-deep/50 backdrop-blur-sm border border-1 w-full"
+                        base: "bg-surface-deep/50 backdrop-blur-sm w-full"
                       }}
                     >
                       <CardBody className="p-4">
@@ -495,6 +495,7 @@ export default function VenueSelection() {
 
               <Button
                 size="lg"
+                radius="full"
                 startContent={<Plus className="w-5 h-5" />}
                 className="bg-accent hover:bg-accent/90 fixed bottom-6 right-6 shadow-lg z-50"
                 onPress={() => router.push('/venues/management')}
@@ -509,6 +510,7 @@ export default function VenueSelection() {
             <>
               <Button
                 variant="flat"
+                radius="full"
                 startContent={<ChevronLeft className="w-4 h-4" />}
                 onPress={() => setSelectedVenueId(null)}
                 className="mb-4 text-md"
@@ -522,6 +524,7 @@ export default function VenueSelection() {
                 </h1>
                 <Button
                   size="lg"
+                  radius="full"
                   startContent={<Play className="w-5 h-5" />}
                   className="w-full bg-accent hover:bg-accent/90 text-surface-light"
                   onPress={() => handleStartNewEvent(selectedVenueId)}
@@ -538,7 +541,7 @@ export default function VenueSelection() {
               <h2 className="text-lg font-semibold mb-3">Recent Events</h2>
               
               {selectedVenueEvents.length === 0 ? (
-                <Card classNames={{ base: "bg-surface-deep/50 border border-default w-full" }}>
+                <Card radius="none" classNames={{ base: "bg-surface-deep/50 border border-default w-full" }}>
                   <CardBody className="text-center py-8 text-surface-light">
                     No events yet. Start your first event at this venue!
                   </CardBody>
@@ -546,9 +549,10 @@ export default function VenueSelection() {
               ) : (
                 <div className="minimal-scrollbar space-y-3 max-h-[32rem] overflow-y-auto pr-2">
                   {selectedVenueEvents.map((event) => (
-                    <Card 
+                    <Card
                       key={event.id}
                       isPressable
+                      radius="none"
                       onPress={() => router.push(`/events/${event.id}/dispatch`)}
                       classNames={{
                         base: "bg-surface-deep/50 backdrop-blur-sm border border-default w-full"
@@ -673,8 +677,6 @@ export default function VenueSelection() {
   // Desktop View - Master-Detail Pattern
   return (
     <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3.5rem)]">
-      <DiagonalStreaksFixed />
-      
       <div className="relative z-10 pt-10 px-6">
         <div className="max-w-[1200px] mx-auto">
           <div className="mb-8">
@@ -690,6 +692,7 @@ export default function VenueSelection() {
               <div className="mb-4">
                 <Button
                   size="lg"
+                  radius="full"
                   startContent={<Plus className="w-5 h-5" />}
                   className="w-full bg-accent hover:bg-accent/90 text-surface-light"
                   onPress={() => router.push('/venues/management')}
@@ -703,9 +706,11 @@ export default function VenueSelection() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 startContent={<Search className="w-4 h-4 text-surface-light" />}
+                variant="flat"
+                color="primary"
                 classNames={{
                   base: "mb-4",
-                  inputWrapper: "bg-surface-deep border border-default",
+                  inputWrapper: "bg-surface-deep",
                   input: "outline-none focus:outline-none data-[focus=true]:outline-none"
                 }}
               />
@@ -714,15 +719,16 @@ export default function VenueSelection() {
                 {filteredVenues.map((venue) => {
                   const stats = venueStats.byVenue[venue.id] ?? { count: 0, lastUsed: null };
                   const isSelected = selectedVenueId === venue.id;
-                  
+
                   return (
-                    <Card 
+                    <Card
                       key={venue.id}
+                      radius="none"
                       classNames={{
-                        base: `${isSelected 
-                          ? 'bg-status-blue/20 border-status-blue' 
-                          : 'bg-surface-deep/50 border-default'
-                        } backdrop-blur-sm border-2 transition-all w-full`
+                        base: `${isSelected
+                          ? 'bg-status-blue/20'
+                          : 'bg-surface-deep/50'
+                        } backdrop-blur-sm transition-all w-full`
                       }}
                     >
                       <div 
@@ -808,7 +814,7 @@ export default function VenueSelection() {
             {/* RIGHT PANEL - Event Table/Details */}
             <div className="flex-1 flex flex-col min-h-[calc(100vh-16rem)]">
               {!selectedVenueId ? (
-                <Card classNames={{ base: "flex-1 bg-surface-deep/50 border border-default" }}>
+                <Card radius="none" classNames={{ base: "flex-1 bg-surface-deep/50 border border-default" }}>
                   <CardBody className="flex items-center justify-center">
                     <div className="text-center text-surface-light">
                       <MapPin className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -831,6 +837,7 @@ export default function VenueSelection() {
                     <div className="flex flex-col items-end gap-1">
                       <Button
                         size="lg"
+                        radius="full"
                         startContent={<Play className="w-5 h-5" />}
                         className="bg-accent hover:bg-accent/90 text-surface-light"
                         onPress={() => handleStartNewEvent(selectedVenueId)}
@@ -845,7 +852,7 @@ export default function VenueSelection() {
                     </div>
                   </div>
 
-                  <Card classNames={{ base: "flex-1 bg-surface-deep/50 border border-default overflow-hidden" }}>
+                  <Card radius="none" classNames={{ base: "flex-1 bg-surface-deep/50 border border-default overflow-hidden" }}>
                     <CardBody className="p-0">
                       {selectedVenueEvents.length === 0 ? (
                         <div className="flex items-center justify-center h-full text-surface-light">

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardBody, Button, Input } from '@heroui/react';
 import { authService, ServiceError } from '@/lib/services';
-import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
 
 const inputClassNames = {
   label: 'text-surface-light font-medium',
@@ -140,7 +139,6 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <main className="relative min-h-[calc(100vh-3.5rem)] bg-surface-deepest text-surface-light overflow-hidden">
-      <DiagonalStreaksFixed />
       <section className="relative z-10 max-w-md mx-auto px-6 py-12">
         <Suspense fallback={null}>
           <ResetPasswordForm />

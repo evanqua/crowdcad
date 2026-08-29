@@ -606,7 +606,7 @@ export default function SummaryPage() {
                   <div className="text-sm text-surface-faint">{event.staff.length} teams</div>
                 </div>
                 <div>
-                  <Button size="sm" variant="flat" onPress={() => setOpenStaff(v => !v)}>
+                  <Button size="sm" radius="full" variant="flat" onPress={() => setOpenStaff(v => !v)}>
                     {openStaff ? 'Hide' : 'Show'}
                   </Button>
                 </div>
@@ -642,7 +642,7 @@ export default function SummaryPage() {
                   <div className="text-sm text-surface-faint">{event.calls.length} calls</div>
                 </div>
                 <div>
-                  <Button size="sm" variant="flat" onPress={() => setOpenCalls(v => !v)}>
+                  <Button size="sm" radius="full" variant="flat" onPress={() => setOpenCalls(v => !v)}>
                     {openCalls ? 'Hide' : 'Show'}
                   </Button>
                 </div>

@@ -46,12 +46,12 @@ Feature: Dispatch board
     And I open the quick call modal
     Then the quick call location field should be empty
 
-  Scenario: End event modal opens and shows summary options
-    When I open the end event modal
-    Then I should see the text "End with no summary"
-    And I should see the text "Quick summary"
-    When I close the end event modal
-    Then the end event modal should be closed
+  Scenario: Event summary modal opens and offers export and full summary
+    When I open the event summary modal
+    Then I should see the text "Export CSV"
+    And I should see the text "View Full Summary"
+    When I close the event summary modal
+    Then the event summary modal should be closed
 
   Scenario: Switching to supervisors section shows empty state
     When I switch to the "Supervisors" section
@@ -116,14 +116,6 @@ Feature: Dispatch board
     And I log a call with location "Stage Right" and complaint "Headache"
     Then I should see the text "Total Calls: 2"
 
-  Scenario: End event Continue button is disabled until a choice is selected
-    When I open the end event modal
-    Then the end event continue button should be disabled
-    When I select the "End with no summary" option
-    Then the end event continue button should be enabled
-    When I close the end event modal
-    Then the end event modal should be closed
-
   Scenario: A team can be deleted from the dispatch board
     When I open the add team modal
     And I create a team named "Hotel" with a member "Sam Park" certified as "EMT-B"
@@ -151,17 +143,10 @@ Feature: Dispatch board
     When I delete the supervisor "Command-Del"
     Then I should see the text "No supervisors assigned"
 
-  Scenario: End event with quick summary navigates to summary page
-    When I open the end event modal
-    And I select the "Quick summary" option
-    And I click the end event continue button
+  Scenario: Event summary modal's View Full Summary navigates to the summary page
+    When I open the event summary modal
+    And I click the "View Full Summary" button
     Then the URL should contain "/summary"
-
-  Scenario: End event with no summary navigates to venue selection
-    When I open the end event modal
-    And I select the "End with no summary" option
-    And I click the end event continue button
-    Then the URL should contain "/venues/selection"
 
   Scenario: Multiple teams can coexist on the dispatch board
     When I open the add team modal

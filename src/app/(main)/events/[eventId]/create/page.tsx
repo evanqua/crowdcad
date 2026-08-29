@@ -8,7 +8,6 @@ import Image from 'next/image';
 import { Tabs, Tab, Button, Card, ScrollShadow } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { syncClinicsFromVenue } from '@/lib/clinics';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
@@ -549,7 +548,6 @@ export default function EventCreation() {
 
   return (
     <main className="relative bg-surface-deepest text-surface-light h-[calc(100dvh-3.5rem)] overflow-hidden leading-none">
-      <DiagonalStreaksFixed />
       <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden">
         <div className="h-full overflow-hidden">
           <div className="flex h-full overflow-hidden">
@@ -768,6 +766,7 @@ export default function EventCreation() {
                             <Button
                               isIconOnly
                               size="sm"
+                              radius="full"
                               variant="flat"
                               onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
                               isDisabled={currentLayer === 0}
@@ -780,6 +779,7 @@ export default function EventCreation() {
                             <Button
                               isIconOnly
                               size="sm"
+                              radius="full"
                               variant="flat"
                               onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
                               isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}

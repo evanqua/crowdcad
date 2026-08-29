@@ -45,7 +45,8 @@ export default function PendingMarkerDialog({
         }}
         placeholder="Location name"
         size="sm"
-        variant="bordered"
+        variant="flat"
+        color="primary"
         classNames={{
           input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
           inputWrapper: 'px-4 hover:bg-surface-deep mb-2',
@@ -60,11 +61,12 @@ export default function PendingMarkerDialog({
         Mark as Clinic
       </Checkbox>
       <div className="flex gap-2 mt-2">
-        <Button size="sm" variant="flat" onPress={onCancel} className="flex-1">
+        <Button size="sm" radius="full" variant="flat" onPress={onCancel} className="flex-1">
           Cancel
         </Button>
         <Button
           size="sm"
+          radius="full"
           onPress={onConfirm}
           className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
         >

@@ -84,7 +84,7 @@ export default function AddTeamModal({
   const selectClassNames = {
     label: "text-surface-light mb-1",
     trigger:
-      "bg-transparent hover:bg-surface-deep data-[focus=true]:outline-none",
+      "rounded-2xl px-4 hover:bg-surface-deep data-[focus=true]:outline-none",
     value: "text-surface-light",
     popover: "bg-surface-deepest border border-surface-liner rounded-2xl",
     listbox:
@@ -125,7 +125,7 @@ export default function AddTeamModal({
               <Input
                 label={t("Team Name")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -138,7 +138,7 @@ export default function AddTeamModal({
                 <Input
                   label={t("Member name")}
                   labelPlacement="inside"
-                  variant="bordered"
+                  variant="flat"
                   size="lg"
                   radius="lg"
                   classNames={inputClassNames}
@@ -167,7 +167,7 @@ export default function AddTeamModal({
                 <Select
                   label={t("Certification")}
                   labelPlacement="inside"
-                  variant="bordered"
+                  variant="flat"
                   size="lg"
                   radius="lg"
                   classNames={selectClassNames}

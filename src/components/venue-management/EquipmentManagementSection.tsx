@@ -97,6 +97,7 @@ export default function EquipmentManagementSection({
                       <Button
                         isIconOnly
                         size="sm"
+                        radius="full"
                         variant="light"
                         color="success"
                         onPress={saveEquipmentEdit}
@@ -107,6 +108,7 @@ export default function EquipmentManagementSection({
                       <Button
                         isIconOnly
                         size="sm"
+                        radius="full"
                         variant="light"
                         onPress={cancelEquipmentEdit}
                         className="min-w-6 w-6 h-6 flex-shrink-0"
@@ -124,6 +126,7 @@ export default function EquipmentManagementSection({
                       <Button
                         isIconOnly
                         size="sm"
+                        radius="full"
                         variant="light"
                         onPress={() => startEditEquipment(idx)}
                         className="min-w-6 w-6 h-6 flex-shrink-0"
@@ -133,6 +136,7 @@ export default function EquipmentManagementSection({
                       <Button
                         isIconOnly
                         size="sm"
+                        radius="full"
                         variant="light"
                         color="danger"
                         onPress={() => removeEquipment(idx)}

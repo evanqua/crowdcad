@@ -190,6 +190,7 @@ export default function LanguageSection() {
                 <Button
                   isIconOnly
                   size="sm"
+                  radius="full"
                   variant="light"
                   aria-label={`Edit ${preset.name}`}
                   onPress={() => setEditingTargetId(preset.id)}
@@ -202,6 +203,7 @@ export default function LanguageSection() {
                   <Button
                     isIconOnly
                     size="sm"
+                    radius="full"
                     variant="light"
                     aria-label={`Delete ${preset.name}`}
                     isDisabled={deletingId === preset.id}
@@ -238,7 +240,8 @@ export default function LanguageSection() {
               <Select
                 label="Based on"
                 labelPlacement="outside"
-                variant="bordered"
+                variant="flat"
+                color="primary"
                 size="sm"
                 radius="lg"
                 classNames={selectClassNames}
@@ -263,7 +266,8 @@ export default function LanguageSection() {
               </Select>
               <Input
                 placeholder="New preset name"
-                variant="bordered"
+                variant="flat"
+                color="primary"
                 size="sm"
                 radius="lg"
                 classNames={inputClassNames}
@@ -303,6 +307,7 @@ export default function LanguageSection() {
               <p className="font-medium text-sm">Editing: {target.name}</p>
               <Button
                 size="sm"
+                radius="full"
                 variant="light"
                 onPress={() => setEditingTargetId(null)}
                 className="text-surface-light/70 hover:bg-surface-deep"
@@ -326,7 +331,8 @@ export default function LanguageSection() {
                           key={term.key}
                           label={term.key}
                           labelPlacement="inside"
-                          variant="bordered"
+                          variant="flat"
+                          color="primary"
                           size="sm"
                           radius="lg"
                           classNames={inputClassNames}
@@ -378,7 +384,8 @@ export default function LanguageSection() {
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         placeholder={`${target.name} (edited)`}
-                        variant="bordered"
+                        variant="flat"
+                        color="primary"
                         size="sm"
                         radius="lg"
                         classNames={inputClassNames}

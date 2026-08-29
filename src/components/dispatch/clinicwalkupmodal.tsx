@@ -138,7 +138,8 @@ export default function ClinicWalkupModal({
                 autoFocus
                 label={t('Age/Sex')}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
+                color="primary"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -153,7 +154,8 @@ export default function ClinicWalkupModal({
               <Input
                 label={t('Chief Complaint')}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
+                color="primary"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}

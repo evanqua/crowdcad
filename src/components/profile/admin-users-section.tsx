@@ -108,6 +108,7 @@ export default function AdminUsersSection({ currentUser }: { currentUser: Servic
           <Button
             isIconOnly
             size="sm"
+            radius="full"
             variant="light"
             onPress={load}
             isDisabled={loading}
@@ -148,6 +149,7 @@ export default function AdminUsersSection({ currentUser }: { currentUser: Servic
                     <Button
                       isIconOnly
                       size="sm"
+                      radius="full"
                       variant="light"
                       color="danger"
                       onPress={() => {

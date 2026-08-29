@@ -8,7 +8,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
 import { dbService, storageService } from '@/lib/services';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
-import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
 import { hasDuplicateClinicName, isClinicPost } from '@/lib/clinics';
 import { stripUndefined } from '@/lib/utils';
@@ -675,8 +674,6 @@ export default function VenueManagementPageClient() {
 
   return (
     <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)]">
-      <DiagonalStreaksFixed />
-      
       <div className="relative z-10 pt-4 max-w-[1200px] mx-auto">
         <div>
 
@@ -785,6 +782,7 @@ export default function VenueManagementPageClient() {
                                       <Button
                                         isIconOnly
                                         size="sm"
+                                        radius="full"
                                         variant="light"
                                         onPress={() => renamePost(item.layerIdx, item.postIdx)}
                                         className="min-w-6 w-6 h-6"
@@ -795,6 +793,7 @@ export default function VenueManagementPageClient() {
                                     <Button
                                       isIconOnly
                                       size="sm"
+                                      radius="full"
                                       variant="light"
                                       color="danger"
                                       onPress={() => removePost(item.layerIdx, item.postIdx)}
@@ -979,6 +978,7 @@ export default function VenueManagementPageClient() {
                           <span className="text-xs text-surface-light truncate max-w-[120px]">{mapFileName}</span>
                           <Button
                             size="sm"
+                            radius="full"
                             variant="flat"
                             onPress={() => fileInputRef.current?.click()}
                             startContent={<Upload className="h-3 w-3" />}
@@ -991,6 +991,7 @@ export default function VenueManagementPageClient() {
                           <Button
                             isIconOnly
                             size="sm"
+                            radius="full"
                             variant="flat"
                             isDisabled={currentLayer <= 0}
                             onPress={() => setCurrentLayer(currentLayer - 1)}
@@ -1005,6 +1006,7 @@ export default function VenueManagementPageClient() {
                           <Button
                             isIconOnly
                             size="sm"
+                            radius="full"
                             variant="flat"
                             isDisabled={!venueData.layers || currentLayer >= venueData.layers.length - 1}
                             onPress={() => setCurrentLayer(currentLayer + 1)}
@@ -1014,6 +1016,7 @@ export default function VenueManagementPageClient() {
                           <Button
                             isIconOnly
                             size="sm"
+                            radius="full"
                             variant="flat"
                             color="danger"
                             onPress={deleteLayer}
@@ -1023,6 +1026,7 @@ export default function VenueManagementPageClient() {
                           <Button
                             isIconOnly
                             size="sm"
+                            radius="full"
                             variant="flat"
                             data-testid="add-layer-button"
                             onPress={() => setIsNewLayerModalOpen(true)}

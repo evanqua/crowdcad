@@ -72,7 +72,8 @@ export default function NewLayerModal({ isOpen, onClose, onSubmit }: Props) {
               <Input
                 label="Layer name"
                 labelPlacement="outside-top"
-                variant="bordered"
+                variant="flat"
+                color="primary"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -102,6 +103,7 @@ export default function NewLayerModal({ isOpen, onClose, onSubmit }: Props) {
                     <span className="text-sm text-surface-light truncate">{file.name}</span>
                     <Button
                       size="sm"
+                      radius="full"
                       variant="light"
                       color="danger"
                       onPress={() => setFile(null)}
