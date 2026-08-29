@@ -425,14 +425,14 @@ export default function PostingScheduleModal({
                   size="sm"
                   className="px-2 py-1 hover:bg-status-red/10 border border-status-red text-status-red"
                   variant="bordered"
-                  radius="lg"
+                  radius="full"
                 >
                   Clear
                 </Button>
                 <Button
                   onPress={handleAutofill}
                   size="sm"
-                  radius="lg"
+                  radius="full"
                   variant="flat"
                   className="px-2 py-1 hover:bg-surface-liner text-surface-light"
                 >
@@ -615,7 +615,7 @@ export default function PostingScheduleModal({
                   <h3 className="text-base font-semibold">
                     {visibleMobileColumns.map(formatTimeLabel).join(' - ')}
                   </h3>
-                  <ButtonGroup size="sm" radius="lg" variant="flat">
+                  <ButtonGroup size="sm" radius="full" variant="flat">
                     <Button
                       isIconOnly
                       className="text-surface-light hover:bg-surface-deep"

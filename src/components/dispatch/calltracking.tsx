@@ -419,6 +419,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                         <DropdownTrigger>
                                           <Button
                                             size="sm"
+                                            radius="full"
                                             variant="light"
                                             className="min-w-0 h-6 px-2 text-xs shrink-0"
                                           >
@@ -461,6 +462,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                         <DropdownTrigger>
                                           <Button
                                             size="sm"
+                                            radius="full"
                                             variant="light"
                                             className="min-w-0 h-6 px-2 text-xs shrink-0"
                                           >

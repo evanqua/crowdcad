@@ -782,6 +782,7 @@ export default function VenueManagementPageClient() {
                                       <Button
                                         isIconOnly
                                         size="sm"
+                                        radius="full"
                                         variant="light"
                                         onPress={() => renamePost(item.layerIdx, item.postIdx)}
                                         className="min-w-6 w-6 h-6"
@@ -792,6 +793,7 @@ export default function VenueManagementPageClient() {
                                     <Button
                                       isIconOnly
                                       size="sm"
+                                      radius="full"
                                       variant="light"
                                       color="danger"
                                       onPress={() => removePost(item.layerIdx, item.postIdx)}
@@ -976,6 +978,7 @@ export default function VenueManagementPageClient() {
                           <span className="text-xs text-surface-light truncate max-w-[120px]">{mapFileName}</span>
                           <Button
                             size="sm"
+                            radius="full"
                             variant="flat"
                             onPress={() => fileInputRef.current?.click()}
                             startContent={<Upload className="h-3 w-3" />}
@@ -988,6 +991,7 @@ export default function VenueManagementPageClient() {
                           <Button
                             isIconOnly
                             size="sm"
+                            radius="full"
                             variant="flat"
                             isDisabled={currentLayer <= 0}
                             onPress={() => setCurrentLayer(currentLayer - 1)}
@@ -1002,6 +1006,7 @@ export default function VenueManagementPageClient() {
                           <Button
                             isIconOnly
                             size="sm"
+                            radius="full"
                             variant="flat"
                             isDisabled={!venueData.layers || currentLayer >= venueData.layers.length - 1}
                             onPress={() => setCurrentLayer(currentLayer + 1)}
@@ -1011,6 +1016,7 @@ export default function VenueManagementPageClient() {
                           <Button
                             isIconOnly
                             size="sm"
+                            radius="full"
                             variant="flat"
                             color="danger"
                             onPress={deleteLayer}
@@ -1020,6 +1026,7 @@ export default function VenueManagementPageClient() {
                           <Button
                             isIconOnly
                             size="sm"
+                            radius="full"
                             variant="flat"
                             data-testid="add-layer-button"
                             onPress={() => setIsNewLayerModalOpen(true)}

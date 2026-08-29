@@ -369,6 +369,7 @@ export default function ClinicTrackingTable({
                           <DropdownTrigger>
                             <Button
                               size="sm"
+                              radius="full"
                               variant="light"
                               className="min-w-0 h-8 px-2 text-xs justify-start bg-transparent hover:bg-surface-muted"
                             >

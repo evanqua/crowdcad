@@ -190,6 +190,7 @@ export default function LanguageSection() {
                 <Button
                   isIconOnly
                   size="sm"
+                  radius="full"
                   variant="light"
                   aria-label={`Edit ${preset.name}`}
                   onPress={() => setEditingTargetId(preset.id)}
@@ -202,6 +203,7 @@ export default function LanguageSection() {
                   <Button
                     isIconOnly
                     size="sm"
+                    radius="full"
                     variant="light"
                     aria-label={`Delete ${preset.name}`}
                     isDisabled={deletingId === preset.id}
@@ -305,6 +307,7 @@ export default function LanguageSection() {
               <p className="font-medium text-sm">Editing: {target.name}</p>
               <Button
                 size="sm"
+                radius="full"
                 variant="light"
                 onPress={() => setEditingTargetId(null)}
                 className="text-surface-light/70 hover:bg-surface-deep"

@@ -337,7 +337,7 @@ export default function TeamCardCondensed({
           <div className="flex items-start justify-between gap-3">
             {/* Members on left */}
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-surface-light mb-1">{t('Team Members')}</div>
+              <div className="text-xs font-semibold text-surface-light pt-2 mb-1">{t('Team Members')}</div>
               <div className="space-y-0.5">
                 {allMembers.map((member, idx) => (
                   <div key={idx} className="text-xs text-surface-faint truncate">
@@ -360,7 +360,7 @@ export default function TeamCardCondensed({
 
           {/* Activity log */}
           <div onClick={e => e.stopPropagation()}>
-            <div className="text-xs font-semibold text-surface-light mb-1">{t('Activity Log')}</div>
+            <div className="text-xs font-semibold text-surface-light pt-2 mb-1">{t('Activity Log')}</div>
             <TrackingTextEntry
               mode="log"
               value={logText}

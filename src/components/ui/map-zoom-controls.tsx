@@ -23,7 +23,7 @@ export default function MapZoomControls({
 }: MapZoomControlsProps) {
   return (
     <div className={className}>
-      <ButtonGroup>
+      <ButtonGroup radius="full">
         <Button isIconOnly size="sm" variant="flat" onPress={onZoomIn} className={buttonClassName} aria-label="Zoom in" title="Zoom in">
           <ZoomIn className="h-4 w-4" />
         </Button>
@@ -31,7 +31,7 @@ export default function MapZoomControls({
           <ZoomOut className="h-4 w-4" />
         </Button>
       </ButtonGroup>
-      <Button size="sm" variant="flat" onPress={onReset} className={resetButtonClassName} aria-label="Reset zoom" title="Reset zoom">
+      <Button size="sm" radius="full" variant="flat" onPress={onReset} className={resetButtonClassName} aria-label="Reset zoom" title="Reset zoom">
         <RotateCcw className="h-4 w-4" />
       </Button>
     </div>

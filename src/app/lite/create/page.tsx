@@ -844,10 +844,10 @@ function LiteCreateContent() {
                                     classNames={inputClassNames}
                                   />
                                   <div className="flex items-center gap-1">
-                                    <Button isIconOnly size="sm" variant="light" onPress={saveLocationEdit}>
+                                    <Button isIconOnly size="sm" radius="full" variant="light" onPress={saveLocationEdit}>
                                       <Edit2 className="h-3.5 w-3.5" />
                                     </Button>
-                                    <Button isIconOnly size="sm" variant="light" onPress={cancelLocationEdit}>
+                                    <Button isIconOnly size="sm" radius="full" variant="light" onPress={cancelLocationEdit}>
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                   </div>
@@ -859,6 +859,7 @@ function LiteCreateContent() {
                                     <Button
                                       isIconOnly
                                       size="sm"
+                                      radius="full"
                                       variant="light"
                                       onPress={() => startLocationEdit(index)}
                                     >
@@ -867,6 +868,7 @@ function LiteCreateContent() {
                                     <Button
                                       isIconOnly
                                       size="sm"
+                                      radius="full"
                                       variant="light"
                                       color="danger"
                                       onPress={() => removeLocation(index)}
@@ -913,10 +915,10 @@ function LiteCreateContent() {
                                     classNames={inputClassNames}
                                   />
                                   <div className="flex items-center gap-1">
-                                    <Button isIconOnly size="sm" variant="light" onPress={saveEquipmentEdit}>
+                                    <Button isIconOnly size="sm" radius="full" variant="light" onPress={saveEquipmentEdit}>
                                       <Edit2 className="h-3.5 w-3.5" />
                                     </Button>
-                                    <Button isIconOnly size="sm" variant="light" onPress={cancelEquipmentEdit}>
+                                    <Button isIconOnly size="sm" radius="full" variant="light" onPress={cancelEquipmentEdit}>
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                   </div>
@@ -928,6 +930,7 @@ function LiteCreateContent() {
                                     <Button
                                       isIconOnly
                                       size="sm"
+                                      radius="full"
                                       variant="light"
                                       onPress={() => startEquipmentEdit(index)}
                                     >
@@ -936,6 +939,7 @@ function LiteCreateContent() {
                                     <Button
                                       isIconOnly
                                       size="sm"
+                                      radius="full"
                                       variant="light"
                                       color="danger"
                                       onPress={() => removeEquipment(index)}
@@ -992,6 +996,7 @@ function LiteCreateContent() {
                             <h3 className="text-surface-light font-semibold text-lg">Teams</h3>
                             <Button
                               size="sm"
+                              radius="full"
                               onPress={() => {
                                 setTeamModalMode('create');
                                 setEditingTeamIndex(null);
@@ -1011,6 +1016,7 @@ function LiteCreateContent() {
                             <h3 className="text-surface-light font-semibold text-lg">Supervisors</h3>
                             <Button
                               size="sm"
+                              radius="full"
                               onPress={() => setIsSupervisorModalOpen(true)}
                               className="h-8 px-3 text-sm text-surface-light bg-surface-deeperer hover:bg-surface-deep"
                             >
@@ -1074,6 +1080,7 @@ function LiteCreateContent() {
                                       <Button
                                         isIconOnly
                                         size="sm"
+                                        radius="full"
                                         variant="light"
                                         onPress={() => startTeamEdit(index)}
                                       >
@@ -1082,6 +1089,7 @@ function LiteCreateContent() {
                                       <Button
                                         isIconOnly
                                         size="sm"
+                                        radius="full"
                                         variant="light"
                                         color="danger"
                                         onPress={() => removeTeam(index)}
@@ -1136,6 +1144,7 @@ function LiteCreateContent() {
                                     <Button
                                       isIconOnly
                                       size="sm"
+                                      radius="full"
                                       variant="light"
                                       color="danger"
                                       onPress={() => removeSupervisor(index)}

@@ -203,6 +203,7 @@ export default function BulkImportModal({
                 </div>
                 <Button
                   size="sm"
+                  radius="full"
                   variant="flat"
                   startContent={<Download className="h-4 w-4" />}
                   onPress={handleDownloadTemplate}
@@ -214,6 +215,7 @@ export default function BulkImportModal({
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
+                  radius="full"
                   variant="flat"
                   startContent={<Upload className="h-4 w-4" />}
                   onPress={() => fileInputRef.current?.click()}

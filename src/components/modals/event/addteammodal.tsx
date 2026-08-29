@@ -84,7 +84,7 @@ export default function AddTeamModal({
   const selectClassNames = {
     label: "text-surface-light mb-1",
     trigger:
-      "bg-transparent hover:bg-surface-deep data-[focus=true]:outline-none",
+      "rounded-2xl px-4 hover:bg-surface-deep data-[focus=true]:outline-none",
     value: "text-surface-light",
     popover: "bg-surface-deepest border border-surface-liner rounded-2xl",
     listbox:

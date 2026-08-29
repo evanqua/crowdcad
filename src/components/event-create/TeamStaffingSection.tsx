@@ -24,7 +24,7 @@ export default function TeamStaffingSection({
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-shrink-0 px-4 py-3 flex items-center justify-between">
         <h3 className="text-surface-light font-semibold text-lg">Teams</h3>
-        <ButtonGroup>
+        <ButtonGroup radius="full">
           <Button
             size="sm"
             onPress={onAddTeam}

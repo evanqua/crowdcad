@@ -24,6 +24,7 @@ export default function CodeSnippet({ code, label }: { code: string; label?: str
           <Button
             isIconOnly
             size="sm"
+            radius="full"
             variant="light"
             onClick={copy}
             className="absolute top-2 right-2 z-10"

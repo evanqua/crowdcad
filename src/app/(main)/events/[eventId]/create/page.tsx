@@ -766,6 +766,7 @@ export default function EventCreation() {
                             <Button
                               isIconOnly
                               size="sm"
+                              radius="full"
                               variant="flat"
                               onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
                               isDisabled={currentLayer === 0}
@@ -778,6 +779,7 @@ export default function EventCreation() {
                             <Button
                               isIconOnly
                               size="sm"
+                              radius="full"
                               variant="flat"
                               onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
                               isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}
