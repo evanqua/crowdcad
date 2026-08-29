@@ -139,7 +139,7 @@ export default function ClinicWalkupModal({
                 label={t('Age/Sex')}
                 labelPlacement="inside"
                 variant="flat"
-                color="primary"
+                color="default"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -155,7 +155,7 @@ export default function ClinicWalkupModal({
                 label={t('Chief Complaint')}
                 labelPlacement="inside"
                 variant="flat"
-                color="primary"
+                color="default"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}

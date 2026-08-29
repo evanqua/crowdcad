@@ -396,7 +396,7 @@ export default function VenueSelection() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 startContent={<Search className="w-4 h-4 text-surface-light" />}
                 variant="flat"
-                color="primary"
+                color="default"
                 classNames={{
                   base: "mb-4",
                   inputWrapper: "bg-surface-deep",
@@ -707,7 +707,7 @@ export default function VenueSelection() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 startContent={<Search className="w-4 h-4 text-surface-light" />}
                 variant="flat"
-                color="primary"
+                color="default"
                 classNames={{
                   base: "mb-4",
                   inputWrapper: "bg-surface-deep",

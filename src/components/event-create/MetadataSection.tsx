@@ -30,7 +30,7 @@ export default function MetadataSection({
           label="Event Name"
           labelPlacement="outside"
           variant="flat"
-          color="primary"
+          color="default"
           placeholder="Enter event name"
           value={eventData.name || ''}
           onValueChange={(value) => setEventData((prev) => ({ ...prev, name: value }))}
@@ -44,7 +44,7 @@ export default function MetadataSection({
             label="Event Date"
             labelPlacement="outside"
             variant="flat"
-            color="primary"
+            color="default"
             value={getCalendarDate()}
             onChange={(date) => {
               if (date) {
@@ -68,7 +68,7 @@ export default function MetadataSection({
             }
             labelPlacement="outside"
             variant="flat"
-            color="primary"
+            color="default"
             placeholder="70"
             min={1}
             max={100}

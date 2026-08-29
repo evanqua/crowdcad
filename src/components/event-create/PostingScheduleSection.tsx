@@ -44,19 +44,24 @@ export default function PostingScheduleSection({
   inputClassNames,
 }: Props) {
   return (
-    <div className={`space-y-3 mt-6 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
+    <div className="space-y-3 mt-6">
       <h3 className="text-surface-light font-semibold text-lg">Schedule</h3>
 
       <div className="grid grid-cols-3 gap-3 rounded-2xl pb-3">
+        {/* From/To define the event's own start/end — kept enabled and
+            required regardless of postsEnabled, since they're used for
+            reporting (the summary page's analytics window) independent of
+            whether auto-posting is turned on. Only the interval ("By") and
+            the generated posting chips below are specific to posting. */}
         <TimeInput
           label="From"
           labelPlacement="inside"
           variant="flat"
-          color="primary"
+          color="default"
           value={scheduleFrom}
           onChange={(value) => value && setScheduleFrom(value)}
           hourCycle={24}
-          isDisabled={!postsEnabled}
+          isRequired
           classNames={inputClassNames}
           size="md"
         />
@@ -64,11 +69,11 @@ export default function PostingScheduleSection({
           label="To"
           labelPlacement="inside"
           variant="flat"
-          color="primary"
+          color="default"
           value={scheduleTo}
           onChange={(value) => value && setScheduleTo(value)}
           hourCycle={24}
-          isDisabled={!postsEnabled}
+          isRequired
           classNames={inputClassNames}
           size="md"
         />
@@ -76,7 +81,7 @@ export default function PostingScheduleSection({
           label="By"
           labelPlacement="inside"
           variant="flat"
-          color="primary"
+          color="default"
           placeholder="75"
           value={scheduleBy}
           onValueChange={setScheduleBy}
@@ -90,7 +95,7 @@ export default function PostingScheduleSection({
       </div>
 
       {scheduleChips.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className={`flex flex-wrap gap-2 mt-4 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
           {scheduleChips.map((chip) => (
             <Chip
               key={chip.id}

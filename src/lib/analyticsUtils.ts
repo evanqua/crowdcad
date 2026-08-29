@@ -1,13 +1,23 @@
-import { Event } from '@/app/types';
+import { Event, Staff } from '@/app/types';
 
 const TWO_HOURS = 2 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
+const TEN_MINUTES = 10 * 60 * 1000;
 
-export type HourlySeriesPoint = {
-  ts: number;
-  label: string;
-  count: number;
-};
+const AVAILABLE = 'Available';
+const ON_BREAK = 'On Break';
+const IN_CLINIC = 'In Clinic';
 
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * The reporting window used for the summary page's charts and stats. New
+ * events always carry an explicit scheduleStart/scheduleEnd (event setup's
+ * From/To, now mandatory) — when present, the window is restricted to
+ * exactly that designated start/end, no padding. Events created before
+ * that field existed fall back to a padded window derived from the
+ * earliest/latest call log timestamp, so old data doesn't just disappear.
+ */
 export function getScheduleWindow(event: Event): { start: number; end: number } {
   const getNum = (v: unknown): number | undefined => {
     if (typeof v === 'number') return v;
@@ -29,6 +39,10 @@ export function getScheduleWindow(event: Event): { start: number; end: number } 
     .map((k) => getNum(event[k as keyof Event]))
     .filter(Boolean) as number[];
 
+  if (starts.length && ends.length) {
+    return { start: Math.min(...starts), end: Math.max(...ends) };
+  }
+
   let minTs = Number.POSITIVE_INFINITY;
   let maxTs = Number.NEGATIVE_INFINITY;
   for (const call of event.calls || []) {
@@ -48,34 +62,6 @@ export function getScheduleWindow(event: Event): { start: number; end: number } 
   return { start, end };
 }
 
-export function buildHourlySeries(event: Event, start: number, end: number): HourlySeriesPoint[] {
-  const hour = 60 * 60 * 1000;
-  const s = Math.floor(start / hour) * hour;
-  const e = Math.ceil(end / hour) * hour;
-  const buckets: HourlySeriesPoint[] = [];
-
-  const pad2 = (n: number) => String(n).padStart(2, '0');
-
-  for (let t = s; t <= e; t += hour) {
-    const d = new Date(t);
-    const label = `${pad2(d.getHours())}:00`;
-    buckets.push({ ts: t, label, count: 0 });
-  }
-
-  for (const call of event.calls || []) {
-    const firstTs = (call.log || []).reduce<number | null>((min, entry) => {
-      if (typeof entry.timestamp !== 'number') return min;
-      return min == null ? entry.timestamp : Math.min(min, entry.timestamp);
-    }, null);
-
-    if (firstTs == null || firstTs < s || firstTs > e) continue;
-    const idx = Math.floor((firstTs - s) / hour);
-    if (idx >= 0 && idx < buckets.length) buckets[idx].count += 1;
-  }
-
-  return buckets;
-}
-
 export function callsByTeam(event: Event): { team: string; count: number }[] {
   const counts: Record<string, number> = {};
   for (const call of event.calls || []) {
@@ -89,6 +75,150 @@ export function callsByTeam(event: Event): { team: string; count: number }[] {
   return Object.entries(counts).map(([team, count]) => ({ team, count }));
 }
 
-export function teamPieData(event: Event): { name: string; value: number }[] {
-  return callsByTeam(event).map((d) => ({ name: d.team || 'Unassigned', value: d.count }));
+/**
+ * Pulls the status a log message implies, for the handful of message shapes
+ * that unambiguously carry one (see the call sites in the dispatch page:
+ * manual status changes, call assignment, detachment, and admin resets).
+ * Anything else (post changes, roster edits, etc.) returns null and is
+ * ignored by the caller — the prior status just carries forward.
+ */
+function statusFromLogMessage(message: string): string | null {
+  const changedTo = message.match(/status changed to (.+?)\.?$/i);
+  if (changedTo) return changedTo[1].trim();
+
+  const setTo = message.match(/status set to (.+?)(?:\s+at\s+\S.*)?$/i);
+  if (setTo) return setTo[1].trim();
+
+  if (/responding to call/i.test(message)) return 'En Route';
+  if (/detached from call|freed from duplicate call/i.test(message)) return AVAILABLE;
+
+  return null;
+}
+
+export type TeamStatusSegment = { status: string; start: number; end: number };
+
+/**
+ * Staff only stores a team's *current* status — this reconstructs status
+ * over time from the team's free-text log so time-in-status can be
+ * computed. Only messages statusFromLogMessage recognizes advance the
+ * timeline; teams default to Available before their first recognized entry
+ * (the log has no record of a team's status before it starts logging).
+ * This is a best-effort reconstruction, not an authoritative audit trail —
+ * a handful of rarer status-changing actions in the dispatch page don't log
+ * a recognizable message and won't be reflected here.
+ */
+export function deriveTeamStatusSegments(
+  team: Staff,
+  windowStart: number,
+  windowEnd: number
+): TeamStatusSegment[] {
+  const changes = (team.log || [])
+    .slice()
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((entry) => ({ ts: entry.timestamp, status: statusFromLogMessage(entry.message || '') }))
+    .filter((e): e is { ts: number; status: string } => e.status != null);
+
+  const segments: TeamStatusSegment[] = [];
+  let currentStatus = AVAILABLE;
+  let segmentStart = windowStart;
+
+  for (const change of changes) {
+    if (change.ts <= windowStart) {
+      currentStatus = change.status;
+      continue;
+    }
+    if (change.ts >= windowEnd) break;
+    if (change.status === currentStatus) continue;
+    segments.push({ status: currentStatus, start: segmentStart, end: change.ts });
+    currentStatus = change.status;
+    segmentStart = change.ts;
+  }
+  segments.push({ status: currentStatus, start: segmentStart, end: windowEnd });
+
+  return segments.filter((s) => s.end > s.start);
+}
+
+export type TeamStatusBreakdown = {
+  team: string;
+  available: number; // percent of tracked time, 0-100
+  onBreak: number;
+  inClinic: number;
+  onCalls: number;
+  calls: number; // count of calls this team was attached to
+};
+
+/** Per-team proportion of the event spent Available / On Break / In Clinic / on a call, plus how many calls each team was attached to. */
+export function teamStatusBreakdown(
+  event: Event,
+  windowStart: number,
+  windowEnd: number
+): TeamStatusBreakdown[] {
+  const span = windowEnd - windowStart;
+  const callCounts = new Map(callsByTeam(event).map((d) => [d.team, d.count]));
+  const pct = (ms: number) => round1(span > 0 ? (ms / span) * 100 : 0);
+
+  return (event.staff || []).map((team) => {
+    const totals = { available: 0, onBreak: 0, inClinic: 0, onCalls: 0 };
+
+    for (const seg of deriveTeamStatusSegments(team, windowStart, windowEnd)) {
+      const duration = seg.end - seg.start;
+      if (seg.status === ON_BREAK) totals.onBreak += duration;
+      else if (seg.status === IN_CLINIC) totals.inClinic += duration;
+      else if (seg.status === AVAILABLE) totals.available += duration;
+      else totals.onCalls += duration;
+    }
+
+    return {
+      team: team.team,
+      available: pct(totals.available),
+      onBreak: pct(totals.onBreak),
+      inClinic: pct(totals.inClinic),
+      onCalls: pct(totals.onCalls),
+      calls: callCounts.get(team.team) ?? 0,
+    };
+  });
+}
+
+export type AvailabilityPoint = { ts: number; label: string; availability: number };
+
+/**
+ * Average percent of teams sitting Available, in 10-minute buckets across
+ * the event (six buckets per hour). Every bucket carries an HH:MM label,
+ * but bucket boundaries stay hour-aligned (the window is floored/ceiled to
+ * the hour) so the chart's x-axis can show a tick only on the hour while
+ * still plotting a bar every 10 minutes.
+ */
+export function teamAvailabilitySeries(event: Event, start: number, end: number): AvailabilityPoint[] {
+  const s = Math.floor(start / HOUR) * HOUR;
+  const e = Math.ceil(end / HOUR) * HOUR;
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+
+  const teams = event.staff || [];
+  const teamSegments = teams.map((team) => deriveTeamStatusSegments(team, s, e));
+
+  const buckets: AvailabilityPoint[] = [];
+  for (let t = s; t <= e; t += TEN_MINUTES) {
+    const bucketEnd = t + TEN_MINUTES;
+    const bucketDate = new Date(t);
+    const label = `${pad2(bucketDate.getHours())}:${pad2(bucketDate.getMinutes())}`;
+
+    if (teams.length === 0) {
+      buckets.push({ ts: t, label, availability: 0 });
+      continue;
+    }
+
+    let availableMs = 0;
+    for (const segments of teamSegments) {
+      for (const seg of segments) {
+        if (seg.status !== AVAILABLE) continue;
+        const overlap = Math.min(seg.end, bucketEnd) - Math.max(seg.start, t);
+        if (overlap > 0) availableMs += overlap;
+      }
+    }
+
+    const availability = (availableMs / (TEN_MINUTES * teams.length)) * 100;
+    buckets.push({ ts: t, label, availability: round1(availability) });
+  }
+
+  return buckets;
 }
