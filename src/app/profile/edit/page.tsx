@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
 import { authService, dbService } from '@/lib/services';
 import { Card, CardBody, Button, Input } from '@heroui/react';
-import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
 import LoadingScreen from '@/components/ui/loading-screen';
 
 const inputClassNames = {
@@ -60,7 +59,6 @@ export default function EditProfilePage() {
 
   return (
     <main className="relative min-h-[calc(100vh-3.5rem)] bg-surface-deepest text-surface-light overflow-hidden">
-      <DiagonalStreaksFixed />
       <section className="relative z-10 max-w-3xl mx-auto px-6 py-12">
         <form onSubmit={handleSubmit}>
           <Card

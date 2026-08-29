@@ -51,7 +51,8 @@ const AssignmentDropdown = React.memo(function AssignmentDropdown({
   return (
     <Select
       aria-label={`Assignment for ${postKey} at ${time}`}
-      variant="bordered"
+      variant="flat"
+      color="primary"
       size="sm"
       radius="lg"
       classNames={selectClassNames}

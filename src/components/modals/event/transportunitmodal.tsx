@@ -80,7 +80,8 @@ export default function TransportUnitModal({
                 label={t('Transport Unit #')}
                 labelPlacement="inside"
                 placeholder={t('Transport Unit #')}
-                variant="bordered"
+                variant="flat"
+                color="primary"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}

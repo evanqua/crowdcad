@@ -54,6 +54,8 @@ export function PostsSelectionSection({
           <Select
             label="Select Posts"
             labelPlacement="outside"
+            variant="flat"
+            color="primary"
             placeholder="Choose posts for this event"
             selectionMode="multiple"
             selectedKeys={new Set((eventData.eventPosts || []).map((post) => getPostName(post)))}
@@ -179,6 +181,8 @@ export function EquipmentSelectionSection({
                   <span className="text-surface-light font-medium flex-shrink-0">{equip.name}</span>
                   {isSelected && (
                     <Select
+                      variant="flat"
+                      color="primary"
                       placeholder="Select Default Location"
                       selectedKeys={selectedEquip?.defaultLocation ? [selectedEquip.defaultLocation] : []}
                       onSelectionChange={(keys) => {

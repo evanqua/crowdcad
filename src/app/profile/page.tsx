@@ -1,7 +1,6 @@
 'use client';
 
 import { useAuth } from '@/hooks/useauth';
-import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
 import LoadingScreen from '@/components/ui/loading-screen';
 import ProfileInfoSection from '@/components/profile/profile-info-section';
 import SecuritySection from '@/components/profile/security-section';
@@ -16,7 +15,6 @@ export default function ProfilePage() {
 
   return (
     <main className="relative min-h-[calc(100vh-3.5rem)] bg-surface-deepest text-surface-light">
-      <DiagonalStreaksFixed />
       <div className="relative z-10 max-w-3xl mx-auto px-6 py-12 space-y-10">
         <ProfileInfoSection user={user} />
         <SecuritySection user={user} />

@@ -238,7 +238,8 @@ export default function LanguageSection() {
               <Select
                 label="Based on"
                 labelPlacement="outside"
-                variant="bordered"
+                variant="flat"
+                color="primary"
                 size="sm"
                 radius="lg"
                 classNames={selectClassNames}
@@ -263,7 +264,8 @@ export default function LanguageSection() {
               </Select>
               <Input
                 placeholder="New preset name"
-                variant="bordered"
+                variant="flat"
+                color="primary"
                 size="sm"
                 radius="lg"
                 classNames={inputClassNames}
@@ -326,7 +328,8 @@ export default function LanguageSection() {
                           key={term.key}
                           label={term.key}
                           labelPlacement="inside"
-                          variant="bordered"
+                          variant="flat"
+                          color="primary"
                           size="sm"
                           radius="lg"
                           classNames={inputClassNames}
@@ -378,7 +381,8 @@ export default function LanguageSection() {
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         placeholder={`${target.name} (edited)`}
-                        variant="bordered"
+                        variant="flat"
+                        color="primary"
                         size="sm"
                         radius="lg"
                         classNames={inputClassNames}

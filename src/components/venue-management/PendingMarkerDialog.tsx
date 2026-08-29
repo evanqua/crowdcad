@@ -45,7 +45,8 @@ export default function PendingMarkerDialog({
         }}
         placeholder="Location name"
         size="sm"
-        variant="bordered"
+        variant="flat"
+        color="primary"
         classNames={{
           input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
           inputWrapper: 'px-4 hover:bg-surface-deep mb-2',

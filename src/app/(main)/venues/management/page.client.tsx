@@ -8,7 +8,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useauth';
 import { dbService, storageService } from '@/lib/services';
 import type { Post, Venue, Equipment, EquipmentStatus, Layer } from '@/app/types';
-import { DiagonalStreaksFixed } from "@/components/ui/diagonal-streaks-fixed";
 import { isPointWithinRect, pixelToPercent } from '@/lib/markerUtils';
 import { hasDuplicateClinicName, isClinicPost } from '@/lib/clinics';
 import { stripUndefined } from '@/lib/utils';
@@ -675,8 +674,6 @@ export default function VenueManagementPageClient() {
 
   return (
     <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)]">
-      <DiagonalStreaksFixed />
-      
       <div className="relative z-10 pt-4 max-w-[1200px] mx-auto">
         <div>
 

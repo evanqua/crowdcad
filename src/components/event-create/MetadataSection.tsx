@@ -29,6 +29,8 @@ export default function MetadataSection({
         <Input
           label="Event Name"
           labelPlacement="outside"
+          variant="flat"
+          color="primary"
           placeholder="Enter event name"
           value={eventData.name || ''}
           onValueChange={(value) => setEventData((prev) => ({ ...prev, name: value }))}
@@ -41,6 +43,8 @@ export default function MetadataSection({
           <DatePicker
             label="Event Date"
             labelPlacement="outside"
+            variant="flat"
+            color="primary"
             value={getCalendarDate()}
             onChange={(date) => {
               if (date) {
@@ -63,6 +67,8 @@ export default function MetadataSection({
               </span>
             }
             labelPlacement="outside"
+            variant="flat"
+            color="primary"
             placeholder="70"
             min={1}
             max={100}

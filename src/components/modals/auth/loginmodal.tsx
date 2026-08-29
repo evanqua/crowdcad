@@ -159,7 +159,8 @@ export default function LoginModal({
                 <Input
                   label="Email Address"
                   labelPlacement="inside"
-                  variant="bordered"
+                  variant="flat"
+                  color="primary"
                   size="lg"
                   radius="lg"
                   type="email"
@@ -194,7 +195,8 @@ export default function LoginModal({
                 <Input
                   label="Email Address"
                   labelPlacement="inside"
-                  variant="bordered"
+                  variant="flat"
+                  color="primary"
                   size="lg"
                   radius="lg"
                   type="email"
@@ -207,7 +209,8 @@ export default function LoginModal({
                 <Input
                   label="Password"
                   labelPlacement="inside"
-                  variant="bordered"
+                  variant="flat"
+                  color="primary"
                   size="lg"
                   radius="lg"
                   type="password"
@@ -224,7 +227,8 @@ export default function LoginModal({
                   <Input
                     label="Confirm Password"
                     labelPlacement="inside"
-                    variant="bordered"
+                    variant="flat"
+                    color="primary"
                     size="lg"
                     radius="lg"
                     type="password"

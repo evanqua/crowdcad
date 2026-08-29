@@ -150,7 +150,29 @@ module.exports = {
         },
         dark: {
           colors: {
-            primary: { DEFAULT: "#5eaae8", foreground: "#0d0d0e" },
+            // Matches --surface-bg-1 (hsl(240 3% 9%)) — the same dark grey
+            // used by the dispatch call rows' hover state
+            // (TEAM_CARD_ROW_HOVER_CLASS = 'hover:bg-surface-deep').
+            // HeroUI's flat/light/etc. variants read the numbered shades
+            // (bg-primary-100, hover:bg-primary-50, ...), not just DEFAULT —
+            // without them, those variants silently fall back to HeroUI's
+            // built-in blue scale. Reuses HeroUI's own dark-mode zinc/grey
+            // ramp (its "default" color) so every shade stays visually
+            // consistent with the rest of the dark theme.
+            primary: {
+              50: "#18181b",
+              100: "#27272a",
+              200: "#3f3f46",
+              300: "#52525b",
+              400: "#71717a",
+              500: "#a1a1aa",
+              600: "#d4d4d8",
+              700: "#e4e4e7",
+              800: "#f4f4f5",
+              900: "#fafafa",
+              DEFAULT: "#161618",
+              foreground: "#f4f4f5",
+            },
             background: "#0d0d0e",
             foreground: "#faf9f5",
           },
