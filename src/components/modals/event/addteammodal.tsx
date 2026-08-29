@@ -125,7 +125,7 @@ export default function AddTeamModal({
               <Input
                 label={t("Team Name")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -138,7 +138,7 @@ export default function AddTeamModal({
                 <Input
                   label={t("Member name")}
                   labelPlacement="inside"
-                  variant="bordered"
+                  variant="flat"
                   size="lg"
                   radius="lg"
                   classNames={inputClassNames}
@@ -167,7 +167,7 @@ export default function AddTeamModal({
                 <Select
                   label={t("Certification")}
                   labelPlacement="inside"
-                  variant="bordered"
+                  variant="flat"
                   size="lg"
                   radius="lg"
                   classNames={selectClassNames}

@@ -95,7 +95,7 @@ export default function AddSupervisorModal({
               <Input
                 label={t("Supervisor Call Sign")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -108,7 +108,7 @@ export default function AddSupervisorModal({
               <Input
                 label={t("Supervisor Name (optional)")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -120,7 +120,7 @@ export default function AddSupervisorModal({
               <Select
                 label={t("Certification")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={selectClassNames}

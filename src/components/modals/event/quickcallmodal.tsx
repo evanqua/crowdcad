@@ -219,7 +219,7 @@ export default function QuickCallModal({
                 autoFocus
                 label={t("Location")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -229,7 +229,7 @@ export default function QuickCallModal({
               <Input
                 label={t("Source")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -240,7 +240,7 @@ export default function QuickCallModal({
               <Input
                 label={t("Age/Sex")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -255,7 +255,7 @@ export default function QuickCallModal({
               <Input
                 label={t("Chief Complaint")}
                 labelPlacement="inside"
-                variant="bordered"
+                variant="flat"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
