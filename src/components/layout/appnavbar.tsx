@@ -94,9 +94,9 @@ export default function AppNavbar() {
       label: "Posting Schedule", 
       onClick: () => window.dispatchEvent(new CustomEvent('open-posting-schedule'))
     },
-    { 
-      label: "End Event", 
-      onClick: () => window.dispatchEvent(new CustomEvent('open-end-event'))
+    {
+      label: "Event Summary",
+      onClick: () => window.dispatchEvent(new CustomEvent('open-event-summary'))
     },
     { 
       label: "Venues", 

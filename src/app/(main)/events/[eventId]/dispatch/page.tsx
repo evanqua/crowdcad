@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback, use } from 'react';
 import PostingScheduleModal from '@/components/modals/event/postingschedulemodal';
 import VenueMapModal from '@/components/modals/event/venuemapmodal';
-import EndEventModal from '@/components/modals/event/endeventmodal';
+import EventSummaryModal from '@/components/modals/event/eventsummarymodal';
 import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
 import AddTeamModal from "@/components/modals/event/addteammodal";
@@ -2867,12 +2867,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [showVenueMap, setShowVenueMap] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
-  const [showEndEvent, setShowEndEvent] = useState(false);
+  const [showEventSummary, setShowEventSummary] = useState(false);
 
   useEffect(() => {
     const openVenue = () => setShowVenueMap(true);
     const openPosting = () => setShowPostingSchedule(true);
-    const openEnd = () => setShowEndEvent(true);
+    const openEventSummary = () => setShowEventSummary(true);
     const openLiteClear = () => {
       void handleClearLiteEvent();
     };
@@ -2886,7 +2886,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
     if (!isLiteMode) {
       window.addEventListener('open-venue-map', openVenue);
-      window.addEventListener('open-end-event', openEnd);
+      window.addEventListener('open-event-summary', openEventSummary);
     }
 
     return () => {
@@ -2896,7 +2896,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
       if (!isLiteMode) {
         window.removeEventListener('open-venue-map', openVenue);
-        window.removeEventListener('open-end-event', openEnd);
+        window.removeEventListener('open-event-summary', openEventSummary);
       }
     };
   }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv]);
@@ -4066,11 +4066,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             />
           )}
 
-          <EndEventModal
-            open={showEndEvent}
-            onClose={() => setShowEndEvent(false)}
-            onEndNoSummary={async () => { router.push('/venues/selection'); }}
-            onQuickSummary={async () => router.push(`/events/${event.id}/summary`)}
+          <EventSummaryModal
+            open={showEventSummary}
+            onClose={() => setShowEventSummary(false)}
+            onExportCsv={handleExportSummaryCsv}
+            eventId={event.id}
           />
         </>
       )}

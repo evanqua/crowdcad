@@ -351,7 +351,7 @@ export default function TeamCardCondensed({
             </div>
             
             {/* Timer on right */}
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 pt-2">
               <div className="text-base font-semibold text-surface-light tabular-nums">
                 {timer}
               </div>
