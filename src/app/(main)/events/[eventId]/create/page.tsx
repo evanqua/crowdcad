@@ -12,6 +12,7 @@ import { syncClinicsFromVenue } from '@/lib/clinics';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
+import { scheduleTimesToWindow } from '@/lib/scheduleUtils';
 import { useTeamForm } from '@/hooks/useTeamForm';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import { useCertifications } from '@/hooks/useCertifications';
@@ -149,6 +150,14 @@ export default function EventCreation() {
     setScheduleChips(chips);
     setEventData(prev => ({ ...prev, postingTimes: times }));
   }, [postingTimes]);
+
+  // Keep the event's own start/end — used for reporting (the summary
+  // page's analytics window) independent of whether auto-posting is
+  // enabled — in sync with the Schedule section's From/To fields.
+  useEffect(() => {
+    const { start, end } = scheduleTimesToWindow(eventData.date || new Date().toISOString(), scheduleFrom, scheduleTo);
+    setEventData(prev => ({ ...prev, scheduleStart: start, scheduleEnd: end }));
+  }, [scheduleFrom, scheduleTo, eventData.date]);
 
   // Autosave postingTimes to the draft event document when they change.
   // Debounced to avoid excessive writes while the user is adjusting inputs.

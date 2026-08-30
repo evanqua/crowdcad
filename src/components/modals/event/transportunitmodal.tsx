@@ -81,7 +81,7 @@ export default function TransportUnitModal({
                 labelPlacement="inside"
                 placeholder={t('Transport Unit #')}
                 variant="flat"
-                color="primary"
+                color="default"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}

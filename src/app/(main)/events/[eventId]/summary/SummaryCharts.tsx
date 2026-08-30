@@ -3,189 +3,139 @@
 import React from 'react';
 import {
   ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
-  PieChart, Pie,
-  LineChart, Line
+  ComposedChart, BarChart, Bar, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
-import { Card, CardBody } from '@heroui/react';
+import { STATUS_COLORS_HEX } from '@/lib/colorTokens';
+import type { TeamStatusBreakdown, AvailabilityPoint } from '@/lib/analyticsUtils';
+import { GRID_WRAPPER, GRID_CELL } from './summaryGrid';
 
-type HourBucket = { ts: number; label: string; count: number };
-type PieSlice = { name: string; value: number };
 type Interaction = { sessionId: string; startTime: string; duration: number; clicks: number; keystrokes: number };
 
+// Recharts' Tooltip defaults to a white content box, unreadable against
+// this app's dark theme — everything else on these charts stays default,
+// but the tooltip needs at least a themed background/text to be legible.
+const TOOLTIP_CONTENT_STYLE = {
+  background: 'hsl(var(--surface-bg-0))',
+  border: '1px solid hsl(var(--surface-border))',
+  borderRadius: 8,
+};
+const TOOLTIP_LABEL_STYLE = { color: 'hsl(var(--surface-text-strong))' };
+const TOOLTIP_ITEM_STYLE = { color: 'hsl(var(--surface-text-strong))' };
+
 export default function SummaryCharts({
-  perHourSeries = [] as HourBucket[],
-  pieSeries = [] as PieSlice[],
+  teamStatusBreakdown = [] as TeamStatusBreakdown[],
+  availabilitySeries = [] as AvailabilityPoint[],
   interactionTimeline = [] as Interaction[],
-  THEME = {},
-  PIE_COLORS = [],
 }: {
-  perHourSeries?: HourBucket[];
-  pieSeries?: PieSlice[];
+  teamStatusBreakdown?: TeamStatusBreakdown[];
+  availabilitySeries?: AvailabilityPoint[];
   interactionTimeline?: Interaction[];
-  THEME?: Record<string, string>;
-  PIE_COLORS?: string[];
 }) {
   return (
     <>
-      <Card isBlurred className="bg-surface-deep/60 border border-default-200">
-        <CardBody className="p-6">
-          <div className="flex items-start justify-between mb-4">
-            <h2 className="text-xl font-semibold">Calls per Hour</h2>
+      <div className={GRID_WRAPPER}>
+        <div className={`${GRID_CELL} p-6`}>
+          <h2 className="text-xl font-semibold mb-4">Total Team Availability</h2>
+          <div className="w-full h-[360px]">
+            <ResponsiveContainer width="100%" height="100%">
+              {/* One bar per 10 minutes of the event (see teamAvailabilitySeries)
+                  — interval={5} skips 5 of every 6 ticks so the x-axis still
+                  only labels the top of each hour. */}
+              <BarChart data={availabilitySeries} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="label" interval={5} />
+                <YAxis allowDecimals={false} unit="%" domain={[0, 100]} />
+                <Tooltip
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
+                  itemStyle={TOOLTIP_ITEM_STYLE}
+                  formatter={(value) => {
+                    const normalized = Array.isArray(value) ? value[0] : value;
+                    return [`${Number(normalized ?? 0)}%`, 'Avg. teams available'];
+                  }}
+                />
+                <Bar dataKey="availability" name="Teams available" fill={STATUS_COLORS_HEX.green} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-          <div className="rounded-xl p-3" style={{ background: 'var(--surface-liner, #374151)' }}>
-            <div className="w-full h-[360px]">
+        </div>
+
+        <div className={`${GRID_CELL} p-6`}>
+          <h2 className="text-xl font-semibold mb-4">Team Status Breakdown</h2>
+          <div className="w-full h-[360px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={teamStatusBreakdown} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="team" />
+                <YAxis yAxisId="pct" allowDecimals={false} unit="%" domain={[0, 100]} />
+                <YAxis yAxisId="calls" orientation="right" allowDecimals={false} />
+                {/* No itemStyle color override here (unlike the other
+                    tooltips) — Recharts colors each row by its series'
+                    own fill/stroke by default, so leaving it unset makes
+                    each status's tooltip text match its bar color. */}
+                <Tooltip
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
+                  formatter={(value, name, entry) =>
+                    entry?.dataKey === 'calls' ? [value, name] : [`${value}%`, name]
+                  }
+                />
+                <Legend />
+                <Bar yAxisId="pct" stackId="status" dataKey="available" name="Available" fill={STATUS_COLORS_HEX.green} isAnimationActive={false} />
+                <Bar yAxisId="pct" stackId="status" dataKey="onBreak" name="On Break" fill={STATUS_COLORS_HEX.blue} isAnimationActive={false} />
+                <Bar yAxisId="pct" stackId="status" dataKey="inClinic" name="In Clinic" fill={STATUS_COLORS_HEX.orange} isAnimationActive={false} />
+                <Bar yAxisId="pct" stackId="status" dataKey="onCalls" name="On Calls" fill={STATUS_COLORS_HEX.red} isAnimationActive={false} />
+                <Line yAxisId="calls" dataKey="calls" name="Calls attached" stroke="currentColor" strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {interactionTimeline && interactionTimeline.length > 0 && (
+        <div className={`grid grid-cols-1 lg:grid-cols-2 ${GRID_WRAPPER}`}>
+          <div className={`${GRID_CELL} p-6`}>
+            <h2 className="text-xl font-semibold mb-4">Session Activity</h2>
+            <div className="w-full h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={perHourSeries} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
-                  <CartesianGrid
-                    stroke={THEME.grid}
-                    strokeOpacity={0.35}
-                    vertical={true}
-                    horizontal={true}
-                  />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: THEME.tickStrong, fontWeight: 600 }}
-                    axisLine={{ stroke: THEME.axis }}
-                    tickLine={{ stroke: THEME.axis }}
-                    interval="preserveStartEnd"
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fill: THEME.tickStrong, fontWeight: 600 }}
-                    axisLine={{ stroke: THEME.axis }}
-                    tickLine={{ stroke: THEME.axis }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: THEME.tooltipBg,
-                      border: `1px solid ${THEME.tooltipBorder}`,
-                      borderRadius: 12,
-                      color: THEME.tooltipText,
-                    }}
-                    itemStyle={{ color: THEME.tooltipText }}
-                    labelStyle={{ color: THEME.tooltipText, fontWeight: 600 }}
-                  />
-                  <Bar dataKey="count" radius={[10, 10, 0, 0]} fill={THEME.barFill} isAnimationActive={false} />
+                <BarChart data={interactionTimeline} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="sessionId" tick={{ fontSize: 12 }} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
+                  <Legend />
+                  <Bar dataKey="clicks" name="Mouse Clicks" fill="#8884d8" isAnimationActive={false} />
+                  <Bar dataKey="keystrokes" name="Keystrokes" fill="#82ca9d" isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
-        </CardBody>
-      </Card>
 
-      <Card isBlurred className="bg-surface-deep/60 border border-default-200">
-        <CardBody className="p-6">
-          <div className="flex items-start justify-between mb-4">
-            <h2 className="text-xl font-semibold">Calls by Team</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            <div className="h-[360px] pl-12">
+          <div className={`${GRID_CELL} p-6`}>
+            <h2 className="text-xl font-semibold mb-4">Session Durations</h2>
+            <div className="w-full h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieSeries}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius="65%"
-                    outerRadius="100%"
-                    paddingAngle={2}
-                  >
-                    {pieSeries.map((_s: PieSlice, i: number) => (
-                      <Cell
-                        key={i}
-                        fill={PIE_COLORS[i % PIE_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
+                <LineChart data={interactionTimeline} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="startTime" tick={{ fontSize: 12 }} />
+                  <YAxis />
                   <Tooltip
-                    contentStyle={{
-                      background: THEME.tooltipBg,
-                      border: `1px solid ${THEME.tooltipBorder}`,
-                      borderRadius: 12,
-                      color: THEME.tooltipText,
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    formatter={(value) => {
+                      const normalized = Array.isArray(value) ? value[0] : value;
+                      return [`${Number(normalized ?? 0).toFixed(1)} min`, 'Duration'];
                     }}
-                    itemStyle={{ color: THEME.tooltipText }}
-                    labelStyle={{ color: THEME.tooltipText, fontWeight: 600 }}
                   />
-                </PieChart>
+                  <Line type="monotone" dataKey="duration" name="Duration" stroke="#8884d8" strokeWidth={2} isAnimationActive={false} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
-
-            <ul className="space-y-2 pl-6">
-              {pieSeries.map((d: PieSlice, i: number) => (
-                <li key={d.name} className="flex items-center gap-2 min-w-0">
-                  <span className="inline-block w-3 h-3 rounded shrink-0"
-                        style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                  <span className="text-sm text-surface-light font-semibold truncate">{d.name}</span>
-                  <span className="text-surface-faint text-sm tabular-nums ml-2 shrink-0">{d.value}</span>
-                </li>
-              ))}
-            </ul>
           </div>
-        </CardBody>
-      </Card>
-
-      {interactionTimeline && interactionTimeline.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card isBlurred className="bg-surface-deep/60 border border-default-200">
-            <CardBody className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <h2 className="text-xl font-semibold">Session Activity</h2>
-              </div>
-              <div className="rounded-xl p-3" style={{ background: 'var(--surface-liner, #374151)' }}>
-                <div className="w-full h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={interactionTimeline} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
-                      <CartesianGrid strokeOpacity={0.35} />
-                      <XAxis dataKey="sessionId" tick={{ fontSize: 12 }} />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip
-                        contentStyle={{
-                          background: 'var(--surface-deepest)',
-                          border: '1px solid var(--accent)',
-                          borderRadius: 12,
-                        }}
-                      />
-                      <Bar dataKey="clicks" name="Mouse Clicks" radius={[4, 4, 0, 0]} fill="var(--accent)" isAnimationActive={false} />
-                      <Bar dataKey="keystrokes" name="Keystrokes" radius={[4, 4, 0, 0]} fill="rgba(var(--ripple-accent-rgb), 0.7)" isAnimationActive={false} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card isBlurred className="bg-surface-deep/60 border border-default-200">
-            <CardBody className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Session Durations</h2>
-              <div className="rounded-xl p-3" style={{ background: 'var(--surface-liner, #374151)' }}>
-                <div className="w-full h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={interactionTimeline} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
-                      <CartesianGrid strokeOpacity={0.35} />
-                      <XAxis dataKey="startTime" tick={{ fontSize: 12 }} />
-                      <YAxis />
-                      <Tooltip
-                        contentStyle={{
-                          background: 'var(--surface-deepest)',
-                          border: '1px solid var(--accent)',
-                          borderRadius: 12,
-                        }}
-                        formatter={(value) => {
-                          const normalized = Array.isArray(value) ? value[0] : value;
-                          return [`${Number(normalized ?? 0).toFixed(1)} min`, 'Duration'];
-                        }}
-                      />
-                      <Line type="monotone" dataKey="duration" stroke="var(--accent)" strokeWidth={2} isAnimationActive={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
         </div>
       )}
     </>
   );
-} 
+}

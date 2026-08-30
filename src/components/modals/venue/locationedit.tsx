@@ -98,7 +98,7 @@ export default function LocationEditModal({
                 label="Location name"
                 labelPlacement="outside"
                 variant="flat"
-                color="primary"
+                color="default"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}
@@ -112,7 +112,7 @@ export default function LocationEditModal({
                 label="Layer"
                 labelPlacement="outside"
                 variant="flat"
-                color="primary"
+                color="default"
                 size="lg"
                 radius="lg"
                 classNames={selectClassNames}

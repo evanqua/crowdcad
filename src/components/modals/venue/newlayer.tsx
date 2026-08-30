@@ -73,7 +73,7 @@ export default function NewLayerModal({ isOpen, onClose, onSubmit }: Props) {
                 label="Layer name"
                 labelPlacement="outside-top"
                 variant="flat"
-                color="primary"
+                color="default"
                 size="lg"
                 radius="lg"
                 classNames={inputClassNames}

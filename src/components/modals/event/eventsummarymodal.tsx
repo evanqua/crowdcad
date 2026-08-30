@@ -61,8 +61,9 @@ export default function EventSummaryModal({
         </ModalHeader>
         <ModalBody>
           <p className="text-surface-light/90 text-sm">
-            Viewing the summary doesn&apos;t end the event — dispatch stays open and you
-            can come back to it anytime after.
+            View or export a summary of all dispatch activity associated with this
+            event. Viewing the summary does not end the event. You can return to the
+            event at any time through the venue selection page.
           </p>
         </ModalBody>
         <ModalFooter className="flex items-center justify-end gap-2">

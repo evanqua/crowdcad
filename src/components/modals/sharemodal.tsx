@@ -116,7 +116,7 @@ export default function ShareModal({
                       key={email}
                       onClose={() => handleRemoveUser(email)}
                       variant="flat"
-                      color="primary"
+                      color="default"
                     >
                       {email}
                     </Chip>

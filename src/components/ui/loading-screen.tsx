@@ -25,7 +25,7 @@ export default function LoadingScreen({
 
   return (
     <div className={wrapper}>
-      <Spinner color="primary" size="lg" />
+      <Spinner color="default" size="lg" />
       {label && (
         <p className="text-sm text-surface-faint">{label}</p>
       )}
