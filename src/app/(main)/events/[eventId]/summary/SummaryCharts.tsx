@@ -74,7 +74,13 @@ export default function SummaryCharts({
                     tooltips) — Recharts colors each row by its series'
                     own fill/stroke by default, so leaving it unset makes
                     each status's tooltip text match its bar color. */}
-                <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} />
+                <Tooltip
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
+                  formatter={(value, name, entry) =>
+                    entry?.dataKey === 'calls' ? [value, name] : [`${value}%`, name]
+                  }
+                />
                 <Legend />
                 <Bar yAxisId="pct" stackId="status" dataKey="available" name="Available" fill={STATUS_COLORS_HEX.green} isAnimationActive={false} />
                 <Bar yAxisId="pct" stackId="status" dataKey="onBreak" name="On Break" fill={STATUS_COLORS_HEX.blue} isAnimationActive={false} />
