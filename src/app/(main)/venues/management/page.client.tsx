@@ -710,7 +710,7 @@ export default function VenueManagementPageClient() {
                       variant="flat"
                       classNames={{
                         label: 'text-surface-light font-medium',
-                        inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+                        inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
                         input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
                       }}
                     />
@@ -736,7 +736,7 @@ export default function VenueManagementPageClient() {
                           variant="flat"
                           classNames={{
                             input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                            inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+                            inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
                           }}
                         />
                         <Button
@@ -869,7 +869,7 @@ export default function VenueManagementPageClient() {
                     size="md"
                     classNames={{
                       input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                      inputWrapper: 'rounded-2xl px-4 pr-6 hover:bg-surface-deep',
+                      inputWrapper: 'rounded-large px-4 pr-6 hover:bg-surface-deep',
                     }}
                     placeholder="Layer name"
                   />

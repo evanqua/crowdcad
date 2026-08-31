@@ -185,7 +185,7 @@ export default function BulkImportModal({
       radius="lg"
       size="2xl"
       classNames={{
-        base: "rounded-2xl bg-surface-deepest text-surface-light mt-20",
+        base: "rounded-lg bg-surface-deepest text-surface-light mt-20",
         header: "pb-0",
         body: "py-4",
         footer: "pt-0",

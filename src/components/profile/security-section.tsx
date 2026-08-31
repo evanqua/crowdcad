@@ -201,7 +201,7 @@ export default function SecuritySection({ user }: { user: ServiceUser }) {
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="Enter current password"
                     classNames={{
-                      inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+                      inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
                       input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
                     }}
                     endContent={
@@ -223,7 +223,7 @@ export default function SecuritySection({ user }: { user: ServiceUser }) {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Enter new password"
                     classNames={{
-                      inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+                      inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
                       input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
                     }}
                     endContent={
@@ -245,7 +245,7 @@ export default function SecuritySection({ user }: { user: ServiceUser }) {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
                     classNames={{
-                      inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+                      inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
                       input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
                     }}
                     endContent={

@@ -123,7 +123,7 @@ export default function AdminUsersSection({ currentUser }: { currentUser: Servic
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or email"
           classNames={{
-            inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+            inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
             input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
           }}
           className="mb-4"

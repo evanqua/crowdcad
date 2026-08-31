@@ -181,7 +181,7 @@ export default function CallTrackingCard({
   }, [event.staff]);
 
   return (
-    <Card className={`rounded-2xl shadow-sm border-0 ${bg}`}>
+    <Card className={`rounded-lg shadow-sm border-0 ${bg}`}>
       {/* HEADER */}
       <CardHeader 
         onClick={() => setExpanded(v => !v)}

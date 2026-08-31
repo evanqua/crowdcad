@@ -17,7 +17,7 @@ export default function DebugModal({ isOpen, onClose, onPopulate, onReset, onCle
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-surface-deep border border-surface-liner w-full max-w-md rounded-xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-surface-deep border border-surface-liner w-full max-w-md rounded-lg shadow-2xl flex flex-col overflow-hidden">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-surface-liner bg-surface-deepest">

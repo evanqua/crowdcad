@@ -27,7 +27,7 @@ export default function LiteLandingPage() {
 
   const inputClassNames = {
     inputWrapper:
-      'rounded-2xl px-4 bg-surface-lighter/30 border border-surface-light/30 hover:bg-surface-lighter/30 shadow-none group-data-[focus=true]:bg-surface-lighter/30 group-data-[focus-visible=true]:bg-surface-lighter/30 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0',
+      'rounded-large px-4 bg-surface-lighter/30 border border-surface-light/30 hover:bg-surface-lighter/30 shadow-none group-data-[focus=true]:bg-surface-lighter/30 group-data-[focus-visible=true]:bg-surface-lighter/30 group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 focus-within:ring-0',
     input:
       'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   } as const;

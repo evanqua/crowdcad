@@ -14,16 +14,16 @@ const BLANK_TEMPLATE_ID = '__blank__';
 
 const inputClassNames = {
   label: 'text-surface-light/70 mb-1 text-xs',
-  inputWrapper: 'rounded-xl px-3 h-10 hover:bg-surface-deep',
+  inputWrapper: 'rounded-medium px-3 h-10 hover:bg-surface-deep',
   input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
 } as const;
 
 const selectClassNames = {
   label: 'text-surface-light mb-1',
   trigger:
-    'rounded-2xl px-4 border border-surface-liner bg-transparent hover:bg-surface-deep data-[focus=true]:outline-none',
+    'rounded-large px-4 border border-surface-liner bg-transparent hover:bg-surface-deep data-[focus=true]:outline-none',
   value: 'text-surface-light',
-  popover: 'bg-surface-deepest border border-surface-liner rounded-2xl',
+  popover: 'bg-surface-deepest border border-surface-liner rounded-large',
   listbox: 'p-1 [&_[data-hover=true]]:bg-surface-deep',
 } as const;
 
