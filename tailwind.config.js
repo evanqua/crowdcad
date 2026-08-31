@@ -82,6 +82,7 @@ module.exports = {
           green:  STATUS_COLORS_HEX.green,   // success, active indicators
           blue:   STATUS_COLORS_HEX.blue,    // informational, selected states
           orange: STATUS_COLORS_HEX.orange,  // non-lead members, equipment runs (gold/amber)
+          alarm:  STATUS_COLORS_HEX.alarm,   // true orange — pending-call blinking alarm
           'card-red': `rgb(${rgbTriplet(STATUS_COLORS_HEX.red)} / var(--status-card-fill-opacity-red))`,
           'card-blue': `rgb(${rgbTriplet(STATUS_COLORS_HEX.blue)} / var(--status-card-fill-opacity-blue))`,
           'card-green': `rgb(${rgbTriplet(STATUS_COLORS_HEX.green)} / var(--status-card-fill-opacity-green))`,
@@ -126,11 +127,24 @@ module.exports = {
       /* ── Animations ──────────────────────────────────────── */
       animation: {
         aurora: 'aurora 92s linear infinite',
+        'pending-alarm': 'pending-alarm 1.1s ease-in-out infinite',
       },
       keyframes: {
         aurora: {
           from: { transform: 'translate3d(0, 0, 0) scale(1.06)' },
           to:   { transform: 'translate3d(-14%, 0, 0) scale(1.06)' },
+        },
+        // Fast fade between the default grey liner and the alarm orange —
+        // used by the Pending call chip once it's been waiting 2+ minutes.
+        'pending-alarm': {
+          '0%, 100%': {
+            borderColor: 'hsl(var(--surface-border))',
+            backgroundColor: 'hsl(var(--surface-border) / 0.3)',
+          },
+          '50%': {
+            borderColor: `rgb(${rgbTriplet(STATUS_COLORS_HEX.alarm)})`,
+            backgroundColor: `rgb(${rgbTriplet(STATUS_COLORS_HEX.alarm)} / 0.45)`,
+          },
         },
       },
     },

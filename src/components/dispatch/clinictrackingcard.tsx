@@ -10,6 +10,7 @@ import { MoreVertical, RotateCw } from 'lucide-react';
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
+import { useMMSS } from '@/hooks/useMMSS';
 
 type ClinicTrackingCardProps = {
   call: Call;
@@ -25,20 +26,6 @@ type ClinicTrackingCardProps = {
   getCallRowClass: (call: Call) => string;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
-
-function useMMSS(since?: number) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!since) return;
-    const tick = () => setElapsed(Math.floor((Date.now() - since) / 1000));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [since]);
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const ss = String(elapsed % 60).padStart(2, '0');
-  return `${mm}:${ss}`;
-}
 
 function callBg() {
   // Clinic calls always use default background
