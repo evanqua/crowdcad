@@ -154,7 +154,7 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   'On Calls': 'En intervention',
   'On Break/Clinic': 'En pause/clinique',
   'Surge limit reached': "Seuil d'affluence atteint",
-  'Call pending 2 minutes — surge alert activated': "Appel en attente depuis 2 minutes — alerte d'affluence activée",
+  'Call pending 1 minute — surge alert activated': "Appel en attente depuis 1 minute — alerte d'affluence activée",
   'Surge alert: multiple clinic calls pending transport': "Alerte d'affluence : plusieurs appels du poste de secours en attente de transport",
   'Reopen Call': "Rouvrir l'appel",
   'Revert this status and reopen the call?': "Annuler ce statut et rouvrir l'appel?",

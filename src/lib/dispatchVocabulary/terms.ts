@@ -168,7 +168,7 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'On Calls',
     'On Break/Clinic',
     'Surge limit reached',
-    'Call pending 2 minutes — surge alert activated',
+    'Call pending 1 minute — surge alert activated',
     'Surge alert: multiple clinic calls pending transport',
     'Reopen Call',
     'Revert this status and reopen the call?',

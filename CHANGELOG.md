@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - Venue and event actions gated by ownership (edit, delete, share, starting a new event at a venue you don't own) now disable themselves in the UI with an explanation, instead of failing after the fact.
 - Admins can designate an event as an "org event" from its 3-dot menu, making it visible to and dispatchable by every org member, the same way org venues already work.
-- **Pending-call surge alerts** — the "Pending" chip shown in place of a team before a call is assigned now ticks a live mm:ss timer, and starts blinking between grey and a new true-orange `status-alarm` color once a call has been pending 2+ minutes. Crossing 2 minutes also fires a one-time toast, and the call log now notes how long a call sat pending once it's finally assigned. Clinic calls have a new "Pending Transport" status (for patients awaiting transport); a second surge toast fires whenever 3 or more clinic calls are marked Pending Transport at once.
+- **Pending-call surge alerts** — the "Pending" chip shown in place of a team before a call is assigned now ticks a live mm:ss timer, and starts blinking between grey and a new true-orange `status-alarm` color once a call has been pending 1+ minute. Crossing 1 minute also fires a one-time toast, and the call log now notes how long a call sat pending once it's finally assigned. Clinic calls have a new "Pending Transport" status (for patients awaiting transport); a second surge toast fires whenever 3 or more clinic calls are marked Pending Transport at once.
 
 ### Fixed
 

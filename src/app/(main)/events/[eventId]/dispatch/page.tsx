@@ -125,7 +125,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   }, [event, t]);
 
   // Pending-call alarm: fires once per call, the moment it's been sitting
-  // Pending (no assigned team) for 2+ minutes. Unlike the surge-percent
+  // Pending (no assigned team) for 1+ minute. Unlike the surge-percent
   // effect above, nothing about a Pending call's own data changes while
   // it waits, so this has to poll wall-clock time rather than react to
   // `event` updates — an eventRef keeps the interval reading fresh data
@@ -134,7 +134,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   eventRef.current = event;
   const toastedPendingCallIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const PENDING_ALARM_MS = 2 * 60 * 1000;
+    const PENDING_ALARM_MS = 60 * 1000;
     const interval = setInterval(() => {
       const currentEvent = eventRef.current;
       if (!currentEvent) return;
@@ -153,7 +153,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         if (!createdAt || Date.now() - createdAt < PENDING_ALARM_MS) continue;
 
         toastedPendingCallIdsRef.current.add(call.id);
-        toast.warning(`${t('Call')} #${call.order}: ${t('Call pending 2 minutes — surge alert activated')}`, {
+        toast.warning(`${t('Call')} #${call.order}: ${t('Call pending 1 minute — surge alert activated')}`, {
           position: 'top-right',
           autoClose: 10000,
           closeOnClick: true,
