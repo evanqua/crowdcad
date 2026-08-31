@@ -105,6 +105,48 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     wasSurgingRef.current = surging;
   }, [event, t]);
 
+  // Pending-call alarm: fires once per call, the moment it's been sitting
+  // Pending (no assigned team) for 2+ minutes. Unlike the surge-percent
+  // effect above, nothing about a Pending call's own data changes while
+  // it waits, so this has to poll wall-clock time rather than react to
+  // `event` updates — an eventRef keeps the interval reading fresh data
+  // without needing to be torn down and recreated on every event change.
+  const eventRef = useRef(event);
+  eventRef.current = event;
+  const toastedPendingCallIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const PENDING_ALARM_MS = 2 * 60 * 1000;
+    const interval = setInterval(() => {
+      const currentEvent = eventRef.current;
+      if (!currentEvent) return;
+      const stillPendingIds = new Set(
+        (currentEvent.calls || []).filter(c => c.status === 'Pending').map(c => c.id)
+      );
+      // Drop toasted ids for calls no longer Pending, so a call that goes
+      // Pending again later (e.g. its only team is removed) can re-alarm.
+      for (const id of toastedPendingCallIdsRef.current) {
+        if (!stillPendingIds.has(id)) toastedPendingCallIdsRef.current.delete(id);
+      }
+      for (const call of currentEvent.calls || []) {
+        if (call.status !== 'Pending') continue;
+        if (toastedPendingCallIdsRef.current.has(call.id)) continue;
+        const createdAt = call.log?.[0]?.timestamp;
+        if (!createdAt || Date.now() - createdAt < PENDING_ALARM_MS) continue;
+
+        toastedPendingCallIdsRef.current.add(call.id);
+        toast.warning(`${t('Call')} #${call.order}: ${t('Call pending 2 minutes — surge alert activated')}`, {
+          position: 'top-right',
+          autoClose: 10000,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          transition: Slide,
+        });
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [t]);
+
   const [openCallId, setOpenCallId] = useState<string | null>(null);
   const [openClinicCallId, setOpenClinicCallId] = useState<string | null>(null);
   const [, setTeamToAdd] = useState<{ [callId: string]: string }>({});
