@@ -283,7 +283,7 @@ export default function ClinicTrackingCard({
             </Dropdown>
           </div>
 
-          {call.outcome && (
+          {call.outcome && call.outcome !== 'Pending Transport' && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onRevertOutcome(call.id); }}

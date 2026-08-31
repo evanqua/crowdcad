@@ -354,7 +354,7 @@ export default function ClinicTrackingTable({
                   {/* Status - Using HeroUI Dropdown */}
                   <td className="p-0" onClick={e => e.stopPropagation()}>
                     <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
-                      <div className={`flex items-center h-8 w-fit max-w-full rounded-full border border-surface-liner bg-surface-liner/30 overflow-hidden ${call.outcome ? 'pr-1.5' : ''}`}>
+                      <div className={`flex items-center h-8 w-fit max-w-full rounded-full border border-surface-liner bg-surface-liner/30 overflow-hidden ${call.outcome && call.outcome !== 'Pending Transport' ? 'pr-1.5' : ''}`}>
                         <Dropdown
                           motionProps={dropdownMotionProps}
                           isOpen={isStatusMenuOpen}
@@ -392,7 +392,7 @@ export default function ClinicTrackingTable({
                             <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
                           </DropdownMenu>
                         </Dropdown>
-                        {call.outcome && (
+                        {call.outcome && call.outcome !== 'Pending Transport' && (
                           <button
                             type="button"
                             onClick={() => onRevertOutcome(call.id)}
