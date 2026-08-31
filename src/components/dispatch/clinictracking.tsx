@@ -16,6 +16,7 @@ import TrackingTableBase from './trackingtablebase';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
+import { isClinicCallResolved } from '@/lib/clinics';
 
 type EditableCallField = keyof Call | 'ageSex';
 
@@ -104,14 +105,14 @@ export default function ClinicTrackingTable({
   );
 
   const resolvedClinicCalls = (event?.calls || [])
-    .filter(c => c.status === 'Delivered' && !!c.outcome && belongsToThisClinic(c))
+    .filter(c => isClinicCallResolved(c) && belongsToThisClinic(c))
     .sort((a, b) => parseInt(a.id) - parseInt(b.id));
   const unresolvedClinicCalls = (event?.calls || [])
-    .filter(c => c.status === 'Delivered' && !c.outcome && belongsToThisClinic(c))
+    .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && belongsToThisClinic(c))
     .sort((a, b) => parseInt(a.id) - parseInt(b.id));
 
   const isClinicCallVisible = React.useCallback(
-    (call: Call) => (!(call.status === 'Delivered' && !!call.outcome) || showResolvedClinicCalls) && belongsToThisClinic(call),
+    (call: Call) => (!isClinicCallResolved(call) || showResolvedClinicCalls) && belongsToThisClinic(call),
     [showResolvedClinicCalls, belongsToThisClinic]
   );
 
@@ -125,7 +126,7 @@ export default function ClinicTrackingTable({
       return;
     }
 
-    const tokenCallIsResolved = tokenCall.status === 'Delivered' && !!tokenCall.outcome;
+    const tokenCallIsResolved = isClinicCallResolved(tokenCall);
     if (tokenCallIsResolved) {
       setOpenMenuToken(null);
     }
@@ -142,7 +143,7 @@ export default function ClinicTrackingTable({
       return;
     }
 
-    const isOpenCallResolved = openCall.status === 'Delivered' && !!openCall.outcome;
+    const isOpenCallResolved = isClinicCallResolved(openCall);
     if (isOpenCallResolved && !showResolvedClinicCalls) {
       setOpenClinicCallId(null);
       setClosingClinicCallId(null);
@@ -226,7 +227,7 @@ export default function ClinicTrackingTable({
             ].map(call => (
               <React.Fragment key={call.id}>
                 {(() => {
-                  const isResolvedClinicCall = call.status === 'Delivered' && !!call.outcome;
+                  const isResolvedClinicCall = isClinicCallResolved(call);
                   const resolvedIndex = isResolvedClinicCall ? resolvedClinicCalls.findIndex((resolvedCall) => resolvedCall.id === call.id) : -1;
                   const motionDelayMs = isResolvedClinicCall && resolvedIndex >= 0 ? resolvedIndex * 30 : 0;
                   const isStatusMenuOpen = openMenuToken === `status:${call.id}` && isClinicCallVisible(call);
@@ -353,13 +354,13 @@ export default function ClinicTrackingTable({
                   {/* Status - Using HeroUI Dropdown */}
                   <td className="p-0" onClick={e => e.stopPropagation()}>
                     <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5">
-                      <div className={`flex items-center h-8 w-fit max-w-full rounded-full border border-surface-liner bg-surface-liner/30 overflow-hidden ${call.outcome ? 'pr-1.5' : ''}`}>
+                      <div className={`flex items-center h-8 w-fit max-w-full rounded-full border border-surface-liner bg-surface-liner/30 overflow-hidden ${call.outcome && call.outcome !== 'Pending Transport' ? 'pr-1.5' : ''}`}>
                         <Dropdown
                           motionProps={dropdownMotionProps}
                           isOpen={isStatusMenuOpen}
                           onOpenChange={(isOpen) => {
                             if (isOpen) {
-                              if (isResolvedClinicCall && !showResolvedClinicCalls) return;
+                              if (isResolvedClinicCall) return;
                               setOpenMenuToken(`status:${call.id}`);
                               return;
                             }
@@ -371,7 +372,8 @@ export default function ClinicTrackingTable({
                               size="sm"
                               radius="full"
                               variant="light"
-                              className="min-w-0 h-8 px-2 text-xs justify-start bg-transparent hover:bg-surface-muted"
+                              isDisabled={isResolvedClinicCall}
+                              className={`min-w-0 h-8 px-2 text-xs justify-start bg-transparent ${isResolvedClinicCall ? 'opacity-100 cursor-default' : 'hover:bg-surface-muted'}`}
                             >
                               {t(call.outcome || 'In Clinic')}
                             </Button>
@@ -384,12 +386,13 @@ export default function ClinicTrackingTable({
                             }}
                           >
                             <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
+                            <DropdownItem key="Pending Transport">{t('Pending Transport')}</DropdownItem>
                             <DropdownItem key="Transported">{t('Transported')}</DropdownItem>
                             <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
                             <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
                           </DropdownMenu>
                         </Dropdown>
-                        {call.outcome && (
+                        {call.outcome && call.outcome !== 'Pending Transport' && (
                           <button
                             type="button"
                             onClick={() => onRevertOutcome(call.id)}

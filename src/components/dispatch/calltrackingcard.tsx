@@ -21,6 +21,7 @@ import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
 import { getStatusColor } from '@/lib/statusColors';
+import { useMMSS } from '@/hooks/useMMSS';
 
 type CallTrackingCardProps = {
   call: Call;
@@ -40,20 +41,6 @@ type CallTrackingCardProps = {
   getCallRowClass: (call: Call) => string;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
-
-function useMMSS(since?: number) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!since) return;
-    const tick = () => setElapsed(Math.floor((Date.now() - since) / 1000));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [since]);
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const ss = String(elapsed % 60).padStart(2, '0');
-  return `${mm}:${ss}`;
-}
 
 function callBg(call: Call, event: Event) {
   // Check if any assigned team has active status
@@ -424,9 +411,15 @@ export default function CallTrackingCard({
               <span className="text-surface-light font-medium mr-2">
                 {detachedTeam.team}
               </span>
-              <span className="text-xs">
+              <Button
+                size="sm"
+                radius="full"
+                variant="light"
+                isDisabled
+                className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
+              >
                 {detachedTeam.reason === 'Delivered' ? getDeliveredLabel(t, clinics, call.clinicId) : t(detachedTeam.reason)}
-              </span>
+              </Button>
             </Chip>
           ))}
 

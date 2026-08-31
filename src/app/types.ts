@@ -117,7 +117,7 @@ export interface DetachedTeam {
   equipmentNames?: string[];
 }
 
-export type ClinicOutcome = "Discharged" | "AMA" | "Rolled from Clinic" | "Transported";
+export type ClinicOutcome = "Discharged" | "AMA" | "Rolled from Clinic" | "Transported" | "Pending Transport";
 
 export interface Call {
   id: string;

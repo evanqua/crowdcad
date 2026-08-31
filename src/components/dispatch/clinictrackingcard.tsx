@@ -10,6 +10,8 @@ import { MoreVertical, RotateCw } from 'lucide-react';
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
+import { useMMSS } from '@/hooks/useMMSS';
+import { isClinicCallResolved } from '@/lib/clinics';
 
 type ClinicTrackingCardProps = {
   call: Call;
@@ -25,20 +27,6 @@ type ClinicTrackingCardProps = {
   getCallRowClass: (call: Call) => string;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
-
-function useMMSS(since?: number) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!since) return;
-    const tick = () => setElapsed(Math.floor((Date.now() - since) / 1000));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [since]);
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const ss = String(elapsed % 60).padStart(2, '0');
-  return `${mm}:${ss}`;
-}
 
 function callBg() {
   // Clinic calls always use default background
@@ -120,6 +108,7 @@ export default function ClinicTrackingCard({
 
   const timer = useMMSS(callTimestamp);
   const bg = getCallRowClass(call) || callBg();
+  const isResolved = isClinicCallResolved(call);
 
   // Get primary team (first assigned team or first detached team)
   const primaryTeam = useMemo(() => {
@@ -267,12 +256,13 @@ export default function ClinicTrackingCard({
         <div className="flex gap-2">
           {/* Status Dropdown */}
           <div className="flex-1" onClick={e => e.stopPropagation()}>
-            <Dropdown motionProps={dropdownMotionProps}>
+            <Dropdown motionProps={dropdownMotionProps} isOpen={isResolved ? false : undefined}>
               <DropdownTrigger>
                 <Button
                   variant="flat"
                   radius="md"
-                  className="w-full h-full justify-start bg-surface-deep border border-surface-liner hover:bg-surface-muted text-surface-light px-2"
+                  isDisabled={isResolved}
+                  className={`w-full h-full justify-start bg-surface-deep border border-surface-liner text-surface-light px-2 ${isResolved ? 'opacity-100 cursor-default' : 'hover:bg-surface-muted'}`}
                 >
                   <div className="text-left flex-4 pl-0.5">
                     <div className="text-xs text-[#d4d4d8] pb-0.5">{t('Status')}</div>
@@ -285,6 +275,7 @@ export default function ClinicTrackingCard({
                 onAction={(key) => onOutcomeChange(call.id, key as string)}
               >
                 <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
+                <DropdownItem key="Pending Transport">{t('Pending Transport')}</DropdownItem>
                 <DropdownItem key="Transported">{t('Transported')}</DropdownItem>
                 <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
                 <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
@@ -292,7 +283,7 @@ export default function ClinicTrackingCard({
             </Dropdown>
           </div>
 
-          {call.outcome && (
+          {call.outcome && call.outcome !== 'Pending Transport' && (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onRevertOutcome(call.id); }}

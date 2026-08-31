@@ -24,6 +24,10 @@ const STATUS_COLORS_HEX = {
   green: '#51c355',
   blue: '#5eaae8',
   orange: '#e2c93d',
+  // True orange (distinct from the gold/amber 'orange' above, which is
+  // already used by En Route Eq / Assisting / Delivered Eq). Used for the
+  // pending-call blinking alarm.
+  alarm: '#e8823c',
 };
 
 // Opacity (0-1) of each status card's tinted background (card fills, chip

@@ -79,7 +79,7 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
   ...terms('equipment', ['In Use']),
 
   // ClinicOutcome union (app/types.ts).
-  ...terms('clinicOutcomes', ['Discharged', 'AMA', 'Rolled from Clinic', 'Transported']),
+  ...terms('clinicOutcomes', ['Discharged', 'AMA', 'Rolled from Clinic', 'Transported', 'Pending Transport']),
 
   // UI copy: buttons, headers, field labels, empty states, menu items.
   ...terms('actions', [
@@ -168,6 +168,8 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'On Calls',
     'On Break/Clinic',
     'Surge limit reached',
+    'Call pending 1 minute — surge alert activated',
+    'Surge alert: multiple clinic calls pending transport',
     'Reopen Call',
     'Revert this status and reopen the call?',
     'Revert this equipment status and reattach it to the team?',

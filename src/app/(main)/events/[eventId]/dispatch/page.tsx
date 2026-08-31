@@ -35,7 +35,8 @@ import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging } from '@/l
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
-import { syncClinicsFromVenue, getEventClinics, getClinicName } from '@/lib/clinics';
+import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResolved } from '@/lib/clinics';
+import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
 
@@ -103,6 +104,67 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     }
     wasSurgingRef.current = surging;
   }, [event, t]);
+
+  const PENDING_TRANSPORT_SURGE_THRESHOLD = 3;
+  const wasPendingTransportSurgingRef = useRef(false);
+  useEffect(() => {
+    if (!event) return;
+    const pendingTransportCount = (event.calls || []).filter(c => c.outcome === 'Pending Transport').length;
+    const surging = pendingTransportCount >= PENDING_TRANSPORT_SURGE_THRESHOLD;
+    if (surging && !wasPendingTransportSurgingRef.current) {
+      toast.warning(`${t('Surge alert: multiple clinic calls pending transport')} (${pendingTransportCount})`, {
+        position: 'top-right',
+        autoClose: 10000,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        transition: Slide,
+      });
+    }
+    wasPendingTransportSurgingRef.current = surging;
+  }, [event, t]);
+
+  // Pending-call alarm: fires once per call, the moment it's been sitting
+  // Pending (no assigned team) for 1+ minute. Unlike the surge-percent
+  // effect above, nothing about a Pending call's own data changes while
+  // it waits, so this has to poll wall-clock time rather than react to
+  // `event` updates — an eventRef keeps the interval reading fresh data
+  // without needing to be torn down and recreated on every event change.
+  const eventRef = useRef(event);
+  eventRef.current = event;
+  const toastedPendingCallIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const PENDING_ALARM_MS = 60 * 1000;
+    const interval = setInterval(() => {
+      const currentEvent = eventRef.current;
+      if (!currentEvent) return;
+      const stillPendingIds = new Set(
+        (currentEvent.calls || []).filter(c => c.status === 'Pending').map(c => c.id)
+      );
+      // Drop toasted ids for calls no longer Pending, so a call that goes
+      // Pending again later (e.g. its only team is removed) can re-alarm.
+      for (const id of toastedPendingCallIdsRef.current) {
+        if (!stillPendingIds.has(id)) toastedPendingCallIdsRef.current.delete(id);
+      }
+      for (const call of currentEvent.calls || []) {
+        if (call.status !== 'Pending') continue;
+        if (toastedPendingCallIdsRef.current.has(call.id)) continue;
+        const createdAt = call.log?.[0]?.timestamp;
+        if (!createdAt || Date.now() - createdAt < PENDING_ALARM_MS) continue;
+
+        toastedPendingCallIdsRef.current.add(call.id);
+        toast.warning(`${t('Call')} #${call.order}: ${t('Call pending 1 minute — surge alert activated')}`, {
+          position: 'top-right',
+          autoClose: 10000,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          transition: Slide,
+        });
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [t]);
 
   const [openCallId, setOpenCallId] = useState<string | null>(null);
   const [openClinicCallId, setOpenClinicCallId] = useState<string | null>(null);
@@ -2144,15 +2206,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (!call) return;
   
     const now = new Date();
-    const hhmm = now.getHours().toString().padStart(2, '0') + 
+    const hhmm = now.getHours().toString().padStart(2, '0') +
                  now.getMinutes().toString().padStart(2, '0');
-  
+
     // Update call log
     const callLogEntry: CallLogEntry = {
       timestamp: now.getTime(),
-      message: `${hhmm} - ${team} assigned and en route.`
+      message: withPendingSuffix(`${hhmm} - ${team} assigned and en route.`, call, now)
     };
-  
+
     // Update team log
     const teamLogEntry: TeamLogEntry = {
       timestamp: now.getTime(),
@@ -3929,12 +3991,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       {isMobile && [
                         // Unresolved clinic (Delivered with no outcome)
                         ...(event.calls || [])
-                          .filter(c => c.status === 'Delivered' && !c.outcome && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
+                          .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
                           .sort((a, b) => parseInt(a.id) - parseInt(b.id)),
                         // Resolved clinic (Delivered with an outcome) when toggled on
                         ...(showResolvedClinicCalls
                           ? (event.calls || [])
-                              .filter(c => c.status === 'Delivered' && !!c.outcome && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
+                              .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
                               .sort((a, b) => parseInt(a.id) - parseInt(b.id))
                           : [])
                       ].map((call: Call) => (
