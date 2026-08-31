@@ -36,6 +36,7 @@ import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
 import { syncClinicsFromVenue, getEventClinics, getClinicName } from '@/lib/clinics';
+import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
 
@@ -2144,15 +2145,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (!call) return;
   
     const now = new Date();
-    const hhmm = now.getHours().toString().padStart(2, '0') + 
+    const hhmm = now.getHours().toString().padStart(2, '0') +
                  now.getMinutes().toString().padStart(2, '0');
-  
+
     // Update call log
     const callLogEntry: CallLogEntry = {
       timestamp: now.getTime(),
-      message: `${hhmm} - ${team} assigned and en route.`
+      message: withPendingSuffix(`${hhmm} - ${team} assigned and en route.`, call, now)
     };
-  
+
     // Update team log
     const teamLogEntry: TeamLogEntry = {
       timestamp: now.getTime(),

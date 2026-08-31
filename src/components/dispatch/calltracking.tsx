@@ -20,6 +20,7 @@ import PendingCallChip from './pendingcallchip';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
+import { withPendingSuffix } from '@/lib/callTiming';
 
 import {
   Dropdownmenu,
@@ -601,7 +602,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                               const callLogEntry = {
                                                 timestamp: now.getTime(),
-                                                message: `${hhmm} - Supervisor ${memberName} (${supervisor.team}) assigned to call.`
+                                                message: withPendingSuffix(`${hhmm} - Supervisor ${memberName} (${supervisor.team}) assigned to call.`, call, now)
                                               };
                                               const teamLogEntry = {
                                                 timestamp: now.getTime(),
@@ -719,7 +720,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                                       const callLogEntry = {
                                                         timestamp: now.getTime(),
-                                                        message: `${hhmm} - ${equipment.name} assigned to ${team.team} for this call.`
+                                                        message: withPendingSuffix(`${hhmm} - ${equipment.name} assigned to ${team.team} for this call.`, call, now)
                                                       };
 
                                                       const teamLogEntry = {
@@ -783,7 +784,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                                       const callLogEntry = {
                                                         timestamp: now.getTime(),
-                                                        message: `${hhmm} - ${equipment.name} assigned to ${team.team} for this call.`
+                                                        message: withPendingSuffix(`${hhmm} - ${equipment.name} assigned to ${team.team} for this call.`, call, now)
                                                       };
 
                                                       const teamLogEntry = {
@@ -874,7 +875,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                                         const callLogEntry = {
                                                           timestamp: now.getTime(),
-                                                          message: `${hhmm} - ${equipment.name} assigned to Supervisor ${memberName} (${supervisor.team}) for this call.`
+                                                          message: withPendingSuffix(`${hhmm} - ${equipment.name} assigned to Supervisor ${memberName} (${supervisor.team}) for this call.`, call, now)
                                                         };
 
                                                         const teamLogEntry = {
@@ -942,7 +943,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                                         const callLogEntry = {
                                                           timestamp: now.getTime(),
-                                                          message: `${hhmm} - ${equipment.name} assigned to Supervisor ${memberName} (${supervisor.team}) for this call.`
+                                                          message: withPendingSuffix(`${hhmm} - ${equipment.name} assigned to Supervisor ${memberName} (${supervisor.team}) for this call.`, call, now)
                                                         };
 
                                                         const teamLogEntry = {
@@ -1039,7 +1040,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                                       const callLogEntry = {
                                                         timestamp: now.getTime(),
-                                                        message: `${hhmm} - ${equipment.name} assigned to ${team.team} for this call.`
+                                                        message: withPendingSuffix(`${hhmm} - ${equipment.name} assigned to ${team.team} for this call.`, call, now)
                                                       };
 
                                                       const teamLogEntry = {
@@ -1103,7 +1104,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                                       const callLogEntry = {
                                                         timestamp: now.getTime(),
-                                                        message: `${hhmm} - ${equipment.name} assigned to ${team.team} for this call.`
+                                                        message: withPendingSuffix(`${hhmm} - ${equipment.name} assigned to ${team.team} for this call.`, call, now)
                                                       };
 
                                                       const teamLogEntry = {
@@ -1194,7 +1195,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                                         const callLogEntry = {
                                                           timestamp: now.getTime(),
-                                                          message: `${hhmm} - ${equipment.name} assigned to Supervisor ${memberName} (${supervisor.team}) for this call.`
+                                                          message: withPendingSuffix(`${hhmm} - ${equipment.name} assigned to Supervisor ${memberName} (${supervisor.team}) for this call.`, call, now)
                                                         };
 
                                                         const teamLogEntry = {
@@ -1262,7 +1263,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
                                                         const callLogEntry = {
                                                           timestamp: now.getTime(),
-                                                          message: `${hhmm} - ${equipment.name} assigned to Supervisor ${memberName} (${supervisor.team}) for this call.`
+                                                          message: withPendingSuffix(`${hhmm} - ${equipment.name} assigned to Supervisor ${memberName} (${supervisor.team}) for this call.`, call, now)
                                                         };
 
                                                         const teamLogEntry = {
