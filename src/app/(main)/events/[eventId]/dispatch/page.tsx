@@ -105,6 +105,25 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     wasSurgingRef.current = surging;
   }, [event, t]);
 
+  const PENDING_TRANSPORT_SURGE_THRESHOLD = 3;
+  const wasPendingTransportSurgingRef = useRef(false);
+  useEffect(() => {
+    if (!event) return;
+    const pendingTransportCount = (event.calls || []).filter(c => c.outcome === 'Pending Transport').length;
+    const surging = pendingTransportCount >= PENDING_TRANSPORT_SURGE_THRESHOLD;
+    if (surging && !wasPendingTransportSurgingRef.current) {
+      toast.warning(`${t('Surge alert: multiple clinic calls pending transport')} (${pendingTransportCount})`, {
+        position: 'top-right',
+        autoClose: 10000,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        transition: Slide,
+      });
+    }
+    wasPendingTransportSurgingRef.current = surging;
+  }, [event, t]);
+
   // Pending-call alarm: fires once per call, the moment it's been sitting
   // Pending (no assigned team) for 2+ minutes. Unlike the surge-percent
   // effect above, nothing about a Pending call's own data changes while

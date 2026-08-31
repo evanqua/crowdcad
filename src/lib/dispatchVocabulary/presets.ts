@@ -66,6 +66,7 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   AMA: 'SCAM',
   'Rolled from Clinic': 'Transféré',
   Transported: 'Transporté',
+  'Pending Transport': 'En attente de transport',
 
   // Actions & labels
   'Total Calls': 'Appels totaux',
@@ -154,6 +155,7 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   'On Break/Clinic': 'En pause/clinique',
   'Surge limit reached': "Seuil d'affluence atteint",
   'Call pending 2 minutes — surge alert activated': "Appel en attente depuis 2 minutes — alerte d'affluence activée",
+  'Surge alert: multiple clinic calls pending transport': "Alerte d'affluence : plusieurs appels du poste de secours en attente de transport",
   'Reopen Call': "Rouvrir l'appel",
   'Revert this status and reopen the call?': "Annuler ce statut et rouvrir l'appel?",
   'Revert this equipment status and reattach it to the team?': "Annuler ce statut d'équipement et le réattribuer à l'équipe?",

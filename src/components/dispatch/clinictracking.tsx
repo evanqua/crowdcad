@@ -384,6 +384,7 @@ export default function ClinicTrackingTable({
                             }}
                           >
                             <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
+                            <DropdownItem key="Pending Transport">{t('Pending Transport')}</DropdownItem>
                             <DropdownItem key="Transported">{t('Transported')}</DropdownItem>
                             <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
                             <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
