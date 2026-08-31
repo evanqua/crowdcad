@@ -150,7 +150,7 @@ function LiteCreateContent() {
     label: 'text-surface-light font-medium',
     input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
     inputWrapper:
-      'rounded-2xl px-4 pr-6 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+      'rounded-large px-4 pr-6 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
   } as const;
 
   useEffect(() => {

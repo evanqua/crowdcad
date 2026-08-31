@@ -49,7 +49,7 @@ export default function EventSummaryModal({
       backdrop="opaque"
       radius="lg"
       classNames={{
-        base: 'rounded-2xl bg-surface-deepest text-surface-light max-w-lg w-full',
+        base: 'rounded-lg bg-surface-deepest text-surface-light max-w-lg w-full',
         header: 'pb-0',
         body: 'py-4',
         footer: 'pt-0',

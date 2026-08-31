@@ -59,7 +59,7 @@ export default function AdminVenuesSection({ currentUser }: { currentUser: Servi
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search your venues"
           classNames={{
-            inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+            inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
             input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
           }}
           className="mb-4"

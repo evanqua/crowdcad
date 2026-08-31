@@ -10,7 +10,7 @@ import LoadingScreen from '@/components/ui/loading-screen';
 const inputClassNames = {
   label: 'text-surface-light font-medium',
   input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
-  inputWrapper: 'rounded-2xl px-4 hover:bg-surface-deep',
+  inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
 } as const;
 
 export default function EditProfilePage() {

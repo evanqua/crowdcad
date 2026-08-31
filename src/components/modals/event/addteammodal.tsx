@@ -76,7 +76,7 @@ export default function AddTeamModal({
 
   const inputClassNames = {
     label: "text-surface-light mb-1",
-    inputWrapper: "rounded-2xl px-4 hover:bg-surface-deep",
+    inputWrapper: "rounded-large px-4 hover:bg-surface-deep",
     input:
       "text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none",
   } as const;
@@ -84,9 +84,9 @@ export default function AddTeamModal({
   const selectClassNames = {
     label: "text-surface-light mb-1",
     trigger:
-      "rounded-2xl px-4 hover:bg-surface-deep data-[focus=true]:outline-none",
+      "rounded-large px-4 hover:bg-surface-deep data-[focus=true]:outline-none",
     value: "text-surface-light",
-    popover: "bg-surface-deepest border border-surface-liner rounded-2xl",
+    popover: "bg-surface-deepest border border-surface-liner rounded-large",
     listbox:
       "p-1 [&_[data-hover=true]]:bg-surface-deep [&_[data-selected=true]]:bg-surface-deep",
   } as const;
@@ -107,7 +107,7 @@ export default function AddTeamModal({
       hideCloseButton
       radius="lg"
       classNames={{
-        base: "rounded-2xl bg-surface-deepest text-surface-light mt-20",
+        base: "rounded-lg bg-surface-deepest text-surface-light mt-20",
         header: "pb-0",
         body: "py-4",
         footer: "pt-0",

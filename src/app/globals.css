@@ -121,7 +121,7 @@
   position: relative;
   isolation: isolate;
   overflow: visible;
-  --tab-chrome-top-radius: 20px;
+  --tab-chrome-top-radius: var(--radius);
 }
 
 .tab-chrome.tab-active {

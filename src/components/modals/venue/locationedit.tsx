@@ -46,14 +46,14 @@ export default function LocationEditModal({
 
   const inputClassNames = {
     label: "text-surface-light mb-1",
-    inputWrapper: "rounded-2xl px-4 hover:bg-surface-deep",
+    inputWrapper: "rounded-large px-4 hover:bg-surface-deep",
     input:
       "text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none",
   } as const;
 
   const selectClassNames = {
     label: "text-surface-light mb-1",
-    trigger: "rounded-2xl px-4 hover:bg-surface-deep bg-surface-deep",
+    trigger: "rounded-large px-4 hover:bg-surface-deep bg-surface-deep",
     value: "text-surface-light",
   } as const;
 
@@ -79,7 +79,7 @@ export default function LocationEditModal({
       hideCloseButton
       radius="lg"
       classNames={{
-        base: "rounded-2xl bg-surface-deepest text-surface-light",
+        base: "rounded-lg bg-surface-deepest text-surface-light",
         header: "pb-0",
         body: "py-4",
         footer: "pt-0",

@@ -39,10 +39,10 @@ const AssignmentDropdown = React.memo(function AssignmentDropdown({
 }: AssignmentDropdownProps) {
   const selectClassNames = {
     label: 'text-surface-light mb-1',
-    trigger: 'rounded-2xl px-3 py-1 min-h-unit-8 w-auto border border-surface-liner bg-transparent hover:bg-surface-deep data-[focus=true]:outline-none',
+    trigger: 'rounded-large px-3 py-1 min-h-unit-8 w-auto border border-surface-liner bg-transparent hover:bg-surface-deep data-[focus=true]:outline-none',
     innerWrapper: 'gap-0 pr-0',
     value: 'text-surface-light text-xs',
-    popover: 'bg-surface-deepest border border-surface-liner rounded-2xl',
+    popover: 'bg-surface-deepest border border-surface-liner rounded-large',
     listbox: 'p-2',
     selectorIcon: 'text-surface-light',
   } as const;
@@ -408,7 +408,7 @@ export default function PostingScheduleModal({
       hideCloseButton
       radius="lg"
       classNames={{
-        base: 'rounded-2xl bg-surface-deepest text-surface-light max-h-[90vh] max-w-[95vw] sm:max-w-[90vw] lg:max-w-5xl overflow-hidden',
+        base: 'rounded-lg bg-surface-deepest text-surface-light max-h-[90vh] max-w-[95vw] sm:max-w-[90vw] lg:max-w-5xl overflow-hidden',
         wrapper: 'overflow-hidden',
         header: 'pb-3',
         body: 'pt-2 pb-4 overflow-y-auto overflow-x-hidden',

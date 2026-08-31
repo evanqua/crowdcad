@@ -61,7 +61,7 @@ export default function TransportUnitModal({
       hideCloseButton
       radius="lg"
       classNames={{
-        base: "rounded-2xl bg-surface-deepest text-surface-light mt-20",
+        base: "rounded-lg bg-surface-deepest text-surface-light mt-20",
         header: "pb-0",
         body: "py-4",
         footer: "pt-0",

@@ -140,6 +140,17 @@ module.exports = {
       addBase(statusCardOpacityBase());
     },
     heroui({
+      layout: {
+        // Ties every HeroUI component's corners to the same shadcn `--radius`
+        // token (see globals.css) used by the plain Tailwind rounded-lg/md/sm
+        // utilities and shadcn/radix components (e.g. dropdown-menu.tsx) —
+        // one shared lever instead of a second, independently-tuned scale.
+        radius: {
+          small: "calc(var(--radius) - 4px)",
+          medium: "calc(var(--radius) - 2px)",
+          large: "var(--radius)",
+        },
+      },
       themes: {
         light: {
           colors: {

@@ -347,7 +347,7 @@ export default function EditVenueModal({ venueId, onClose, onSaved }: Props) {
       tabIndex={-1}
     >
       <div
-        className="mx-4 w-full max-w-6xl rounded-2xl bg-surface-deepest text-surface-light shadow-2xl"
+        className="mx-4 w-full max-w-6xl rounded-lg bg-surface-deepest text-surface-light shadow-2xl"
         style={{ maxHeight: '85vh', overflowY: 'auto' }}
         onMouseDown={(e) => e.stopPropagation()}
       >

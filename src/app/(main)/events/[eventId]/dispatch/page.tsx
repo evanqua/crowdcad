@@ -3366,9 +3366,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               
               {/* LEFT SIDEBAR - Select for Teams/Supervisors/Equipment */}
               <ResizablePanel defaultSize={25} minSize={20} maxSize={37}>
-                <div className="h-full rounded-xl pb-16">
+                <div className="h-full rounded-xl flex flex-col">
                   {/* Header with Select and Action Buttons */}
-                  <div className="flex w-full justify-between items-center pt-2 pb-2 border-b border-surface-liner">
+                  <div className="flex w-full justify-between items-center pt-2 pb-2 border-b border-surface-liner shrink-0">
                     <Select
                       selectedKeys={[selectedLeftTab]}
                       onSelectionChange={(keys) => {
@@ -3391,12 +3391,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     <TeamActionButtonGroup selectedTab={selectedLeftTab as 'teams' | 'supervisors' | 'equipment'} />
                   </div>
 
-                  {event && <AvailabilitySurgeStrip event={event} />}
+                  {event && <div className="shrink-0"><AvailabilitySurgeStrip event={event} /></div>}
 
                   {/* Content with ScrollShadow */}
-                  <div className="h-full overflow-auto scrollbar-hide">
-                    <div className="p-0">
-                      
+                  <div className="flex-1 min-h-0 overflow-auto scrollbar-hide">
+                    <div className="p-0 pb-16">
+
                       {/* TEAMS CONTENT */}
                       {selectedLeftTab === 'teams' && (
                         <div className="dispatch-shell-list">
@@ -3558,7 +3558,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     </div>
 
                     {selectedRightTab === 'calls' && !isMobile && (
-                      <div className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
+                      <div className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
                           <h3 className="text-md font-semibold text-surface-light">{t('Total Calls')}: {event.calls?.length || 0}</h3>
                           <Tooltip content={t('Add Call')} placement="top">
@@ -3609,7 +3609,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     )}
 
                     {clinics.map((clinic) => selectedRightTab === clinic.id && !isMobile && (
-                      <div key={clinic.id} className="relative z-10 -mt-px mx-1.5 rounded-2xl bg-surface-deep px-2.5 py-2 space-y-2">
+                      <div key={clinic.id} className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 space-y-2">
                         <div className="flex items-center justify-between py-1">
                           <h3 className="text-md font-semibold text-surface-light">{t('Total Patients')}: {getClinicCalls(clinic.id).length}</h3>
                           <Tooltip content={t('Add Patient')} placement="top">
@@ -4079,7 +4079,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         <div className="fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-center justify-center" onClick={() => setShowDuplicateModal(false)}>
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-surface-deepest border border-surface-liner text-surface-light rounded-2xl p-6 w-full max-w-2xl shadow-xl space-y-4"
+            className="bg-surface-deepest border border-surface-liner text-surface-light rounded-lg p-6 w-full max-w-2xl shadow-xl space-y-4"
           >
             <h2 className="text-2xl font-bold text-surface mb-4">Select Original Call</h2>
             <p className="text-surface-light mb-4">
