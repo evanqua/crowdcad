@@ -35,7 +35,7 @@ import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging } from '@/l
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
-import { syncClinicsFromVenue, getEventClinics, getClinicName } from '@/lib/clinics';
+import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResolved } from '@/lib/clinics';
 import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
@@ -3991,12 +3991,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       {isMobile && [
                         // Unresolved clinic (Delivered with no outcome)
                         ...(event.calls || [])
-                          .filter(c => c.status === 'Delivered' && !c.outcome && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
+                          .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
                           .sort((a, b) => parseInt(a.id) - parseInt(b.id)),
                         // Resolved clinic (Delivered with an outcome) when toggled on
                         ...(showResolvedClinicCalls
                           ? (event.calls || [])
-                              .filter(c => c.status === 'Delivered' && !!c.outcome && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
+                              .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
                               .sort((a, b) => parseInt(a.id) - parseInt(b.id))
                           : [])
                       ].map((call: Call) => (

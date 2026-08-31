@@ -11,6 +11,7 @@ import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { useMMSS } from '@/hooks/useMMSS';
+import { isClinicCallResolved } from '@/lib/clinics';
 
 type ClinicTrackingCardProps = {
   call: Call;
@@ -107,6 +108,7 @@ export default function ClinicTrackingCard({
 
   const timer = useMMSS(callTimestamp);
   const bg = getCallRowClass(call) || callBg();
+  const isResolved = isClinicCallResolved(call);
 
   // Get primary team (first assigned team or first detached team)
   const primaryTeam = useMemo(() => {
@@ -254,12 +256,13 @@ export default function ClinicTrackingCard({
         <div className="flex gap-2">
           {/* Status Dropdown */}
           <div className="flex-1" onClick={e => e.stopPropagation()}>
-            <Dropdown motionProps={dropdownMotionProps}>
+            <Dropdown motionProps={dropdownMotionProps} isOpen={isResolved ? false : undefined}>
               <DropdownTrigger>
                 <Button
                   variant="flat"
                   radius="md"
-                  className="w-full h-full justify-start bg-surface-deep border border-surface-liner hover:bg-surface-muted text-surface-light px-2"
+                  isDisabled={isResolved}
+                  className={`w-full h-full justify-start bg-surface-deep border border-surface-liner text-surface-light px-2 ${isResolved ? 'opacity-100 cursor-default' : 'hover:bg-surface-muted'}`}
                 >
                   <div className="text-left flex-4 pl-0.5">
                     <div className="text-xs text-[#d4d4d8] pb-0.5">{t('Status')}</div>

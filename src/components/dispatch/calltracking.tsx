@@ -500,12 +500,18 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 <span className="text-surface-light font-medium mr-2">
                                   {detachedTeam.team}
                                 </span>
-                                <span className="text-xs">
+                                <Button
+                                  size="sm"
+                                  radius="full"
+                                  variant="light"
+                                  isDisabled
+                                  className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
+                                >
                                   {detachedTeam.reason === 'Delivered' ? getDeliveredLabel(t, clinics, call.clinicId) : t(detachedTeam.reason)}
-                                </span>
+                                </Button>
                               </Chip>
                             ))}
-                            
+
                             {/* Add Team Button with shadcn DropdownMenu */}
                             <Dropdownmenu>
                               <DropdownMenuTrigger asChild>

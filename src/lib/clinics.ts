@@ -1,4 +1,4 @@
-import type { Clinic, Post, Venue } from '@/app/types';
+import type { Call, Clinic, Post, Venue } from '@/app/types';
 
 export const DEFAULT_CLINICS: Clinic[] = [{ id: 'clinic', name: 'Clinic' }];
 
@@ -73,6 +73,16 @@ export function hasDuplicateClinicName(
     if (!isClinicPost(post)) return false;
     return post.name.trim().toLowerCase() === trimmed;
   });
+}
+
+/**
+ * True once a clinic call has a terminal outcome (Discharged, AMA, Rolled
+ * from Clinic, Transported). "Pending Transport" is deliberately excluded —
+ * it's a waiting-room status like "In Clinic", not a resolution, so a call
+ * marked Pending Transport stays in the active/unresolved list.
+ */
+export function isClinicCallResolved(call: Call): boolean {
+  return call.status === 'Delivered' && !!call.outcome && call.outcome !== 'Pending Transport';
 }
 
 /**
