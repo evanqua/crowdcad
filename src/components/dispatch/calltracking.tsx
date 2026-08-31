@@ -16,6 +16,7 @@ import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
 import DispatchMotionCell from './motioncell';
 import TrackingTableBase from './trackingtablebase';
+import PendingCallChip from './pendingcallchip';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
@@ -376,14 +377,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                           <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5">
                             <div className="relative z-0 flex flex-nowrap items-center gap-2 min-w-max w-max">
                             {(call.assignedTeam || []).length === 0 && !isResolvedCall && (
-                              <Chip
-                                size="lg"
-                                variant="flat"
-                                color="default"
-                                className="text-surface-light h-8 shrink-0 border border-surface-liner bg-surface-liner/30"
-                              >
-                                {t('Pending')}
-                              </Chip>
+                              <PendingCallChip since={call.log?.[0]?.timestamp} label={t('Pending')} />
                             )}
                             {/* Active assigned teams - Larger chips with centered dropdown */}
                             {(Array.isArray(call.assignedTeam) ? call.assignedTeam : []).map((team: string) => {
