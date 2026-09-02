@@ -42,7 +42,10 @@ Given('I have ended an event and am on the summary page', async ({ page }) => {
   await dialog.locator('[aria-label="Certification"]').click();
   await page.locator('[role="listbox"]').getByText('CPR', { exact: true }).click();
   await dialog.getByRole('button', { name: 'Save & close' }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible();
+  // Named locator avoids a strict-mode clash with the Certification Select's
+  // own popover, which also carries role="dialog" and can briefly linger in
+  // the DOM mid-unmount after the parent modal closes.
+  await expect(page.getByRole('dialog', { name: 'Add New Team' })).not.toBeVisible();
 
   // 5. Log a call assigned to the team
   await page.getByTestId('add-call-button').click();
