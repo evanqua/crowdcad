@@ -68,6 +68,11 @@ export interface Event {
 
   /** Percent of teams actively on calls at which the surge display turns red. Defaults to 70 when unset. */
   surgeLimitPercent?: number;
+
+  /** Manually declared "surge" state for the ops team, toggled via the Surge button beside the Calls/Clinic tabs — distinct from the automatic `surgeLimitPercent` threshold indicator. */
+  manualSurgeActive?: boolean;
+  /** Epoch ms when the current manual surge was started; cleared when surge is turned off. */
+  manualSurgeStartedAt?: number;
 }
 
 export interface TeamLogEntry {

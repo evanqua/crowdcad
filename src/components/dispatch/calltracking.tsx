@@ -207,9 +207,21 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   }, [closingCallId, openCallId]);
 
 
+  const resolvedToggleFooter = (
+    <div className="flex justify-center pt-3">
+      <button
+        onClick={() => setShowResolvedCalls(prev => !prev)}
+        className="text-surface-faint text-base hover:text-surface-light"
+        aria-label="Toggle resolved calls"
+      >
+        {showResolvedCalls ? t('Hide Resolved Calls') : t('Show Resolved Calls')}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="col-span-2 text-black w-full">
-      <TrackingTableBase TableColGroup={TableColGroup} showStatusColumn={false} showTeamAssignmentChips={true}>
+    <div className="col-span-2 text-black w-full h-full min-h-0">
+      <TrackingTableBase TableColGroup={TableColGroup} showStatusColumn={false} showTeamAssignmentChips={true} footer={resolvedToggleFooter}>
               {[
                 // Active calls first
                 ...activeCalls,
@@ -1479,16 +1491,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                 );
               })}
       </TrackingTableBase>
-
-      <div className="flex justify-center pt-3">
-        <button
-          onClick={() => setShowResolvedCalls(prev => !prev)}
-          className="text-surface-faint text-base hover:text-surface-light"
-          aria-label="Toggle resolved calls"
-        >
-          {showResolvedCalls ? t('Hide Resolved Calls') : t('Show Resolved Calls')}
-        </button>
-      </div>
     </div>
   );
 };
