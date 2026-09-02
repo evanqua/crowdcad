@@ -211,12 +211,25 @@ export default function ClinicTrackingTable({
 
   
 
+  const resolvedToggleFooter = (
+    <div className="flex justify-center pt-3">
+      <button
+        onClick={() => setShowResolvedClinicCalls(prev => !prev)}
+        className="text-surface-faint text-base hover:text-surface-light"
+        aria-label="Toggle resolved clinic calls"
+      >
+        {showResolvedClinicCalls ? t('Hide Resolved Clinic Calls') : t('Show Resolved Clinic Calls')}
+      </button>
+    </div>
+  );
+
   return (
-    <div className="col-span-2 text-black w-full">
+    <div className="col-span-2 text-black w-full h-full min-h-0">
       <TrackingTableBase
         TableColGroup={TableColGroup}
         showStatusColumn={true}
         showTeamAssignmentChips={false}
+        footer={resolvedToggleFooter}
       >
             {[
               // Unresolved clinic (Delivered with no outcome)
@@ -488,7 +501,7 @@ export default function ClinicTrackingTable({
                             : 'pt-0 pb-0'
                         }`}
                       >
-                        <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer">
+                        <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer" overflowVisibleWhenOpen>
                           {call.priority && (
                             <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
                               ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
@@ -592,16 +605,6 @@ export default function ClinicTrackingTable({
               </React.Fragment>
             ))}
       </TrackingTableBase>
-      
-      <div className="flex justify-center pt-3">
-        <button
-          onClick={() => setShowResolvedClinicCalls(prev => !prev)}
-          className="text-surface-faint text-base hover:text-surface-light"
-          aria-label="Toggle resolved clinic calls"
-        >
-          {showResolvedClinicCalls ? t('Hide Resolved Clinic Calls') : t('Show Resolved Clinic Calls')}
-        </button>
-      </div>
     </div>
   );
 }

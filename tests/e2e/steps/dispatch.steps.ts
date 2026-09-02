@@ -56,6 +56,13 @@ Then('the call should appear in the call list', async ({ page, scenarioState }) 
   await expect(page.getByText(scenarioState.loggedCallLocation)).toBeVisible();
 });
 
+Then('I should see the text {string} in the calls table', async ({ page }, text: string) => {
+  // Scoped to the calls <table> so a plain getByText doesn't clash with the
+  // same word appearing in the stat row above it (e.g. "Pending" is both a
+  // call's status chip and one of the Calls tab's insight labels).
+  await expect(page.locator('table').getByText(text)).toBeVisible();
+});
+
 // Team management
 
 When('I open the add team modal', async ({ page }) => {

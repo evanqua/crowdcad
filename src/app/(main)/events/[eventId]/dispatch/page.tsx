@@ -31,6 +31,8 @@ import { ShieldAlert } from 'lucide-react';
 import { Select, SelectItem, Tabs, Tab, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Tooltip } from "@heroui/react"
 import EquipmentCard from '@/components/dispatch/equipmentcard';
 import AvailabilitySurgeStrip from '@/components/dispatch/availabilitysurgestrip';
+import SurgeToggleButton from '@/components/dispatch/surgetogglebutton';
+import { TrackingInsightsRow } from '@/components/dispatch/trackinginsights';
 import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging } from '@/lib/teamAvailability';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
@@ -2995,6 +2997,31 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     }
   }, [user, ready, router, eventId, isLiteMode]);
 
+  // Auto-activates the manual surge toggle when the automatic percent-on-calls
+  // threshold (surgeLimitPercent) is first crossed. Edge-triggered off a ref
+  // rather than continuously synced, so a dispatcher who manually turns the
+  // surge back off isn't immediately re-flipped while the team is still above
+  // threshold — only a fresh crossing (drop below, then rise above again)
+  // re-triggers it.
+  const wasAboveSurgeThresholdRef = useRef(false);
+  useEffect(() => {
+    if (!event) return;
+    const summary = getTeamAvailabilitySummary(event);
+    const threshold = getSurgeLimitPercent(event);
+    const aboveThreshold = isSurging(summary.percentOnCalls, threshold);
+
+    if (aboveThreshold && !wasAboveSurgeThresholdRef.current && !event.manualSurgeActive) {
+      // Functional form reads the transaction's live snapshot rather than this
+      // closure's possibly-stale `event`, so a surge someone else just started
+      // (or that this effect itself already started a moment ago) never gets
+      // its start time clobbered by a second, redundant Date.now().
+      updateEvent((current) =>
+        current.manualSurgeActive ? {} : { manualSurgeActive: true, manualSurgeStartedAt: Date.now() }
+      );
+    }
+    wasAboveSurgeThresholdRef.current = aboveThreshold;
+  }, [event, updateEvent]);
+
   // Return early if auth is not ready or user is not authenticated
   if (!isLiteMode && !ready) {
     return <LoadingScreen label="Loading…" />;
@@ -3090,9 +3117,27 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     'Unable to Locate',
   ];
 
-  const activeCallsCount = (event.calls || []).filter(
+  const activeCallsList = (event.calls || []).filter(
     call => !resolvedCallStatuses.includes(call.status)
-  ).length;
+  );
+  const activeCallsCount = activeCallsList.length;
+
+  // A call's "primary" team status, mirroring the same Transporting > On Scene
+  // priority used for the table row tint (getRowStatusClass) so a call with
+  // teams in more than one status isn't double-counted across insight tiles.
+  const getCallPrimaryStatus = (call: Call): 'Pending' | 'Transporting' | 'On Scene' | 'Other' => {
+    if (!Array.isArray(call.assignedTeam) || call.assignedTeam.length === 0) return 'Pending';
+    const statuses = call.assignedTeam
+      .map(team => event?.staff.find(s => s.team === team)?.status)
+      .filter((status): status is string => status !== undefined);
+    if (statuses.includes('Transporting')) return 'Transporting';
+    if (statuses.includes('On Scene')) return 'On Scene';
+    return 'Other';
+  };
+
+  const pendingCallsCount = activeCallsList.filter(call => getCallPrimaryStatus(call) === 'Pending').length;
+  const onSceneCallsCount = activeCallsList.filter(call => getCallPrimaryStatus(call) === 'On Scene').length;
+  const transportingCallsCount = activeCallsList.filter(call => getCallPrimaryStatus(call) === 'Transporting').length;
 
   // Venue-designated clinics, falling back to a single default "Clinic" for
   // events created before multi-clinic support existed.
@@ -3103,6 +3148,33 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const getClinicCalls = (clinicId: string) => (event.calls || []).filter(
     call => call.status === 'Delivered' && (clinics.length <= 1 || (call.clinicId ?? clinics[0]?.id) === clinicId)
   );
+
+  const getClinicInsightCounts = (clinicId: string) => {
+    const calls = getClinicCalls(clinicId);
+    return {
+      totalPatients: calls.length,
+      // Matches the tab label's count exactly: unresolved means no outcome set yet.
+      totalInClinic: calls.filter(c => !c.outcome).length,
+      totalTransported: calls.filter(c => c.outcome === 'Transported').length,
+      totalPendingTransport: calls.filter(c => c.outcome === 'Pending Transport').length,
+    };
+  };
+
+  const handleToggleSurge = async () => {
+    if (event.manualSurgeActive) {
+      if (!window.confirm(t('Are you sure you want to disable surge?'))) return;
+      await updateEvent((current) =>
+        current.manualSurgeActive ? { manualSurgeActive: false, manualSurgeStartedAt: undefined } : {}
+      );
+    } else {
+      // Functional form: if a surge was already started (by the auto-trigger
+      // effect or another dispatcher) between this click and the transaction
+      // running, keep its original start time instead of overwriting it.
+      await updateEvent((current) =>
+        current.manualSurgeActive ? {} : { manualSurgeActive: true, manualSurgeStartedAt: Date.now() }
+      );
+    }
+  };
 
   const COLW = {
     CALLNO: '4rem',   // Call #
@@ -3594,123 +3666,159 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
               {/* RIGHT SIDE - Calls and Clinic Tabs */}
               <ResizablePanel defaultSize={75} minSize={50}>
-                <div className="h-full overflow-auto scrollbar-hide pt-2 pb-2">
-                  <div className="w-full">
-                    <div className="relative z-30 mx-1.5 pb-0 flex items-end gap-1 h-10">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRightTab('calls')}
-                        className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
-                        aria-pressed={selectedRightTab === 'calls'}
-                      >
-                        {t('Calls')} ({activeCallsCount})
-                      </button>
-
-                      {clinics.map((clinic) => (
+                <div className="h-full flex flex-col overflow-hidden pt-2 pb-2">
+                  <div className="w-full flex flex-col flex-1 min-h-0">
+                    <div className="relative z-30 mx-1.5 pb-0 flex items-start justify-between gap-1 h-10 shrink-0">
+                      <div className="flex items-end gap-1 min-w-0">
                         <button
-                          key={clinic.id}
                           type="button"
-                          onClick={() => setSelectedRightTab(clinic.id)}
-                          className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === clinic.id ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
-                          aria-pressed={selectedRightTab === clinic.id}
+                          onClick={() => setSelectedRightTab('calls')}
+                          className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                          aria-pressed={selectedRightTab === 'calls'}
                         >
-                          {clinic.name} ({getClinicCalls(clinic.id).filter(c => !c.outcome).length})
+                          {t('Calls')} ({activeCallsCount})
                         </button>
-                      ))}
+
+                        {clinics.map((clinic) => (
+                          <button
+                            key={clinic.id}
+                            type="button"
+                            onClick={() => setSelectedRightTab(clinic.id)}
+                            className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === clinic.id ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                            aria-pressed={selectedRightTab === clinic.id}
+                          >
+                            {clinic.name} ({getClinicCalls(clinic.id).filter(c => !c.outcome).length})
+                          </button>
+                        ))}
+                      </div>
+
+                      <SurgeToggleButton
+                        active={!!event.manualSurgeActive}
+                        startedAt={event.manualSurgeStartedAt}
+                        onToggle={handleToggleSurge}
+                      />
                     </div>
 
                     {selectedRightTab === 'calls' && !isMobile && (
-                      <div className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 space-y-2">
-                        <div className="flex items-center justify-between py-1">
-                          <h3 className="text-md font-semibold text-surface-light">{t('Total Calls')}: {event.calls?.length || 0}</h3>
-                          <Tooltip content={t('Add Call')} placement="top">
-                            <div>
-                              <Button
-                                size="sm"
-                                variant="flat"
-                                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                                aria-label={t('Add Call')}
-                                data-testid="add-call-button"
-                                onPress={() => setShowQuickCallForm(true)}
-                              >
-                                {t('Add Call')}
-                              </Button>
-                            </div>
-                          </Tooltip>
+                      <div className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 flex flex-col flex-1 min-h-0">
+                        <div className="shrink-0 flex flex-col gap-2 pb-1">
+                          <div className="flex items-center justify-between py-1">
+                            <TrackingInsightsRow
+                              items={[
+                                { key: 'total', label: t('Total Calls Logged'), count: event.calls?.length || 0 },
+                                { key: 'active', label: t('Active'), count: activeCallsCount },
+                                { key: 'pending', label: t('Pending'), count: pendingCallsCount, colorClass: 'text-surface-light' },
+                                { key: 'onScene', label: t('On Scene'), count: onSceneCallsCount, colorClass: 'text-status-red' },
+                                { key: 'transporting', label: t('Transporting'), count: transportingCallsCount, colorClass: 'text-status-red' },
+                              ]}
+                            />
+                            <Tooltip content={t('Add Call')} placement="top">
+                              <div>
+                                <Button
+                                  size="sm"
+                                  variant="flat"
+                                  className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                  aria-label={t('Add Call')}
+                                  data-testid="add-call-button"
+                                  onPress={() => setShowQuickCallForm(true)}
+                                >
+                                  {t('Add Call')}
+                                </Button>
+                              </div>
+                            </Tooltip>
+                          </div>
                         </div>
 
-                        <CallTrackingTable
-                          event={event}
-                          callDisplayNumberMap={callDisplayNumberMap}
-                          showResolvedCalls={showResolvedCalls}
-                          setShowResolvedCalls={setShowResolvedCalls}
-                          openCallId={openCallId}
-                          setOpenCallId={setOpenCallId}
-                          editingCell={editingCell}
-                          setEditingCell={setEditingCell}
-                          editValue={editValue}
-                          setEditValue={setEditValue}
-                          teamStatusMap={teamStatusMap}
-                          updateEvent={updateEvent}
-                          handleCellClick={handleCellClick}
-                          handleCellBlur={handleCellBlur}
-                          handleAgeSexBlur={handleAgeSexBlur}
-                          handleRowClick={handleRowClick}
-                          handleMarkDuplicate={handleMarkDuplicate}
-                          handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
-                          handleDeleteCall={handleDeleteCall}
-                          handleTeamStatusChange={handleTeamStatusChange}
-                          handleRemoveTeamFromCall={handleRemoveTeamFromCall}
-                          handleAddTeamToCall={handleAddTeamToCall}
-                          handleRevertDetachment={handleRevertDetachment}
-                          getCallRowClass={getCallRowClass}
-                          formatAgeSex={formatAgeSex}
-                          TableColGroup={TableColGroup}
-                        />
+                        <div className="flex-1 min-h-0">
+                          <CallTrackingTable
+                            event={event}
+                            callDisplayNumberMap={callDisplayNumberMap}
+                            showResolvedCalls={showResolvedCalls}
+                            setShowResolvedCalls={setShowResolvedCalls}
+                            openCallId={openCallId}
+                            setOpenCallId={setOpenCallId}
+                            editingCell={editingCell}
+                            setEditingCell={setEditingCell}
+                            editValue={editValue}
+                            setEditValue={setEditValue}
+                            teamStatusMap={teamStatusMap}
+                            updateEvent={updateEvent}
+                            handleCellClick={handleCellClick}
+                            handleCellBlur={handleCellBlur}
+                            handleAgeSexBlur={handleAgeSexBlur}
+                            handleRowClick={handleRowClick}
+                            handleMarkDuplicate={handleMarkDuplicate}
+                            handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
+                            handleDeleteCall={handleDeleteCall}
+                            handleTeamStatusChange={handleTeamStatusChange}
+                            handleRemoveTeamFromCall={handleRemoveTeamFromCall}
+                            handleAddTeamToCall={handleAddTeamToCall}
+                            handleRevertDetachment={handleRevertDetachment}
+                            getCallRowClass={getCallRowClass}
+                            formatAgeSex={formatAgeSex}
+                            TableColGroup={TableColGroup}
+                          />
+                        </div>
                       </div>
                     )}
 
                     {clinics.map((clinic) => selectedRightTab === clinic.id && !isMobile && (
-                      <div key={clinic.id} className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 space-y-2">
-                        <div className="flex items-center justify-between py-1">
-                          <h3 className="text-md font-semibold text-surface-light">{t('Total Patients')}: {getClinicCalls(clinic.id).length}</h3>
-                          <Tooltip content={t('Add Patient')} placement="top">
-                            <div>
-                              <Button
-                                size="sm"
-                                variant="flat"
-                                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                                aria-label={t('Add Patient')}
-                                onPress={() => setShowQuickClinicCallForm(true)}
-                              >
-                                {t('Add Patient')}
-                              </Button>
-                            </div>
-                          </Tooltip>
+                      <div key={clinic.id} className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 flex flex-col flex-1 min-h-0">
+                        <div className="shrink-0 flex flex-col gap-2 pb-1">
+                          <div className="flex items-center justify-between py-1">
+                            {(() => {
+                              const clinicCounts = getClinicInsightCounts(clinic.id);
+                              return (
+                                <TrackingInsightsRow
+                                  items={[
+                                    { key: 'total', label: t('Total Patients'), count: clinicCounts.totalPatients },
+                                    { key: 'inClinic', label: t('In Clinic'), count: clinicCounts.totalInClinic, colorClass: 'text-status-blue' },
+                                    { key: 'transported', label: t('Transported'), count: clinicCounts.totalTransported, colorClass: 'text-status-green' },
+                                    { key: 'pendingTransport', label: t('Pending Transport'), count: clinicCounts.totalPendingTransport, colorClass: 'text-status-orange' },
+                                  ]}
+                                />
+                              );
+                            })()}
+                            <Tooltip content={t('Add Patient')} placement="top">
+                              <div>
+                                <Button
+                                  size="sm"
+                                  variant="flat"
+                                  className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                  aria-label={t('Add Patient')}
+                                  onPress={() => setShowQuickClinicCallForm(true)}
+                                >
+                                  {t('Add Patient')}
+                                </Button>
+                              </div>
+                            </Tooltip>
+                          </div>
                         </div>
 
-                        <ClinicTrackingTable
-                          event={event}
-                          clinicId={clinic.id}
-                          clinics={clinics}
-                          callDisplayNumberMap={callDisplayNumberMap}
-                          showResolvedClinicCalls={showResolvedClinicCalls}
-                          setShowResolvedClinicCalls={setShowResolvedClinicCalls}
-                          openClinicCallId={openClinicCallId}
-                          setOpenClinicCallId={setOpenClinicCallId}
-                          editingCell={editingCell}
-                          setEditingCell={setEditingCell}
-                          editValue={editValue}
-                          setEditValue={setEditValue}
-                          updateEvent={updateEvent}
-                          handleCellClick={handleCellClick}
-                          handleCellBlur={handleCellBlur}
-                          handleAgeSexBlur={handleAgeSexBlur}
-                          onOutcomeChange={handleClinicOutcomeChange}
-                          onRevertOutcome={handleRevertClinicOutcome}
-                          getCallRowClass={getCallRowClass}
-                          formatAgeSex={formatAgeSex}
-                        />
+                        <div className="flex-1 min-h-0">
+                          <ClinicTrackingTable
+                            event={event}
+                            clinicId={clinic.id}
+                            clinics={clinics}
+                            callDisplayNumberMap={callDisplayNumberMap}
+                            showResolvedClinicCalls={showResolvedClinicCalls}
+                            setShowResolvedClinicCalls={setShowResolvedClinicCalls}
+                            openClinicCallId={openClinicCallId}
+                            setOpenClinicCallId={setOpenClinicCallId}
+                            editingCell={editingCell}
+                            setEditingCell={setEditingCell}
+                            editValue={editValue}
+                            setEditValue={setEditValue}
+                            updateEvent={updateEvent}
+                            handleCellClick={handleCellClick}
+                            handleCellBlur={handleCellBlur}
+                            handleAgeSexBlur={handleAgeSexBlur}
+                            onOutcomeChange={handleClinicOutcomeChange}
+                            onRevertOutcome={handleRevertClinicOutcome}
+                            getCallRowClass={getCallRowClass}
+                            formatAgeSex={formatAgeSex}
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

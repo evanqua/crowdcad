@@ -22,11 +22,11 @@ export default function TrackingTableBase({
 }: TrackingTableBaseProps) {
   const { t } = useDispatchTerms();
   return (
-    <div className={`w-full ${className || ''}`.trim()} data-team-chips={showTeamAssignmentChips ? 'on' : 'off'}>
-      <div className="overflow-x-auto w-full">
+    <div className={`w-full h-full flex flex-col min-h-0 ${className || ''}`.trim()} data-team-chips={showTeamAssignmentChips ? 'on' : 'off'}>
+      <div className="flex-1 min-h-0 overflow-auto minimal-scrollbar">
         <table className="min-w-[870px] w-full text-[14px] sm:text-[15px] text-surface-light table-fixed border-separate border-spacing-0">
           <TableColGroup />
-          <thead>
+          <thead className="sticky top-0 z-10 bg-surface-deep">
             <tr className="border-b border-surface-liner">
               <th className="px-3 py-2.5 text-left text-surface-faint w-16">{t('Call #')}</th>
               <th className="px-3 py-2.5 text-left text-surface-faint w-40">{t('Chief Complaint')}</th>
@@ -42,7 +42,7 @@ export default function TrackingTableBase({
         </table>
       </div>
 
-      {footer}
+      {footer && <div className="shrink-0">{footer}</div>}
     </div>
   );
 }
