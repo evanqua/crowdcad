@@ -19,6 +19,7 @@ Feature: Venue map management
     And I enable Add Markers mode
     And I click on the center of the venue map
     And I name the marker "Gate A"
+    And I go to the "Locations" venue step
     Then I should see the text "Gate A"
 
   Scenario: Adding a new layer via the modal

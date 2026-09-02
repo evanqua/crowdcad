@@ -25,14 +25,17 @@ Feature: Venue management
     When I clear the venue name
     Then the "Continue" button should be disabled
 
-  Scenario: Create Venue button is disabled until a venue name is entered
+  Scenario: Create Venue becomes available once a venue name is entered
     When I fill the venue name with "Test Arena"
     And I go to the "Review & save" venue step
     Then the "Create Venue" button should be enabled
-    When I go to the "Basics" venue step
-    And I clear the venue name
+
+  Scenario: Clearing the venue name locks the later steps again
+    When I fill the venue name with "Test Arena"
     And I go to the "Review & save" venue step
-    Then the "Create Venue" button should be disabled
+    And I go to the "Basics" venue step
+    And I clear the venue name
+    Then the "Continue" button should be disabled
 
   Scenario: Cancel button navigates back to venue selection
     When I fill the venue name with "Unfinished Venue"
