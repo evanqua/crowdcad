@@ -90,6 +90,7 @@ export default function LayerControlBar({
             size="sm"
             radius="full"
             variant="flat"
+            data-testid="add-layer-button"
             onPress={onAddLayer}
             aria-label="Add layer"
             title="Add layer"

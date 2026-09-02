@@ -18,6 +18,7 @@ Given('I have ended an event and am on the summary page', async ({ page }) => {
   await page.goto('/venues/management', { timeout: NAV_TIMEOUT });
   await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(venueName);
+  await page.getByRole('button', { name: /^Review & save:/ }).click();
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
 
@@ -41,7 +42,10 @@ Given('I have ended an event and am on the summary page', async ({ page }) => {
   await dialog.locator('[aria-label="Certification"]').click();
   await page.locator('[role="listbox"]').getByText('CPR', { exact: true }).click();
   await dialog.getByRole('button', { name: 'Save & close' }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible();
+  // Named locator avoids a strict-mode clash with the Certification Select's
+  // own popover, which also carries role="dialog" and can briefly linger in
+  // the DOM mid-unmount after the parent modal closes.
+  await expect(page.getByRole('dialog', { name: 'Add New Team' })).not.toBeVisible();
 
   // 5. Log a call assigned to the team
   await page.getByTestId('add-call-button').click();
