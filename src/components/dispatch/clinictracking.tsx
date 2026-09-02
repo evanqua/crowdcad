@@ -501,7 +501,7 @@ export default function ClinicTrackingTable({
                             : 'pt-0 pb-0'
                         }`}
                       >
-                        <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer">
+                        <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer" overflowVisibleWhenOpen>
                           {call.priority && (
                             <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
                               ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}

@@ -51,7 +51,7 @@ export default function CallTrackingDetails({
             isOpen ? 'pt-1.5 pb-3' : 'pt-0 pb-0'
           }`}
         >
-          <DispatchMotionCell isOpen={isOpen} animate={true} className="cursor-pointer">
+          <DispatchMotionCell isOpen={isOpen} animate={true} className="cursor-pointer" overflowVisibleWhenOpen>
             {priority && (
               <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
                 ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
