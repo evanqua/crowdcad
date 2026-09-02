@@ -4,7 +4,7 @@ import { test } from '../fixtures';
 import { NAV_TIMEOUT } from '../timeouts';
 import { uniqueSuffix } from '../helpers/unique';
 
-const { Given, When } = createBdd(test);
+const { Given, When, Then } = createBdd(test);
 
 Given('I have a venue ready for event creation', async ({ page, scenarioState }) => {
   scenarioState.eventVenueName = `EC-Venue-${uniqueSuffix()}`;
@@ -26,6 +26,27 @@ Given('I have started a new draft event from that venue', async ({ page, scenari
 
 When('I fill the event name with {string}', async ({ page }, name: string) => {
   await page.getByPlaceholder('Enter event name').fill(name);
+});
+
+Then('the event name input should show {string}', async ({ page }, name: string) => {
+  await expect(page.getByPlaceholder('Enter event name')).toHaveValue(name);
+});
+
+// ── Wizard step navigation ──────────────────────────────────────────────────────
+// Each step's progress dot carries an accessible name of "<label>: <state>"
+// (see StepProgress) — a completed or current step's dot is clickable and
+// jumps straight there without losing data already entered on other steps.
+
+When('I go to the {string} step', async ({ page }, label: string) => {
+  await page.getByRole('button', { name: new RegExp(`^${label}:`) }).click();
+});
+
+When('I fill the surge limit with {string}', async ({ page }, value: string) => {
+  await page.getByTestId('surge-limit-input').fill(value);
+});
+
+Then('the surge limit input should show {string}', async ({ page }, value: string) => {
+  await expect(page.getByTestId('surge-limit-input')).toHaveValue(value);
 });
 
 When('I click the add team button', async ({ page }) => {

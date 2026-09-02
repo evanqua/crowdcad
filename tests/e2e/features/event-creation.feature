@@ -1,6 +1,6 @@
 @authenticated
 Feature: Event creation
-  Tests for the event creation form at /events/[id]/create
+  Tests for the event creation stepper at /events/[id]/create
 
   Background:
     Given I have a venue ready for event creation
@@ -8,13 +8,15 @@ Feature: Event creation
 
   Scenario: Form renders correctly
     Then I should see the "Enter event name" placeholder
-    And I should see the "Teams" tab
-    And I should see the "Supervisors" tab
-    And I should see the "Posts" tab
-    And I should see the "Equipment" tab
+    When I go to the "Teams & supervisors" step
+    Then I should see the heading "Teams"
+    And I should see the heading "Supervisors"
+    When I go to the "Equipment" step
+    Then I should see the heading "Equipment"
 
   Scenario: Add a team via modal
-    When I click the add team button
+    When I go to the "Teams & supervisors" step
+    And I click the add team button
     And I fill the "Team Name" field with "Alpha"
     And I fill the "Member name" field with "John"
     And I select "EMT-B" from the "Certification" dropdown
@@ -23,19 +25,16 @@ Feature: Event creation
 
   Scenario: Creating event navigates to dispatch
     When I fill the event name with "Test Event"
+    And I go to the "Review & launch" step
     And I click the "Create Event" button
     Then the URL should contain "/dispatch"
 
-  Scenario: Supervisors tab renders correctly
-    When I click the "Supervisors" tab
-    Then I should see the heading "Supervisors"
-
-  Scenario: Equipment tab renders correctly
-    When I click the "Equipment" tab
+  Scenario: Equipment step renders correctly
+    When I go to the "Equipment" step
     Then I should see the heading "Equipment"
 
   Scenario: A supervisor can be added during event creation
-    When I click the "Supervisors" tab
+    When I go to the "Teams & supervisors" step
     And I click the add event supervisor button
     And I fill the supervisor call sign with "Lead-1"
     And I select event supervisor certification "EMT-B"
@@ -45,3 +44,12 @@ Feature: Event creation
   Scenario: Event name field accepts input
     When I fill the event name with "My Custom Event"
     Then I should see the "Enter event name" placeholder
+
+  Scenario: Non-linear navigation preserves entered data across steps
+    When I fill the event name with "Preserved Event"
+    And I go to the "Surge criteria" step
+    And I fill the surge limit with "85"
+    And I go to the "Basics" step
+    Then the event name input should show "Preserved Event"
+    When I go to the "Surge criteria" step
+    Then the surge limit input should show "85"

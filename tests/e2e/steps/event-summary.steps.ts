@@ -28,6 +28,7 @@ Given('I have ended an event and am on the summary page', async ({ page }) => {
 
   // 3. Name and launch the event
   await page.getByPlaceholder('Enter event name').fill(`Summary Event ${uniqueSuffix()}`);
+  await page.getByRole('button', { name: /^Review & launch:/ }).click();
   await page.getByRole('button', { name: 'Create Event' }).click();
   await page.waitForURL(/\/events\/.*\/dispatch/, { timeout: NAV_TIMEOUT });
   await page.locator('[aria-label="Select section"]').waitFor({ state: 'visible', timeout: 10_000 });

@@ -45,7 +45,7 @@ export default function StepProgress({ steps, currentStepId, onStepChange, class
 
         return (
           <li key={step.id} className={`flex items-start min-w-0 ${isLast ? '' : 'flex-1'}`}>
-            <div className="flex flex-col items-center shrink-0">
+            <div className="flex flex-col items-center min-w-0">
               <button
                 type="button"
                 disabled={!clickable}
@@ -56,7 +56,7 @@ export default function StepProgress({ steps, currentStepId, onStepChange, class
               />
               <span
                 aria-hidden="true"
-                className="mt-1.5 max-w-[6rem] truncate text-center text-[11px] text-surface-faint"
+                className="mt-1.5 w-full max-w-[5.5rem] text-center text-[11px] leading-tight text-surface-faint break-words"
               >
                 {step.label}
               </span>
@@ -66,7 +66,7 @@ export default function StepProgress({ steps, currentStepId, onStepChange, class
               <div
                 aria-hidden="true"
                 role="presentation"
-                className={`mt-1.5 h-0.5 w-8 flex-1 mx-1.5 rounded-full sm:w-16 ${
+                className={`mt-1.5 h-0.5 flex-1 min-w-[0.5rem] mx-1.5 rounded-full ${
                   idx < currentIndex ? 'bg-accent' : 'bg-surface-liner'
                 }`}
               />

@@ -28,6 +28,7 @@ Given('I have created an event and am on the dispatch page', async ({ page }) =>
   // Name and launch the event (auth.currentUser stays set across SPA navigation)
   const eventName = `Test Event ${uniqueSuffix()}`;
   await page.getByPlaceholder('Enter event name').fill(eventName);
+  await page.getByRole('button', { name: /^Review & launch:/ }).click();
   await page.getByRole('button', { name: 'Create Event' }).click();
   await page.waitForURL(/\/events\/.*\/dispatch/, { timeout: NAV_TIMEOUT });
   // Wait for the dispatch page to hydrate before asserting
