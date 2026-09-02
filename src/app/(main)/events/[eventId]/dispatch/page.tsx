@@ -5,7 +5,7 @@ import VenueMapModal from '@/components/modals/event/venuemapmodal';
 import EventSummaryModal from '@/components/modals/event/eventsummarymodal';
 import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
-import AddTeamModal from "@/components/modals/event/addteammodal";
+import AddTeamModal, { TeamDraft } from "@/components/modals/event/addteammodal";
 import AddSupervisorModal from "@/components/modals/event/addsupervisormodal";
 import TransportUnitModal from "@/components/modals/event/transportunitmodal";
 import React from 'react';
@@ -192,8 +192,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [teamName, setTeamName] = useState('');
   const [memberName, setMemberName] = useState('');
   const [memberCert, setMemberCert] = useState('');
-  const [isTeamLead, setIsTeamLead] = useState(false);
-  const [currentMembers, setCurrentMembers] = useState<{ name: string, cert: string, lead: boolean }[]>([]);
   const [editTeamOriginalName, setEditTeamOriginalName] = useState<string | null>(null);
   const { certifications: LICENSES } = useCertifications();
   const [contextMenu, setContextMenu] = useState<{
@@ -494,24 +492,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     });
   }
 
-  const addMember = () => {
-    if (memberName.trim() && memberCert) {
-      setCurrentMembers(prev => [...prev, { name: memberName.trim(), cert: memberCert, lead: isTeamLead }]);
-      setMemberName('');
-      setMemberCert('');
-      setIsTeamLead(false);
-    }
-  };
-  const removeMember = (index: number) => {
-    setCurrentMembers(prev => prev.filter((_, i) => i !== index));
-  };
-
   const handleAddNewTeam = useCallback(() => {
-    setTeamName('');
-    setCurrentMembers([]);
-    setMemberName('');
-    setMemberCert('');
-    setIsTeamLead(false);
     setShowAddTeamModal(true);
   }, []);
 
@@ -520,8 +501,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     setTeamName('');        // Call Sign
     setMemberName('');      // Supervisor Name (optional)
     setMemberCert('');      // Certification (required)
-
-    // Do NOT touch currentMembers / isTeamLead; those are for teams
     setShowAddSupervisorModal(true);
   }, []);
 
@@ -682,23 +661,18 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     });
   }, [event, updateEvent]);
 
-  const handleSaveNewTeam = useCallback(async () => {
-    if (!teamName || currentMembers.length === 0) {
-      alert('Please enter a team name and add at least one member.');
-      return;
-    }
-
-    const trimmedName = teamName.trim();
+  const handleSaveNewTeam = useCallback(async (team: TeamDraft) => {
+    const trimmedName = team.name;
 
     // Pass a function to updateEvent to get the LATEST 'event' from server
     await updateEvent((currentEvent) => {
       // Check for duplicates using the FRESH currentEvent
       if (isDuplicateTeamName(trimmedName, currentEvent.staff || [])) {
-        throw new Error(`A team with the name "${trimmedName}" already exists.`); 
+        throw new Error(`A team with the name "${trimmedName}" already exists.`);
         // Note: Throwing here cancels the transaction
       }
 
-      const membersStrings = currentMembers.map(m => `${m.name} [${m.cert}]${m.lead ? ' (Lead)' : ''}`);
+      const membersStrings = team.members.map(m => `${m.name} [${m.cert}]${m.lead ? ' (Lead)' : ''}`);
 
       const staffEntry: Staff = {
         team: trimmedName,
@@ -710,48 +684,48 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
       return { staff: [...(currentEvent.staff || []), staffEntry] };
     });
-
-    // UI resets (only runs if transaction didn't throw)
-    setTeamName('');
-    setCurrentMembers([]);
-    setShowAddTeamModal(false);
-  }, [teamName, currentMembers, updateEvent]);
+  }, [updateEvent]);
 
   const handleEditTeam = useCallback((staff: Staff) => {
-    setTeamName(staff.team);
-    const parsed = (staff.members || []).map((m) => {
+    setEditTeamOriginalName(staff.team);
+    setShowEditTeamModal(true);
+  }, []);
+
+  const editingTeam = useMemo<TeamDraft | undefined>(() => {
+    if (!editTeamOriginalName || !event) return undefined;
+    const staff = (event.staff || []).find(s => s.team === editTeamOriginalName);
+    if (!staff) return undefined;
+    const members = (staff.members || []).map((m) => {
       const lead = m.includes('(Lead)');
       const nameCertMatch = m.match(/^(.+?)\s\[(.+?)\]/);
       const name = nameCertMatch ? nameCertMatch[1].trim() : m.trim();
       const cert = nameCertMatch ? nameCertMatch[2].trim() : '';
       return { name, cert, lead };
     });
-    setCurrentMembers(parsed);
-    setMemberName('');
-    setMemberCert('');
-    setIsTeamLead(false);
-    setEditTeamOriginalName(staff.team);
-    setShowEditTeamModal(true);
-  }, []);
+    return { name: staff.team, members };
+  }, [editTeamOriginalName, event]);
 
-  const handleSaveEditedTeam = useCallback(async () => {
-    if (!teamName || currentMembers.length === 0 || !event || !editTeamOriginalName) {
-      alert('Please enter a team name and add at least one member.');
-      return;
-    }
+  const allTeamNames = useMemo(
+    () => (event?.staff || []).map(s => s.team),
+    [event]
+  );
+  const teamNamesExcludingEdited = useMemo(
+    () => (event?.staff || []).filter(s => s.team !== editTeamOriginalName).map(s => s.team),
+    [event, editTeamOriginalName]
+  );
 
-    const newName = teamName.trim();
+  const handleSaveEditedTeam = useCallback(async (team: TeamDraft) => {
+    if (!event || !editTeamOriginalName) return;
+
+    const newName = team.name;
     const oldName = editTeamOriginalName;
-
-    console.log('Attempting to save edited team:', oldName, '->', newName);
-    console.log('Current event staff:', event.staff);
 
     if (oldName !== newName && isDuplicateTeamName(newName, event.staff || [])) {
       alert(`A team with the name "${newName}" already exists. Please choose a different name.`);
-      return;
+      throw new Error(`A team with the name "${newName}" already exists.`);
     }
 
-    const membersStrings = currentMembers.map(m => `${m.name} [${m.cert}]${m.lead ? ' (Lead)' : ''}`);
+    const membersStrings = team.members.map(m => `${m.name} [${m.cert}]${m.lead ? ' (Lead)' : ''}`);
 
     const now = new Date();
     const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
@@ -787,16 +761,13 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
     try {
       await updateEvent({ staff: updatedStaff, calls: updatedCalls });
-
-      setTeamName('');
-      setCurrentMembers([]);
       setEditTeamOriginalName(null);
-      setShowEditTeamModal(false);
     } catch (error) {
       console.error('Error saving team changes:', error);
       alert('Error saving team changes. Please try again.');
+      throw error;
     }
-  }, [teamName, currentMembers, event, editTeamOriginalName, updateEvent]);
+  }, [event, editTeamOriginalName, updateEvent]);
 
   const handleDeleteTeam = useCallback(async (teamNameToDelete: string) => {
     if (!event) return;
@@ -3413,36 +3384,21 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         isOpen={showAddTeamModal}
         onClose={() => setShowAddTeamModal(false)}
         mode="create"
-        onSubmit={handleSaveNewTeam}
-        teamName={teamName}
-        setTeamName={setTeamName}
-        memberName={memberName}
-        setMemberName={setMemberName}
-        memberCert={memberCert}
-        setMemberCert={setMemberCert}
-        isTeamLead={isTeamLead}
-        setIsTeamLead={setIsTeamLead}
-        addMember={addMember}
-        currentMembers={currentMembers}
-        removeMember={removeMember}
+        existingTeamNames={allTeamNames}
+        onSave={(team) => handleSaveNewTeam(team)}
         roles={LICENSES.map(name => ({ name, fullName: name }))}
       />
       <AddTeamModal
         isOpen={showEditTeamModal}
-        onClose={() => setShowEditTeamModal(false)}
+        onClose={() => {
+          setShowEditTeamModal(false);
+          setEditTeamOriginalName(null);
+        }}
         mode="edit"
-        onSubmit={handleSaveEditedTeam}
-        teamName={teamName}
-        setTeamName={setTeamName}
-        memberName={memberName}
-        setMemberName={setMemberName}
-        memberCert={memberCert}
-        setMemberCert={setMemberCert}
-        isTeamLead={isTeamLead}
-        setIsTeamLead={setIsTeamLead}
-        addMember={addMember}
-        currentMembers={currentMembers}
-        removeMember={removeMember}
+        submitLabelOverride="Save Changes"
+        existingTeamNames={teamNamesExcludingEdited}
+        initialTeam={editingTeam}
+        onSave={(team) => handleSaveEditedTeam(team)}
         roles={LICENSES.map(name => ({ name, fullName: name }))}
       />
       <AddSupervisorModal

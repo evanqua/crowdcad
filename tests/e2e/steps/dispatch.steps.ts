@@ -80,8 +80,7 @@ When('I create a team named {string} with a member {string} certified as {string
   // HeroUI SelectItem's aria-label lands on an inner wrapper, leaving the <li role="option">
   // with no accessible name — use getByText within the listbox instead
   await page.locator('[role="listbox"]').getByText(cert, { exact: true }).click();
-  await dialog.getByRole('button', { name: 'Add member' }).click();
-  await dialog.getByRole('button', { name: 'Create Team' }).click();
+  await dialog.getByRole('button', { name: 'Save & close' }).click();
   // Named locator avoids a strict-mode clash with the Certification Select's
   // own popover, which also carries role="dialog" and can briefly linger in
   // the DOM mid-unmount after the parent modal closes.
