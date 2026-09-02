@@ -141,7 +141,7 @@ function LiteCreateContent() {
   const attachedInputClassNames = {
     label: inputClassNames.label,
     inputWrapper:
-      'rounded-l-2xl rounded-r-none px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+      'rounded-l-lg rounded-r-none px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
     input:
       'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
   } as const;
@@ -762,10 +762,10 @@ function LiteCreateContent() {
                       selectedKey={selectedLeftTab}
                       onSelectionChange={(key) => setSelectedLeftTab(key as 'locations' | 'equipment')}
                       classNames={{
-                        tabList: 'p-1 rounded-2xl flex-shrink-0',
-                        tab: 'rounded-2xl px-4 text-surface-light data-[selected=true]:text-surface-light',
+                        tabList: 'p-1 rounded-large flex-shrink-0',
+                        tab: 'rounded-large px-4 text-surface-light data-[selected=true]:text-surface-light',
                         panel: 'hidden',
-                        cursor: 'rounded-2xl',
+                        cursor: 'rounded-large',
                       }}
                     >
                       <Tab key="locations" title="Locations" />
@@ -799,7 +799,7 @@ function LiteCreateContent() {
                       />
                       <Button
                         onPress={selectedLeftTab === 'locations' ? addLocation : addEquipment}
-                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-2xl"
+                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-lg"
                       >
                         Add
                       </Button>
@@ -821,7 +821,7 @@ function LiteCreateContent() {
                           <Card
                             key={`${getPostName(post)}_${index}`}
                             isBlurred
-                            className="rounded-2xl bg-surface-deeper/90"
+                            className="rounded-large bg-surface-deeper/90"
                           >
                             <div className="flex items-center justify-between px-3 py-2 gap-2">
                               {editingLocationIndex === index ? (
@@ -892,7 +892,7 @@ function LiteCreateContent() {
                           <Card
                             key={item.id}
                             isBlurred
-                            className="rounded-2xl bg-surface-deeper/90"
+                            className="rounded-large bg-surface-deeper/90"
                           >
                             <div className="flex items-center justify-between px-3 py-2 gap-2">
                               {editingEquipmentIndex === index ? (
@@ -980,7 +980,7 @@ function LiteCreateContent() {
                         classNames={{
                           tabList: 'p-1 w-full flex-shrink-0',
                           tab: 'text-surface-light data-[selected=true]:text-surface-light',
-                          cursor: 'rounded-2xl',
+                          cursor: 'rounded-large',
                           panel: 'hidden',
                         }}
                       >
@@ -1060,7 +1060,7 @@ function LiteCreateContent() {
                                 <Card
                                   key={`${staff.team}_${index}`}
                                   isBlurred
-                                  className="rounded-2xl h-fit bg-surface-deeper/90"
+                                  className="rounded-large h-fit bg-surface-deeper/90"
                                 >
                                   <div className="flex items-center justify-between px-3 py-2 gap-2">
                                     <button
@@ -1125,7 +1125,7 @@ function LiteCreateContent() {
                                 <Card
                                   key={`${supervisor.team}_${index}`}
                                   isBlurred
-                                  className="rounded-2xl h-fit bg-surface-deeper/90"
+                                  className="rounded-large h-fit bg-surface-deeper/90"
                                 >
                                   <div className="flex items-center justify-between px-3 py-2 gap-2">
                                     <button
@@ -1235,7 +1235,7 @@ function LiteCreateContent() {
                             <div className={`space-y-1 mt-2 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
                               <h3 className="text-surface-light font-medium text-md">Schedule</h3>
 
-                              <div className="grid grid-cols-3 gap-3 rounded-2xl pt-2 pb-3">
+                              <div className="grid grid-cols-3 gap-3 rounded-large pt-2 pb-3">
                                 <TimeInput
                                   label="From"
                                   labelPlacement="inside"
@@ -1327,7 +1327,7 @@ function LiteCreateContent() {
                               );
 
                               return (
-                                <div key={equipment.id} className="rounded-2xl p-3 bg-surface-deeper/90">
+                                <div key={equipment.id} className="rounded-large p-3 bg-surface-deeper/90">
                                   <div className="flex items-center gap-3">
                                     <Checkbox
                                       isSelected={Boolean(selectedEquipment)}

@@ -130,13 +130,13 @@ export default function AdminUsersSection({ currentUser }: { currentUser: Servic
         />
 
         {loading ? (
-          <Spinner size="sm" />
+          <Spinner size="sm" classNames={{ circle1: 'border-b-accent', circle2: 'border-b-accent' }} />
         ) : (
           <div className="minimal-scrollbar space-y-2 max-h-96 overflow-y-auto pr-2">
             {filtered.map((row) => (
               <div
                 key={row.id}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-surface-deeper/90 px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-large bg-surface-deeper/90 px-4 py-3"
               >
                 <div className="min-w-0">
                   <p className="text-sm text-surface-light truncate">{row.displayName || row.email}</p>
@@ -166,6 +166,7 @@ export default function AdminUsersSection({ currentUser }: { currentUser: Servic
                     onValueChange={() => toggleAdmin(row)}
                     isDisabled={updatingId === row.id}
                     aria-label={`Admin access for ${row.email}`}
+                    classNames={{ wrapper: 'group-data-[selected=true]:bg-accent' }}
                   />
                 </div>
               </div>

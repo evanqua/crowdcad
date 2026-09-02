@@ -66,13 +66,13 @@ export default function AdminVenuesSection({ currentUser }: { currentUser: Servi
         />
 
         {loading ? (
-          <Spinner size="sm" />
+          <Spinner size="sm" classNames={{ circle1: 'border-b-accent', circle2: 'border-b-accent' }} />
         ) : (
           <div className="minimal-scrollbar space-y-2 max-h-96 overflow-y-auto pr-2">
             {filtered.map((venue) => (
               <div
                 key={venue.id}
-                className="flex items-center justify-between gap-3 rounded-2xl bg-surface-deeper/90 px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-large bg-surface-deeper/90 px-4 py-3"
               >
                 <p className="text-sm text-surface-light truncate">{venue.name}</p>
                 <Switch
@@ -80,6 +80,7 @@ export default function AdminVenuesSection({ currentUser }: { currentUser: Servi
                   onValueChange={() => toggleOrgVenue(venue)}
                   isDisabled={updatingId === venue.id}
                   aria-label={`Organization venue toggle for ${venue.name}`}
+                  classNames={{ wrapper: 'group-data-[selected=true]:bg-accent' }}
                 />
               </div>
             ))}

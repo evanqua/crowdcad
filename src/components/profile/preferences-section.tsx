@@ -20,7 +20,15 @@ export default function PreferencesSection() {
                 Minimize animations and transitions throughout the app.
               </p>
             </div>
-            <Switch isSelected={enabled} onValueChange={setEnabled} aria-label="Reduce motion" />
+            {/* Switch defaults to color="primary", which this dark theme
+                repurposes into a near-black grey (see #49); override the
+                selected-track background with the actual accent blue. */}
+            <Switch
+              isSelected={enabled}
+              onValueChange={setEnabled}
+              aria-label="Reduce motion"
+              classNames={{ wrapper: 'group-data-[selected=true]:bg-accent' }}
+            />
           </div>
         </CardBody>
       </Card>
