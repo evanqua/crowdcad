@@ -22,7 +22,7 @@ import { Edit2, Trash2 } from 'lucide-react';
 import type { Post, Staff, Supervisor, Equipment } from '@/app/types';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
-import AddTeamModal from '@/components/modals/event/addteammodal';
+import AddTeamModal, { TeamDraft, TeamMemberDraft } from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
 import {
   createDefaultLiteEventDraft,
@@ -34,7 +34,6 @@ import {
 import { formatTimeValue, parseTimeValue } from '@/lib/scheduleUtils';
 import { syncClinicsFromVenue } from '@/lib/clinics';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
-import { useTeamForm } from '@/hooks/useTeamForm';
 
 const LICENSES = ['CPR', 'EMT-B', 'EMT-A', 'EMT-P', 'RN', 'MD/DO'];
 
@@ -55,6 +54,15 @@ const getPostName = (post: Post): string =>
 
 const setPostName = (post: Post, name: string): Post =>
   typeof post === 'string' ? { name, x: null, y: null } : { ...post, name };
+
+const parseMemberStrings = (members: string[]): TeamMemberDraft[] =>
+  members.map((member) => {
+    const match = member.match(/^(.+?)\s*\[([^\]]+)\]\s*(\(Lead\))?$/);
+    if (match) {
+      return { name: match[1], cert: match[2], lead: Boolean(match[3]) };
+    }
+    return { name: member, cert: '', lead: false };
+  });
 
 function LiteCreateContent() {
   const router = useRouter();
@@ -80,21 +88,6 @@ function LiteCreateContent() {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [teamModalMode, setTeamModalMode] = useState<'create' | 'edit'>('create');
   const [editingTeamIndex, setEditingTeamIndex] = useState<number | null>(null);
-  const {
-    teamName,
-    setTeamName,
-    memberName,
-    setMemberName,
-    memberCert,
-    setMemberCert,
-    isTeamLead,
-    setIsTeamLead,
-    currentMembers,
-    setCurrentMembers,
-    addMember,
-    removeMember,
-    reset: resetTeamForm,
-  } = useTeamForm();
   const [openTeams, setOpenTeams] = useState<Record<number, boolean>>({});
 
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
@@ -435,35 +428,16 @@ function LiteCreateContent() {
     setEquipmentEditInput('');
   };
 
-  const handleAddTeam = () => {
-    if (!teamName.trim()) {
-      alert('Please enter a team name.');
-      return;
-    }
-
-    if (currentMembers.length === 0) {
-      alert('A team must have at least one member.');
-      return;
-    }
-
+  const handleSaveTeam = (team: TeamDraft) => {
     updateDraft((current) => {
       if (teamModalMode === 'edit' && editingTeamIndex !== null) {
         const existing = current.staff[editingTeamIndex];
         if (!existing) return current;
 
-        const duplicate = current.staff.some(
-          (staff, idx) =>
-            idx !== editingTeamIndex && staff.team.toLowerCase() === teamName.trim().toLowerCase()
-        );
-        if (duplicate) {
-          alert('Team name already used.');
-          return current;
-        }
-
         const nextStaff = {
           ...existing,
-          team: teamName.trim(),
-          members: currentMembers.map(
+          team: team.name,
+          members: team.members.map(
             (member) => `${member.name} [${member.cert}]${member.lead ? ' (Lead)' : ''}`
           ),
         };
@@ -475,57 +449,45 @@ function LiteCreateContent() {
           ...current,
           staff: nextStaffArray,
         };
-      } else {
-        const duplicate = current.staff.some(
-          (staff) => staff.team.toLowerCase() === teamName.trim().toLowerCase()
-        );
-        if (duplicate) {
-          alert('Team name already used.');
-          return current;
-        }
-
-        const members = currentMembers.map(
-          (member) => `${member.name} [${member.cert}]${member.lead ? ' (Lead)' : ''}`
-        );
-
-        const nextStaff: Staff = {
-          team: teamName.trim(),
-          location: 'No Post',
-          status: 'On Break',
-          members,
-        };
-
-        return {
-          ...current,
-          staff: [...current.staff, nextStaff],
-        };
       }
-    });
 
-    resetTeamForm();
-    setIsTeamModalOpen(false);
-    setTeamModalMode('create');
-    setEditingTeamIndex(null);
+      const members = team.members.map(
+        (member) => `${member.name} [${member.cert}]${member.lead ? ' (Lead)' : ''}`
+      );
+
+      const nextStaff: Staff = {
+        team: team.name,
+        location: 'No Post',
+        status: 'On Break',
+        members,
+      };
+
+      return {
+        ...current,
+        staff: [...current.staff, nextStaff],
+      };
+    });
   };
+
+  const editingTeam = useMemo<TeamDraft | undefined>(() => {
+    if (teamModalMode !== 'edit' || editingTeamIndex === null) return undefined;
+    const team = eventDraft?.staff[editingTeamIndex];
+    if (!team) return undefined;
+    return { name: team.team, members: parseMemberStrings(team.members) };
+  }, [teamModalMode, editingTeamIndex, eventDraft]);
+
+  const teamNamesForModal = useMemo(
+    () =>
+      (eventDraft?.staff || [])
+        .filter((_, idx) => !(teamModalMode === 'edit' && idx === editingTeamIndex))
+        .map((s) => s.team),
+    [eventDraft, teamModalMode, editingTeamIndex]
+  );
 
   const startTeamEdit = (index: number) => {
     const team = eventDraft?.staff[index];
     if (!team) return;
 
-    const members = team.members.map((member) => {
-      const match = member.match(/^(.+?)\s*\[([^\]]+)\]\s*(\(Lead\))?$/);
-      if (match) {
-        return {
-          name: match[1],
-          cert: match[2],
-          lead: Boolean(match[3]),
-        };
-      }
-      return { name: member, cert: '', lead: false };
-    });
-
-    setTeamName(team.team);
-    setCurrentMembers(members);
     setTeamModalMode('edit');
     setEditingTeamIndex(index);
     setIsTeamModalOpen(true);
@@ -1000,8 +962,6 @@ function LiteCreateContent() {
                               onPress={() => {
                                 setTeamModalMode('create');
                                 setEditingTeamIndex(null);
-                                setTeamName('');
-                                setCurrentMembers([]);
                                 setIsTeamModalOpen(true);
                               }}
                               className="h-8 px-3 text-sm text-surface-light bg-surface-deeperer hover:bg-surface-deep"
@@ -1412,23 +1372,13 @@ function LiteCreateContent() {
           setIsTeamModalOpen(false);
           setTeamModalMode('create');
           setEditingTeamIndex(null);
-          resetTeamForm();
         }}
         mode={teamModalMode}
-        onSubmit={handleAddTeam}
         titleOverride={teamModalMode === 'edit' ? 'Edit Team' : 'Add New Team'}
-        submitLabelOverride={teamModalMode === 'edit' ? 'Save Team' : 'Add Team'}
-        teamName={teamName}
-        setTeamName={setTeamName}
-        memberName={memberName}
-        setMemberName={setMemberName}
-        memberCert={memberCert}
-        setMemberCert={setMemberCert}
-        isTeamLead={isTeamLead}
-        setIsTeamLead={setIsTeamLead}
-        addMember={addMember}
-        currentMembers={currentMembers}
-        removeMember={removeMember}
+        submitLabelOverride={teamModalMode === 'edit' ? 'Save Team' : undefined}
+        existingTeamNames={teamNamesForModal}
+        initialTeam={editingTeam}
+        onSave={(team) => handleSaveTeam(team)}
         roles={LICENSES.map(name => ({ name, fullName: name }))}
       />
 
