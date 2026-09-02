@@ -52,7 +52,7 @@ export default function StepProgress({ steps, currentStepId, onStepChange, class
                 aria-current={status === 'current' ? 'step' : undefined}
                 aria-label={`${step.label}: ${STATUS_ANNOUNCEMENT[status]}`}
                 onClick={() => clickable && onStepChange(step.id)}
-                className={`shrink-0 rounded-full transition-all disabled:cursor-not-allowed ${DOT_CLASS[status]}`}
+                className={`shrink-0 rounded-full transition-all disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-deepest ${DOT_CLASS[status]}`}
               />
               <span
                 aria-hidden="true"

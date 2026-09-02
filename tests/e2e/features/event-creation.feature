@@ -53,3 +53,7 @@ Feature: Event creation
     Then the event name input should show "Preserved Event"
     When I go to the "Surge criteria" step
     Then the surge limit input should show "85"
+
+  Scenario: Advancing a step moves focus to the new step's content
+    When I go to the "Equipment" step
+    Then the focused element should be labeled "Equipment"

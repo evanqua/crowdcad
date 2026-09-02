@@ -102,3 +102,8 @@ Feature: Venue management
     Then the venue name input should show "Preserved Venue"
     When I go to the "Locations" venue step
     Then I should see the text "Backstage"
+
+  Scenario: Advancing a step moves focus to the new step's content
+    When I fill the venue name with "Focus Test Venue"
+    And I go to the "Map & floors" venue step
+    Then the focused element should be labeled "Map & floors"
