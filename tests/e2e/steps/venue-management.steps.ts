@@ -6,10 +6,23 @@ import { uniqueSuffix } from '../helpers/unique';
 
 const { When, Then } = createBdd(test);
 
+// ── Wizard step navigation ──────────────────────────────────────────────────────
+// Each step's progress dot carries an accessible name of "<label>: <state>"
+// (see StepProgress) — a completed or current step's dot is clickable and
+// jumps straight there without losing data already entered on other steps.
+
+When('I go to the {string} venue step', async ({ page }, label: string) => {
+  await page.getByRole('button', { name: new RegExp(`^${label}:`) }).click();
+});
+
 // ── Form field assertions ──────────────────────────────────────────────────────
 
 Then('I should see the venue name input', async ({ page }) => {
   await expect(page.getByPlaceholder('e.g., Convention Center Hall A')).toBeVisible();
+});
+
+Then('the venue name input should show {string}', async ({ page }, name: string) => {
+  await expect(page.getByPlaceholder('e.g., Convention Center Hall A')).toHaveValue(name);
 });
 
 Then('I should see the location name input', async ({ page }) => {
@@ -43,6 +56,7 @@ When('I create a venue with a unique name', async ({ page, scenarioState }) => {
   // submitting, but doesn't hard-fail — a backend with an open real-time
   // channel (e.g. Firestore's Listen/Write long-poll) never reaches true idle.
   await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
+  await page.getByRole('button', { name: /^Review & save:/ }).click();
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
 });
@@ -62,6 +76,7 @@ When('I create two venues with unique names', async ({ page, scenarioState }) =>
     await page.goto('/venues/management', { timeout: 15_000 });
     await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
     await page.getByPlaceholder('e.g., Convention Center Hall A').fill(name);
+    await page.getByRole('button', { name: /^Review & save:/ }).click();
     await page.getByRole('button', { name: 'Create Venue' }).click();
     await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
   }

@@ -22,26 +22,22 @@ import PendingMarkerDialog from '@/components/venue-management/PendingMarkerDial
 import MarkerPlacementInstruction from '@/components/venue-management/MarkerPlacementInstruction';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
+import { WizardShell, type WizardStep } from '@/components/wizard';
 import {
   Button,
   Input,
   Card,
-  Tabs,
-  Tab,
   ScrollShadow,
 } from '@heroui/react';
-import { 
-  MapPin, 
-  Plus,  
-  Upload, 
-  Trash2, 
+import {
+  MapPin,
+  Plus,
+  Upload,
+  Trash2,
   Edit2,
   MapPinned,
   HousePlus,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 
 // Props: none required for this page
@@ -145,7 +141,8 @@ export default function VenueManagementPageClient() {
   const [editingEquipmentIndex, setEditingEquipmentIndex] = useState<number | null>(null);
   const [equipmentEditInput, setEquipmentEditInput] = useState('');
   
-  const [selectedLeftTab, setSelectedLeftTab] = useState<string>('locations');
+  const STEP_ORDER = ['basics', 'map', 'locations', 'equipment', 'review'] as const;
+  const [currentStepId, setCurrentStepId] = useState<string>('basics');
 
 
   // Update preview when a new map file is selected
@@ -548,7 +545,7 @@ export default function VenueManagementPageClient() {
   };
 
   // Create venue
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent, options?: { createEvent?: boolean }) => {
     e?.preventDefault();
 
     if (!userId) {
@@ -604,12 +601,35 @@ export default function VenueManagementPageClient() {
 
       const sanitizedDataToSave = stripUndefined(dataToSave);
 
+      let savedVenueId: string;
       if (venueId) {
         await dbService.updateDocument('venues', venueId, sanitizedDataToSave);
+        savedVenueId = venueId;
       } else {
-        await dbService.addDocument('venues', sanitizedDataToSave);
+        savedVenueId = await dbService.addDocument('venues', sanitizedDataToSave);
       }
-      router.push('/venues/selection')
+
+      if (options?.createEvent) {
+        const savedVenue = { id: savedVenueId, ...sanitizedDataToSave } as Venue;
+        const newEvent = {
+          name: '',
+          date: new Date(),
+          venue: savedVenue,
+          postingTimes: [],
+          staff: [],
+          supervisor: [],
+          userId,
+          calls: [],
+          eventPosts: [],
+          eventEquipment: [],
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+        };
+        const newEventId = await dbService.addDocument('events', stripUndefined(newEvent));
+        router.push(`/events/${newEventId}/create`);
+      } else {
+        router.push('/venues/selection');
+      }
     } catch (error: unknown) {
       console.error('Error saving venue:', error);
       const message =
@@ -672,396 +692,410 @@ export default function VenueManagementPageClient() {
     setCurrentLayer(Math.max(0, currentLayer - 1));
   };
 
-  return (
-    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)]">
-      <div className="relative z-10 pt-4 max-w-[1200px] mx-auto">
-        <div>
+  // Shared interactive map area (upload prompt, or the zoom/pan canvas with
+  // marker placement plus floor controls). Reused, unchanged, by both the
+  // "Map & floors" step and the "Locations" step, so a location can be
+  // placed on the map directly within the Locations step whenever a map
+  // already exists.
+  const mapCanvas = (
+    <div className="flex flex-col h-full">
+      <div className="mb-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-surface-light">
+            Venue Map <span className="text-surface-light text-xs">(Optional)</span>
+          </label>
+          <Input
+            value={venueData.layers[currentLayer].name}
+            onValueChange={updateLayerName}
+            variant="flat"
+            size="md"
+            classNames={{
+              input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+              inputWrapper: 'rounded-large px-4 pr-6 hover:bg-surface-deep',
+            }}
+            placeholder="Layer name"
+          />
+        </div>
+        {previewUrl && (
+          <div className="flex gap-2">
+            <MarkerModeToggleButton
+              isAddMarkerMode={isAddMarkerMode}
+              onToggle={() => setIsAddMarkerMode(!isAddMarkerMode)}
+            />
+          </div>
+        )}
+      </div>
 
-          <div className="flex h-[calc(100vh-80px)]">
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            data-testid="map-file-input"
-            onChange={(e) => {
-              setMapFile(e.target.files?.[0] ?? null);
-              setPendingLayer(currentLayer);
+      <div
+        className={`rounded-xl relative flex flex-col items-center justify-start w-full ${previewUrl ? 'max-h-[calc(100vh-320px)]' : 'h-full'}`}
+      >
+        {previewUrl ? (
+          <div className="w-full flex flex-col gap-3 max-h-full">
+            <div className="relative w-full overflow-hidden rounded-2xl">
+              <MapPanSurface
+                containerRef={imgContainerRef}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                style={{
+                  cursor: isAddMarkerMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
+                  maxHeight: 'calc(100vh - 340px)',
+                }}
+              >
+                <div
+                  className="relative inline-block"
+                  onClick={handleImageClick}
+                  style={{
+                    transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+                    transformOrigin: 'left top',
+                    transition: isPanning ? 'none' : 'transform 0.1s',
+                  }}
+                >
+                  <Image
+                    ref={(node) => {
+                      if (node) {
+                        const img = node as unknown as HTMLImageElement;
+                        imgRef.current = img;
+                      }
+                    }}
+                    src={previewUrl}
+                    alt="Venue map"
+                    width={1200}
+                    height={900}
+                    className="block"
+                    style={{
+                      display: 'block',
+                      width: 'auto',
+                      height: 'auto',
+                      maxWidth: '100%'
+                    }}
+                    unoptimized
+                    onLoad={(e) => {
+                      const ratio = e.currentTarget.naturalWidth / e.currentTarget.naturalHeight;
+                      setAspectRatio(ratio);
+                    }}
+                  />
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="relative w-full h-full pointer-events-auto">
+                      {renderMarkers()}
+                    </div>
+                  </div>
+                </div>
+              </MapPanSurface>
+
+              {pendingMarker && (
+                <PendingMarkerDialog
+                  markerNameInput={markerNameInput}
+                  markerInputRef={markerInputRef}
+                  setMarkerNameInput={setMarkerNameInput}
+                  markerIsClinicInput={markerIsClinicInput}
+                  setMarkerIsClinicInput={setMarkerIsClinicInput}
+                  onConfirm={confirmMarkerName}
+                  onCancel={cancelMarkerName}
+                />
+              )}
+
+              {/* Zoom Controls - Top Right */}
+              <MapZoomControls
+                onZoomIn={() => zoomIn(0.5)}
+                onZoomOut={() => zoomOut(0.5)}
+                onReset={resetZoom}
+                buttonClassName="bg-surface-deepest/95"
+                resetButtonClassName="bg-surface-deepest/95 text-xs px-2"
+              />
+
+              {/* Instructions overlay - Top Left */}
+              {isAddMarkerMode && !pendingMarker && <MarkerPlacementInstruction />}
+            </div>
+
+            <LayerControlBar
+              mapFileName={mapFileName}
+              onReplaceMap={() => fileInputRef.current?.click()}
+              currentLayer={currentLayer}
+              totalLayers={venueData.layers.length}
+              currentLayerName={venueData.layers?.[currentLayer]?.name || 'Layer'}
+              onPreviousLayer={() => setCurrentLayer(currentLayer - 1)}
+              onNextLayer={() => setCurrentLayer(currentLayer + 1)}
+              onDeleteLayer={deleteLayer}
+              onAddLayer={() => setIsNewLayerModalOpen(true)}
+            />
+          </div>
+        ) : (
+          <Card
+            isBlurred
+            className="border-2 border-default-200 bg-transparent w-full h-full px-3 py-2"
+          >
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-full w-full flex-col items-center justify-center gap-3 text-surface-light/70 transition hover:border-status-blue/50 hover:text-status-blue rounded-xl"
+            >
+              <Upload className="h-12 w-12" />
+              <div className="text-center">
+                <p className="text-sm font-medium">Upload Venue Map</p>
+                <p className="mt-1 text-xs text-surface-light/50">
+                  Optional - Click to select an image
+                </p>
+              </div>
+            </button>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+
+  const basicsStep = (
+    <div className="flex h-full items-center justify-center">
+      <div className="w-full max-w-md">
+        <Input
+          label="Venue Name"
+          placeholder="e.g., Convention Center Hall A"
+          value={venueData.name}
+          onValueChange={handleChange}
+          isRequired
+          labelPlacement="outside"
+          variant="flat"
+          classNames={{
+            label: 'text-surface-light font-medium',
+            inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
+            input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  const mapFloorsStep = <div className="h-full">{mapCanvas}</div>;
+
+  const locationsStep = (
+    <div className="flex h-full gap-4">
+      <div className="w-full max-w-sm flex-shrink-0 flex flex-col overflow-hidden">
+        <label className="mb-2 block text-sm font-medium text-surface-light">
+          Locations
+        </label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="e.g., Main Entrance"
+            value={locationInput}
+            onValueChange={setLocationInput}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addTextLocation();
+              }
+            }}
+            variant="flat"
+            classNames={{
+              input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+              inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
             }}
           />
+          <Button
+            isIconOnly
+            onPress={addTextLocation}
+            className="flex-shrink-0 bg-accent hover:bg-accent/90 text-surface-light"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        {allPosts.length > 0 && (
+          <ScrollShadow className="mt-3 space-y-2 pr-2 flex-1 min-h-0 scrollbar-hide">
+            {allPosts.map((item, idx) => {
+              const post = item.post;
+              const label = typeof post === 'string' ? post : post.name;
+              const hasCoordinates = typeof post === 'object' && post.x !== null && post.y !== null;
+              const isPending = pendingMarker?.layerIdx === item.layerIdx && pendingMarker?.postIdx === item.postIdx;
 
-          <PanelGroup direction="horizontal">
-            {/* Left Panel - Resizable */}
-            <Panel defaultSize={30} minSize={25} maxSize={50}>
-              <div className="flex flex-col h-full relative">
-                <div className="flex-1 p-6 pb-12">
-                  <div className="space-y-6">
-
-                  {/* Venue Name */}
-                  <div>
-                    <Input
-                      label="Venue Name"
-                      placeholder="e.g., Convention Center Hall A"
-                      value={venueData.name}
-                      onValueChange={handleChange}
-                      isRequired
-                      labelPlacement={"outside"}
-                      variant="flat"
-                      classNames={{
-                        label: 'text-surface-light font-medium',
-                        inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
-                        input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
-                      }}
-                    />
-                  </div>
-
-                  {/* Locations & Equipment Section with Tabs */}
-                  <Tabs className="flex-1 w-full" fullWidth radius="lg" selectedKey={selectedLeftTab} onSelectionChange={(key) => setSelectedLeftTab(key as string)}>
-                    <Tab key="locations" title="Locations">
-                      <label className="mb-2 block text-sm font-medium text-surface-light">
-                        Locations
-                      </label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="e.g., Main Entrance"
-                          value={locationInput}
-                          onValueChange={setLocationInput}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addTextLocation();
-                            }
-                          }}
-                          variant="flat"
-                          classNames={{
-                            input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                            inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
-                          }}
-                        />
+              return (
+                <Card
+                  key={idx}
+                  isBlurred
+                  className="border-2 rounded-2xl border-default-200 bg-transparent"
+                >
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {isClinicPost(post) ? (
+                        <HousePlus className="h-4 w-4 flex-shrink-0 text-accent" />
+                      ) : hasCoordinates ? (
+                        <MapPinned className="h-4 w-4 flex-shrink-0 text-accent" />
+                      ) : (
+                        <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />
+                      )}
+                      <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-surface-light'}`}>
+                        {label}
+                      </span>
+                      {item.layerName && (
+                        <span className="text-xs text-surface-light">({item.layerName})</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {typeof post !== 'string' && (
                         <Button
                           isIconOnly
-                          onPress={addTextLocation}
-                          className="flex-shrink-0 bg-accent hover:bg-accent/90 text-surface-light"
+                          size="sm"
+                          radius="full"
+                          variant="light"
+                          onPress={() => renamePost(item.layerIdx, item.postIdx)}
+                          className="min-w-6 w-6 h-6"
                         >
-                          <Plus className="h-4 w-4" />
+                          <Edit2 className="h-3.5 w-3.5" />
                         </Button>
-                      </div>
-                      {allPosts.length > 0 && (
-                        <ScrollShadow className="mt-3 space-y-2 pr-2 max-h-[calc(100vh-430px)] scrollbar-hide">
-                          {allPosts.map((item, idx) => {
-                            const post = item.post;
-                            const label = typeof post === 'string' ? post : post.name;
-                            const hasCoordinates = typeof post === 'object' && post.x !== null && post.y !== null;
-                            const isPending = pendingMarker?.layerIdx === item.layerIdx && pendingMarker?.postIdx === item.postIdx;
-
-                            return (
-                              <Card
-                                key={idx}
-                                isBlurred
-                                className="border-2 rounded-2xl border-default-200 bg-transparent"
-                              >
-                                <div className="flex items-center justify-between px-3 py-2">
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    {isClinicPost(post) ? (
-                                      <HousePlus className="h-4 w-4 flex-shrink-0 text-accent" />
-                                    ) : hasCoordinates ? (
-                                      <MapPinned className="h-4 w-4 flex-shrink-0 text-accent" />
-                                    ) : (
-                                      <MapPin className="h-4 w-4 flex-shrink-0 text-surface-light" />
-                                    )}
-                                    <span className={`text-sm truncate ${isPending ? 'text-status-blue italic' : 'text-surface-light'}`}>
-                                      {label}
-                                    </span>
-                                    {item.layerName && (
-                                      <span className="text-xs text-surface-light">({item.layerName})</span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    {typeof post !== 'string' && (
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        radius="full"
-                                        variant="light"
-                                        onPress={() => renamePost(item.layerIdx, item.postIdx)}
-                                        className="min-w-6 w-6 h-6"
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    )}
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      radius="full"
-                                      variant="light"
-                                      color="danger"
-                                      onPress={() => removePost(item.layerIdx, item.postIdx)}
-                                      className="min-w-6 w-6 h-6"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </Card>
-                            );
-                          })}
-                        </ScrollShadow>
                       )}
-                    </Tab>
-                    <Tab key="equipment" title="Equipment">
-                      <EquipmentManagementSection
-                        equipmentInput={equipmentInput}
-                        setEquipmentInput={setEquipmentInput}
-                        addEquipment={addEquipment}
-                        equipment={venueData.equipment}
-                        editingEquipmentIndex={editingEquipmentIndex}
-                        equipmentEditInput={equipmentEditInput}
-                        setEquipmentEditInput={setEquipmentEditInput}
-                        saveEquipmentEdit={saveEquipmentEdit}
-                        cancelEquipmentEdit={cancelEquipmentEdit}
-                        startEditEquipment={startEditEquipment}
-                        removeEquipment={removeEquipment}
-                      />
-                    </Tab>
-                  </Tabs>
-                </div>
-              </div>
-
-              {/* Action Buttons - Fixed to Bottom */}
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <div className="flex gap-3">
-                  <Button
-                    variant="bordered"
-                    onPress={() => router.push('/venues/selection')}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onPress={() => handleSubmit()}
-                    isLoading={isUploading}
-                    isDisabled={!venueData.name.trim()}
-                    className="flex-1 bg-accent hover:bg-accent/90 text-surface-light px-10"
-                  >
-                    {isUploading ? (venueId ? 'Updating...' : 'Creating...') : (venueId ? 'Update Venue' : 'Create Venue')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Panel>
-          {/* Resize Handle */}
-          <PanelResizeHandle className="w-1 bg-surface-liner transition-colors cursor-col-resize flex items-center justify-center group">
-            <div className="w-0.5 h-8 bg-surface-light/30 rounded-full transition-colors" />
-          </PanelResizeHandle>
-          {/* Right Panel - Resizable */}
-          <Panel defaultSize={70} minSize={45}>
-            <div className="flex flex-col h-full relative px-6 pt-6 pb-[72px] overflow-hidden">
-              <div className="mb-3 flex items-center justify-between flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-surface-light">
-                    Venue Map <span className="text-surface-light text-xs">(Optional)</span>
-                  </label>
-                  <Input
-                    value={venueData.layers[currentLayer].name}
-                    onValueChange={updateLayerName}
-                    variant="flat"
-                    size="md"
-                    classNames={{
-                      input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                      inputWrapper: 'rounded-large px-4 pr-6 hover:bg-surface-deep',
-                    }}
-                    placeholder="Layer name"
-                  />
-                </div>
-                {previewUrl && (
-                  <div className="flex gap-2">
-                    <MarkerModeToggleButton
-                      isAddMarkerMode={isAddMarkerMode}
-                      onToggle={() => setIsAddMarkerMode(!isAddMarkerMode)}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div 
-                className={`rounded-xl relative flex flex-col items-center justify-start w-full ${previewUrl ? 'max-h-[calc(100vh-180px)]' : 'h-full'}`}
-              >
-                {previewUrl ? (
-                  <div className="w-full flex flex-col gap-3 max-h-full">
-                    <div className="relative w-full overflow-hidden rounded-2xl">
-                      <MapPanSurface
-                        containerRef={imgContainerRef}
-                        onWheel={handleWheel}
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        style={{ 
-                          cursor: isAddMarkerMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
-                          maxHeight: 'calc(100vh - 200px)',
-                        }}
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        radius="full"
+                        variant="light"
+                        color="danger"
+                        onPress={() => removePost(item.layerIdx, item.postIdx)}
+                        className="min-w-6 w-6 h-6"
                       >
-                        <div
-                          className="relative inline-block"
-                          onClick={handleImageClick}
-                          style={{
-                            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
-                            transformOrigin: 'left top',
-                            transition: isPanning ? 'none' : 'transform 0.1s',
-                          }}
-                        >
-                          <Image
-                            ref={(node) => {
-                              if (node) {
-                                const img = node as unknown as HTMLImageElement;
-                                imgRef.current = img;
-                              }
-                            }}
-                            src={previewUrl}
-                            alt="Venue map"
-                            width={1200}
-                            height={900}
-                            className="block"
-                            style={{ 
-                              display: 'block', 
-                              width: 'auto', 
-                              height: 'auto',
-                              maxWidth: '100%'
-                            }}
-                            unoptimized
-                            onLoad={(e) => {
-                              const ratio = e.currentTarget.naturalWidth / e.currentTarget.naturalHeight;
-                              setAspectRatio(ratio);
-                            }}
-                          />
-                          <div className="absolute inset-0 pointer-events-none">
-                            <div className="relative w-full h-full pointer-events-auto">
-                              {renderMarkers()}
-                            </div>
-                          </div>
-                        </div>
-                      </MapPanSurface>
-
-                      {pendingMarker && (
-                        <PendingMarkerDialog
-                          markerNameInput={markerNameInput}
-                          markerInputRef={markerInputRef}
-                          setMarkerNameInput={setMarkerNameInput}
-                          markerIsClinicInput={markerIsClinicInput}
-                          setMarkerIsClinicInput={setMarkerIsClinicInput}
-                          onConfirm={confirmMarkerName}
-                          onCancel={cancelMarkerName}
-                        />
-                      )}
-
-                      {/* Zoom Controls - Top Right */}
-                      <MapZoomControls
-                        onZoomIn={() => zoomIn(0.5)}
-                        onZoomOut={() => zoomOut(0.5)}
-                        onReset={resetZoom}
-                        buttonClassName="bg-surface-deepest/95"
-                        resetButtonClassName="bg-surface-deepest/95 text-xs px-2"
-                      />
-
-                      {/* Instructions overlay - Top Left */}
-                      {isAddMarkerMode && !pendingMarker && <MarkerPlacementInstruction />}
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-
-                    {/* Bottom Info Bar - Now OUTSIDE and BELOW the image container */}
-                    <Card
-                      isBlurred
-                      className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <MapPinned className="h-4 w-4 text-accent" />
-                          <span className="text-xs text-surface-light truncate max-w-[120px]">{mapFileName}</span>
-                          <Button
-                            size="sm"
-                            radius="full"
-                            variant="flat"
-                            onPress={() => fileInputRef.current?.click()}
-                            startContent={<Upload className="h-3 w-3" />}
-                            className="ml-2"
-                          >
-                            Replace
-                          </Button>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            radius="full"
-                            variant="flat"
-                            isDisabled={currentLayer <= 0}
-                            onPress={() => setCurrentLayer(currentLayer - 1)}
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </Button>
-                          <span
-                            className="text-xs text-surface-light min-w-[100px] text-center"
-                          >
-                            {venueData.layers?.[currentLayer]?.name || 'Layer'}
-                          </span>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            radius="full"
-                            variant="flat"
-                            isDisabled={!venueData.layers || currentLayer >= venueData.layers.length - 1}
-                            onPress={() => setCurrentLayer(currentLayer + 1)}
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            radius="full"
-                            variant="flat"
-                            color="danger"
-                            onPress={deleteLayer}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            radius="full"
-                            variant="flat"
-                            data-testid="add-layer-button"
-                            onPress={() => setIsNewLayerModalOpen(true)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
                   </div>
-                ) : (
-                  <Card
-                    isBlurred
-                    className="border-2 border-default-200 bg-transparent w-full h-full px-3 py-2"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex h-full w-full flex-col items-center justify-center gap-3 text-surface-light/70 transition hover:border-status-blue/50 hover:text-status-blue rounded-xl"
-                    >
-                      <Upload className="h-12 w-12" />
-                      <div className="text-center">
-                        <p className="text-sm font-medium">Upload Venue Map</p>
-                        <p className="mt-1 text-xs text-surface-light/50">
-                          Optional - Click to select an image
-                        </p>
-                      </div>
-                    </button>
-                  </Card>
-                )}
-              </div>
-            </div>
-          </Panel>
-          </PanelGroup>
-          </div>
+                </Card>
+              );
+            })}
+          </ScrollShadow>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">{mapCanvas}</div>
+    </div>
+  );
+
+  const equipmentStep = (
+    <div className="h-full max-w-xl">
+      <EquipmentManagementSection
+        equipmentInput={equipmentInput}
+        setEquipmentInput={setEquipmentInput}
+        addEquipment={addEquipment}
+        equipment={venueData.equipment}
+        editingEquipmentIndex={editingEquipmentIndex}
+        equipmentEditInput={equipmentEditInput}
+        setEquipmentEditInput={setEquipmentEditInput}
+        saveEquipmentEdit={saveEquipmentEdit}
+        cancelEquipmentEdit={cancelEquipmentEdit}
+        startEditEquipment={startEditEquipment}
+        removeEquipment={removeEquipment}
+      />
+    </div>
+  );
+
+  const floorsWithMap = venueData.layers.filter((l) => !!l.mapUrl).length + (mapFile ? 1 : 0);
+  const reviewStep = (
+    <div className="h-full max-w-xl">
+      <Card isBlurred className="border-2 border-default-200 bg-transparent p-5 space-y-4">
+        <div>
+          <span className="text-xs text-surface-faint">Venue name</span>
+          <p className="text-surface-light font-medium">{venueData.name.trim() || '(untitled)'}</p>
+        </div>
+        <div>
+          <span className="text-xs text-surface-faint">Floors</span>
+          <p className="text-surface-light">
+            {venueData.layers.length} floor{venueData.layers.length === 1 ? '' : 's'}
+            {floorsWithMap > 0 ? ` · ${floorsWithMap} with a map` : ''}
+          </p>
+        </div>
+        <div>
+          <span className="text-xs text-surface-faint">Locations</span>
+          <p className="text-surface-light">{allPosts.length} location{allPosts.length === 1 ? '' : 's'}</p>
+        </div>
+        <div>
+          <span className="text-xs text-surface-faint">Equipment</span>
+          <p className="text-surface-light">{venueData.equipment.length} item{venueData.equipment.length === 1 ? '' : 's'}</p>
+        </div>
+      </Card>
+    </div>
+  );
+
+  const hasName = !!venueData.name.trim();
+  const steps: WizardStep[] = [
+    { id: 'basics', label: 'Basics', component: basicsStep, isComplete: hasName },
+    { id: 'map', label: 'Map & floors', component: mapFloorsStep, isComplete: hasName },
+    { id: 'locations', label: 'Locations', component: locationsStep, isComplete: hasName },
+    { id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: hasName },
+    { id: 'review', label: 'Review & save', component: reviewStep, isComplete: hasName },
+  ];
+
+  const stepIdx = STEP_ORDER.indexOf(currentStepId as (typeof STEP_ORDER)[number]);
+  const isFirstStep = stepIdx <= 0;
+  const isLastStep = stepIdx === STEP_ORDER.length - 1;
+  const goNext = () => {
+    if (stepIdx >= 0 && stepIdx < STEP_ORDER.length - 1) setCurrentStepId(STEP_ORDER[stepIdx + 1]);
+  };
+  const goBack = () => {
+    if (stepIdx > 0) setCurrentStepId(STEP_ORDER[stepIdx - 1]);
+  };
+
+  return (
+    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)] flex flex-col">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        data-testid="map-file-input"
+        onChange={(e) => {
+          setMapFile(e.target.files?.[0] ?? null);
+          setPendingLayer(currentLayer);
+        }}
+      />
+
+      <div className="relative z-10 flex-1 min-h-0 max-w-[1200px] w-full mx-auto px-6 pt-4 flex flex-col overflow-hidden">
+        <WizardShell
+          steps={steps}
+          currentStepId={currentStepId}
+          onStepChange={setCurrentStepId}
+          className="flex-1 min-h-0"
+        />
+      </div>
+
+      <div className="flex-shrink-0 max-w-[1200px] w-full mx-auto px-6 pb-6 pt-2">
+        <div className="flex gap-3">
+          <Button
+            variant="bordered"
+            onPress={() => router.push('/venues/selection')}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          {!isFirstStep && (
+            <Button variant="flat" onPress={goBack} className="flex-1">
+              Back
+            </Button>
+          )}
+          {!isLastStep ? (
+            <Button
+              onPress={goNext}
+              isDisabled={currentStepId === 'basics' && !hasName}
+              className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
+            >
+              Continue
+            </Button>
+          ) : (
+            <>
+              <Button
+                onPress={() => handleSubmit()}
+                isLoading={isUploading}
+                isDisabled={!hasName}
+                className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
+              >
+                {isUploading ? (venueId ? 'Updating...' : 'Creating...') : (venueId ? 'Update Venue' : 'Create Venue')}
+              </Button>
+              <Button
+                onPress={() => handleSubmit(undefined, { createEvent: true })}
+                isLoading={isUploading}
+                isDisabled={!hasName}
+                variant="bordered"
+                className="flex-1"
+              >
+                Save & Start Event
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

@@ -3,6 +3,8 @@ Feature: Venue map management
 
   Background:
     Given I navigate to "/venues/management"
+    And I fill the venue name with "Map Test Venue"
+    And I go to the "Map & floors" venue step
 
   Scenario: Upload a map image to the default layer
     When I upload the venue map image "stage.png"
@@ -17,6 +19,7 @@ Feature: Venue map management
     And I enable Add Markers mode
     And I click on the center of the venue map
     And I name the marker "Gate A"
+    And I go to the "Locations" venue step
     Then I should see the text "Gate A"
 
   Scenario: Adding a new layer via the modal
@@ -30,3 +33,11 @@ Feature: Venue map management
   Scenario: Editing the default layer name
     When I clear the layer name and type "Main Floor"
     Then the layer name input should show "Main Floor"
+
+  Scenario: A location placed on the map appears in the Locations step
+    When I upload the venue map image "stage.png"
+    And I enable Add Markers mode
+    And I click on the center of the venue map
+    And I name the marker "Stage Left"
+    And I go to the "Locations" venue step
+    Then I should see the text "Stage Left"

@@ -13,16 +13,18 @@ Given('I have a venue with location {string} and equipment {string} and am on th
   await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(venueName);
 
-  // Add location on Locations tab (default active)
+  // Add location on the Locations step
+  await page.getByRole('button', { name: /^Locations:/ }).click();
   await page.getByPlaceholder('e.g., Main Entrance').fill(location);
   await page.keyboard.press('Enter');
 
-  // Switch to Equipment tab and add equipment
-  await page.getByRole('tab', { name: 'Equipment' }).click();
+  // Add equipment on the Equipment step
+  await page.getByRole('button', { name: /^Equipment:/ }).click();
   await page.getByPlaceholder('e.g., Gurney 1').fill(equipment);
   await page.keyboard.press('Enter');
 
   // Create venue and navigate to selection
+  await page.getByRole('button', { name: /^Review & save:/ }).click();
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
   const venueLink = page.getByText(venueName, { exact: true });
