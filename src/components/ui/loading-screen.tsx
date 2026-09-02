@@ -25,7 +25,11 @@ export default function LoadingScreen({
 
   return (
     <div className={wrapper}>
-      <Spinner color="default" size="lg" />
+      {/* color="default" avoids the near-invisible grey-on-grey HeroUI's
+          theme "primary" now renders in dark mode (see #49) — but "default"
+          is grey too, so the ring itself is overridden to the app's actual
+          accent blue rather than any HeroUI theme color. */}
+      <Spinner color="default" size="lg" classNames={{ circle1: 'border-b-accent', circle2: 'border-b-accent' }} />
       {label && (
         <p className="text-sm text-surface-faint">{label}</p>
       )}

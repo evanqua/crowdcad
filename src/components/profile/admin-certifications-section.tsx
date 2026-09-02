@@ -54,7 +54,7 @@ export default function AdminCertificationsSection() {
         </p>
 
         {loading ? (
-          <Spinner size="sm" />
+          <Spinner size="sm" classNames={{ circle1: 'border-b-accent', circle2: 'border-b-accent' }} />
         ) : (
           <div className="flex flex-wrap gap-2 mb-4">
             {certifications.map((cert) => (

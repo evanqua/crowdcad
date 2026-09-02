@@ -157,7 +157,7 @@ export default function LanguageSection() {
             return (
               <div
                 key={preset.id}
-                className={`flex items-center gap-3 rounded-2xl border px-4 py-2.5 transition-colors ${
+                className={`flex items-center gap-3 rounded-large border px-4 py-2.5 transition-colors ${
                   isActive
                     ? 'border-accent bg-accent/10'
                     : 'border-surface-liner bg-surface-deeper/40'
@@ -231,7 +231,7 @@ export default function LanguageSection() {
         </Button>
 
         {creatingNew && (
-          <div className="rounded-2xl border border-surface-liner bg-surface-deeper/60 p-4 space-y-3">
+          <div className="rounded-large border border-surface-liner bg-surface-deeper/60 p-4 space-y-3">
             <p className="text-sm text-surface-light/70">
               Start a new shared preset from an existing one, or from scratch, then customize its
               terms.
@@ -302,7 +302,7 @@ export default function LanguageSection() {
         )}
 
         {target && (
-          <div className="rounded-2xl border border-surface-liner bg-surface-deeper/40 p-4 space-y-4">
+          <div className="rounded-large border border-surface-liner bg-surface-deeper/40 p-4 space-y-4">
             <div className="flex items-center justify-between gap-2">
               <p className="font-medium text-sm">Editing: {target.name}</p>
               <Button

@@ -99,7 +99,9 @@ export default function LiteLandingPage() {
             variant="shadow"
             color="primary"
             size="lg"
-            className="w-full flex items-center justify-center gap-2"
+            // color="primary" resolves to this dark theme's near-black grey
+            // (see #49); override with the actual accent blue.
+            className="w-full flex items-center justify-center gap-2 bg-accent text-accent-foreground shadow-accent/40"
           >
             Start Lite Mode
           </Button>
