@@ -18,8 +18,7 @@ Feature: Event creation
     And I fill the "Team Name" field with "Alpha"
     And I fill the "Member name" field with "John"
     And I select "EMT-B" from the "Certification" dropdown
-    And I click the "Add member" button in the modal
-    And I click the "Add Team" button in the modal
+    And I click the "Save & close" button in the modal
     Then I should see the text "Alpha"
 
   Scenario: Creating event navigates to dispatch

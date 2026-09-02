@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus } from "lucide-react";
+import { X } from "lucide-react";
 import {
   Modal,
   ModalContent,
@@ -14,65 +14,177 @@ import {
   Select,
   SelectItem,
   Checkbox,
-  Chip,
 } from "@heroui/react";
 import { Role } from "@/app/types";
 import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
 
-type Member = { name: string; cert: string; lead: boolean };
+export type TeamMemberDraft = { name: string; cert: string; lead: boolean };
+export type TeamDraft = { name: string; members: TeamMemberDraft[] };
+
+type Row = TeamMemberDraft & { id: number };
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
 
-  // NEW: unify create/edit
   mode?: "create" | "edit";
-  onSubmit: () => void;
   titleOverride?: string;
   submitLabelOverride?: string;
 
-  // Inputs/state the page already owns (unchanged)
-  teamName: string;
-  setTeamName: (v: string) => void;
-
-  memberName: string;
-  setMemberName: (v: string) => void;
-
-  memberCert: string;
-  setMemberCert: (v: string) => void;
-
-  isTeamLead: boolean;
-  setIsTeamLead: (v: boolean) => void;
-
-  addMember: () => void;
-  currentMembers: Member[];
-  removeMember: (idx: number) => void;
-
   roles: Role[]; // e.g., [{ name: "EMT", fullName: "Emergency Medical Technician" }, ...]
+
+  // Names already in use this session. In edit mode the caller should exclude
+  // the team currently being edited so renaming back to its own name is allowed.
+  existingTeamNames: string[];
+
+  // Edit mode only: the team being edited.
+  initialTeam?: TeamDraft;
+
+  // Called on every save (both "Save & add another" and "Save & close"/edit save).
+  onSave: (team: TeamDraft, opts: { addAnother: boolean }) => void | Promise<void>;
 };
+
+let rowIdCounter = 0;
+const nextRowId = () => ++rowIdCounter;
+
+const emptyRow = (cert: string): Row => ({ id: nextRowId(), name: "", cert, lead: false });
+
+const rowsFromMembers = (members: TeamMemberDraft[], trailingCert: string): Row[] => [
+  ...members.map((m) => ({ ...m, id: nextRowId() })),
+  emptyRow(trailingCert),
+];
+
+/**
+ * "Medic 4" -> "Medic 5"; a name with no trailing integer gets " 1" appended;
+ * no prior name in the session defaults to "Team 1".
+ */
+export function getNextTeamName(existingNames: string[]): string {
+  if (existingNames.length === 0) return "Team 1";
+  const last = existingNames[existingNames.length - 1].trim();
+  const match = last.match(/^(.*?)(\d+)$/);
+  if (match) {
+    const [, prefix, digits] = match;
+    return `${prefix}${parseInt(digits, 10) + 1}`;
+  }
+  return `${last} 1`;
+}
 
 export default function AddTeamModal({
   isOpen,
   onClose,
   mode = "create",
-  onSubmit,
   titleOverride,
   submitLabelOverride,
-  teamName,
-  setTeamName,
-  memberName,
-  setMemberName,
-  memberCert,
-  setMemberCert,
-  isTeamLead,
-  setIsTeamLead,
-  addMember,
-  currentMembers,
-  removeMember,
   roles,
+  existingTeamNames,
+  initialTeam,
+  onSave,
 }: Props) {
   const { t } = useDispatchTerms();
+  const isEdit = mode === "edit";
+
+  const [teamName, setTeamName] = React.useState("");
+  const [rows, setRows] = React.useState<Row[]>([]);
+  const [nameError, setNameError] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+
+  const stickyCertRef = React.useRef("");
+  const nameInputRefs = React.useRef<Record<number, HTMLInputElement | null>>({});
+  const focusMemberIdRef = React.useRef<number | null>(null);
+  const wasOpenRef = React.useRef(false);
+
+  const defaultCert = () => stickyCertRef.current || roles[0]?.name || "";
+
+  const resetForNewTeam = (nextName: string, opts: { focusMember: boolean }) => {
+    const row = emptyRow(defaultCert());
+    setRows([row]);
+    setTeamName(nextName);
+    setNameError("");
+    if (opts.focusMember) focusMemberIdRef.current = row.id;
+  };
+
+  // (Re-)initialize whenever the modal transitions closed -> open.
+  React.useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      if (isEdit && initialTeam) {
+        const cert = initialTeam.members[initialTeam.members.length - 1]?.cert || defaultCert();
+        setTeamName(initialTeam.name);
+        setRows(rowsFromMembers(initialTeam.members, cert));
+        setNameError("");
+      } else {
+        resetForNewTeam(getNextTeamName(existingTeamNames), { focusMember: false });
+      }
+    }
+    wasOpenRef.current = isOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // Focus a queued member row once it exists in the DOM (e.g. a newly appended row).
+  React.useEffect(() => {
+    if (focusMemberIdRef.current == null) return;
+    const id = focusMemberIdRef.current;
+    focusMemberIdRef.current = null;
+    requestAnimationFrame(() => nameInputRefs.current[id]?.focus());
+  }, [rows]);
+
+  const updateRow = (id: number, patch: Partial<TeamMemberDraft>) => {
+    setRows((current) => current.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
+
+  const removeRow = (id: number) => {
+    setRows((current) => {
+      const next = current.filter((r) => r.id !== id);
+      return next.length > 0 ? next : [emptyRow(defaultCert())];
+    });
+  };
+
+  const handleNameKeyDown = (row: Row, idx: number) => (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const isLast = idx === rows.length - 1;
+    if (isLast) {
+      if (!row.name.trim()) return;
+      const newRow = emptyRow(defaultCert());
+      focusMemberIdRef.current = newRow.id;
+      setRows((current) => [...current, newRow]);
+    } else {
+      const nextRow = rows[idx + 1];
+      nameInputRefs.current[nextRow.id]?.focus();
+    }
+  };
+
+  const commitSave = async (addAnother: boolean) => {
+    if (submitting) return;
+    const trimmedName = teamName.trim();
+    if (!trimmedName) {
+      setNameError(t("Please enter a team name."));
+      return;
+    }
+    const isDuplicate = existingTeamNames.some(
+      (n) => n.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (isDuplicate) {
+      setNameError(t("Team name already used."));
+      return;
+    }
+
+    const members: TeamMemberDraft[] = rows
+      .filter((r) => r.name.trim())
+      .map((r) => ({ name: r.name.trim(), cert: r.cert || defaultCert(), lead: r.lead }));
+
+    try {
+      setSubmitting(true);
+      await Promise.resolve(onSave({ name: trimmedName, members }, { addAnother }));
+    } finally {
+      setSubmitting(false);
+    }
+
+    if (addAnother) {
+      resetForNewTeam(getNextTeamName([...existingTeamNames, trimmedName]), { focusMember: true });
+    } else {
+      onClose();
+    }
+  };
 
   const inputClassNames = {
     label: "text-surface-light mb-1",
@@ -82,19 +194,15 @@ export default function AddTeamModal({
   } as const;
 
   const selectClassNames = {
-    label: "text-surface-light mb-1",
     trigger:
-      "rounded-large px-4 hover:bg-surface-deep data-[focus=true]:outline-none",
+      "rounded-large px-3 hover:bg-surface-deep data-[focus=true]:outline-none",
     value: "text-surface-light",
     popover: "bg-surface-deepest border border-surface-liner rounded-large",
     listbox:
       "p-1 [&_[data-hover=true]]:bg-surface-deep [&_[data-selected=true]]:bg-surface-deep",
   } as const;
 
-  const title =
-    titleOverride ?? (mode === "edit" ? t("Edit Team") : t("Add New Team"));
-  const submitLabel =
-    submitLabelOverride ?? (mode === "edit" ? t("Save Changes") : t("Create Team"));
+  const title = titleOverride ?? (isEdit ? t("Edit Team") : t("Add New Team"));
 
   return (
     <Modal
@@ -121,7 +229,6 @@ export default function AddTeamModal({
             </ModalHeader>
 
             <ModalBody>
-              {/* Team name */}
               <Input
                 label={t("Team Name")}
                 labelPlacement="inside"
@@ -130,96 +237,85 @@ export default function AddTeamModal({
                 radius="lg"
                 classNames={inputClassNames}
                 value={teamName}
-                onValueChange={setTeamName}
+                onValueChange={(v) => {
+                  setTeamName(v);
+                  if (nameError) setNameError("");
+                }}
+                isInvalid={!!nameError}
+                errorMessage={nameError}
               />
 
-              {/* Member add row */}
-              <div className="flex gap-2 items-center">
-                <Input
-                  label={t("Member name")}
-                  labelPlacement="inside"
-                  variant="flat"
-                  size="lg"
-                  radius="lg"
-                  classNames={inputClassNames}
-                  value={memberName}
-                  onValueChange={setMemberName}
-                  aria-label="Member name"
-                  className="flex-1"
-                />
-                <Checkbox
-                  isSelected={isTeamLead}
-                  onValueChange={setIsTeamLead}
-                  classNames={{
-                    base: "h-[52px] px-4 rounded-2xl flex items-center",
-                    label: "text-surface-light",
-                    wrapper:
-                      "outline-none focus:outline-none data-[focus=true]:outline-none",
-                  }}
-                  aria-label="Lead"
-                >
-                  {t("Lead")}
-                </Checkbox>
-              </div>
+              <div className="flex flex-col gap-2 mt-3">
+                <div className="grid grid-cols-[1fr_10rem_3.5rem_2rem] gap-2 px-1 text-xs text-surface-faint">
+                  <span>{t("Member name")}</span>
+                  <span>{t("Certification")}</span>
+                  <span>{t("Lead")}</span>
+                  <span />
+                </div>
 
-              {/* Cert dropdown (left) + Add button (right) */}
-              <div className="flex gap-2 items-center">
-                <Select
-                  label={t("Certification")}
-                  labelPlacement="inside"
-                  variant="flat"
-                  size="lg"
-                  radius="lg"
-                  classNames={selectClassNames}
-                  selectedKeys={memberCert ? new Set([memberCert]) : new Set()}
-                  onSelectionChange={(keys) => {
-                    const val = Array.from(keys)[0] as string | undefined;
-                    setMemberCert(val ?? "");
-                  }}
-                  aria-label="Certification"
-                  className="flex-1"
-                >
-                  {roles.map((role) => (
-                    <SelectItem key={role.name} aria-label={role.fullName} textValue={role.fullName}>
-                      {role.name}
-                    </SelectItem>
-                  ))}
-                </Select>
+                {rows.map((row, idx) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-[1fr_10rem_3.5rem_2rem] gap-2 items-center"
+                  >
+                    <Input
+                      ref={(el) => {
+                        nameInputRefs.current[row.id] = el;
+                      }}
+                      aria-label={t("Member name")}
+                      variant="flat"
+                      size="md"
+                      radius="lg"
+                      classNames={inputClassNames}
+                      value={row.name}
+                      onValueChange={(v) => updateRow(row.id, { name: v })}
+                      onKeyDown={handleNameKeyDown(row, idx)}
+                    />
 
-                <Button
-                  onPress={addMember}
-                  isIconOnly
-                  size="lg"
-                  variant="flat"
-                  radius="full"
-                  aria-label="Add member"
-                >
-                  <Plus className="h-6 w-6" />
-                </Button>
-              </div>
-
-              {/* Current members chips */}
-              {currentMembers?.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {currentMembers.map((m, idx) => (
-                    <Chip
-                      key={`${m.name}-${idx}`}
-                      onClose={() => removeMember(idx)}
-                      radius="full"
-                      variant="solid"
-                      classNames={{
-                        base: `px-2 py-2 rounded-full text-surface-light ${m.lead ? "bg-status-blue" : "bg-status-orange"
-                          } outline-none focus:outline-none data-[focus=true]:outline-none`,
-                        content: "text-surface-light text-md",
-                        closeButton:
-                          "text-surface-light hover:text-status-red focus:outline-none data-[focus-visible=true]:outline-none",
+                    <Select
+                      aria-label={t("Certification")}
+                      variant="flat"
+                      size="md"
+                      radius="lg"
+                      classNames={selectClassNames}
+                      selectedKeys={row.cert ? new Set([row.cert]) : new Set()}
+                      onSelectionChange={(keys) => {
+                        const val = Array.from(keys)[0] as string | undefined;
+                        updateRow(row.id, { cert: val ?? "" });
+                        if (val) stickyCertRef.current = val;
                       }}
                     >
-                      {`${m.name} [${m.cert}]${m.lead ? ` (${t("Lead")})` : ""}`}
-                    </Chip>
-                  ))}
-                </div>
-              )}
+                      {roles.map((role) => (
+                        <SelectItem
+                          key={role.name}
+                          aria-label={role.fullName}
+                          textValue={role.fullName}
+                        >
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </Select>
+
+                    <Checkbox
+                      isSelected={row.lead}
+                      onValueChange={(v) => updateRow(row.id, { lead: v })}
+                      aria-label={t("Lead")}
+                    />
+
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="light"
+                      radius="full"
+                      aria-label={t("Remove member")}
+                      className="text-surface-faint hover:text-status-red"
+                      onPress={() => removeRow(row.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </ModalBody>
 
             <ModalFooter className="flex justify-end gap-2">
@@ -234,22 +330,37 @@ export default function AddTeamModal({
               >
                 {t("Cancel")}
               </Button>
-              <Button
-                onPress={async () => {
-                  if (submitting) return;
-                  try {
-                    setSubmitting(true);
-                    await Promise.resolve(onSubmit());
-                  } finally {
-                    setSubmitting(false);
-                  }
-                }}
-                radius="lg"
-                className="px-4 py-2 bg-accent hover:bg-accent/90 text-surface-light"
-                isDisabled={submitting}
-              >
-                {submitLabel}
-              </Button>
+
+              {isEdit ? (
+                <Button
+                  onPress={() => commitSave(false)}
+                  isDisabled={submitting}
+                  radius="lg"
+                  className="px-4 py-2 bg-accent hover:bg-accent/90 text-surface-light"
+                >
+                  {submitLabelOverride ?? t("Save Changes")}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    onPress={() => commitSave(true)}
+                    isDisabled={submitting}
+                    variant="flat"
+                    radius="lg"
+                    className="px-4 py-2 text-surface-light bg-surface-deeperer hover:bg-surface-deep"
+                  >
+                    {t("Save & add another")}
+                  </Button>
+                  <Button
+                    onPress={() => commitSave(false)}
+                    isDisabled={submitting}
+                    radius="lg"
+                    className="px-4 py-2 bg-accent hover:bg-accent/90 text-surface-light"
+                  >
+                    {submitLabelOverride ?? t("Save & close")}
+                  </Button>
+                </>
+              )}
             </ModalFooter>
           </>
         )}

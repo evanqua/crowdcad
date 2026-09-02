@@ -13,7 +13,6 @@ import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { scheduleTimesToWindow } from '@/lib/scheduleUtils';
-import { useTeamForm } from '@/hooks/useTeamForm';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import { useCertifications } from '@/hooks/useCertifications';
 import MetadataSection from '@/components/event-create/MetadataSection';
@@ -22,7 +21,7 @@ import SupervisorStaffingSection from '@/components/event-create/SupervisorStaff
 import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
 import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/event-create/PostsEquipmentSection';
 import { stripUndefined } from '@/lib/utils';
-import AddTeamModal from '@/components/modals/event/addteammodal';
+import AddTeamModal, { TeamDraft } from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
 import BulkImportModal from '@/components/modals/event/bulkimportmodal';
 import LoadingScreen from '@/components/ui/loading-screen';
@@ -81,21 +80,6 @@ export default function EventCreation() {
     zoomOut,
     resetZoom,
   } = useZoomPan(imgRef, imgContainerRef, { minScale: 0.5, maxScale: 3 });
-
-  const {
-    teamName,
-    setTeamName,
-    memberName,
-    setMemberName,
-    memberCert,
-    setMemberCert,
-    isTeamLead,
-    setIsTeamLead,
-    currentMembers,
-    addMember,
-    removeMember,
-    reset: resetTeamForm,
-  } = useTeamForm();
 
   const {
     scheduleFrom,
@@ -289,34 +273,17 @@ export default function EventCreation() {
   //   };
   // }, [eventId]);
 
-  const handleAddTeam = () => {
-    if (!teamName.trim()) {
-      alert("Please enter a team name.");
-      return;
-    }
-    if (currentMembers.length === 0) {
-      alert("A team must have at least one member before saving.");
-      return;
-    }
-    const duplicate = eventData.staff?.some(
-      staff => staff.team.toLowerCase() === teamName.trim().toLowerCase()
-    );
-    if (duplicate) {
-      alert("Team name already used. Please choose a different name.");
-      return;
-    }
-    const members = currentMembers.map(
+  const handleSaveTeam = (team: TeamDraft) => {
+    const members = team.members.map(
       m => `${m.name} [${m.cert}]${m.lead ? " (Lead)" : ""}`
     );
     const newStaff: Staff = {
-      team: teamName.trim(),
+      team: team.name,
       location: "No Post",
       status: "On Break",
       members,
     };
     setEventData(prev => ({ ...prev, staff: [...(prev.staff || []), newStaff] }));
-    resetTeamForm();
-    setIsTeamModalOpen(false);
   };
 
   const handleAddSamUnit = () => {
@@ -826,20 +793,9 @@ export default function EventCreation() {
         isOpen={isTeamModalOpen}
         onClose={() => setIsTeamModalOpen(false)}
         mode="create"
-        onSubmit={handleAddTeam}
         titleOverride="Add New Team"
-        submitLabelOverride="Add Team"
-        teamName={teamName}
-        setTeamName={setTeamName}
-        memberName={memberName}
-        setMemberName={setMemberName}
-        memberCert={memberCert}
-        setMemberCert={setMemberCert}
-        isTeamLead={isTeamLead}
-        setIsTeamLead={setIsTeamLead}
-        addMember={addMember}
-        currentMembers={currentMembers}
-        removeMember={removeMember}
+        existingTeamNames={(eventData.staff || []).map(s => s.team)}
+        onSave={(team) => handleSaveTeam(team)}
         roles={certifications.map(name => ({ name, fullName: name }))}
       />
 
