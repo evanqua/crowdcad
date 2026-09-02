@@ -9,7 +9,7 @@ Feature: Dispatch board
     Then I should see the teams section
 
   Scenario: Calls section visible
-    Then I should see the text "Total Calls:"
+    Then I should see the text "Total Calls Logged:"
 
   Scenario: Quick call modal opens
     When I open the quick call modal
@@ -29,7 +29,7 @@ Feature: Dispatch board
     When I open the quick call modal
     And I log a call with location "Parking Lot" and complaint "Laceration"
     Then the call should appear in the call list
-    And I should see the text "Pending"
+    And I should see the text "Pending" in the calls table
 
   Scenario: Assigning a call to a team changes team status to En Route
     When I open the add team modal
@@ -114,7 +114,7 @@ Feature: Dispatch board
     And I log a call with location "Stage Left" and complaint "Sprain"
     And I open the quick call modal
     And I log a call with location "Stage Right" and complaint "Headache"
-    Then I should see the text "Total Calls: 2"
+    Then I should see the text "Total Calls Logged: 2"
 
   Scenario: A team can be deleted from the dispatch board
     When I open the add team modal
