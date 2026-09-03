@@ -446,6 +446,9 @@ export interface VenueMapWithPostsProps {
   onMouseUp: () => void;
   onWheel: (e: React.WheelEvent<HTMLDivElement>) => void;
   imgRef: React.RefObject<HTMLImageElement | null>;
+  /** Overrides the image container's default rounded-2xl corners — for a
+   *  caller (e.g. event creation) whose map merges flush with UI beneath it. */
+  imageRadiusClassName?: string;
 }
 
 export function VenueMapWithPosts({
@@ -458,6 +461,7 @@ export function VenueMapWithPosts({
   clinics = [],
   onNaturalSize,
   isOpen,
+  imageRadiusClassName = 'rounded-2xl',
   scale,
   position,
   isPanning,
@@ -591,7 +595,7 @@ export function VenueMapWithPosts({
     >
       <div
         ref={imgContainerRef}
-        className="relative overflow-hidden h-full w-full rounded-2xl"
+        className={`relative overflow-hidden h-full w-full ${imageRadiusClassName}`}
         onWheel={onWheel}
         style={{
           cursor: isPanning ? 'grabbing' : 'grab',

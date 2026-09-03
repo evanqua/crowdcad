@@ -325,7 +325,7 @@ export default function AddTeamModal({
                     radius="full"
                     variant="flat"
                     aria-label={t("Add member")}
-                    className="shrink-0 text-surface-light bg-surface-deeperer hover:bg-surface-deep"
+                    className="shrink-0 text-surface-light bg-default/40 hover:bg-default/60"
                     onPress={() => {
                       const newRow = emptyRow(defaultCert());
                       focusMemberIdRef.current = newRow.id;
@@ -368,7 +368,7 @@ export default function AddTeamModal({
                     isDisabled={submitting}
                     variant="flat"
                     radius="lg"
-                    className="px-4 py-2 text-surface-light bg-surface-deeperer hover:bg-surface-deep"
+                    className="px-4 py-2 text-surface-light bg-default/40 hover:bg-default/60"
                   >
                     {t("Save & add another")}
                   </Button>

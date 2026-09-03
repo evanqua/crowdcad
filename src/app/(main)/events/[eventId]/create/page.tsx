@@ -30,6 +30,20 @@ const getPostName = (post: Post): string => {
   return typeof post === 'string' ? post : post.name;
 };
 
+// Subtle checkerboard behind the venue map, so the letterboxed area outside
+// the map image (which itself is fully transparent there) reads as "outside
+// the image" rather than a flat, ambiguous fill.
+const MAP_CHECKER_BG: React.CSSProperties = {
+  backgroundColor: 'hsl(var(--surface-bg-1))',
+  backgroundImage:
+    'linear-gradient(45deg, hsl(var(--surface-bg-2)) 25%, transparent 25%), ' +
+    'linear-gradient(-45deg, hsl(var(--surface-bg-2)) 25%, transparent 25%), ' +
+    'linear-gradient(45deg, transparent 75%, hsl(var(--surface-bg-2)) 75%), ' +
+    'linear-gradient(-45deg, transparent 75%, hsl(var(--surface-bg-2)) 75%)',
+  backgroundSize: '20px 20px',
+  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+};
+
 
 export default function EventCreation() {
   const router = useRouter();
@@ -714,7 +728,7 @@ export default function EventCreation() {
             the same VenueMapWithPosts marker/icon rendering and pan/zoom behavior
             as the dispatch page's own venue map modal. */}
         <div className="w-full flex flex-col flex-1 min-h-0">
-          <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-t-sm">
+          <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-t-sm" style={MAP_CHECKER_BG}>
             <VenueMapWithPosts
               layers={eventData.venue?.layers || []}
               currentLayer={currentLayer}
@@ -731,6 +745,7 @@ export default function EventCreation() {
               onMouseUp={handleMouseUp}
               onWheel={handleWheel}
               imgRef={imgRef}
+              imageRadiusClassName="rounded-none"
             />
 
             <MapZoomControls
@@ -747,7 +762,7 @@ export default function EventCreation() {
           <Card
             isBlurred
             radius="none"
-            className="rounded-b-sm bg-surface-deeper/90 w-full px-3 py-2 flex-shrink-0"
+            className="rounded-b-sm bg-default/40 w-full px-3 py-2 flex-shrink-0"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

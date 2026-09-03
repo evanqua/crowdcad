@@ -206,25 +206,25 @@ export function EquipmentSelectionSection({
                 }
               }}
               variant="flat"
-              size="sm"
+              size="lg"
               classNames={{
                 input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-                inputWrapper: 'rounded-small px-3 hover:bg-surface-deep',
+                inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
               }}
             />
             <Button
               isIconOnly
-              size="sm"
+              size="lg"
               onPress={addCustomEquipment}
               className="flex-shrink-0 bg-accent hover:bg-accent/90 text-surface-light"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
             </Button>
           </div>
 
           <ScrollShadow className="space-y-1.5 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
             {customEquipment.map((equip) => (
-              <div key={equip.id} className="rounded-sm p-3 bg-surface-deeper/90">
+              <div key={equip.id} className="rounded-sm p-3 bg-default/40">
                 <div className="flex items-center gap-3">
                   <span className="text-surface-light font-medium flex-shrink-0">{equip.name}</span>
                   <Chip size="sm" variant="flat" className="bg-accent/20 text-accent">
@@ -267,7 +267,7 @@ export function EquipmentSelectionSection({
               const selectedEquip = eventData.eventEquipment.find((e) => e.id === equip.id);
               const isSelected = !!selectedEquip;
               return (
-                <div key={equip.id} className="rounded-sm p-3 bg-surface-deeper/90">
+                <div key={equip.id} className="rounded-sm p-3 bg-default/40">
                   <div className="flex items-center gap-3">
                     <Checkbox
                       isSelected={isSelected}

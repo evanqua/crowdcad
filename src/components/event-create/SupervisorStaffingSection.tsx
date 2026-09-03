@@ -28,7 +28,7 @@ export default function SupervisorStaffingSection({
           <Button
             size="sm"
             onPress={onAddSupervisor}
-            className="h-8 px-3 text-sm text-surface-light bg-surface-deeperer hover:bg-surface-deep"
+            className="h-8 px-3 text-sm text-surface-light bg-default/40 hover:bg-default/60"
             aria-label="Add Supervisor"
           >
             Add Supervisor
@@ -38,7 +38,7 @@ export default function SupervisorStaffingSection({
               <Button
                 isIconOnly
                 size="sm"
-                className="h-8 min-w-8 w-8 text-surface-light bg-surface-deeperer hover:bg-surface-deep"
+                className="h-8 min-w-8 w-8 text-surface-light bg-default/40 hover:bg-default/60"
                 aria-label="More add-supervisor options"
               >
                 <ChevronDown className="h-4 w-4 text-surface-light" />
@@ -59,7 +59,7 @@ export default function SupervisorStaffingSection({
       <div className="px-4 py-3 flex-1 min-h-0 flex flex-col">
         <ScrollShadow className="space-y-2 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
           {supervisors.map((supervisor, idx) => (
-            <Card key={idx} isBlurred radius="sm" className="bg-white/10">
+            <Card key={idx} isBlurred radius="sm" className="bg-default/40">
               <div
                 className="flex items-center justify-between px-3 py-2 gap-2 cursor-pointer"
                 onClick={() => setOpenSupervisors((prev) => ({ ...prev, [idx]: !prev[idx] }))}
