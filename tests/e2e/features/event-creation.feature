@@ -8,14 +8,16 @@ Feature: Event creation
 
   Scenario: Form renders correctly
     Then I should see the "Enter event name" placeholder
-    When I go to the "Staff Assignments" step
+    When I fill the event name with "Render Test Event"
+    And I go to the "Staff Assignments" step
     Then I should see the heading "Teams"
     And I should see the heading "Supervisors"
     When I go to the "Equipment" step
     Then I should see the heading "Equipment"
 
   Scenario: Add a team via modal
-    When I go to the "Staff Assignments" step
+    When I fill the event name with "Team Modal Event"
+    And I go to the "Staff Assignments" step
     And I click the add team button
     And I fill the "Team Name" field with "Alpha"
     And I fill the "Member name" field with "John"
@@ -30,11 +32,13 @@ Feature: Event creation
     Then the URL should contain "/dispatch"
 
   Scenario: Equipment step renders correctly
-    When I go to the "Equipment" step
+    When I fill the event name with "Equipment Render Event"
+    And I go to the "Equipment" step
     Then I should see the heading "Equipment"
 
   Scenario: A supervisor can be added during event creation
-    When I go to the "Staff Assignments" step
+    When I fill the event name with "Supervisor Add Event"
+    And I go to the "Staff Assignments" step
     And I click the add event supervisor button
     And I fill the supervisor call sign with "Lead-1"
     And I select event supervisor certification "EMT-B"
@@ -56,5 +60,6 @@ Feature: Event creation
     Then the surge limit input should show "85"
 
   Scenario: Advancing a step moves focus to the new step's content
-    When I go to the "Equipment" step
+    When I fill the event name with "Focus Test Event"
+    And I go to the "Equipment" step
     Then the focused element should be labeled "Equipment"

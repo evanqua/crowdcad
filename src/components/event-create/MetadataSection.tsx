@@ -48,6 +48,7 @@ export default function MetadataSection({
           placeholder="Enter event name"
           value={eventData.name || ''}
           onValueChange={(value) => setEventData((prev) => ({ ...prev, name: value }))}
+          isRequired
           classNames={inputClassNames}
           size="lg"
         />
@@ -65,6 +66,7 @@ export default function MetadataSection({
               setEventData((prev) => ({ ...prev, date: date.toString() }));
             }
           }}
+          isRequired
           classNames={inputClassNames}
           size="lg"
         />

@@ -1012,9 +1012,9 @@ export default function VenueManagementPageClient() {
 
   const locationsStep = (
     <div className="flex flex-col h-full">
-      <label className="mb-2 block text-sm font-medium text-surface-light flex-shrink-0">
+      <h3 className="mb-2 flex-shrink-0 text-surface-light font-semibold text-xl">
         Locations
-      </label>
+      </h3>
       <div className="flex gap-2 flex-shrink-0">
         <Input
           placeholder="e.g., Main Entrance"
@@ -1123,24 +1123,25 @@ export default function VenueManagementPageClient() {
   const floorsWithMap = venueData.layers.filter((l) => !!l.mapUrl).length + (mapFile ? 1 : 0);
   const reviewStep = (
     <div className="h-full space-y-4">
+      <h3 className="text-surface-light font-semibold text-xl mb-1">Review</h3>
       <div>
-        <span className="text-xs text-surface-faint">Venue name</span>
-        <p className="text-surface-light font-medium">{venueData.name.trim() || '(untitled)'}</p>
+        <span className="text-sm text-surface-faint">Venue name</span>
+        <p className="text-surface-light font-medium text-lg">{venueData.name.trim() || '(untitled)'}</p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Floors</span>
-        <p className="text-surface-light">
+        <span className="text-sm text-surface-faint">Floors</span>
+        <p className="text-surface-light text-lg">
           {venueData.layers.length} floor{venueData.layers.length === 1 ? '' : 's'}
           {floorsWithMap > 0 ? ` · ${floorsWithMap} with a map` : ''}
         </p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Locations</span>
-        <p className="text-surface-light">{allPosts.length} location{allPosts.length === 1 ? '' : 's'}</p>
+        <span className="text-sm text-surface-faint">Locations</span>
+        <p className="text-surface-light text-lg">{allPosts.length} location{allPosts.length === 1 ? '' : 's'}</p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Equipment</span>
-        <p className="text-surface-light">{venueData.equipment.length} item{venueData.equipment.length === 1 ? '' : 's'}</p>
+        <span className="text-sm text-surface-faint">Equipment</span>
+        <p className="text-surface-light text-lg">{venueData.equipment.length} item{venueData.equipment.length === 1 ? '' : 's'}</p>
       </div>
     </div>
   );
@@ -1264,8 +1265,8 @@ export default function VenueManagementPageClient() {
           <div className="flex h-full overflow-hidden">
             {showMapColumn ? (
               <>
-                <div className="w-1/2 h-full flex-shrink-0 overflow-hidden">{leftPanelContent}</div>
-                <div className="w-1/2 h-full flex-shrink-0 overflow-hidden">{rightPanel}</div>
+                <div className="w-1/3 h-full flex-shrink-0 overflow-hidden">{leftPanelContent}</div>
+                <div className="w-2/3 h-full flex-shrink-0 overflow-hidden">{rightPanel}</div>
               </>
             ) : (
               <div className="w-full h-full overflow-hidden">{leftPanelContent}</div>

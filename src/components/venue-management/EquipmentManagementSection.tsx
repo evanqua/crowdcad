@@ -48,9 +48,9 @@ export default function EquipmentManagementSection({
 }: EquipmentManagementSectionProps) {
   return (
     <>
-      <label className="mb-2 block text-sm font-medium text-surface-light">
-        Equipment <span className="text-surface-light text-xs">(Optional)</span>
-      </label>
+      <h3 className="mb-2 text-surface-light font-semibold text-xl">
+        Equipment <span className="text-surface-faint text-sm font-normal">(Optional)</span>
+      </h3>
       <div className="flex gap-2 mb-3">
         <Input
           placeholder="e.g., Gurney 1"

@@ -365,6 +365,10 @@ export default function EventCreation() {
         alert('You must be logged in to create an event.');
         return;
       }
+      if (!eventData.name?.trim()) {
+        alert('Please enter an event name.');
+        return;
+      }
       const dateValue = new Date(eventData.date!);
       if (isNaN(dateValue.getTime())) {
         alert('Invalid event date');
@@ -546,7 +550,7 @@ export default function EventCreation() {
   const equipmentStep = (
     <div className="flex flex-col h-full overflow-hidden px-3 pt-4">
       <div className="flex-shrink-0 pb-3 pl-3 flex items-center justify-between">
-        <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
+        <h3 className="text-surface-light font-semibold text-xl">Equipment</h3>
       </div>
       <EquipmentSelectionSection
         hasVenue={hasVenue}
@@ -599,45 +603,46 @@ export default function EventCreation() {
 
   const reviewStep = (
     <div className="px-6 pt-4 h-full max-w-md space-y-4">
+      <h3 className="text-surface-light font-semibold text-xl mb-1">Review</h3>
       <div>
-        <span className="text-xs text-surface-faint">Event name</span>
-        <p className="text-surface-light font-medium">{eventData.name?.trim() || '(untitled)'}</p>
+        <span className="text-sm text-surface-faint">Event name</span>
+        <p className="text-surface-light font-medium text-lg">{eventData.name?.trim() || '(untitled)'}</p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Venue</span>
-        <p className="text-surface-light">{eventData.venue?.name || '(none)'}</p>
+        <span className="text-sm text-surface-faint">Venue</span>
+        <p className="text-surface-light text-lg">{eventData.venue?.name || '(none)'}</p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Date</span>
-        <p className="text-surface-light">
+        <span className="text-sm text-surface-faint">Date</span>
+        <p className="text-surface-light text-lg">
           {eventData.date ? new Date(eventData.date).toLocaleDateString() : '—'}
         </p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Start / End time</span>
-        <p className="text-surface-light">
+        <span className="text-sm text-surface-faint">Start / End time</span>
+        <p className="text-surface-light text-lg">
           {formatTimeValue(scheduleFrom)} – {formatTimeValue(scheduleTo)}
         </p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Surge limit</span>
-        <p className="text-surface-light">{eventData.surgeLimitPercent ?? 70}%</p>
+        <span className="text-sm text-surface-faint">Surge limit</span>
+        <p className="text-surface-light text-lg">{eventData.surgeLimitPercent ?? 70}%</p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Teams</span>
-        <p className="text-surface-light">{(eventData.staff || []).length} team{(eventData.staff || []).length === 1 ? '' : 's'}</p>
+        <span className="text-sm text-surface-faint">Teams</span>
+        <p className="text-surface-light text-lg">{(eventData.staff || []).length} team{(eventData.staff || []).length === 1 ? '' : 's'}</p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Supervisors</span>
-        <p className="text-surface-light">{(eventData.supervisor || []).length} supervisor{(eventData.supervisor || []).length === 1 ? '' : 's'}</p>
+        <span className="text-sm text-surface-faint">Supervisors</span>
+        <p className="text-surface-light text-lg">{(eventData.supervisor || []).length} supervisor{(eventData.supervisor || []).length === 1 ? '' : 's'}</p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Equipment</span>
-        <p className="text-surface-light">{eventData.eventEquipment.length} item{eventData.eventEquipment.length === 1 ? '' : 's'}</p>
+        <span className="text-sm text-surface-faint">Equipment</span>
+        <p className="text-surface-light text-lg">{eventData.eventEquipment.length} item{eventData.eventEquipment.length === 1 ? '' : 's'}</p>
       </div>
       <div>
-        <span className="text-xs text-surface-faint">Post schedule</span>
-        <p className="text-surface-light">
+        <span className="text-sm text-surface-faint">Post schedule</span>
+        <p className="text-surface-light text-lg">
           {postsEnabled
             ? `${(eventData.eventPosts || []).length} post${(eventData.eventPosts || []).length === 1 ? '' : 's'} · ${scheduleChips.length} repost time${scheduleChips.length === 1 ? '' : 's'}`
             : 'Not enabled'}
@@ -646,12 +651,15 @@ export default function EventCreation() {
     </div>
   );
 
+  // Event name and date are required before advancing past Event Configuration.
+  const hasRequiredBasics = !!eventData.name?.trim() && !!eventData.date;
+
   const steps: WizardStep[] = [
-    { id: 'basics', label: 'Event Configuration', component: basicsStep, isComplete: true },
-    { id: 'teams', label: 'Staff Assignments', component: teamsSupervisorsStep, isComplete: true },
-    { id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: true },
-    { id: 'postschedule', label: 'Post schedule', component: postScheduleStep, isComplete: true },
-    { id: 'review', label: 'Review', component: reviewStep, isComplete: true },
+    { id: 'basics', label: 'Event Configuration', component: basicsStep, isComplete: hasRequiredBasics },
+    { id: 'teams', label: 'Staff Assignments', component: teamsSupervisorsStep, isComplete: hasRequiredBasics },
+    { id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: hasRequiredBasics },
+    { id: 'postschedule', label: 'Post schedule', component: postScheduleStep, isComplete: hasRequiredBasics },
+    { id: 'review', label: 'Review', component: reviewStep, isComplete: hasRequiredBasics },
   ];
 
   const showMapPanel = currentStepId === 'equipment' || currentStepId === 'postschedule' || currentStepId === 'review';
@@ -678,6 +686,7 @@ export default function EventCreation() {
     <Button
       size="md"
       onPress={isLastStep ? handleSubmit : goNext}
+      isDisabled={currentStepId === 'basics' && !hasRequiredBasics}
       className="px-6 bg-accent hover:bg-accent/90 text-surface-light"
     >
       {isLastStep ? 'Create Event' : 'Continue'}

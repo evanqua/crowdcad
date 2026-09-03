@@ -44,7 +44,7 @@ export function PostsSelectionSection({
   return (
     <>
       <div className="flex-shrink-0 pb-3 pt-0.5 flex items-center justify-between">
-        <h3 className="text-surface-light font-semibold text-lg">Posts</h3>
+        <h3 className="text-surface-light font-semibold text-xl">Posts</h3>
         <Checkbox
           isSelected={postsEnabled}
           onValueChange={setPostsEnabled}
