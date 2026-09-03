@@ -116,7 +116,7 @@ export function PostsSelectionSection({
                     setLastSelectedPostIndex(idx);
                   }}
                 >
-                  {postName} ({layerName})
+                  {layerName ? `${postName} (${layerName})` : postName}
                 </SelectItem>
               );
             })}
@@ -257,7 +257,7 @@ export function EquipmentSelectionSection({
                     className="p-1 rounded bg-transparent flex-shrink-0"
                     aria-label="Remove equipment"
                   >
-                    <Trash2 className="h-4 w-4 text-surface-light" />
+                    <Trash2 className="h-4 w-4 text-status-red" />
                   </button>
                 </div>
               </div>

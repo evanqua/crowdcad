@@ -55,6 +55,8 @@ export interface LiteEventDraft {
   createdAt: string;
   updatedAt: string;
   surgeLimitPercent?: number;
+  scheduleStart?: string | number;
+  scheduleEnd?: string | number;
 }
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
