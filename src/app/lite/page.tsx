@@ -70,9 +70,6 @@ export default function LiteLandingPage() {
               CrowdCAD Lite
             </h1>
           </div>
-          <p className="text-lg sm:text-xl text-surface-light/80 text-center">
-            Fast, lightweight dispatch for events — no internet required
-          </p>
         </div>
 
         {/* Event setup form */}
