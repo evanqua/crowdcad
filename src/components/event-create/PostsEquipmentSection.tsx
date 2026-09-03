@@ -276,7 +276,9 @@ export function EquipmentSelectionSection({
                         if (checked) {
                           setEventData((prev) => ({
                             ...prev,
-                            eventEquipment: [...prev.eventEquipment, { ...equip, defaultLocation: undefined }],
+                            // Inherits the venue's own configured default location (if any) —
+                            // still just a starting point, adjustable per event via the Select below.
+                            eventEquipment: [...prev.eventEquipment, { ...equip, defaultLocation: equip.location }],
                           }));
                         } else {
                           setEventData((prev) => ({

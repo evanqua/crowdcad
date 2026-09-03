@@ -24,7 +24,7 @@ Given('I have a venue with location {string} and equipment {string} and am on th
   await page.keyboard.press('Enter');
 
   // Create venue and navigate to selection
-  await page.getByRole('button', { name: /^Review & save:/ }).click();
+  await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
   const venueLink = page.getByText(venueName, { exact: true });

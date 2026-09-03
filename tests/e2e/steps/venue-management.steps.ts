@@ -56,7 +56,7 @@ When('I create a venue with a unique name', async ({ page, scenarioState }) => {
   // submitting, but doesn't hard-fail — a backend with an open real-time
   // channel (e.g. Firestore's Listen/Write long-poll) never reaches true idle.
   await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
-  await page.getByRole('button', { name: /^Review & save:/ }).click();
+  await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
 });
@@ -76,7 +76,7 @@ When('I create two venues with unique names', async ({ page, scenarioState }) =>
     await page.goto('/venues/management', { timeout: 15_000 });
     await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
     await page.getByPlaceholder('e.g., Convention Center Hall A').fill(name);
-    await page.getByRole('button', { name: /^Review & save:/ }).click();
+    await page.getByRole('button', { name: /^Review:/ }).click();
     await page.getByRole('button', { name: 'Create Venue' }).click();
     await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
   }

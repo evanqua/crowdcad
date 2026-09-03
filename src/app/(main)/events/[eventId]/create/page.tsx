@@ -23,25 +23,12 @@ import AddTeamModal, { TeamDraft } from '@/components/modals/event/addteammodal'
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
 import BulkImportModal from '@/components/modals/event/bulkimportmodal';
 import { VenueMapWithPosts } from '@/components/modals/event/venuemapmodal';
+import { MAP_CHECKER_BG } from '@/lib/mapStyles';
 import LoadingScreen from '@/components/ui/loading-screen';
 
 // Helper to get post name regardless of type
 const getPostName = (post: Post): string => {
   return typeof post === 'string' ? post : post.name;
-};
-
-// Subtle checkerboard behind the venue map, so the letterboxed area outside
-// the map image (which itself is fully transparent there) reads as "outside
-// the image" rather than a flat, ambiguous fill.
-const MAP_CHECKER_BG: React.CSSProperties = {
-  backgroundColor: 'hsl(var(--surface-bg-1))',
-  backgroundImage:
-    'linear-gradient(45deg, hsl(var(--surface-bg-2)) 25%, transparent 25%), ' +
-    'linear-gradient(-45deg, hsl(var(--surface-bg-2)) 25%, transparent 25%), ' +
-    'linear-gradient(45deg, transparent 75%, hsl(var(--surface-bg-2)) 75%), ' +
-    'linear-gradient(-45deg, transparent 75%, hsl(var(--surface-bg-2)) 75%)',
-  backgroundSize: '20px 20px',
-  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
 };
 
 

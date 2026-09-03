@@ -4,7 +4,7 @@ Feature: Venue map management
   Background:
     Given I navigate to "/venues/management"
     And I fill the venue name with "Map Test Venue"
-    And I go to the "Map & floors" venue step
+    And I go to the "Map" venue step
 
   Scenario: Upload a map image to the default layer
     When I upload the venue map image "stage.png"

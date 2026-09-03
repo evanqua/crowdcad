@@ -9,13 +9,13 @@ Feature: Venue management
   Scenario: Every step is reachable once a venue name is entered
     Then I should see the venue name input
     When I fill the venue name with "Test Arena"
-    And I go to the "Map & floors" venue step
+    And I go to the "Map" venue step
     Then I should see the layer name input
     When I go to the "Locations" venue step
     Then I should see the location name input
     When I go to the "Equipment" venue step
     Then I should see the equipment name input
-    When I go to the "Review & save" venue step
+    When I go to the "Review" venue step
     Then I should see a "Create Venue" button
 
   Scenario: Continue is disabled until a venue name is entered
@@ -27,13 +27,13 @@ Feature: Venue management
 
   Scenario: Create Venue becomes available once a venue name is entered
     When I fill the venue name with "Test Arena"
-    And I go to the "Review & save" venue step
+    And I go to the "Review" venue step
     Then the "Create Venue" button should be enabled
 
   Scenario: Clearing the venue name locks the later steps again
     When I fill the venue name with "Test Arena"
-    And I go to the "Review & save" venue step
-    And I go to the "Basics" venue step
+    And I go to the "Review" venue step
+    And I go to the "Venue Configuration" venue step
     And I clear the venue name
     Then the "Continue" button should be disabled
 
@@ -98,12 +98,12 @@ Feature: Venue management
     When I fill the venue name with "Preserved Venue"
     And I go to the "Locations" venue step
     And I add a location named "Backstage"
-    And I go to the "Basics" venue step
+    And I go to the "Venue Configuration" venue step
     Then the venue name input should show "Preserved Venue"
     When I go to the "Locations" venue step
     Then I should see the text "Backstage"
 
   Scenario: Advancing a step moves focus to the new step's content
     When I fill the venue name with "Focus Test Venue"
-    And I go to the "Map & floors" venue step
-    Then the focused element should be labeled "Map & floors"
+    And I go to the "Map" venue step
+    Then the focused element should be labeled "Map"
