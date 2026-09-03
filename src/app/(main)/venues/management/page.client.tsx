@@ -21,6 +21,7 @@ import LayerControlBar from '@/components/venue-management/LayerControlBar';
 import MarkerModeToggleButton from '@/components/venue-management/MarkerModeToggleButton';
 import PendingMarkerDialog from '@/components/venue-management/PendingMarkerDialog';
 import MarkerPlacementInstruction from '@/components/venue-management/MarkerPlacementInstruction';
+import VenueMapMarker from '@/components/venue-management/VenueMapMarker';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
 import { VenueMapWithPosts } from '@/components/modals/event/venuemapmodal';
@@ -548,47 +549,29 @@ export default function VenueManagementPageClient() {
         post.y !== null
       )
       .map((post, idx) => {
-        const left = `calc(${post.x}% - 12px)`;
-        const top = `calc(${post.y}% - 12px)`;
         const isHover = hoverId === idx;
         const isPending = pendingMarker?.layerIdx === currentLayer && pendingMarker?.postIdx === idx;
 
         return (
-          <React.Fragment key={idx}>
-            <div
-              style={{ left, top }}
-              className={`absolute z-10 flex h-6 w-6 cursor-grab items-center justify-center rounded-full border-2 transition-all ${
-                isPending
-                  ? 'border-status-blue bg-status-blue/20 scale-125'
-                  : isHover || draggingIdx === idx
-                  ? 'border-accent bg-accent/30 scale-110'
-                  : 'border-accent bg-accent/20 hover:scale-110'
-              } ${draggingIdx === idx ? 'cursor-grabbing scale-110' : ''}`}
-              onMouseEnter={() => setHoverId(idx)}
-              onMouseLeave={() => setHoverId((cur) => (cur === idx ? null : cur))}
-              onMouseDown={onMarkerMouseDown(idx)}
-              onClick={(e) => {
-                if (isPending) return;
-                e.preventDefault();
-                e.stopPropagation();
-                renamePost(currentLayer, idx);
-              }}
-            >
-              {post.isClinic ? (
-                <HousePlus className="h-4 w-4 text-accent" strokeWidth={2.5} />
-              ) : (
-                <MapPin className="h-4 w-4 text-accent" strokeWidth={2.5} />
-              )}
-            </div>
-            {isHover && !isPending && post.name && (
-              <div
-                style={{ left: `calc(${post.x}% - 50px)`, top: `calc(${post.y}% - 40px)` }}
-                className="pointer-events-none absolute z-20 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
-              >
-                {post.name}
-              </div>
-            )}
-          </React.Fragment>
+          <VenueMapMarker
+            key={idx}
+            x={post.x}
+            y={post.y}
+            name={post.name}
+            isClinic={post.isClinic}
+            isHover={isHover}
+            isPending={isPending}
+            isDragging={draggingIdx === idx}
+            onMouseEnter={() => setHoverId(idx)}
+            onMouseLeave={() => setHoverId((cur) => (cur === idx ? null : cur))}
+            onMouseDown={onMarkerMouseDown(idx)}
+            onClick={(e) => {
+              if (isPending) return;
+              e.preventDefault();
+              e.stopPropagation();
+              renamePost(currentLayer, idx);
+            }}
+          />
         );
       });
   };
