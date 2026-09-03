@@ -118,7 +118,7 @@ export default function VenueManagementPageClient() {
     zoomIn,
     zoomOut,
     resetZoom,
-  } = useZoomPan(imgRef, imgContainerRef, {
+  } = useZoomPan({
     minScale: 1,
     maxScale: 5,
     disablePan: () => isAddMarkerMode || draggingIdx !== null,
@@ -742,21 +742,33 @@ export default function VenueManagementPageClient() {
   };
 
   const hasMapForStep = Boolean(previewUrl);
-  const showMapPanel = currentStepId !== 'basics';
+  // A just-uploaded map isn't in venueData.layers yet — it only becomes a
+  // real mapUrl there once the venue is saved (handleSubmit uploads it and
+  // patches this layer in). The interactive map already shows it via
+  // previewUrl (a local object URL); the read-only panel reads mapUrl
+  // straight off the layers array, so without this override it would show
+  // nothing for the current layer until the venue is actually saved.
+  const layersForMapDisplay = previewUrl
+    ? venueData.layers.map((layer, idx) => (idx === currentLayer ? { ...layer, mapUrl: previewUrl } : layer))
+    : venueData.layers;
+  // The Map step always renders full-width (header + its own interactive
+  // map), never the half-split every other map-showing step uses.
+  const showMapPanel = currentStepId !== 'basics' && currentStepId !== 'map';
   const showMapColumn = showMapPanel && hasMapForStep;
-  // The interactive editor (place/drag markers) only applies to the steps
-  // actually responsible for the map/layer itself and for placing
-  // locations; Equipment and Review just need a plain reference view,
-  // matching the event creation page's own read-only map panel exactly.
-  const isInteractiveMapStep = currentStepId === 'map' || currentStepId === 'locations';
+  // The interactive editor (place/drag markers) only applies to Locations
+  // (placing a location directly on the map); Equipment and Review just
+  // need a plain reference view, matching event creation's read-only map
+  // panel exactly. The Map step renders its own dedicated interactive map
+  // below, outside this left/right split entirely.
+  const isInteractiveMapStep = currentStepId === 'locations';
 
-  // The map/floor-controls header shared by the "Map" and "Locations"
-  // steps' left column whenever an interactive map is showing.
+  // The map/floor-controls header for the Map step: floor name top-left,
+  // Add Markers top-right.
   const mapStepHeader = (
     <div className="mb-3 flex items-center justify-between flex-shrink-0">
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-surface-light">
-          Venue Map <span className="text-surface-light text-xs">(Optional)</span>
+          Venue Map
         </label>
         <Input
           value={venueData.layers[currentLayer].name}
@@ -907,7 +919,7 @@ export default function VenueManagementPageClient() {
     <div className="flex flex-col h-full">
       <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-t-sm" style={MAP_CHECKER_BG}>
         <VenueMapWithPosts
-          layers={venueData.layers}
+          layers={layersForMapDisplay}
           currentLayer={currentLayer}
           staff={[]}
           equipment={venueData.equipment}
@@ -994,7 +1006,7 @@ export default function VenueManagementPageClient() {
   const mapFloorsStep = (
     <div className="flex flex-col h-full">
       {mapStepHeader}
-      {!hasMapForStep && <div className="flex-1 min-h-0">{mapUploadPrompt}</div>}
+      <div className="flex-1 min-h-0">{hasMapForStep ? interactiveMapPanel : mapUploadPrompt}</div>
     </div>
   );
 
@@ -1230,7 +1242,7 @@ export default function VenueManagementPageClient() {
   );
 
   return (
-    <main className="relative bg-surface-deepest text-surface-light h-[calc(100vh-3rem)] flex flex-col overflow-hidden">
+    <main className="relative bg-surface-deepest text-surface-light h-[calc(100dvh-3.5rem)] flex flex-col overflow-hidden">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}

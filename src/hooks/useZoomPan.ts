@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { clampPanPosition, clampScale } from '@/lib/zoomPanUtils';
+import { clampScale } from '@/lib/zoomPanUtils';
 
 type Position = { x: number; y: number };
 
@@ -9,11 +9,7 @@ type Options = {
   disablePan?: () => boolean;
 };
 
-export function useZoomPan(
-  imgRef: React.RefObject<HTMLImageElement | null>,
-  containerRef: React.RefObject<HTMLDivElement | null>,
-  options: Options = {}
-) {
+export function useZoomPan(options: Options = {}) {
   const { minScale = 1, maxScale = 5, disablePan } = options;
 
   const [scale, setScale] = useState(1);
@@ -31,37 +27,17 @@ export function useZoomPan(
     setPanStart({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
 
+  // Unclamped, matching the pan behavior of VenueMapWithPosts (the dispatch
+  // page's own venue map, and event creation's map panel) — a bounded clamp
+  // here left almost no drag range at the default scale (minScale defaults
+  // to 1, at which the image already fits its container, so maxX/maxY were
+  // ~0), which read as the map barely dragging at all.
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isPanning) return;
-
-    const img = imgRef.current;
-    const container = containerRef.current;
-    if (!img || !container) {
-      setPosition({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const imgWidth = img.offsetWidth * scale;
-    const imgHeight = img.offsetHeight * scale;
-
-    const newX = e.clientX - panStart.x;
-    const newY = e.clientY - panStart.y;
-
-    setPosition(
-      clampPanPosition({
-        newX,
-        newY,
-        imgWidth,
-        imgHeight,
-        containerWidth: containerRect.width,
-        containerHeight: containerRect.height,
-        scale,
-      })
-    );
+    setPosition({
+      x: e.clientX - panStart.x,
+      y: e.clientY - panStart.y,
+    });
   };
 
   const handleMouseUp = () => {
