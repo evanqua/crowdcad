@@ -448,7 +448,7 @@ export default function PostingScheduleModal({
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-surface-liner">
-                      <th className="p-3 text-left font-semibold sticky left-0 bg-surface-deepest z-10 w-1 whitespace-nowrap border-r border-surface-liner">
+                      <th className="p-3 text-left font-semibold sticky left-0 bg-transparent z-10 w-1 whitespace-nowrap border-r border-surface-liner">
                         Post
                       </th>
                       {times.map(time => {
@@ -458,7 +458,7 @@ export default function PostingScheduleModal({
                           <th
                             key={time}
                             className={`p-2 text-left whitespace-nowrap ${
-                              isCurrentPeriod ? 'bg-surface-deep' : 'bg-surface-deepest'
+                              isCurrentPeriod ? 'bg-surface-deep' : 'bg-transparent'
                             }`}
                             style={{ maxWidth: '180px', minWidth: '120px' }}
                           >
@@ -496,7 +496,7 @@ export default function PostingScheduleModal({
                   <tbody>
                     {posts.map((post) => (
                       <tr key={getPostKey(post)} className="border-b border-surface-liner">
-                        <td className="p-3 font-medium sticky left-0 bg-surface-deepest z-10 w-1 whitespace-nowrap border-r border-surface-liner">
+                        <td className="p-3 font-medium sticky left-0 bg-transparent z-10 w-1 whitespace-nowrap border-r border-surface-liner">
                           {getPostKey(post)}
                         </td>
                         {times.map((time) => {
@@ -533,7 +533,7 @@ export default function PostingScheduleModal({
                   <table className="w-full border-collapse text-sm table-fixed">
                     <thead>
                       <tr className="border-b border-surface-liner">
-                        <th className="p-2 text-left font-semibold bg-surface-deepest w-1/3">
+                        <th className="p-2 text-left font-semibold bg-transparent w-1/3">
                           Post
                         </th>
                           {visibleMobileColumns.map(time => {
@@ -543,7 +543,7 @@ export default function PostingScheduleModal({
                             <th
                               key={time}
                               className={`p-2 text-left w-1/3 ${
-                                isCurrentPeriod ? 'bg-surface-deep' : 'bg-surface-deepest'
+                                isCurrentPeriod ? 'bg-surface-deep' : 'bg-transparent'
                               }`}
                             >
                               {editingTime?.originalTime === time ? (
@@ -580,7 +580,7 @@ export default function PostingScheduleModal({
                     <tbody>
                       {posts.map((post) => (
                         <tr key={getPostKey(post)} className="border-b border-surface-liner">
-                          <td className="p-2 font-medium bg-surface-deepest text-xs w-1/3 align-top">
+                          <td className="p-2 font-medium bg-transparent text-xs w-1/3 align-top">
                             {getPostKey(post)}
                           </td>
                           {visibleMobileColumns.map((time) => {
