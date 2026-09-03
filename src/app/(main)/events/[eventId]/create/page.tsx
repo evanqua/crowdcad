@@ -4,16 +4,13 @@ import { useRouter, useParams } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import { Event, Venue, Staff, Supervisor, Post, Equipment, EventEquipment } from '@/app/types';
 import { authService, dbService } from '@/lib/services';
-import Image from 'next/image';
 import { Button, Card, ScrollShadow } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
-import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { syncClinicsFromVenue } from '@/lib/clinics';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
-import MapPanSurface from '@/components/ui/map-pan-surface';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { scheduleTimesToWindow, formatTimeValue } from '@/lib/scheduleUtils';
-import { useZoomPan } from '@/hooks/useZoomPan';
 import { useCertifications } from '@/hooks/useCertifications';
 import MetadataSection from '@/components/event-create/MetadataSection';
 import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
@@ -25,6 +22,7 @@ import { stripUndefined } from '@/lib/utils';
 import AddTeamModal, { TeamDraft } from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
 import BulkImportModal from '@/components/modals/event/bulkimportmodal';
+import { VenueMapWithPosts } from '@/components/modals/event/venuemapmodal';
 import LoadingScreen from '@/components/ui/loading-screen';
 
 // Helper to get post name regardless of type
@@ -64,24 +62,35 @@ export default function EventCreation() {
   const [bulkImportMode, setBulkImportMode] = useState<'team' | 'supervisor' | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const imgContainerRef = useRef<HTMLDivElement>(null);
   const [, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const submittedRef = useRef(false);
 
-  const {
-    scale,
-    position,
-    isPanning,
-    handleWheel,
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-    zoomIn,
-    zoomOut,
-    resetZoom,
-  } = useZoomPan(imgRef, imgContainerRef, { minScale: 0.5, maxScale: 3 });
+  // Pan/zoom state, mirroring the dispatch page's own venue map modal
+  // (VenueMapModal) exactly, since VenueMapWithPosts is shared with it.
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
+  const handleResetZoom = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPanning) return;
+    setPosition({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+  };
+  const handleMouseUp = () => setIsPanning(false);
 
   const {
     scheduleFrom,
@@ -93,8 +102,6 @@ export default function EventCreation() {
     postingTimes,
   } = useScheduleGeneration({ initialBy: '480' });
 
-  const [hoverId, setHoverId] = useState<number | null>(null);
-  const [tooltip, setTooltip] = useState<{ left: number; top: number; text: string } | null>(null);
   const [samName, setSamName] = useState('');
   const [samMemberName, setSamMemberName] = useState('');
   const [samCert, setSamCert] = useState('');
@@ -432,104 +439,6 @@ export default function EventCreation() {
   };
 
 
-  const renderMarkers = () => {
-    type CoordinatedPost = {
-      name: string;
-      x: number;
-      y: number;
-    };
-
-    return currentLayerPosts
-      .filter((post): post is CoordinatedPost =>
-        typeof post === 'object' &&
-        post !== null &&
-        'name' in post &&
-        typeof post.x === 'number' &&
-        typeof post.y === 'number' &&
-        post.x !== null &&
-        post.y !== null
-      )
-      .map((post, idx) => {
-        const left = `calc(${post.x}% - 12px)`;
-        const top = `calc(${post.y}% - 12px)`;
-        const isHover = hoverId === idx;
-
-        return (
-          <React.Fragment key={idx}>
-            <div
-              style={{ left, top }}
-              className={`absolute z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all ${
-                isHover
-                  ? 'border-accent bg-accent/30 scale-110'
-                  : 'border-accent bg-accent/20 hover:scale-110'
-              }`}
-                onMouseEnter={() => {
-                  setHoverId(idx);
-                  const img = imgRef.current;
-                  if (img && typeof post.x === 'number' && typeof post.y === 'number') {
-                    const rect = img.getBoundingClientRect();
-                    const xPx = rect.left + (post.x / 100) * rect.width;
-                    const yPx = rect.top + (post.y / 100) * rect.height;
-                    setTooltip({ left: Math.round(xPx - 50), top: Math.round(yPx - 40), text: post.name });
-                  }
-                }}
-                onMouseLeave={() => {
-                  setHoverId((cur) => (cur === idx ? null : cur));
-                  setTooltip(null);
-                }}
-            >
-              <svg className="h-4 w-4 text-accent" fill="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-              </svg>
-            </div>
-            {/* tooltip rendered globally to avoid being clipped by overflow */}
-          </React.Fragment>
-        );
-      });
-  };
-
-  // Equipment assigned a default location shows a small icon next to that
-  // location's marker, the same way it'll appear once the event is live.
-  const renderEquipmentMarkers = () => {
-    type CoordinatedPost = { name: string; x: number; y: number };
-    const coordinatedPosts = currentLayerPosts.filter((post): post is CoordinatedPost =>
-      typeof post === 'object' &&
-      post !== null &&
-      'name' in post &&
-      typeof post.x === 'number' &&
-      typeof post.y === 'number' &&
-      post.x !== null &&
-      post.y !== null
-    );
-
-    const byLocation = new Map<string, EventEquipment[]>();
-    for (const item of eventData.eventEquipment) {
-      if (!item.defaultLocation) continue;
-      const list = byLocation.get(item.defaultLocation) || [];
-      list.push(item);
-      byLocation.set(item.defaultLocation, list);
-    }
-
-    return Array.from(byLocation.entries()).flatMap(([locationName, items]) => {
-      const post = coordinatedPosts.find((p) => p.name === locationName);
-      if (!post) return [];
-      return items.map((item, i) => {
-        const left = `calc(${post.x}% + ${14 + i * 10}px - 8px)`;
-        const top = `calc(${post.y}% - 22px)`;
-        return (
-          <div
-            key={item.id}
-            style={{ left, top }}
-            title={item.name}
-            className="absolute z-10 flex h-4 w-4 items-center justify-center rounded-full bg-status-blue border border-surface-deepest"
-          >
-            <Package className="h-2.5 w-2.5 text-surface-light" />
-          </div>
-        );
-      });
-    });
-  };
-
   useEffect(() => {
     if (eventData.venue && Object.keys(eventData.venue).length > 0) {
     }
@@ -543,7 +452,6 @@ export default function EventCreation() {
   const hasVenue = Boolean(eventData.venue?.name && eventData.venue?.layers?.length);
   const hasMap = hasVenue && Boolean(eventData.venue?.layers?.[currentLayer]?.mapUrl);
   const allPosts = hasVenue ? (eventData.venue?.layers?.flatMap(layer => layer.posts || []) || []) : [];
-  const currentLayerPosts = hasVenue ? (eventData.venue?.layers?.[currentLayer]?.posts || []) : [];
   const flattenedPosts = hasVenue ? (eventData.venue?.layers?.flatMap(layer => (layer.posts || []).map(p => ({ post: p, layerName: layer.name }))) || []) : [];
 
   
@@ -572,18 +480,6 @@ export default function EventCreation() {
       ...prev,
       supervisor: (prev.supervisor || []).filter((_, i) => i !== idx),
     }));
-  };
-
-  const handleZoomIn = () => {
-    zoomIn(0.25);
-  };
-
-  const handleZoomOut = () => {
-    zoomOut(0.25);
-  };
-
-  const handleResetZoom = () => {
-    resetZoom();
   };
 
   // Convert date string to CalendarDate
@@ -814,47 +710,28 @@ export default function EventCreation() {
     <div className="flex flex-col h-full relative px-6 pt-4 pb-4 overflow-hidden">
       <div className="flex flex-col gap-2 flex-1 min-h-0">
         {/* Map — this panel only renders when showMapColumn is true, which already
-            requires hasMap, so there's no "no map" fallback to render here. */}
-        <div className="w-full flex flex-col gap-3 flex-1 min-h-0">
-          <div className="relative w-full overflow-hidden rounded-2xl">
-            <MapPanSurface
-              containerRef={imgContainerRef}
-              onWheel={handleWheel}
+            requires hasMap, so there's no "no map" fallback to render here. Reuses
+            the same VenueMapWithPosts marker/icon rendering and pan/zoom behavior
+            as the dispatch page's own venue map modal. */}
+        <div className="w-full flex flex-col flex-1 min-h-0">
+          <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-t-sm">
+            <VenueMapWithPosts
+              layers={eventData.venue?.layers || []}
+              currentLayer={currentLayer}
+              staff={eventData.staff || []}
+              equipment={(eventData.eventEquipment || []).map((e) => ({ ...e, location: e.defaultLocation }))}
+              teamTimers={{}}
+              calls={eventData.calls || []}
+              clinics={eventData.clinics || []}
+              scale={scale}
+              position={position}
+              isPanning={isPanning}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
-              style={{
-                cursor: isPanning ? 'grabbing' : 'grab',
-                maxHeight: 'calc(100vh - 215px)',
-              }}
-            >
-              <div
-                className="relative"
-                style={{
-                  transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                  transformOrigin: 'center center',
-                  transition: isPanning ? 'none' : 'transform 0.1s ease-out',
-                }}
-              >
-                <Image
-                  ref={imgRef}
-                  src={eventData.venue?.layers?.[currentLayer]?.mapUrl || ''}
-                  alt={`${eventData.venue?.layers?.[currentLayer]?.name || 'Venue'} map`}
-                  width={1200}
-                  height={800}
-                  className="w-full h-auto"
-                  unoptimized
-                  onLoad={(e) => {
-                    const t = e.currentTarget as HTMLImageElement;
-                    if (t && t.naturalWidth && t.naturalHeight) {
-                      setNaturalSize({ width: t.naturalWidth, height: t.naturalHeight });
-                    }
-                  }}
-                />
-                {renderMarkers()}
-                {renderEquipmentMarkers()}
-              </div>
-            </MapPanSurface>
+              onWheel={handleWheel}
+              imgRef={imgRef}
+            />
 
             <MapZoomControls
               onZoomIn={handleZoomIn}
@@ -865,10 +742,12 @@ export default function EventCreation() {
             />
           </div>
 
-          {/* Bottom Control Bar */}
+          {/* Bottom Control Bar — merges flush with the map above: square where
+              they meet, sharp radius only at the map's top and this bar's bottom. */}
           <Card
             isBlurred
-            className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
+            radius="none"
+            className="rounded-b-sm bg-surface-deeper/90 w-full px-3 py-2 flex-shrink-0"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -923,10 +802,10 @@ export default function EventCreation() {
           <div className="flex h-full overflow-hidden">
             {showMapColumn ? (
               <>
-                <div className="w-1/3 h-full flex-shrink-0 overflow-hidden">
+                <div className="w-1/2 h-full flex-shrink-0 overflow-hidden">
                   {leftPanelContent}
                 </div>
-                <div className="w-2/3 h-full flex-shrink-0 overflow-hidden">
+                <div className="w-1/2 h-full flex-shrink-0 overflow-hidden">
                   {rightPanelContent}
                 </div>
               </>
@@ -938,14 +817,6 @@ export default function EventCreation() {
           </div>
         </div>
       </div>
-      {tooltip && (
-        <div
-          style={{ left: tooltip.left, top: tooltip.top }}
-          className="pointer-events-none fixed z-50 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
-        >
-          {tooltip.text}
-        </div>
-      )}
 
       {/* Modals */}
       <AddTeamModal

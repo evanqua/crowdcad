@@ -300,6 +300,7 @@ export default function AddTeamModal({
                       isSelected={row.lead}
                       onValueChange={(v) => updateRow(row.id, { lead: v })}
                       aria-label={t("Lead")}
+                      classNames={{ wrapper: "after:bg-accent" }}
                     />
 
                     <Button

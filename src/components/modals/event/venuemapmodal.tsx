@@ -428,7 +428,7 @@ function TeamMarker({
   );
 }
 
-interface VenueMapWithPostsProps {
+export interface VenueMapWithPostsProps {
   layers: Layer[];
   currentLayer: number;
   staff: Staff[];
@@ -448,7 +448,7 @@ interface VenueMapWithPostsProps {
   imgRef: React.RefObject<HTMLImageElement | null>;
 }
 
-function VenueMapWithPosts({
+export function VenueMapWithPosts({
   layers,
   currentLayer,
   staff,

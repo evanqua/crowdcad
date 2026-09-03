@@ -45,7 +45,12 @@ export function PostsSelectionSection({
     <>
       <div className="flex-shrink-0 pb-3 pt-0.5 flex items-center justify-between">
         <h3 className="text-surface-light font-semibold text-lg">Posts</h3>
-        <Checkbox isSelected={postsEnabled} onValueChange={setPostsEnabled} size="sm">
+        <Checkbox
+          isSelected={postsEnabled}
+          onValueChange={setPostsEnabled}
+          size="sm"
+          classNames={{ wrapper: 'after:bg-accent' }}
+        >
           <span className="text-sm text-surface-light">Enable Posts</span>
         </Checkbox>
       </div>
@@ -266,6 +271,7 @@ export function EquipmentSelectionSection({
                   <div className="flex items-center gap-3">
                     <Checkbox
                       isSelected={isSelected}
+                      classNames={{ wrapper: 'after:bg-accent' }}
                       onValueChange={(checked) => {
                         if (checked) {
                           setEventData((prev) => ({
