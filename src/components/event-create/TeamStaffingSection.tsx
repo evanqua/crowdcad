@@ -66,7 +66,7 @@ export default function TeamStaffingSection({
                 className="flex items-center justify-between px-3 py-2 gap-2 cursor-pointer"
                 onClick={() => setOpenTeams((prev) => ({ ...prev, [idx]: !prev[idx] }))}
               >
-                <span className="text-surface-light font-medium truncate">{team.team}</span>
+                <span className="text-surface-light font-medium truncate leading-normal">{team.team}</span>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
                     type="button"
@@ -88,7 +88,7 @@ export default function TeamStaffingSection({
                     className="p-1 rounded bg-transparent"
                     aria-label="Delete team"
                   >
-                    <Trash2 className="h-4 w-4 text-surface-light" />
+                    <Trash2 className="h-4 w-4 text-status-red" />
                   </button>
                 </div>
               </div>

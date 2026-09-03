@@ -1,29 +1,25 @@
 'use client';
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  Button,
-  Card,
-  Checkbox,
-  Chip,
-  DatePicker,
-  Input,
-  ScrollShadow,
-  Select,
-  SelectItem,
-  Tab,
-  Tabs,
-  TimeInput,
-} from '@heroui/react';
-import { getLocalTimeZone, parseDate, Time, today } from '@internationalized/date';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { Edit2, Trash2 } from 'lucide-react';
-import type { Post, Staff, Supervisor, Equipment } from '@/app/types';
+import { Button, Card, Input, ScrollShadow } from '@heroui/react';
+import { parseDate, getLocalTimeZone, today, Time } from '@internationalized/date';
+import { Pencil, Trash2 } from 'lucide-react';
+import type { Event, EventEquipment, Post, Staff, Supervisor, Venue } from '@/app/types';
 import LoadingScreen from '@/components/ui/loading-screen';
-import { DiagonalStreaksFixed } from '@/components/ui/diagonal-streaks-fixed';
+import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
+import { scheduleTimesToWindow, formatTimeValue, parseTimeValue } from '@/lib/scheduleUtils';
+import { syncClinicsFromVenue } from '@/lib/clinics';
+import { stripUndefined } from '@/lib/utils';
+import MetadataSection from '@/components/event-create/MetadataSection';
+import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
+import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
+import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
+import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/event-create/PostsEquipmentSection';
+import { WizardShell, StepProgress, type WizardStep } from '@/components/wizard';
 import AddTeamModal, { TeamDraft, TeamMemberDraft } from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
+import BulkImportModal from '@/components/modals/event/bulkimportmodal';
 import {
   createDefaultLiteEventDraft,
   generateLiteEventId,
@@ -31,16 +27,8 @@ import {
   type LiteEventDraft,
   saveLiteEvent,
 } from '@/lib/liteEventStore';
-import { formatTimeValue, parseTimeValue } from '@/lib/scheduleUtils';
-import { syncClinicsFromVenue } from '@/lib/clinics';
-import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 
 const LICENSES = ['CPR', 'EMT-B', 'EMT-A', 'EMT-P', 'RN', 'MD/DO'];
-
-type ScheduleChip = {
-  id: string;
-  time: string;
-};
 
 const makeId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -49,8 +37,7 @@ const makeId = () => {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 };
 
-const getPostName = (post: Post): string =>
-  typeof post === 'string' ? post : post.name;
+const getPostName = (post: Post): string => (typeof post === 'string' ? post : post.name);
 
 const setPostName = (post: Post, name: string): Post =>
   typeof post === 'string' ? { name, x: null, y: null } : { ...post, name };
@@ -64,6 +51,38 @@ const parseMemberStrings = (members: string[]): TeamMemberDraft[] =>
     return { name: member, cert: '', lead: false };
   });
 
+// The shape the shared event-create step components (also used by cloud
+// event creation) expect. Lite events don't have a pre-existing Venue
+// (no id/userId, no map, no layers) — this adapter fabricates the minimal
+// Venue wrapper those components need around the same posts/equipment
+// arrays a LiteEventDraft already carries, so they can be reused unmodified.
+type SectionEventData = Partial<Event> & { venue: Venue; eventEquipment: EventEquipment[] };
+
+const toSectionData = (draft: LiteEventDraft): SectionEventData => ({
+  ...draft,
+  venue: {
+    id: draft.id,
+    userId: '',
+    name: draft.venue.name,
+    posts: draft.venue.posts,
+    equipment: draft.venue.equipment,
+  },
+});
+
+const fromSectionData = (current: LiteEventDraft, next: SectionEventData): LiteEventDraft => ({
+  ...current,
+  name: next.name ?? current.name,
+  date: next.date ?? current.date,
+  surgeLimitPercent: next.surgeLimitPercent,
+  eventEquipment: next.eventEquipment,
+  eventPosts: next.eventPosts ?? current.eventPosts,
+  venue: {
+    name: next.venue.name,
+    posts: next.venue.posts ?? [],
+    equipment: next.venue.equipment,
+  },
+});
+
 function LiteCreateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,31 +91,23 @@ function LiteCreateContent() {
   const [loading, setLoading] = useState(true);
   const [eventDraft, setEventDraft] = useState<LiteEventDraft | null>(null);
 
-  const [selectedLeftTab, setSelectedLeftTab] = useState<'locations' | 'equipment'>('locations');
-  const [selectedRightTab, setSelectedRightTab] = useState<
-    'teams' | 'supervisors' | 'posts' | 'equipment'
-  >('teams');
+  const [currentStepId, setCurrentStepId] = useState<string>('basics');
+
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [editingTeamIndex, setEditingTeamIndex] = useState<number | null>(null);
+  const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
+  const [bulkImportMode, setBulkImportMode] = useState<'team' | 'supervisor' | null>(null);
+  const [openTeams, setOpenTeams] = useState<Record<number, boolean>>({});
+  const [openSupervisors, setOpenSupervisors] = useState<Record<number, boolean>>({});
+  const [postsEnabled, setPostsEnabled] = useState(true);
+  const [lastSelectedPostIndex, setLastSelectedPostIndex] = useState<number | null>(null);
 
   const [locationInput, setLocationInput] = useState('');
   const [editingLocationIndex, setEditingLocationIndex] = useState<number | null>(null);
   const [locationEditInput, setLocationEditInput] = useState('');
-
   const [equipmentInput, setEquipmentInput] = useState('');
   const [editingEquipmentIndex, setEditingEquipmentIndex] = useState<number | null>(null);
   const [equipmentEditInput, setEquipmentEditInput] = useState('');
-
-  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
-  const [teamModalMode, setTeamModalMode] = useState<'create' | 'edit'>('create');
-  const [editingTeamIndex, setEditingTeamIndex] = useState<number | null>(null);
-  const [openTeams, setOpenTeams] = useState<Record<number, boolean>>({});
-
-  const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
-  const [samName, setSamName] = useState('');
-  const [samMemberName, setSamMemberName] = useState('');
-  const [samCert, setSamCert] = useState('');
-  const [openSupervisors, setOpenSupervisors] = useState<Record<number, boolean>>({});
-
-  const [postsEnabled, setPostsEnabled] = useState(true);
 
   const {
     scheduleFrom,
@@ -107,44 +118,24 @@ function LiteCreateContent() {
     setScheduleBy,
     postingTimes,
   } = useScheduleGeneration({ enabled: postsEnabled });
-  const [scheduleChips, setScheduleChips] = useState<ScheduleChip[]>([]);
+  const [scheduleChips, setScheduleChips] = useState<{ id: string; time: string; editable: boolean }[]>([]);
   const [editingChipId, setEditingChipId] = useState<string | null>(null);
   const [editingChipValue, setEditingChipValue] = useState('');
 
   const initializedScheduleRef = useRef<string | null>(null);
-
-  const allPosts = useMemo(() => eventDraft?.venue.posts ?? [], [eventDraft?.venue.posts]);
+  const postsSeededRef = useRef(false);
 
   const inputClassNames = {
     label: 'text-surface-light font-medium',
-    input:
-      'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
-  } as const;
-
-  const timeInputClassNames = {
-    label: inputClassNames.label,
-    input: inputClassNames.input,
-  } as const;
-
-  const byInputClassNames = {
-    label: inputClassNames.label,
-    input: inputClassNames.input,
-  } as const;
-
-  const attachedInputClassNames = {
-    label: inputClassNames.label,
-    inputWrapper:
-      'rounded-l-lg rounded-r-none px-4 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
-    input:
-      'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
-  } as const;
+    inputWrapper: 'rounded-large px-4',
+    input: 'text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none focus:ring-0 focus-visible:ring-0',
+  };
 
   const selectClassNames = {
     label: 'text-surface-light font-medium',
     input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
-    inputWrapper:
-      'rounded-large px-4 pr-6 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
-  } as const;
+    inputWrapper: 'rounded-large px-4 pr-6 shadow-none group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0',
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -190,7 +181,6 @@ function LiteCreateContent() {
 
   useEffect(() => {
     if (!eventDraft) return;
-
     if (initializedScheduleRef.current === eventDraft.id) return;
 
     const from = parseTimeValue(eventDraft.scheduleConfig.from, new Time(16, 0));
@@ -202,12 +192,7 @@ function LiteCreateContent() {
     setScheduleBy(eventDraft.scheduleConfig.by || '75');
 
     if (eventDraft.postingTimes.length > 0) {
-      setScheduleChips(
-        eventDraft.postingTimes.map((time) => ({
-          id: makeId(),
-          time,
-        }))
-      );
+      setScheduleChips(eventDraft.postingTimes.map((time) => ({ id: makeId(), time, editable: false })));
     } else {
       setScheduleChips([]);
     }
@@ -217,11 +202,9 @@ function LiteCreateContent() {
 
   useEffect(() => {
     if (!eventDraft) return;
-
     const timeout = window.setTimeout(() => {
       void saveLiteEvent(eventDraft);
     }, 250);
-
     return () => window.clearTimeout(timeout);
   }, [eventDraft]);
 
@@ -229,24 +212,68 @@ function LiteCreateContent() {
     setEventDraft((current) => (current ? updater(current) : current));
   };
 
+  // Keep the event's own start/end — used for reporting (the summary page's
+  // analytics window) independent of whether auto-posting is enabled — in
+  // sync with the Schedule section's From/To fields, mirroring cloud event
+  // creation.
+  useEffect(() => {
+    if (!eventDraft) return;
+    const { start, end } = scheduleTimesToWindow(eventDraft.date || new Date().toISOString(), scheduleFrom, scheduleTo);
+    updateDraft((current) => ({ ...current, scheduleStart: start, scheduleEnd: end }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleFrom, scheduleTo, eventDraft?.date]);
+
+  // Default post selection to "all posts" the first time a location is
+  // added, instead of starting from none — only runs once, and only if
+  // nothing has already been selected.
+  useEffect(() => {
+    if (postsSeededRef.current) return;
+    if (!eventDraft) return;
+    if (eventDraft.venue.posts.length === 0) return;
+    postsSeededRef.current = true;
+    if (eventDraft.eventPosts.length > 0) return;
+    updateDraft((current) => ({ ...current, eventPosts: current.venue.posts }));
+  }, [eventDraft]);
+
+  const eventDraftId = eventDraft?.id;
+  useEffect(() => {
+    if (!eventDraftId) return;
+
+    setScheduleChips(postingTimes.map((time) => ({ id: makeId(), time, editable: false })));
+
+    updateDraft((current) => ({
+      ...current,
+      postingScheduleEnabled: postsEnabled,
+      postingTimes,
+      scheduleConfig: {
+        from: formatTimeValue(scheduleFrom),
+        to: formatTimeValue(scheduleTo),
+        by: scheduleBy,
+      },
+    }));
+  }, [eventDraftId, postingTimes, postsEnabled, scheduleFrom, scheduleTo, scheduleBy]);
+
+  const updateSectionData = (updater: React.SetStateAction<SectionEventData>) => {
+    updateDraft((current) => {
+      const currentSection = toSectionData(current);
+      const nextSection =
+        typeof updater === 'function'
+          ? (updater as (prev: SectionEventData) => SectionEventData)(currentSection)
+          : updater;
+      return fromSectionData(current, nextSection);
+    });
+  };
+
   const addLocation = () => {
     const name = locationInput.trim();
     if (!name) return;
 
     updateDraft((current) => {
-      const duplicate = current.venue.posts.some(
-        (post) => getPostName(post).toLowerCase() === name.toLowerCase()
-      );
+      const duplicate = current.venue.posts.some((post) => getPostName(post).toLowerCase() === name.toLowerCase());
       if (duplicate) return current;
 
       const nextPost: Post = { name, x: null, y: null };
-      return {
-        ...current,
-        venue: {
-          ...current.venue,
-          posts: [...current.venue.posts, nextPost],
-        },
-      };
+      return { ...current, venue: { ...current.venue, posts: [...current.venue.posts, nextPost] } };
     });
 
     setLocationInput('');
@@ -260,15 +287,10 @@ function LiteCreateContent() {
       const removedName = getPostName(target);
       return {
         ...current,
-        venue: {
-          ...current.venue,
-          posts: current.venue.posts.filter((_, idx) => idx !== index),
-        },
+        venue: { ...current.venue, posts: current.venue.posts.filter((_, idx) => idx !== index) },
         eventPosts: current.eventPosts.filter((post) => getPostName(post) !== removedName),
         eventEquipment: current.eventEquipment.map((item) =>
-          item.defaultLocation === removedName
-            ? { ...item, defaultLocation: undefined }
-            : item
+          item.defaultLocation === removedName ? { ...item, defaultLocation: undefined } : item
         ),
       };
     });
@@ -280,7 +302,7 @@ function LiteCreateContent() {
   };
 
   const startLocationEdit = (index: number) => {
-    const post = allPosts[index];
+    const post = eventDraft?.venue.posts[index];
     if (!post) return;
     setEditingLocationIndex(index);
     setLocationEditInput(getPostName(post));
@@ -288,7 +310,6 @@ function LiteCreateContent() {
 
   const saveLocationEdit = () => {
     if (editingLocationIndex === null) return;
-
     const nextName = locationEditInput.trim();
     if (!nextName) return;
 
@@ -307,17 +328,10 @@ function LiteCreateContent() {
 
       return {
         ...current,
-        venue: {
-          ...current.venue,
-          posts: nextPosts,
-        },
-        eventPosts: current.eventPosts.map((post) =>
-          getPostName(post) === oldName ? setPostName(post, nextName) : post
-        ),
+        venue: { ...current.venue, posts: nextPosts },
+        eventPosts: current.eventPosts.map((post) => (getPostName(post) === oldName ? setPostName(post, nextName) : post)),
         eventEquipment: current.eventEquipment.map((item) =>
-          item.defaultLocation === oldName
-            ? { ...item, defaultLocation: nextName }
-            : item
+          item.defaultLocation === oldName ? { ...item, defaultLocation: nextName } : item
         ),
       };
     });
@@ -336,22 +350,14 @@ function LiteCreateContent() {
     if (!name) return;
 
     updateDraft((current) => {
-      const duplicate = current.venue.equipment.some(
-        (equipment) => equipment.name.toLowerCase() === name.toLowerCase()
-      );
+      const duplicate = current.venue.equipment.some((equipment) => equipment.name.toLowerCase() === name.toLowerCase());
       if (duplicate) return current;
-
-      const nextEquipment: Equipment = {
-        id: makeId(),
-        name,
-        status: 'Available',
-      };
 
       return {
         ...current,
         venue: {
           ...current.venue,
-          equipment: [...current.venue.equipment, nextEquipment],
+          equipment: [...current.venue.equipment, { id: makeId(), name, status: 'Available' }],
         },
       };
     });
@@ -366,10 +372,7 @@ function LiteCreateContent() {
 
       return {
         ...current,
-        venue: {
-          ...current.venue,
-          equipment: current.venue.equipment.filter((_, idx) => idx !== index),
-        },
+        venue: { ...current.venue, equipment: current.venue.equipment.filter((_, idx) => idx !== index) },
         eventEquipment: current.eventEquipment.filter((eq) => eq.id !== item.id),
       };
     });
@@ -383,14 +386,12 @@ function LiteCreateContent() {
   const startEquipmentEdit = (index: number) => {
     const item = eventDraft?.venue.equipment[index];
     if (!item) return;
-
     setEditingEquipmentIndex(index);
     setEquipmentEditInput(item.name);
   };
 
   const saveEquipmentEdit = () => {
     if (editingEquipmentIndex === null) return;
-
     const nextName = equipmentEditInput.trim();
     if (!nextName) return;
 
@@ -399,8 +400,7 @@ function LiteCreateContent() {
       if (!existing) return current;
 
       const duplicate = current.venue.equipment.some(
-        (equipment, idx) =>
-          idx !== editingEquipmentIndex && equipment.name.toLowerCase() === nextName.toLowerCase()
+        (equipment, idx) => idx !== editingEquipmentIndex && equipment.name.toLowerCase() === nextName.toLowerCase()
       );
       if (duplicate) return current;
 
@@ -409,10 +409,7 @@ function LiteCreateContent() {
 
       return {
         ...current,
-        venue: {
-          ...current.venue,
-          equipment: nextEquipment,
-        },
+        venue: { ...current.venue, equipment: nextEquipment },
         eventEquipment: current.eventEquipment.map((equipment) =>
           equipment.id === existing.id ? { ...equipment, name: nextName } : equipment
         ),
@@ -430,191 +427,86 @@ function LiteCreateContent() {
 
   const handleSaveTeam = (team: TeamDraft) => {
     updateDraft((current) => {
-      if (teamModalMode === 'edit' && editingTeamIndex !== null) {
+      if (editingTeamIndex !== null) {
         const existing = current.staff[editingTeamIndex];
         if (!existing) return current;
 
-        const nextStaff = {
+        const nextStaff: Staff = {
           ...existing,
           team: team.name,
-          members: team.members.map(
-            (member) => `${member.name} [${member.cert}]${member.lead ? ' (Lead)' : ''}`
-          ),
+          members: team.members.map((m) => `${m.name} [${m.cert}]${m.lead ? ' (Lead)' : ''}`),
         };
 
         const nextStaffArray = [...current.staff];
         nextStaffArray[editingTeamIndex] = nextStaff;
-
-        return {
-          ...current,
-          staff: nextStaffArray,
-        };
+        return { ...current, staff: nextStaffArray };
       }
 
-      const members = team.members.map(
-        (member) => `${member.name} [${member.cert}]${member.lead ? ' (Lead)' : ''}`
-      );
-
-      const nextStaff: Staff = {
-        team: team.name,
-        location: 'No Post',
-        status: 'On Break',
-        members,
-      };
-
-      return {
-        ...current,
-        staff: [...current.staff, nextStaff],
-      };
+      const members = team.members.map((m) => `${m.name} [${m.cert}]${m.lead ? ' (Lead)' : ''}`);
+      const nextStaff: Staff = { team: team.name, location: 'No Post', status: 'On Break', members };
+      return { ...current, staff: [...current.staff, nextStaff] };
     });
   };
 
-  const editingTeam = useMemo<TeamDraft | undefined>(() => {
-    if (teamModalMode !== 'edit' || editingTeamIndex === null) return undefined;
-    const team = eventDraft?.staff[editingTeamIndex];
-    if (!team) return undefined;
-    return { name: team.team, members: parseMemberStrings(team.members) };
-  }, [teamModalMode, editingTeamIndex, eventDraft]);
+  const parseTeamForEdit = (team: Staff): TeamDraft => ({
+    name: team.team,
+    members: parseMemberStrings(team.members),
+  });
 
-  const teamNamesForModal = useMemo(
-    () =>
-      (eventDraft?.staff || [])
-        .filter((_, idx) => !(teamModalMode === 'edit' && idx === editingTeamIndex))
-        .map((s) => s.team),
-    [eventDraft, teamModalMode, editingTeamIndex]
-  );
-
-  const startTeamEdit = (index: number) => {
-    const team = eventDraft?.staff[index];
-    if (!team) return;
-
-    setTeamModalMode('edit');
-    setEditingTeamIndex(index);
-    setIsTeamModalOpen(true);
+  const handleDeleteTeam = (idx: number) => {
+    updateDraft((current) => ({ ...current, staff: current.staff.filter((_, i) => i !== idx) }));
   };
 
-  const removeTeam = (index: number) => {
+  const [samName, setSamName] = useState('');
+  const [samMemberName, setSamMemberName] = useState('');
+  const [samCert, setSamCert] = useState('');
+
+  const handleAddSamUnit = () => {
+    if (!samName.trim() || !samCert) return;
     updateDraft((current) => ({
       ...current,
-      staff: current.staff.filter((_, idx) => idx !== index),
+      supervisor: [
+        ...current.supervisor,
+        {
+          team: samName.trim(),
+          location: 'Roaming',
+          status: 'On Break',
+          member: samMemberName.trim() ? `${samMemberName.trim()} [${samCert}]` : `${samName.trim()} [${samCert}]`,
+        },
+      ],
     }));
-  };
-
-  const handleAddSupervisor = () => {
-    if (!samName.trim() || !samCert) {
-      alert('Supervisor call sign and certification are required.');
-      return;
-    }
-
-    updateDraft((current) => {
-      const duplicate = current.supervisor.some(
-        (supervisor) => supervisor.team.toLowerCase() === samName.trim().toLowerCase()
-      );
-      if (duplicate) {
-        alert('Supervisor call sign already used.');
-        return current;
-      }
-
-      const nextSupervisor: Supervisor = {
-        team: samName.trim(),
-        location: 'Roaming',
-        status: 'On Break',
-        member: samMemberName.trim()
-          ? `${samMemberName.trim()} [${samCert}]`
-          : `${samName.trim()} [${samCert}]`,
-      };
-
-      return {
-        ...current,
-        supervisor: [...current.supervisor, nextSupervisor],
-      };
-    });
-
     setSamName('');
     setSamMemberName('');
     setSamCert('');
     setIsSupervisorModalOpen(false);
   };
 
-  const removeSupervisor = (index: number) => {
-    updateDraft((current) => ({
-      ...current,
-      supervisor: current.supervisor.filter((_, idx) => idx !== index),
-    }));
+  const handleDeleteSupervisor = (idx: number) => {
+    updateDraft((current) => ({ ...current, supervisor: current.supervisor.filter((_, i) => i !== idx) }));
   };
 
-  const eventDraftId = eventDraft?.id;
-
-  useEffect(() => {
-    if (!eventDraftId) return;
-
-    setScheduleChips(
-      postingTimes.map((time) => ({
-        id: makeId(),
-        time,
-      }))
-    );
-
+  const handleBulkImport = (staff: Staff[], supervisors: Supervisor[]) => {
     updateDraft((current) => ({
       ...current,
-      postingScheduleEnabled: postsEnabled,
-      postingTimes,
-      scheduleConfig: {
-        from: formatTimeValue(scheduleFrom),
-        to: formatTimeValue(scheduleTo),
-        by: scheduleBy,
-      },
+      staff: staff.length > 0 ? [...current.staff, ...staff] : current.staff,
+      supervisor: supervisors.length > 0 ? [...current.supervisor, ...supervisors] : current.supervisor,
     }));
-  }, [eventDraftId, postingTimes, postsEnabled, scheduleFrom, scheduleTo, scheduleBy]);
-
-  const removeScheduleChip = (chipId: string) => {
-    setScheduleChips((current) => {
-      const filtered = current.filter((chip) => chip.id !== chipId);
-      updateDraft((draft) => ({
-        ...draft,
-        postingTimes: filtered.map((chip) => chip.time),
-      }));
-      return filtered;
-    });
-  };
-
-  const saveEditedScheduleChip = (chipId: string, nextTime: string) => {
-    const trimmed = nextTime.trim();
-    if (!trimmed) {
-      setEditingChipId(null);
-      setEditingChipValue('');
-      return;
-    }
-
-    setScheduleChips((current) => {
-      const updated = current.map((chip) =>
-        chip.id === chipId ? { ...chip, time: trimmed } : chip
-      );
-      updateDraft((draft) => ({
-        ...draft,
-        postingTimes: updated.map((chip) => chip.time),
-      }));
-      return updated;
-    });
-
-    setEditingChipId(null);
-    setEditingChipValue('');
+    setBulkImportMode(null);
   };
 
   const getCalendarDate = () => {
-    const currentDate = eventDraft?.date;
-    if (!currentDate) return today(getLocalTimeZone());
-
-    try {
-      return parseDate(currentDate);
-    } catch {
-      return today(getLocalTimeZone());
+    if (eventDraft?.date) {
+      try {
+        return parseDate(eventDraft.date);
+      } catch {
+        return today(getLocalTimeZone());
+      }
     }
+    return today(getLocalTimeZone());
   };
 
   const handleCreateLiteEvent = async () => {
     if (!eventDraft) return;
-
     if (!eventDraft.name.trim()) {
       alert('Please enter an event name.');
       return;
@@ -627,7 +519,7 @@ function LiteCreateContent() {
       clinics: syncClinicsFromVenue(eventDraft.venue, eventDraft.clinics),
     };
 
-    await saveLiteEvent(finalized);
+    await saveLiteEvent(stripUndefined(finalized));
 
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem(`lite_event_${eventDraft.id}`);
@@ -640,728 +532,369 @@ function LiteCreateContent() {
     return <LoadingScreen label="Loading Lite setup…" />;
   }
 
+  const sectionData = toSectionData(eventDraft);
+  const hasVenueEquipment = eventDraft.venue.equipment.length > 0;
+  const allPosts = eventDraft.venue.posts;
+  const flattenedPosts = allPosts.map((post) => ({ post, layerName: '' }));
+
+  type StepId = 'basics' | 'locations' | 'teams' | 'equipment' | 'postschedule' | 'review';
+  const STEP_ORDER: StepId[] = hasVenueEquipment
+    ? ['basics', 'locations', 'teams', 'equipment', 'postschedule', 'review']
+    : ['basics', 'locations', 'teams', 'postschedule', 'review'];
+
+  const hasRequiredBasics = !!eventDraft.name.trim() && !!eventDraft.date;
+
+  const basicsStep = (
+    <div className="px-6 pt-4 h-full">
+      <MetadataSection
+        eventData={sectionData}
+        setEventData={
+          updateSectionData as unknown as React.Dispatch<
+            React.SetStateAction<Partial<Event> & { eventEquipment: EventEquipment[] }>
+          >
+        }
+        getCalendarDate={getCalendarDate}
+        scheduleFrom={scheduleFrom}
+        setScheduleFrom={setScheduleFrom}
+        scheduleTo={scheduleTo}
+        setScheduleTo={setScheduleTo}
+        inputClassNames={inputClassNames}
+      />
+    </div>
+  );
+
+  const locationListItem = (
+    label: string,
+    isEditing: boolean,
+    editValue: string,
+    setEditValue: (v: string) => void,
+    onSave: () => void,
+    onCancel: () => void,
+    onStartEdit: () => void,
+    onRemove: () => void,
+    key: string
+  ) => (
+    <Card key={key} radius="sm" className="bg-default/40">
+      <div className="flex items-center justify-between px-3 py-2 gap-2">
+        {isEditing ? (
+          <>
+            <Input
+              value={editValue}
+              onValueChange={setEditValue}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onSave();
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  onCancel();
+                }
+              }}
+              size="sm"
+              autoFocus
+              classNames={inputClassNames}
+            />
+            <button type="button" onClick={onSave} className="p-1 rounded bg-transparent flex-shrink-0" aria-label="Save">
+              <Pencil className="h-4 w-4 text-surface-light" />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-surface-light font-medium truncate leading-normal">{label}</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button type="button" onClick={onStartEdit} className="p-1 rounded bg-transparent" aria-label="Edit">
+                <Pencil className="h-4 w-4 text-surface-light" />
+              </button>
+              <button type="button" onClick={onRemove} className="p-1 rounded bg-transparent" aria-label="Delete">
+                <Trash2 className="h-4 w-4 text-status-red" />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+
+  const locationsStep = (
+    <div className="flex h-full px-6 pt-4">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 pb-3 flex items-center justify-between">
+          <h3 className="text-surface-light font-semibold text-lg">Locations</h3>
+        </div>
+        <div className="flex-shrink-0 flex gap-2 pb-3">
+          <Input
+            placeholder="e.g., Main Entrance"
+            value={locationInput}
+            onValueChange={setLocationInput}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addLocation();
+              }
+            }}
+            variant="flat"
+            classNames={inputClassNames}
+          />
+          <Button onPress={addLocation} className="flex-shrink-0 h-10 px-4 text-sm text-surface-light bg-default/40 hover:bg-default/60">
+            Add
+          </Button>
+        </div>
+        <ScrollShadow className="space-y-2 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
+          {allPosts.map((post, index) =>
+            locationListItem(
+              getPostName(post),
+              editingLocationIndex === index,
+              locationEditInput,
+              setLocationEditInput,
+              saveLocationEdit,
+              cancelLocationEdit,
+              () => startLocationEdit(index),
+              () => removeLocation(index),
+              `${getPostName(post)}_${index}`
+            )
+          )}
+        </ScrollShadow>
+      </div>
+
+      <div className="w-px bg-surface-liner mx-2 flex-shrink-0" />
+
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 pb-3 flex items-center justify-between">
+          <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
+        </div>
+        <div className="flex-shrink-0 flex gap-2 pb-3">
+          <Input
+            placeholder="e.g., Gurney 1"
+            value={equipmentInput}
+            onValueChange={setEquipmentInput}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addEquipment();
+              }
+            }}
+            variant="flat"
+            classNames={inputClassNames}
+          />
+          <Button onPress={addEquipment} className="flex-shrink-0 h-10 px-4 text-sm text-surface-light bg-default/40 hover:bg-default/60">
+            Add
+          </Button>
+        </div>
+        <ScrollShadow className="space-y-2 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
+          {eventDraft.venue.equipment.map((item, index) =>
+            locationListItem(
+              item.name,
+              editingEquipmentIndex === index,
+              equipmentEditInput,
+              setEquipmentEditInput,
+              saveEquipmentEdit,
+              cancelEquipmentEdit,
+              () => startEquipmentEdit(index),
+              () => removeEquipment(index),
+              item.id
+            )
+          )}
+        </ScrollShadow>
+      </div>
+    </div>
+  );
+
+  const teamsSupervisorsStep = (
+    <div className="flex h-full px-6 pt-4">
+      <div className="flex-1 min-w-0">
+        <TeamStaffingSection
+          staff={eventDraft.staff}
+          openTeams={openTeams}
+          setOpenTeams={setOpenTeams}
+          onDeleteTeam={handleDeleteTeam}
+          onEditTeam={(idx) => {
+            setEditingTeamIndex(idx);
+            setIsTeamModalOpen(true);
+          }}
+          onAddTeam={() => {
+            setEditingTeamIndex(null);
+            setIsTeamModalOpen(true);
+          }}
+          onUploadCSV={() => setBulkImportMode('team')}
+        />
+      </div>
+      <div className="w-px bg-surface-liner mx-2 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <SupervisorStaffingSection
+          supervisors={eventDraft.supervisor}
+          openSupervisors={openSupervisors}
+          setOpenSupervisors={setOpenSupervisors}
+          onDeleteSupervisor={handleDeleteSupervisor}
+          onUploadCSV={() => setBulkImportMode('supervisor')}
+          onAddSupervisor={() => setIsSupervisorModalOpen(true)}
+        />
+      </div>
+    </div>
+  );
+
+  const equipmentStep = (
+    <div className="flex flex-col h-full overflow-hidden px-3 pt-4">
+      <div className="flex-shrink-0 pb-3 pl-3 flex items-center justify-between">
+        <h3 className="text-surface-light font-semibold text-xl">Equipment</h3>
+      </div>
+      <EquipmentSelectionSection
+        hasVenue
+        eventData={sectionData}
+        setEventData={updateSectionData}
+        selectClassNames={selectClassNames}
+        allPosts={allPosts}
+        getPostName={getPostName}
+      />
+    </div>
+  );
+
+  const postScheduleStep = (
+    <div className="px-6 pt-4 h-full min-h-0 flex flex-col">
+      <ScrollShadow className="space-y-4 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
+        <PostsSelectionSection
+          hasVenue
+          postsEnabled={postsEnabled}
+          setPostsEnabled={setPostsEnabled}
+          flattenedPosts={flattenedPosts}
+          allPosts={allPosts}
+          getPostName={getPostName}
+          eventData={sectionData}
+          setEventData={updateSectionData}
+          lastSelectedPostIndex={lastSelectedPostIndex}
+          setLastSelectedPostIndex={setLastSelectedPostIndex}
+          selectClassNames={selectClassNames}
+        />
+        <PostingScheduleSection
+          postsEnabled={postsEnabled}
+          scheduleBy={scheduleBy}
+          setScheduleBy={setScheduleBy}
+          scheduleChips={scheduleChips}
+          setScheduleChips={setScheduleChips}
+          editingChipId={editingChipId}
+          setEditingChipId={setEditingChipId}
+          editingChipValue={editingChipValue}
+          setEditingChipValue={setEditingChipValue}
+          setPostingTimes={(updater) =>
+            updateDraft((current) => ({ ...current, postingTimes: updater(current.postingTimes || []) }))
+          }
+          inputClassNames={inputClassNames}
+        />
+      </ScrollShadow>
+    </div>
+  );
+
+  const reviewStep = (
+    <div className="px-6 pt-4 h-full max-w-md space-y-4">
+      <h3 className="text-surface-light font-semibold text-xl mb-1">Review</h3>
+      <div>
+        <span className="text-sm text-surface-faint">Event name</span>
+        <p className="text-surface-light font-medium text-lg">{eventDraft.name.trim() || '(untitled)'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Locations</span>
+        <p className="text-surface-light text-lg">{allPosts.length} location{allPosts.length === 1 ? '' : 's'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Date</span>
+        <p className="text-surface-light text-lg">{eventDraft.date ? new Date(eventDraft.date).toLocaleDateString() : '—'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Start / End time</span>
+        <p className="text-surface-light text-lg">
+          {formatTimeValue(scheduleFrom)} – {formatTimeValue(scheduleTo)}
+        </p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Surge limit</span>
+        <p className="text-surface-light text-lg">{eventDraft.surgeLimitPercent ?? 70}%</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Teams</span>
+        <p className="text-surface-light text-lg">{eventDraft.staff.length} team{eventDraft.staff.length === 1 ? '' : 's'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Supervisors</span>
+        <p className="text-surface-light text-lg">
+          {eventDraft.supervisor.length} supervisor{eventDraft.supervisor.length === 1 ? '' : 's'}
+        </p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Equipment</span>
+        <p className="text-surface-light text-lg">
+          {eventDraft.eventEquipment.length} item{eventDraft.eventEquipment.length === 1 ? '' : 's'}
+        </p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Post schedule</span>
+        <p className="text-surface-light text-lg">
+          {postsEnabled
+            ? `${eventDraft.eventPosts.length} post${eventDraft.eventPosts.length === 1 ? '' : 's'} · ${scheduleChips.length} repost time${scheduleChips.length === 1 ? '' : 's'}`
+            : 'Not enabled'}
+        </p>
+      </div>
+    </div>
+  );
+
+  const steps: WizardStep[] = [
+    { id: 'basics', label: 'Event Configuration', component: basicsStep, isComplete: hasRequiredBasics },
+    { id: 'locations', label: 'Locations', component: locationsStep, isComplete: hasRequiredBasics },
+    { id: 'teams', label: 'Staff Assignments', component: teamsSupervisorsStep, isComplete: hasRequiredBasics },
+    ...(hasVenueEquipment
+      ? [{ id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: hasRequiredBasics }]
+      : []),
+    { id: 'postschedule', label: 'Post schedule', component: postScheduleStep, isComplete: hasRequiredBasics },
+    { id: 'review', label: 'Review', component: reviewStep, isComplete: hasRequiredBasics },
+  ];
+
+  const stepIdx = STEP_ORDER.indexOf(currentStepId as (typeof STEP_ORDER)[number]);
+  const isFirstStep = stepIdx <= 0;
+  const isLastStep = stepIdx === STEP_ORDER.length - 1;
+  const goNext = () => {
+    if (stepIdx >= 0 && stepIdx < STEP_ORDER.length - 1) setCurrentStepId(STEP_ORDER[stepIdx + 1]);
+  };
+  const goBack = () => {
+    if (stepIdx > 0) setCurrentStepId(STEP_ORDER[stepIdx - 1]);
+  };
+
+  const backButton = !isFirstStep && (
+    <Button variant="flat" size="md" onPress={goBack} className="px-6">
+      Back
+    </Button>
+  );
+
+  const primaryButton = (
+    <Button
+      size="md"
+      onPress={isLastStep ? handleCreateLiteEvent : goNext}
+      isDisabled={currentStepId === 'basics' && !hasRequiredBasics}
+      className="px-6 bg-accent hover:bg-accent/90 text-surface-light"
+    >
+      {isLastStep ? 'Create Event' : 'Continue'}
+    </Button>
+  );
+
   return (
     <main className="relative bg-surface-deepest text-surface-light h-full overflow-hidden leading-none">
-      <DiagonalStreaksFixed />
-
       <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden flex flex-col">
-        <div className="px-6 pt-4 pb-4 flex-shrink-0 space-y-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-surface-light text-left">Lite Event Setup</h1>
-            <p className="text-sm text-surface-light mt-1">
-              Build your event locally with locations, staffing, posts, and schedule before dispatch.
-            </p>
-          </div>
-
-          <div className="flex items-end gap-4">
-            <div style={{ flex: 4 }}>
-              <Input
-                label="Event Name"
-                labelPlacement="outside"
-                placeholder="Enter event name"
-                value={eventDraft.name}
-                onValueChange={(value) =>
-                  updateDraft((current) => ({ ...current, name: value }))
-                }
-                classNames={inputClassNames}
-                size="lg"
-              />
-            </div>
-            <div style={{ flex: 3 }}>
-              <DatePicker
-                label="Event Date"
-                labelPlacement="outside"
-                value={getCalendarDate()}
-                onChange={(value) => {
-                  if (!value) return;
-                  updateDraft((current) => ({ ...current, date: value.toString() }));
-                }}
-                classNames={inputClassNames}
-                size="lg"
-              />
-            </div>
-            <div style={{ flex: 2 }}>
-              <Input
-                type="number"
-                label="Surge Limit"
-                labelPlacement="outside"
-                placeholder="70"
-                min={1}
-                max={100}
-                value={String(eventDraft.surgeLimitPercent ?? 70)}
-                onValueChange={(value) => {
-                  const parsed = Number(value);
-                  updateDraft((current) => ({
-                    ...current,
-                    surgeLimitPercent: Number.isFinite(parsed) ? Math.min(100, Math.max(1, parsed)) : current.surgeLimitPercent,
-                  }));
-                }}
-                endContent={<span className="text-surface-faint text-sm">%</span>}
-                classNames={inputClassNames}
-                size="lg"
-              />
-            </div>
-            <div className="flex-shrink-0">
-              <Button
-                onPress={handleCreateLiteEvent}
-                size="lg"
-                radius="lg"
-                className="bg-accent hover:bg-accent/90 text-surface-light"
-              >
-                Create Event
-              </Button>
-            </div>
-          </div>
+        <div className="px-6 pt-4 flex-shrink-0">
+          <StepProgress steps={steps} currentStepId={currentStepId} onStepChange={setCurrentStepId} />
         </div>
-
-        <div className="flex-1 overflow-hidden">
-          <div className="flex h-full overflow-hidden">
-            <PanelGroup direction="horizontal">
-              <Panel defaultSize={40} minSize={30} maxSize={55}>
-                <div className="flex flex-col h-full relative overflow-hidden px-6 pt-0 pb-4">
-                  <div className="flex-shrink-0 flex items-end gap-3 mb-3">
-                    <Tabs
-                      selectedKey={selectedLeftTab}
-                      onSelectionChange={(key) => setSelectedLeftTab(key as 'locations' | 'equipment')}
-                      classNames={{
-                        tabList: 'p-1 rounded-large flex-shrink-0',
-                        tab: 'rounded-large px-4 text-surface-light data-[selected=true]:text-surface-light',
-                        panel: 'hidden',
-                        cursor: 'rounded-large',
-                      }}
-                    >
-                      <Tab key="locations" title="Locations" />
-                      <Tab key="equipment" title="Equipment" />
-                    </Tabs>
-
-                    <div className="flex-1 flex gap-0">
-                      <Input
-                        className="flex-1"
-                        placeholder={selectedLeftTab === 'locations' ? 'e.g., Main Entrance' : 'e.g., Gurney 1'}
-                        value={selectedLeftTab === 'locations' ? locationInput : equipmentInput}
-                        onValueChange={(value) => {
-                          if (selectedLeftTab === 'locations') {
-                            setLocationInput(value);
-                          } else {
-                            setEquipmentInput(value);
-                          }
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            if (selectedLeftTab === 'locations') {
-                              addLocation();
-                            } else {
-                              addEquipment();
-                            }
-                          }
-                        }}
-                        variant="flat"
-                        classNames={attachedInputClassNames}
-                      />
-                      <Button
-                        onPress={selectedLeftTab === 'locations' ? addLocation : addEquipment}
-                        className="flex-shrink-0 min-w-10 w-12 h-10 rounded-l-none rounded-r-lg"
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Card
-                    isBlurred
-                    className="flex-1 overflow-hidden"
-                    style={{ backgroundColor: 'hsl(var(--surface-bg-2) / 0.5)' }}
-                  >
-                    {selectedLeftTab === 'locations' ? (
-                      <ScrollShadow
-                        hideScrollBar
-                        className="space-y-2 p-3 pr-2 scrollbar-hide h-full"
-                        style={{ minHeight: 0 }}
-                      >
-                        {allPosts.map((post, index) => (
-                          <Card
-                            key={`${getPostName(post)}_${index}`}
-                            isBlurred
-                            className="rounded-large bg-surface-deeper/90"
-                          >
-                            <div className="flex items-center justify-between px-3 py-2 gap-2">
-                              {editingLocationIndex === index ? (
-                                <>
-                                  <Input
-                                    value={locationEditInput}
-                                    onValueChange={setLocationEditInput}
-                                    onKeyDown={(event) => {
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        saveLocationEdit();
-                                      }
-                                      if (event.key === 'Escape') {
-                                        event.preventDefault();
-                                        cancelLocationEdit();
-                                      }
-                                    }}
-                                    size="sm"
-                                    autoFocus
-                                    classNames={inputClassNames}
-                                  />
-                                  <div className="flex items-center gap-1">
-                                    <Button isIconOnly size="sm" radius="full" variant="light" onPress={saveLocationEdit}>
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button isIconOnly size="sm" radius="full" variant="light" onPress={cancelLocationEdit}>
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-sm text-surface-light truncate">{getPostName(post)}</span>
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      radius="full"
-                                      variant="light"
-                                      onPress={() => startLocationEdit(index)}
-                                    >
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      radius="full"
-                                      variant="light"
-                                      color="danger"
-                                      onPress={() => removeLocation(index)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </Card>
-                        ))}
-                      </ScrollShadow>
-                    ) : (
-                      <ScrollShadow
-                        hideScrollBar
-                        className="space-y-2 p-3 pr-2 scrollbar-hide h-full"
-                        style={{ minHeight: 0 }}
-                      >
-                        {eventDraft.venue.equipment.map((item, index) => (
-                          <Card
-                            key={item.id}
-                            isBlurred
-                            className="rounded-large bg-surface-deeper/90"
-                          >
-                            <div className="flex items-center justify-between px-3 py-2 gap-2">
-                              {editingEquipmentIndex === index ? (
-                                <>
-                                  <Input
-                                    value={equipmentEditInput}
-                                    onValueChange={setEquipmentEditInput}
-                                    onKeyDown={(event) => {
-                                      if (event.key === 'Enter') {
-                                        event.preventDefault();
-                                        saveEquipmentEdit();
-                                      }
-                                      if (event.key === 'Escape') {
-                                        event.preventDefault();
-                                        cancelEquipmentEdit();
-                                      }
-                                    }}
-                                    size="sm"
-                                    autoFocus
-                                    classNames={inputClassNames}
-                                  />
-                                  <div className="flex items-center gap-1">
-                                    <Button isIconOnly size="sm" radius="full" variant="light" onPress={saveEquipmentEdit}>
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button isIconOnly size="sm" radius="full" variant="light" onPress={cancelEquipmentEdit}>
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-sm text-surface-light truncate">{item.name}</span>
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      radius="full"
-                                      variant="light"
-                                      onPress={() => startEquipmentEdit(index)}
-                                    >
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      radius="full"
-                                      variant="light"
-                                      color="danger"
-                                      onPress={() => removeEquipment(index)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </Card>
-                        ))}
-                      </ScrollShadow>
-                    )}
-                  </Card>
-                </div>
-              </Panel>
-
-              <PanelResizeHandle className="w-1 bg-surface-liner transition-colors cursor-col-resize flex items-center justify-center group">
-                <div className="w-0.5 h-8 bg-surface-light/30 rounded-full transition-colors" />
-              </PanelResizeHandle>
-
-              <Panel defaultSize={60} minSize={45}>
-                <div className="flex flex-col h-full relative overflow-hidden px-6 pt-0 pb-4">
-                  <Card
-                    isBlurred
-                    className="flex-1 flex flex-col overflow-hidden"
-                    style={{ backgroundColor: 'hsl(var(--surface-bg-2) / 0.5)' }}
-                  >
-                    <div className="flex-1 flex flex-col h-full overflow-hidden">
-                      <Tabs
-                        selectedKey={selectedRightTab}
-                        onSelectionChange={(key) =>
-                          setSelectedRightTab(key as 'teams' | 'supervisors' | 'posts' | 'equipment')
-                        }
-                        fullWidth
-                        className="w-full flex-shrink-0"
-                        classNames={{
-                          tabList: 'p-1 w-full flex-shrink-0',
-                          tab: 'text-surface-light data-[selected=true]:text-surface-light',
-                          cursor: 'rounded-large',
-                          panel: 'hidden',
-                        }}
-                      >
-                        <Tab key="teams" title="Teams" />
-                        <Tab key="supervisors" title="Supervisors" />
-                        <Tab key="posts" title="Posts" />
-                        <Tab key="equipment" title="Equipment" />
-                      </Tabs>
-
-                      <div className="flex-shrink-0 min-h-12 px-3 py-2 flex items-center justify-between border-b border-surface-liner">
-                        {selectedRightTab === 'teams' && (
-                          <>
-                            <h3 className="text-surface-light font-semibold text-lg">Teams</h3>
-                            <Button
-                              size="sm"
-                              radius="full"
-                              onPress={() => {
-                                setTeamModalMode('create');
-                                setEditingTeamIndex(null);
-                                setIsTeamModalOpen(true);
-                              }}
-                              className="h-8 px-3 text-sm text-surface-light bg-surface-deeperer hover:bg-surface-deep"
-                            >
-                              Add Team
-                            </Button>
-                          </>
-                        )}
-
-                        {selectedRightTab === 'supervisors' && (
-                          <>
-                            <h3 className="text-surface-light font-semibold text-lg">Supervisors</h3>
-                            <Button
-                              size="sm"
-                              radius="full"
-                              onPress={() => setIsSupervisorModalOpen(true)}
-                              className="h-8 px-3 text-sm text-surface-light bg-surface-deeperer hover:bg-surface-deep"
-                            >
-                              Add Supervisor
-                            </Button>
-                          </>
-                        )}
-
-                        {selectedRightTab === 'posts' && (
-                          <>
-                            <h3 className="text-surface-light font-semibold text-lg">Posts</h3>
-                            <div className="h-8 flex items-center">
-                              <Checkbox
-                                isSelected={postsEnabled}
-                                onValueChange={setPostsEnabled}
-                                size="sm"
-                              >
-                                <span className="text-sm text-surface-light">Enable Posts</span>
-                              </Checkbox>
-                            </div>
-                          </>
-                        )}
-
-                        {selectedRightTab === 'equipment' && (
-                          <>
-                            <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
-                            <div className="w-8 h-8" />
-                          </>
-                        )}
-                      </div>
-
-                      {selectedRightTab === 'teams' && (
-                        <div className="px-4 py-3 flex-1 overflow-hidden">
-                          <ScrollShadow
-                            className="pr-2 scrollbar-hide h-full"
-                            hideScrollBar
-                            style={{ minHeight: 0 }}
-                          >
-                            <div className="grid grid-cols-2 gap-2 auto-rows-max content-start items-start">
-                              {eventDraft.staff.map((staff, index) => (
-                                <Card
-                                  key={`${staff.team}_${index}`}
-                                  isBlurred
-                                  className="rounded-large h-fit bg-surface-deeper/90"
-                                >
-                                  <div className="flex items-center justify-between px-3 py-2 gap-2">
-                                    <button
-                                      type="button"
-                                      className="text-sm text-surface-light truncate text-left flex-1"
-                                      onClick={() =>
-                                        setOpenTeams((current) => ({
-                                          ...current,
-                                          [index]: !current[index],
-                                        }))
-                                      }
-                                    >
-                                      {staff.team}
-                                    </button>
-
-                                    <div className="flex items-center gap-1 flex-shrink-0">
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        radius="full"
-                                        variant="light"
-                                        onPress={() => startTeamEdit(index)}
-                                      >
-                                        <Edit2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                      <Button
-                                        isIconOnly
-                                        size="sm"
-                                        radius="full"
-                                        variant="light"
-                                        color="danger"
-                                        onPress={() => removeTeam(index)}
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </div>
-
-                                  {openTeams[index] && (
-                                    <ul className="px-3 pb-2 list-disc list-inside text-xs text-surface-faint">
-                                      {staff.members.map((member, memberIndex) => (
-                                        <li key={`${staff.team}_${memberIndex}`}>{member}</li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                </Card>
-                              ))}
-                            </div>
-                          </ScrollShadow>
-                        </div>
-                      )}
-
-                      {selectedRightTab === 'supervisors' && (
-                        <div className="px-4 py-3 flex-1 overflow-hidden">
-                          <ScrollShadow
-                            className="pr-2 scrollbar-hide h-full"
-                            hideScrollBar
-                            style={{ minHeight: 0 }}
-                          >
-                            <div className="grid grid-cols-2 gap-2 auto-rows-max content-start items-start">
-                              {eventDraft.supervisor.map((supervisor, index) => (
-                                <Card
-                                  key={`${supervisor.team}_${index}`}
-                                  isBlurred
-                                  className="rounded-large h-fit bg-surface-deeper/90"
-                                >
-                                  <div className="flex items-center justify-between px-3 py-2 gap-2">
-                                    <button
-                                      type="button"
-                                      className="text-sm text-surface-light truncate text-left flex-1"
-                                      onClick={() =>
-                                        setOpenSupervisors((current) => ({
-                                          ...current,
-                                          [index]: !current[index],
-                                        }))
-                                      }
-                                    >
-                                      {supervisor.team}
-                                    </button>
-
-                                    <Button
-                                      isIconOnly
-                                      size="sm"
-                                      radius="full"
-                                      variant="light"
-                                      color="danger"
-                                      onPress={() => removeSupervisor(index)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
-
-                                  {openSupervisors[index] && (
-                                    <ul className="px-3 pb-2 list-disc list-inside text-xs text-surface-faint">
-                                      <li>{supervisor.member}</li>
-                                    </ul>
-                                  )}
-                                </Card>
-                              ))}
-                            </div>
-                          </ScrollShadow>
-                        </div>
-                      )}
-
-                      {selectedRightTab === 'posts' && (
-                        <div className="px-4 py-3 flex-1 overflow-hidden">
-                          <ScrollShadow
-                            className="space-y-4 pr-2 scrollbar-hide h-full"
-                            hideScrollBar
-                            style={{ minHeight: 0 }}
-                          >
-                            <div className={`space-y-3 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
-                              <Select
-                                label="Select Posts"
-                                labelPlacement="outside"
-                                placeholder="Choose posts for this event"
-                                selectionMode="multiple"
-                                selectedKeys={new Set(eventDraft.eventPosts.map((post) => getPostName(post)))}
-                                isDisabled={!postsEnabled}
-                                classNames={selectClassNames}
-                                size="lg"
-                                onSelectionChange={(keys) => {
-                                  const values =
-                                    keys === 'all'
-                                      ? allPosts.map((post) => getPostName(post))
-                                      : Array.from(keys).map((key) => String(key));
-
-                                  updateDraft((current) => ({
-                                    ...current,
-                                    eventPosts: values
-                                      .map((value) =>
-                                        current.venue.posts.find((post) => getPostName(post) === value)
-                                      )
-                                      .filter((post): post is Post => Boolean(post)),
-                                  }));
-                                }}
-                              >
-                                {allPosts.map((post) => {
-                                  const postName = getPostName(post);
-                                  return (
-                                    <SelectItem key={postName} textValue={postName} aria-label={postName}>
-                                      {postName}
-                                    </SelectItem>
-                                  );
-                                })}
-                              </Select>
-
-                              {eventDraft.eventPosts.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {eventDraft.eventPosts.map((post, index) => {
-                                    const postName = getPostName(post);
-                                    return (
-                                      <Chip
-                                        key={`${postName}_${index}`}
-                                        onClose={() => {
-                                          updateDraft((current) => ({
-                                            ...current,
-                                            eventPosts: current.eventPosts.filter((_, idx) => idx !== index),
-                                          }));
-                                        }}
-                                        variant="flat"
-                                        className="bg-accent/20 text-accent"
-                                      >
-                                        {postName}
-                                      </Chip>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className={`space-y-1 mt-2 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
-                              <h3 className="text-surface-light font-medium text-md">Schedule</h3>
-
-                              <div className="grid grid-cols-3 gap-3 rounded-large pt-2 pb-3">
-                                <TimeInput
-                                  label="From"
-                                  labelPlacement="inside"
-                                  value={scheduleFrom}
-                                  onChange={(value) => value && setScheduleFrom(value)}
-                                  hourCycle={24}
-                                  isDisabled={!postsEnabled}
-                                  classNames={timeInputClassNames}
-                                  size="md"
-                                />
-                                <TimeInput
-                                  label="To"
-                                  labelPlacement="inside"
-                                  value={scheduleTo}
-                                  onChange={(value) => value && setScheduleTo(value)}
-                                  hourCycle={24}
-                                  isDisabled={!postsEnabled}
-                                  classNames={timeInputClassNames}
-                                  size="md"
-                                />
-                                <Input
-                                  label="By"
-                                  labelPlacement="inside"
-                                  placeholder="75"
-                                  value={scheduleBy}
-                                  onValueChange={setScheduleBy}
-                                  type="number"
-                                  min="1"
-                                  endContent="min"
-                                  isDisabled={!postsEnabled}
-                                  classNames={byInputClassNames}
-                                  size="md"
-                                />
-                              </div>
-
-                              {scheduleChips.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-4">
-                                  {scheduleChips.map((chip) => (
-                                    <Chip
-                                      key={chip.id}
-                                      onClose={() => removeScheduleChip(chip.id)}
-                                      variant="flat"
-                                      onClick={() => {
-                                        setEditingChipId(chip.id);
-                                        setEditingChipValue(chip.time);
-                                      }}
-                                      className="cursor-pointer bg-accent/20 text-accent"
-                                    >
-                                      {editingChipId === chip.id ? (
-                                        <input
-                                          type="text"
-                                          value={editingChipValue}
-                                          onChange={(event) => setEditingChipValue(event.target.value)}
-                                          onBlur={() => saveEditedScheduleChip(chip.id, editingChipValue)}
-                                          onKeyDown={(event) => {
-                                            if (event.key === 'Enter') {
-                                              saveEditedScheduleChip(chip.id, editingChipValue);
-                                            }
-                                            if (event.key === 'Escape') {
-                                              setEditingChipId(null);
-                                              setEditingChipValue('');
-                                            }
-                                          }}
-                                          autoFocus
-                                          className="bg-transparent outline-none w-16 text-center"
-                                        />
-                                      ) : (
-                                        chip.time
-                                      )}
-                                    </Chip>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </ScrollShadow>
-                        </div>
-                      )}
-
-                      {selectedRightTab === 'equipment' && (
-                        <div className="px-4 py-3 flex-1 overflow-hidden">
-                          <ScrollShadow
-                            className="space-y-2 pr-2 scrollbar-hide h-full"
-                            hideScrollBar
-                            style={{ minHeight: 0 }}
-                          >
-                            {eventDraft.venue.equipment.map((equipment) => {
-                              const selectedEquipment = eventDraft.eventEquipment.find(
-                                (item) => item.id === equipment.id
-                              );
-
-                              return (
-                                <div key={equipment.id} className="rounded-large p-3 bg-surface-deeper/90">
-                                  <div className="flex items-center gap-3">
-                                    <Checkbox
-                                      isSelected={Boolean(selectedEquipment)}
-                                      onValueChange={(checked) => {
-                                        if (checked) {
-                                          updateDraft((current) => ({
-                                            ...current,
-                                            eventEquipment: [
-                                              ...current.eventEquipment,
-                                              { ...equipment, defaultLocation: undefined },
-                                            ],
-                                          }));
-                                        } else {
-                                          updateDraft((current) => ({
-                                            ...current,
-                                            eventEquipment: current.eventEquipment.filter(
-                                              (item) => item.id !== equipment.id
-                                            ),
-                                          }));
-                                        }
-                                      }}
-                                    />
-
-                                    <span className="text-surface-light font-medium flex-shrink-0">{equipment.name}</span>
-
-                                    {selectedEquipment && (
-                                      <Select
-                                        placeholder="Select Default Location"
-                                        selectedKeys={
-                                          selectedEquipment.defaultLocation
-                                            ? [selectedEquipment.defaultLocation]
-                                            : []
-                                        }
-                                        onSelectionChange={(keys) => {
-                                          const locationName =
-                                            keys === 'all' ? '' : (Array.from(keys)[0] as string | undefined);
-
-                                          updateDraft((current) => ({
-                                            ...current,
-                                            eventEquipment: current.eventEquipment.map((item) =>
-                                              item.id === equipment.id
-                                                ? {
-                                                    ...item,
-                                                    defaultLocation: locationName,
-                                                  }
-                                                : item
-                                            ),
-                                          }));
-                                        }}
-                                        classNames={{
-                                          ...selectClassNames,
-                                          base: 'max-w-[220px]',
-                                        }}
-                                        size="sm"
-                                        className="ml-auto"
-                                      >
-                                        {allPosts.map((post) => {
-                                          const postName = getPostName(post);
-                                          return <SelectItem key={postName}>{postName}</SelectItem>;
-                                        })}
-                                      </Select>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </ScrollShadow>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                </div>
-              </Panel>
-            </PanelGroup>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-col h-full relative overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden pt-2 pb-4">
+              <WizardShell
+                steps={steps}
+                currentStepId={currentStepId}
+                onStepChange={setCurrentStepId}
+                hideProgress
+                className="flex-1 min-h-0 px-0"
+              />
+            </div>
+            <div className="flex items-center justify-between px-6 pt-4 pb-4 flex-shrink-0">
+              <div>{backButton}</div>
+              <div>{primaryButton}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1370,23 +903,22 @@ function LiteCreateContent() {
         isOpen={isTeamModalOpen}
         onClose={() => {
           setIsTeamModalOpen(false);
-          setTeamModalMode('create');
           setEditingTeamIndex(null);
         }}
-        mode={teamModalMode}
-        titleOverride={teamModalMode === 'edit' ? 'Edit Team' : 'Add New Team'}
-        submitLabelOverride={teamModalMode === 'edit' ? 'Save Team' : undefined}
-        existingTeamNames={teamNamesForModal}
-        initialTeam={editingTeam}
+        mode={editingTeamIndex !== null ? 'edit' : 'create'}
+        titleOverride={editingTeamIndex !== null ? 'Edit Team' : 'Add New Team'}
+        submitLabelOverride={editingTeamIndex !== null ? 'Save Changes' : undefined}
+        existingTeamNames={eventDraft.staff.map((s) => s.team).filter((_, i) => i !== editingTeamIndex)}
+        initialTeam={editingTeamIndex !== null ? parseTeamForEdit(eventDraft.staff[editingTeamIndex]) : undefined}
         onSave={(team) => handleSaveTeam(team)}
-        roles={LICENSES.map(name => ({ name, fullName: name }))}
+        roles={LICENSES.map((name) => ({ name, fullName: name }))}
       />
 
       <AddSupervisorModal
         isOpen={isSupervisorModalOpen}
         onClose={() => setIsSupervisorModalOpen(false)}
         mode="create"
-        onSubmit={handleAddSupervisor}
+        onSubmit={handleAddSamUnit}
         titleOverride="Add New Supervisor"
         submitLabelOverride="Add Supervisor"
         teamName={samName}
@@ -1395,7 +927,18 @@ function LiteCreateContent() {
         setMemberName={setSamMemberName}
         memberCert={samCert}
         setMemberCert={setSamCert}
-        roles={LICENSES.map(name => ({ name, fullName: name }))}
+        roles={LICENSES.map((name) => ({ name, fullName: name }))}
+      />
+
+      <BulkImportModal
+        isOpen={bulkImportMode !== null}
+        onClose={() => setBulkImportMode(null)}
+        mode={bulkImportMode || 'team'}
+        roles={LICENSES.map((name) => ({ name, fullName: name }))}
+        existingTeamNames={
+          bulkImportMode === 'supervisor' ? eventDraft.supervisor.map((s) => s.team) : eventDraft.staff.map((s) => s.team)
+        }
+        onImport={handleBulkImport}
       />
     </main>
   );

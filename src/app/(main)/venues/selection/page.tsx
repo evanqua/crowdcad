@@ -413,7 +413,7 @@ export default function VenueSelection() {
                       isPressable
                       onPress={() => setSelectedVenueId(venue.id)}
                       classNames={{
-                        base: "rounded-sm hover:bg-surface-deep backdrop-blur-sm w-full"
+                        base: "rounded-sm bg-surface-deep/50 hover:bg-surface-deep backdrop-blur-sm w-full"
                       }}
                     >
                       <CardBody className="p-4">
@@ -724,7 +724,7 @@ export default function VenueSelection() {
                       classNames={{
                         base: `rounded-sm ${isSelected
                           ? 'bg-status-blue/20'
-                          : 'hover:bg-surface-deep'
+                          : 'bg-surface-deep/50 hover:bg-surface-deep'
                         } backdrop-blur-sm transition-all w-full`
                       }}
                     >

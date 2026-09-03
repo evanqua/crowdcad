@@ -5,9 +5,10 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { authService } from "@/lib/services";
+import { authService, dbService } from "@/lib/services";
 import { useAuth } from "@/hooks/useauth";
 import { useDispatchVocabulary } from "@/hooks/useDispatchVocabulary";
+import type { Event } from "@/app/types";
 
 import {
   Navbar,
@@ -79,27 +80,75 @@ export default function AppNavbar() {
   }, [isDarkTheme]);
 
   const isDispatch = !!(pathname && /^\/events\/[^/]+\/dispatch(?:$|\/|\?)/.test(pathname));
+  const dispatchEventId = pathname?.match(/^\/events\/([^/?#]+)\/dispatch(?:$|[/?#])/)?.[1] ?? null;
 
   const navItems = [
     { label: "Home", href: "/" },
     { label: "Venues", href: "/venues/selection" },
   ];
 
-   const dispatchItems = [
-    { 
-      label: "Venue Map", 
-      onClick: () => window.dispatchEvent(new CustomEvent('open-venue-map'))
-    },
-    { 
-      label: "Posting Schedule", 
-      onClick: () => window.dispatchEvent(new CustomEvent('open-posting-schedule'))
-    },
+  // Whether the current dispatch event actually has something for these
+  // buttons to open — a venue with no map uploaded, or an event with no
+  // posting schedule configured, gets no button rather than one that opens
+  // an empty modal. Defaults to shown (true) until the event doc loads, to
+  // avoid the buttons popping in after a flash of nothing.
+  const [hasVenueMap, setHasVenueMap] = useState(true);
+  const [postingScheduleEnabled, setPostingScheduleEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDispatchNavState = async () => {
+      if (!isDispatch || !dispatchEventId) {
+        setHasVenueMap(true);
+        setPostingScheduleEnabled(true);
+        return;
+      }
+
+      try {
+        const docSnap = await dbService.getDocument<Event>('events', decodeURIComponent(dispatchEventId));
+        if (cancelled) return;
+
+        const data = docSnap.exists ? docSnap.data : null;
+        const layers = data?.venue?.layers;
+        const hasMap = Boolean((layers && layers.some((layer) => !!layer.mapUrl)) || data?.venue?.mapUrl);
+
+        setHasVenueMap(hasMap);
+        setPostingScheduleEnabled((data?.postingTimes?.length ?? 0) > 0);
+      } catch {
+        if (!cancelled) {
+          setHasVenueMap(true);
+          setPostingScheduleEnabled(true);
+        }
+      }
+    };
+
+    void loadDispatchNavState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDispatch, dispatchEventId]);
+
+  const dispatchItems = [
+    ...(hasVenueMap
+      ? [{
+          label: "Venue Map",
+          onClick: () => window.dispatchEvent(new CustomEvent('open-venue-map')),
+        }]
+      : []),
+    ...(postingScheduleEnabled
+      ? [{
+          label: "Posting Schedule",
+          onClick: () => window.dispatchEvent(new CustomEvent('open-posting-schedule')),
+        }]
+      : []),
     {
       label: "Event Summary",
       onClick: () => window.dispatchEvent(new CustomEvent('open-event-summary'))
     },
-    { 
-      label: "Venues", 
+    {
+      label: "Venues",
       onClick: () => router.push('/venues/selection'),
       isActive: pathname === '/venues/selection'
     },

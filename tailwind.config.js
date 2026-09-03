@@ -118,10 +118,24 @@ module.exports = {
       },
 
       /* ── Border Radius ───────────────────────────────────── */
+      // Every non-none/non-full radius tier (sm/md/lg/xl/2xl/3xl) resolves to
+      // the same value — the one HeroUI's Button renders at by default
+      // (size="md" → rounded-medium). Components used to reach for whichever
+      // tier they liked (Cards defaulted to "lg", inputs were hardcoded to
+      // "large", a few dispatch cards used Tailwind's own xl/2xl) and the
+      // corners visibly didn't match across the app. Collapsing the scale
+      // here — instead of hunting down every call site — makes every
+      // existing (and future) rounded-* usage converge on the button's
+      // corner automatically; `rounded-none` and `rounded-full` are
+      // deliberately untouched since those are a different shape choice, not
+      // a scale mismatch.
       borderRadius: {
-        lg: 'var(--radius)',
+        sm: 'calc(var(--radius) - 2px)',
         md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        lg: 'calc(var(--radius) - 2px)',
+        xl: 'calc(var(--radius) - 2px)',
+        '2xl': 'calc(var(--radius) - 2px)',
+        '3xl': 'calc(var(--radius) - 2px)',
       },
 
       /* ── Animations ──────────────────────────────────────── */
@@ -159,10 +173,14 @@ module.exports = {
         // token (see globals.css) used by the plain Tailwind rounded-lg/md/sm
         // utilities and shadcn/radix components (e.g. dropdown-menu.tsx) —
         // one shared lever instead of a second, independently-tuned scale.
+        // small/medium/large all resolve to the same value (see the plain
+        // borderRadius block above for why) so every HeroUI component's
+        // corners match Button's regardless of which tier — or none at all —
+        // it happens to request.
         radius: {
-          small: "calc(var(--radius) - 4px)",
+          small: "calc(var(--radius) - 2px)",
           medium: "calc(var(--radius) - 2px)",
-          large: "var(--radius)",
+          large: "calc(var(--radius) - 2px)",
         },
       },
       themes: {

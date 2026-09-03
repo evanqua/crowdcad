@@ -123,9 +123,8 @@ Feature: Dispatch board
     When I delete the team "Hotel"
     Then the team "Hotel" should not be visible
 
-  Scenario: Venue Map modal opens
-    When I click the "Venue Map" button
-    Then I should see the text "No map"
+  Scenario: Venue Map button is hidden when the venue has no map
+    Then I should not see a "Venue Map" button
 
   Scenario: Posting Schedule modal opens
     When I click the "Posting Schedule" button
