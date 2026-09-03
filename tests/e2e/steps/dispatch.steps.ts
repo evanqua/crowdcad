@@ -15,7 +15,7 @@ Given('I have created an event and am on the dispatch page', async ({ page }) =>
   await page.goto('/venues/management', { timeout: NAV_TIMEOUT });
   await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(venueName);
-  await page.getByRole('button', { name: /^Review & save:/ }).click();
+  await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
 
@@ -29,7 +29,7 @@ Given('I have created an event and am on the dispatch page', async ({ page }) =>
   // Name and launch the event (auth.currentUser stays set across SPA navigation)
   const eventName = `Test Event ${uniqueSuffix()}`;
   await page.getByPlaceholder('Enter event name').fill(eventName);
-  await page.getByRole('button', { name: /^Review & launch:/ }).click();
+  await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Event' }).click();
   await page.waitForURL(/\/events\/.*\/dispatch/, { timeout: NAV_TIMEOUT });
   // Wait for the dispatch page to hydrate before asserting

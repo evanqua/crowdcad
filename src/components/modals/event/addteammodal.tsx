@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import {
   Modal,
   ModalContent,
@@ -300,6 +300,7 @@ export default function AddTeamModal({
                       isSelected={row.lead}
                       onValueChange={(v) => updateRow(row.id, { lead: v })}
                       aria-label={t("Lead")}
+                      classNames={{ wrapper: "after:bg-accent" }}
                     />
 
                     <Button
@@ -315,6 +316,26 @@ export default function AddTeamModal({
                     </Button>
                   </div>
                 ))}
+
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="flex-1 h-px bg-surface-liner" />
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    radius="full"
+                    variant="flat"
+                    aria-label={t("Add member")}
+                    className="shrink-0 text-surface-light bg-default/40 hover:bg-default/60"
+                    onPress={() => {
+                      const newRow = emptyRow(defaultCert());
+                      focusMemberIdRef.current = newRow.id;
+                      setRows((current) => [...current, newRow]);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <div className="flex-1 h-px bg-surface-liner" />
+                </div>
               </div>
             </ModalBody>
 
@@ -347,7 +368,7 @@ export default function AddTeamModal({
                     isDisabled={submitting}
                     variant="flat"
                     radius="lg"
-                    className="px-4 py-2 text-surface-light bg-surface-deeperer hover:bg-surface-deep"
+                    className="px-4 py-2 text-surface-light bg-default/40 hover:bg-default/60"
                   >
                     {t("Save & add another")}
                   </Button>

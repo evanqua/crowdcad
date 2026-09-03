@@ -56,7 +56,7 @@ When('I create a venue with a unique name', async ({ page, scenarioState }) => {
   // submitting, but doesn't hard-fail — a backend with an open real-time
   // channel (e.g. Firestore's Listen/Write long-poll) never reaches true idle.
   await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
-  await page.getByRole('button', { name: /^Review & save:/ }).click();
+  await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
 });
@@ -76,7 +76,7 @@ When('I create two venues with unique names', async ({ page, scenarioState }) =>
     await page.goto('/venues/management', { timeout: 15_000 });
     await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
     await page.getByPlaceholder('e.g., Convention Center Hall A').fill(name);
-    await page.getByRole('button', { name: /^Review & save:/ }).click();
+    await page.getByRole('button', { name: /^Review:/ }).click();
     await page.getByRole('button', { name: 'Create Venue' }).click();
     await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });
   }
@@ -122,15 +122,15 @@ When('I add equipment named {string}', async ({ page }, name: string) => {
 });
 
 // Location and equipment deletion — icon-only Trash2 buttons have no aria-label,
-// so we locate the card containing the item text and click its danger-colored button.
+// so we locate the row containing the item text (by its stable data-testid,
+// not layout classes that are free to change) and click its last button.
 
 When('I delete the location {string}', async ({ page }, name: string) => {
-  // Each location is in a Card; find the row containing the text and click the last icon button (Trash2)
-  const row = page.locator('div.flex.items-center.justify-between', { hasText: name }).first();
+  const row = page.getByTestId('location-row').filter({ hasText: name }).first();
   await row.locator('button').last().click();
 });
 
 When('I delete the equipment {string}', async ({ page }, name: string) => {
-  const row = page.locator('div.flex.items-center.justify-between', { hasText: name }).first();
+  const row = page.getByTestId('equipment-row').filter({ hasText: name }).first();
   await row.locator('button').last().click();
 });

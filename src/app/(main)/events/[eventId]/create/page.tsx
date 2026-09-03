@@ -4,30 +4,27 @@ import { useRouter, useParams } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import { Event, Venue, Staff, Supervisor, Post, Equipment, EventEquipment } from '@/app/types';
 import { authService, dbService } from '@/lib/services';
-import Image from 'next/image';
 import { Button, Card, ScrollShadow } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { syncClinicsFromVenue } from '@/lib/clinics';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
-import MapPanSurface from '@/components/ui/map-pan-surface';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
-import { scheduleTimesToWindow } from '@/lib/scheduleUtils';
-import { useZoomPan } from '@/hooks/useZoomPan';
+import { scheduleTimesToWindow, formatTimeValue } from '@/lib/scheduleUtils';
 import { useCertifications } from '@/hooks/useCertifications';
 import MetadataSection from '@/components/event-create/MetadataSection';
-import SurgeCriteriaSection from '@/components/event-create/SurgeCriteriaSection';
 import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
 import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
 import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
 import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/event-create/PostsEquipmentSection';
-import { WizardShell, type WizardStep } from '@/components/wizard';
+import { WizardShell, StepProgress, type WizardStep } from '@/components/wizard';
 import { stripUndefined } from '@/lib/utils';
 import AddTeamModal, { TeamDraft } from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
 import BulkImportModal from '@/components/modals/event/bulkimportmodal';
+import { VenueMapWithPosts } from '@/components/modals/event/venuemapmodal';
+import { MAP_CHECKER_BG } from '@/lib/mapStyles';
 import LoadingScreen from '@/components/ui/loading-screen';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 // Helper to get post name regardless of type
 const getPostName = (post: Post): string => {
@@ -57,32 +54,49 @@ export default function EventCreation() {
     surgeLimitPercent: 70,
   });
 
-  const STEP_ORDER = ['basics', 'surge', 'teams', 'equipment', 'postschedule', 'review'] as const;
+  // A venue with no equipment of its own skips the Equipment step entirely.
+  const hasVenueEquipment = (eventData.venue?.equipment?.length ?? 0) > 0;
+  type StepId = 'basics' | 'teams' | 'equipment' | 'postschedule' | 'review';
+  const STEP_ORDER: StepId[] = hasVenueEquipment
+    ? ['basics', 'teams', 'equipment', 'postschedule', 'review']
+    : ['basics', 'teams', 'postschedule', 'review'];
   const [currentStepId, setCurrentStepId] = useState<string>('basics');
   const [currentLayer, setCurrentLayer] = useState(0);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [editingTeamIndex, setEditingTeamIndex] = useState<number | null>(null);
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
   const [bulkImportMode, setBulkImportMode] = useState<'team' | 'supervisor' | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const imgContainerRef = useRef<HTMLDivElement>(null);
   const [, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const submittedRef = useRef(false);
 
-  const {
-    scale,
-    position,
-    isPanning,
-    handleWheel,
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-    zoomIn,
-    zoomOut,
-    resetZoom,
-  } = useZoomPan(imgRef, imgContainerRef, { minScale: 0.5, maxScale: 3 });
+  // Pan/zoom state, mirroring the dispatch page's own venue map modal
+  // (VenueMapModal) exactly, since VenueMapWithPosts is shared with it.
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
+  const handleResetZoom = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPanning) return;
+    setPosition({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+  };
+  const handleMouseUp = () => setIsPanning(false);
 
   const {
     scheduleFrom,
@@ -94,8 +108,6 @@ export default function EventCreation() {
     postingTimes,
   } = useScheduleGeneration({ initialBy: '480' });
 
-  const [hoverId, setHoverId] = useState<number | null>(null);
-  const [tooltip, setTooltip] = useState<{ left: number; top: number; text: string } | null>(null);
   const [samName, setSamName] = useState('');
   const [samMemberName, setSamMemberName] = useState('');
   const [samCert, setSamCert] = useState('');
@@ -291,18 +303,37 @@ export default function EventCreation() {
   //   };
   // }, [eventId]);
 
-  const handleSaveTeam = (team: TeamDraft) => {
+  const handleSaveTeam = (team: TeamDraft, editIdx: number | null) => {
     const members = team.members.map(
       m => `${m.name} [${m.cert}]${m.lead ? " (Lead)" : ""}`
     );
-    const newStaff: Staff = {
-      team: team.name,
-      location: "No Post",
-      status: "On Break",
-      members,
-    };
-    setEventData(prev => ({ ...prev, staff: [...(prev.staff || []), newStaff] }));
+    setEventData(prev => {
+      if (editIdx !== null) {
+        const staff = [...(prev.staff || [])];
+        staff[editIdx] = { ...staff[editIdx], team: team.name, members };
+        return { ...prev, staff };
+      }
+      const newStaff: Staff = {
+        team: team.name,
+        location: "No Post",
+        status: "On Break",
+        members,
+      };
+      return { ...prev, staff: [...(prev.staff || []), newStaff] };
+    });
   };
+
+  // Reverses the "Name [CERT] (Lead)" string format handleSaveTeam writes,
+  // so an existing Staff record can prefill AddTeamModal for editing.
+  const parseTeamForEdit = (team: Staff): TeamDraft => ({
+    name: team.team,
+    members: team.members.map((m) => {
+      const match = m.match(/^(.*) \[(.*)\](?: \(Lead\))?$/);
+      const lead = / \(Lead\)$/.test(m);
+      if (!match) return { name: m, cert: '', lead };
+      return { name: match[1], cert: match[2], lead };
+    }),
+  });
 
   const handleAddSamUnit = () => {
     if (!samName.trim() || !samCert) return;
@@ -337,6 +368,10 @@ export default function EventCreation() {
       const user = authService.currentUser;
       if (!user) {
         alert('You must be logged in to create an event.');
+        return;
+      }
+      if (!eventData.name?.trim()) {
+        alert('Please enter an event name.');
         return;
       }
       const dateValue = new Date(eventData.date!);
@@ -414,64 +449,6 @@ export default function EventCreation() {
   };
 
 
-  const renderMarkers = () => {
-    type CoordinatedPost = {
-      name: string;
-      x: number;
-      y: number;
-    };
-
-    return currentLayerPosts
-      .filter((post): post is CoordinatedPost =>
-        typeof post === 'object' &&
-        post !== null &&
-        'name' in post &&
-        typeof post.x === 'number' &&
-        typeof post.y === 'number' &&
-        post.x !== null &&
-        post.y !== null
-      )
-      .map((post, idx) => {
-        const left = `calc(${post.x}% - 12px)`;
-        const top = `calc(${post.y}% - 12px)`;
-        const isHover = hoverId === idx;
-
-        return (
-          <React.Fragment key={idx}>
-            <div
-              style={{ left, top }}
-              className={`absolute z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all ${
-                isHover
-                  ? 'border-accent bg-accent/30 scale-110'
-                  : 'border-accent bg-accent/20 hover:scale-110'
-              }`}
-                onMouseEnter={() => {
-                  setHoverId(idx);
-                  const img = imgRef.current;
-                  if (img && typeof post.x === 'number' && typeof post.y === 'number') {
-                    const rect = img.getBoundingClientRect();
-                    const xPx = rect.left + (post.x / 100) * rect.width;
-                    const yPx = rect.top + (post.y / 100) * rect.height;
-                    setTooltip({ left: Math.round(xPx - 50), top: Math.round(yPx - 40), text: post.name });
-                  }
-                }}
-                onMouseLeave={() => {
-                  setHoverId((cur) => (cur === idx ? null : cur));
-                  setTooltip(null);
-                }}
-            >
-              <svg className="h-4 w-4 text-accent" fill="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-              </svg>
-            </div>
-            {/* tooltip rendered globally to avoid being clipped by overflow */}
-          </React.Fragment>
-        );
-      });
-  };
-
-
-
   useEffect(() => {
     if (eventData.venue && Object.keys(eventData.venue).length > 0) {
     }
@@ -485,7 +462,6 @@ export default function EventCreation() {
   const hasVenue = Boolean(eventData.venue?.name && eventData.venue?.layers?.length);
   const hasMap = hasVenue && Boolean(eventData.venue?.layers?.[currentLayer]?.mapUrl);
   const allPosts = hasVenue ? (eventData.venue?.layers?.flatMap(layer => layer.posts || []) || []) : [];
-  const currentLayerPosts = hasVenue ? (eventData.venue?.layers?.[currentLayer]?.posts || []) : [];
   const flattenedPosts = hasVenue ? (eventData.venue?.layers?.flatMap(layer => (layer.posts || []).map(p => ({ post: p, layerName: layer.name }))) || []) : [];
 
   
@@ -516,18 +492,6 @@ export default function EventCreation() {
     }));
   };
 
-  const handleZoomIn = () => {
-    zoomIn(0.25);
-  };
-
-  const handleZoomOut = () => {
-    zoomOut(0.25);
-  };
-
-  const handleResetZoom = () => {
-    resetZoom();
-  };
-
   // Convert date string to CalendarDate
   const getCalendarDate = () => {
     if (eventData.date) {
@@ -546,34 +510,36 @@ export default function EventCreation() {
         eventData={eventData}
         setEventData={setEventData}
         getCalendarDate={getCalendarDate}
-        inputClassNames={inputClassNames}
-      />
-    </div>
-  );
-
-  const surgeStep = (
-    <div className="px-6 pt-4 h-full">
-      <SurgeCriteriaSection
-        eventData={eventData}
-        setEventData={setEventData}
+        scheduleFrom={scheduleFrom}
+        setScheduleFrom={setScheduleFrom}
+        scheduleTo={scheduleTo}
+        setScheduleTo={setScheduleTo}
         inputClassNames={inputClassNames}
       />
     </div>
   );
 
   const teamsSupervisorsStep = (
-    <div className="flex flex-col h-full gap-4 px-6 pt-4">
-      <div className="flex-1 min-h-0 rounded-2xl border border-surface-liner overflow-hidden">
+    <div className="flex h-full px-6 pt-4">
+      <div className="flex-1 min-w-0">
         <TeamStaffingSection
           staff={eventData.staff || []}
           openTeams={openTeams}
           setOpenTeams={setOpenTeams}
           onDeleteTeam={handleDeleteTeam}
-          onAddTeam={() => setIsTeamModalOpen(true)}
+          onEditTeam={(idx) => {
+            setEditingTeamIndex(idx);
+            setIsTeamModalOpen(true);
+          }}
+          onAddTeam={() => {
+            setEditingTeamIndex(null);
+            setIsTeamModalOpen(true);
+          }}
           onUploadCSV={() => setBulkImportMode('team')}
         />
       </div>
-      <div className="flex-1 min-h-0 rounded-2xl border border-surface-liner overflow-hidden">
+      <div className="w-px bg-surface-liner mx-2 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
         <SupervisorStaffingSection
           supervisors={eventData.supervisor || []}
           openSupervisors={openSupervisors}
@@ -587,9 +553,9 @@ export default function EventCreation() {
   );
 
   const equipmentStep = (
-    <div className="flex flex-col h-full overflow-hidden px-6 pt-4">
-      <div className="flex-shrink-0 pb-3 flex items-center justify-between">
-        <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
+    <div className="flex flex-col h-full overflow-hidden px-3 pt-4">
+      <div className="flex-shrink-0 pb-3 pl-3 flex items-center justify-between">
+        <h3 className="text-surface-light font-semibold text-xl">Equipment</h3>
       </div>
       <EquipmentSelectionSection
         hasVenue={hasVenue}
@@ -620,10 +586,6 @@ export default function EventCreation() {
         />
         <PostingScheduleSection
           postsEnabled={postsEnabled}
-          scheduleFrom={scheduleFrom}
-          setScheduleFrom={setScheduleFrom}
-          scheduleTo={scheduleTo}
-          setScheduleTo={setScheduleTo}
           scheduleBy={scheduleBy}
           setScheduleBy={setScheduleBy}
           scheduleChips={scheduleChips}
@@ -645,56 +607,73 @@ export default function EventCreation() {
   );
 
   const reviewStep = (
-    <div className="px-6 pt-4 h-full max-w-md">
-      <Card isBlurred className="border-2 border-default-200 bg-transparent p-5 space-y-4">
-        <div>
-          <span className="text-xs text-surface-faint">Event name</span>
-          <p className="text-surface-light font-medium">{eventData.name?.trim() || '(untitled)'}</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Surge limit</span>
-          <p className="text-surface-light">{eventData.surgeLimitPercent ?? 70}%</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Teams</span>
-          <p className="text-surface-light">{(eventData.staff || []).length} team{(eventData.staff || []).length === 1 ? '' : 's'}</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Supervisors</span>
-          <p className="text-surface-light">{(eventData.supervisor || []).length} supervisor{(eventData.supervisor || []).length === 1 ? '' : 's'}</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Equipment</span>
-          <p className="text-surface-light">{eventData.eventEquipment.length} item{eventData.eventEquipment.length === 1 ? '' : 's'}</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Post schedule</span>
-          <p className="text-surface-light">
-            {postsEnabled
-              ? `${(eventData.eventPosts || []).length} post${(eventData.eventPosts || []).length === 1 ? '' : 's'} · ${scheduleChips.length} repost time${scheduleChips.length === 1 ? '' : 's'}`
-              : 'Not enabled'}
-          </p>
-        </div>
-      </Card>
-      <Button
-        onPress={handleSubmit}
-        size="md"
-        radius="lg"
-        className="mt-4 bg-accent hover:bg-accent/90 text-surface-light"
-      >
-        Create Event
-      </Button>
+    <div className="px-6 pt-4 h-full max-w-md space-y-4">
+      <h3 className="text-surface-light font-semibold text-xl mb-1">Review</h3>
+      <div>
+        <span className="text-sm text-surface-faint">Event name</span>
+        <p className="text-surface-light font-medium text-lg">{eventData.name?.trim() || '(untitled)'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Venue</span>
+        <p className="text-surface-light text-lg">{eventData.venue?.name || '(none)'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Date</span>
+        <p className="text-surface-light text-lg">
+          {eventData.date ? new Date(eventData.date).toLocaleDateString() : '—'}
+        </p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Start / End time</span>
+        <p className="text-surface-light text-lg">
+          {formatTimeValue(scheduleFrom)} – {formatTimeValue(scheduleTo)}
+        </p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Surge limit</span>
+        <p className="text-surface-light text-lg">{eventData.surgeLimitPercent ?? 70}%</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Teams</span>
+        <p className="text-surface-light text-lg">{(eventData.staff || []).length} team{(eventData.staff || []).length === 1 ? '' : 's'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Supervisors</span>
+        <p className="text-surface-light text-lg">{(eventData.supervisor || []).length} supervisor{(eventData.supervisor || []).length === 1 ? '' : 's'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Equipment</span>
+        <p className="text-surface-light text-lg">{eventData.eventEquipment.length} item{eventData.eventEquipment.length === 1 ? '' : 's'}</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Post schedule</span>
+        <p className="text-surface-light text-lg">
+          {postsEnabled
+            ? `${(eventData.eventPosts || []).length} post${(eventData.eventPosts || []).length === 1 ? '' : 's'} · ${scheduleChips.length} repost time${scheduleChips.length === 1 ? '' : 's'}`
+            : 'Not enabled'}
+        </p>
+      </div>
     </div>
   );
 
+  // Event name and date are required before advancing past Event Configuration.
+  const hasRequiredBasics = !!eventData.name?.trim() && !!eventData.date;
+
+  // A venue with nothing defined in its own equipment list has nothing for
+  // this step to offer beyond the "event only" add flow — skip it entirely
+  // rather than show an empty tab.
   const steps: WizardStep[] = [
-    { id: 'basics', label: 'Basics', component: basicsStep, isComplete: true },
-    { id: 'surge', label: 'Surge criteria', component: surgeStep, isComplete: true },
-    { id: 'teams', label: 'Teams & supervisors', component: teamsSupervisorsStep, isComplete: true },
-    { id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: true },
-    { id: 'postschedule', label: 'Post schedule', component: postScheduleStep, isComplete: true },
-    { id: 'review', label: 'Review & launch', component: reviewStep, isComplete: true },
+    { id: 'basics', label: 'Event Configuration', component: basicsStep, isComplete: hasRequiredBasics },
+    { id: 'teams', label: 'Staff Assignments', component: teamsSupervisorsStep, isComplete: hasRequiredBasics },
+    ...(hasVenueEquipment
+      ? [{ id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: hasRequiredBasics }]
+      : []),
+    { id: 'postschedule', label: 'Post schedule', component: postScheduleStep, isComplete: hasRequiredBasics },
+    { id: 'review', label: 'Review', component: reviewStep, isComplete: hasRequiredBasics },
   ];
+
+  const showMapPanel = currentStepId === 'equipment' || currentStepId === 'postschedule' || currentStepId === 'review';
+  const showMapColumn = showMapPanel && hasMap;
 
   const stepIdx = STEP_ORDER.indexOf(currentStepId as (typeof STEP_ORDER)[number]);
   const isFirstStep = stepIdx <= 0;
@@ -706,172 +685,174 @@ export default function EventCreation() {
     if (stepIdx > 0) setCurrentStepId(STEP_ORDER[stepIdx - 1]);
   };
 
+  const backButton = !isFirstStep && (
+    <Button variant="flat" size="md" onPress={goBack} className="px-6">
+      Back
+    </Button>
+  );
+
+  // The last step's primary action creates the event instead of advancing.
+  const primaryButton = (
+    <Button
+      size="md"
+      onPress={isLastStep ? handleSubmit : goNext}
+      isDisabled={currentStepId === 'basics' && !hasRequiredBasics}
+      className="px-6 bg-accent hover:bg-accent/90 text-surface-light"
+    >
+      {isLastStep ? 'Create Event' : 'Continue'}
+    </Button>
+  );
+
+  const leftPanelContent = (
+    <div className="flex flex-col h-full relative overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden pt-2 pb-4">
+        <WizardShell
+          steps={steps}
+          currentStepId={currentStepId}
+          onStepChange={setCurrentStepId}
+          hideProgress
+          className={`flex-1 min-h-0 pl-6 ${showMapColumn ? 'pr-3' : 'pr-6'}`}
+        />
+      </div>
+
+      {showMapColumn ? (
+        <div className="flex pl-6 pr-3 pt-4 pb-4 flex-shrink-0">{backButton}</div>
+      ) : (
+        <div className="flex items-center justify-between px-6 pt-4 pb-4 flex-shrink-0">
+          <div>{backButton}</div>
+          <div>{primaryButton}</div>
+        </div>
+      )}
+    </div>
+  );
+
+  const rightPanelContent = (
+    <div className="flex flex-col h-full relative pl-3 pr-6 pt-4 pb-4 overflow-hidden">
+      <div className="flex flex-col gap-2 flex-1 min-h-0">
+        {/* Map — this panel only renders when showMapColumn is true, which already
+            requires hasMap, so there's no "no map" fallback to render here. Reuses
+            the same VenueMapWithPosts marker/icon rendering and pan/zoom behavior
+            as the dispatch page's own venue map modal. */}
+        <div className="w-full flex flex-col flex-1 min-h-0">
+          <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-t-sm" style={MAP_CHECKER_BG}>
+            <VenueMapWithPosts
+              layers={eventData.venue?.layers || []}
+              currentLayer={currentLayer}
+              staff={eventData.staff || []}
+              equipment={(eventData.eventEquipment || []).map((e) => ({ ...e, location: e.defaultLocation }))}
+              teamTimers={{}}
+              calls={eventData.calls || []}
+              clinics={eventData.clinics || []}
+              scale={scale}
+              position={position}
+              isPanning={isPanning}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onWheel={handleWheel}
+              imgRef={imgRef}
+              imageRadiusClassName="rounded-none"
+            />
+
+            <MapZoomControls
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onReset={handleResetZoom}
+              buttonClassName="bg-surface-deepest/90 backdrop-blur"
+              resetButtonClassName="bg-surface-deepest/90 backdrop-blur"
+            />
+          </div>
+
+          {/* Bottom Control Bar — merges flush with the map above: square where
+              they meet, sharp radius only at the map's top and this bar's bottom. */}
+          <Card
+            radius="none"
+            className="rounded-b-sm bg-default/40 w-full px-3 py-2 flex-shrink-0"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-surface-light">Layer:</span>
+                <span className="text-sm font-medium text-surface-light">
+                  {eventData.venue?.layers?.[currentLayer]?.name || 'Main Floor'}
+                </span>
+              </div>
+              {eventData.venue?.layers && eventData.venue.layers.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    radius="full"
+                    variant="flat"
+                    onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
+                    isDisabled={currentLayer === 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs text-surface-light">
+                    {currentLayer + 1} / {eventData.venue.layers.length}
+                  </span>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    radius="full"
+                    variant="flat"
+                    onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
+                    isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      <div className="flex justify-end pt-4 flex-shrink-0">{primaryButton}</div>
+    </div>
+  );
+
   return (
     <main className="relative bg-surface-deepest text-surface-light h-[calc(100dvh-3.5rem)] overflow-hidden leading-none">
-      <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden">
-        <div className="h-full overflow-hidden">
+      <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden flex flex-col">
+        <div className="px-6 pt-4 flex-shrink-0">
+          <StepProgress steps={steps} currentStepId={currentStepId} onStepChange={setCurrentStepId} />
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden">
           <div className="flex h-full overflow-hidden">
-            <PanelGroup direction="horizontal">
-              <Panel defaultSize={46} minSize={35} maxSize={60}>
-                <div className="flex flex-col h-full relative overflow-hidden">
-                  <div className="flex-1 flex flex-col overflow-hidden py-4">
-                    <WizardShell
-                      steps={steps}
-                      currentStepId={currentStepId}
-                      onStepChange={setCurrentStepId}
-                      className="flex-1 min-h-0 px-6"
-                    />
-
-                    <div className="flex gap-3 px-6 pt-4 flex-shrink-0">
-                      {!isFirstStep && (
-                        <Button variant="flat" onPress={goBack} className="flex-1">
-                          Back
-                        </Button>
-                      )}
-                      {!isLastStep && (
-                        <Button
-                          onPress={goNext}
-                          className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
-                        >
-                          Continue
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+            {showMapColumn ? (
+              <>
+                <div className="w-1/2 h-full flex-shrink-0 overflow-hidden">
+                  {leftPanelContent}
                 </div>
-              </Panel>
-              <PanelResizeHandle className="w-1 bg-surface-liner transition-colors cursor-col-resize flex items-center justify-center group">
-                <div className="w-0.5 h-8 bg-surface-light/30 rounded-full transition-colors" />
-              </PanelResizeHandle>
-              <Panel defaultSize={54} minSize={40}>
-                <div className="flex flex-col h-full relative px-6 pt-2 pb-4 overflow-hidden">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center flex-shrink-0">
-                      {hasVenue && <h2 className="text-surface-light text-xl font-semibold">{eventData.venue?.name}</h2>}
-                    </div>
-
-                {/* Map */}
-                {hasMap ? (
-                  <div className="w-full flex flex-col gap-3">
-                    <div className="relative w-full overflow-hidden rounded-2xl">
-                        <MapPanSurface
-                          containerRef={imgContainerRef}
-                          onWheel={handleWheel}
-                          onMouseDown={handleMouseDown}
-                          onMouseMove={handleMouseMove}
-                          onMouseUp={handleMouseUp}
-                          style={{
-                            cursor: isPanning ? 'grabbing' : 'grab',
-                            maxHeight: 'calc(100vh - 215px)',
-                          }}
-                        >
-                        <div
-                          className="relative"
-                          style={{
-                            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                            transformOrigin: 'center center',
-                            transition: isPanning ? 'none' : 'transform 0.1s ease-out',
-                          }}
-                        >
-                          <Image
-                            ref={imgRef}
-                            src={eventData.venue?.layers?.[currentLayer]?.mapUrl || ''}
-                            alt={`${eventData.venue?.layers?.[currentLayer]?.name || 'Venue'} map`}
-                            width={1200}
-                            height={800}
-                            className="w-full h-auto"
-                            unoptimized
-                            onLoad={(e) => {
-                              const t = e.currentTarget as HTMLImageElement;
-                              if (t && t.naturalWidth && t.naturalHeight) {
-                                setNaturalSize({ width: t.naturalWidth, height: t.naturalHeight });
-                              }
-                            }}
-                          />
-                          {renderMarkers()}
-                        </div>
-                      </MapPanSurface>
-
-                      <MapZoomControls
-                        onZoomIn={handleZoomIn}
-                        onZoomOut={handleZoomOut}
-                        onReset={handleResetZoom}
-                        buttonClassName="bg-surface-deepest/90 backdrop-blur"
-                        resetButtonClassName="bg-surface-deepest/90 backdrop-blur"
-                      />
-                    </div>
-
-                    {/* Bottom Control Bar */}
-                    <Card
-                      isBlurred
-                      className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-surface-light">Layer:</span>
-                          <span className="text-sm font-medium text-surface-light">
-                            {eventData.venue?.layers?.[currentLayer]?.name || 'Main Floor'}
-                          </span>
-                        </div>
-                        {eventData.venue?.layers && eventData.venue.layers.length > 1 && (
-                          <div className="flex items-center gap-2">
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              radius="full"
-                              variant="flat"
-                              onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
-                              isDisabled={currentLayer === 0}
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <span className="text-xs text-surface-light">
-                              {currentLayer + 1} / {eventData.venue.layers.length}
-                            </span>
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              radius="full"
-                              variant="flat"
-                              onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
-                              isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </Card>
-                  </div>
-                ) : (
-                  <div className="bg-surface-deep rounded-2xl p-8 text-center text-surface-faint">
-                    No map available
-                  </div>
-                )}
-                      </div>
-                    </div>
-                  </Panel>
-                </PanelGroup>
+                <div className="w-1/2 h-full flex-shrink-0 overflow-hidden">
+                  {rightPanelContent}
+                </div>
+              </>
+            ) : (
+              <div className="w-full h-full overflow-hidden">
+                {leftPanelContent}
               </div>
-            </div>
+            )}
           </div>
-          {tooltip && (
-            <div
-              style={{ left: tooltip.left, top: tooltip.top }}
-              className="pointer-events-none fixed z-50 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
-            >
-              {tooltip.text}
-            </div>
-          )}
+        </div>
+      </div>
 
       {/* Modals */}
       <AddTeamModal
         isOpen={isTeamModalOpen}
-        onClose={() => setIsTeamModalOpen(false)}
-        mode="create"
-        titleOverride="Add New Team"
-        existingTeamNames={(eventData.staff || []).map(s => s.team)}
-        onSave={(team) => handleSaveTeam(team)}
+        onClose={() => {
+          setIsTeamModalOpen(false);
+          setEditingTeamIndex(null);
+        }}
+        mode={editingTeamIndex !== null ? 'edit' : 'create'}
+        titleOverride={editingTeamIndex !== null ? 'Edit Team' : 'Add New Team'}
+        submitLabelOverride={editingTeamIndex !== null ? 'Save Changes' : undefined}
+        existingTeamNames={(eventData.staff || [])
+          .map(s => s.team)
+          .filter((_, i) => i !== editingTeamIndex)}
+        initialTeam={editingTeamIndex !== null ? parseTeamForEdit((eventData.staff || [])[editingTeamIndex]) : undefined}
+        onSave={(team) => handleSaveTeam(team, editingTeamIndex)}
         roles={certifications.map(name => ({ name, fullName: name }))}
       />
 

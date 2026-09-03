@@ -29,8 +29,8 @@ export default function LayerControlBar({
 }: LayerControlBarProps) {
   return (
     <Card
-      isBlurred
-      className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
+      radius="none"
+      className="rounded-b-sm bg-default/40 w-full px-3 py-2 flex-shrink-0"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

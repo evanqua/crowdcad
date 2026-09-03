@@ -17,6 +17,11 @@ Given('I navigate to {string}', async ({ page }, url: string) => {
   await page.goto(url);
 });
 
+Then('the focused element should be labeled {string}', async ({ page }, label: string) => {
+  const focusedLabel = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+  expect(focusedLabel).toBe(label);
+});
+
 When('I click the {string} button', async ({ page }, name: string) => {
   await page.getByRole('button', { name }).first().click();
 });

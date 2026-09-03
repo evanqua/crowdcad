@@ -30,6 +30,8 @@ Directory highlights
 - `src/components/venue-management/` — venue management sections used by the venue editor:
   - layer controls, marker placement UI, upload handling, and equipment management are separated into dedicated components.
 
+- `src/components/wizard/` — the shared step/wizard shell used by both venue creation and event creation. See "Wizard step shell" below.
+
 - `src/components/layout/` — layout-level components (global navigation, header):
   - `appnavbar.tsx` — top navigation used in `layout.tsx`.
 
@@ -39,6 +41,38 @@ Directory highlights
 
 - Root helpers
   - `src/components/devServiceWorkerCleanup.tsx` — helper for service worker cleanup in dev.
+
+Wizard step shell
+
+`src/components/wizard/` (`WizardShell` + `StepProgress`) is the config-driven step flow used by both venue creation (`src/app/(main)/venues/management/page.client.tsx`) and event creation (`src/app/(main)/events/[eventId]/create/page.tsx`). It renders a "dot-line-dot" progress indicator above the current step's content, and handles non-linear navigation (clicking a completed step's dot jumps there), focus management on step change, and ARIA labeling — none of that needs reimplementing per page.
+
+The shell itself owns no form data and no navigation policy beyond "don't let you click into a step that isn't reachable yet." Everything else — what a step contains, whether it's optional, what "Continue" does — is the calling page's job.
+
+Adding a step to an existing wizard: add one entry to that page's `steps` array. Nothing in `WizardShell` or `StepProgress` needs to change.
+
+```tsx
+import { WizardShell, type WizardStep } from '@/components/wizard';
+
+const [currentStepId, setCurrentStepId] = useState('basics');
+
+const steps: WizardStep[] = [
+  { id: 'basics', label: 'Basics', component: basicsStepContent, isComplete: hasName },
+  { id: 'newstep', label: 'New Step', component: newStepContent, isComplete: true },
+  // ...
+];
+
+<WizardShell
+  steps={steps}
+  currentStepId={currentStepId}
+  onStepChange={setCurrentStepId}
+/>
+```
+
+- `component` is JSX the page already constructed from its own state (a `const` computed each render, same as any other section) — `WizardShell` just inserts whichever step's `component` matches `currentStepId`. It never inspects step content itself.
+- `isComplete` is a plain boolean the page computes from its own data (e.g. `!!eventData.name.trim()`), not something the shell derives. It controls whether that step's progress dot is clickable — a step that's always safe to jump to (nothing required to reach it) should just be `true`.
+- `WizardShell` doesn't render Back/Continue/Save buttons — those are page-specific (a save action might live only on a final "Review" step, an optional step might skip straight past validation, etc.), so each page renders its own step-navigation footer below `<WizardShell />`, calling `onStepChange` directly to move forward/back.
+- Keep step content itself reasonably narrow when a wizard lives in a fixed-width column rather than the full page (event creation's left panel, for example) — `StepProgress`'s labels wrap onto two lines rather than truncating, but a step with 6+ entries still needs real width to read cleanly; check it in the browser at the column width it'll actually render at, not just full-page.
+- Accessibility (already handled, no per-page work needed): each progress dot has an `aria-label` announcing its name and state (`"Basics: completed"`) and `aria-current="step"` on the current one; disabled dots are unreachable via keyboard the same way they're unclickable with a mouse; focus moves to the new step's content automatically whenever `currentStepId` changes, so keyboard/screen-reader users don't lose their place when a control they just used (e.g. a dot in yesterday's step) disappears from the DOM.
 
 Styling and design tokens
 
@@ -92,6 +126,7 @@ Tips
 
 Where to find examples
 
+- Wizard step shell: `src/components/wizard/WizardShell.tsx`, `src/components/wizard/StepProgress.tsx` — consumed by `src/app/(main)/venues/management/page.client.tsx` and `src/app/(main)/events/[eventId]/create/page.tsx`.
 - Modal example: `src/components/modals/event/venuemapmodal.tsx`
 - Dispatch card examples: `src/components/dispatch/teamcard.tsx`, `src/components/dispatch/calltrackingcard.tsx`, `src/components/dispatch/clinictrackingcard.tsx`
 - Shared dispatch primitive examples: `src/components/dispatch/trackingtablebase.tsx`, `src/components/dispatch/trackingtextentry.tsx`

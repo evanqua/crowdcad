@@ -1,5 +1,6 @@
 import React from 'react';
-import { Checkbox, Chip, ScrollShadow, Select, SelectItem } from '@heroui/react';
+import { Button, Checkbox, Chip, Input, ScrollShadow, Select, SelectItem } from '@heroui/react';
+import { Plus, Trash2 } from 'lucide-react';
 import type { Event, Post, Venue, EventEquipment } from '@/app/types';
 
 type FlattenedPost = {
@@ -43,8 +44,13 @@ export function PostsSelectionSection({
   return (
     <>
       <div className="flex-shrink-0 pb-3 pt-0.5 flex items-center justify-between">
-        <h3 className="text-surface-light font-semibold text-lg">Posts</h3>
-        <Checkbox isSelected={postsEnabled} onValueChange={setPostsEnabled} size="sm">
+        <h3 className="text-surface-light font-semibold text-xl">Posts</h3>
+        <Checkbox
+          isSelected={postsEnabled}
+          onValueChange={setPostsEnabled}
+          size="sm"
+          classNames={{ wrapper: 'after:bg-accent' }}
+        >
           <span className="text-sm text-surface-light">Enable Posts</span>
         </Checkbox>
       </div>
@@ -152,66 +158,171 @@ export function EquipmentSelectionSection({
   allPosts,
   getPostName,
 }: Pick<Props, 'hasVenue' | 'eventData' | 'setEventData' | 'selectClassNames' | 'allPosts' | 'getPostName'>) {
+  const [newEquipName, setNewEquipName] = React.useState('');
+
+  const venueEquipmentIds = new Set((eventData.venue?.equipment || []).map((e) => e.id));
+  const customEquipment = eventData.eventEquipment.filter((e) => !venueEquipmentIds.has(e.id));
+
+  const addCustomEquipment = () => {
+    const name = newEquipName.trim();
+    if (!name) return;
+    setEventData((prev) => ({
+      ...prev,
+      eventEquipment: [
+        ...prev.eventEquipment,
+        { id: crypto.randomUUID(), name, status: 'Available', defaultLocation: undefined },
+      ],
+    }));
+    setNewEquipName('');
+  };
+
+  const removeCustomEquipment = (id: string) => {
+    setEventData((prev) => ({
+      ...prev,
+      eventEquipment: prev.eventEquipment.filter((e) => e.id !== id),
+    }));
+  };
+
+  const setCustomEquipmentLocation = (id: string, locName: string) => {
+    setEventData((prev) => ({
+      ...prev,
+      eventEquipment: prev.eventEquipment.map((e) => (e.id === id ? { ...e, defaultLocation: locName } : e)),
+    }));
+  };
+
   return (
-    <div className="flex-1 min-h-0 px-4 py-3 flex flex-col">
+    <div className="flex-1 min-h-0 py-3 flex flex-col">
       {hasVenue && (
-        <ScrollShadow className="space-y-1.5 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
-          {eventData.venue?.equipment?.map((equip) => {
-            const selectedEquip = eventData.eventEquipment.find((e) => e.id === equip.id);
-            const isSelected = !!selectedEquip;
-            return (
-              <div key={equip.id} className="rounded-2xl p-3 bg-surface-deeper/90">
+        <>
+          <div className="flex-shrink-0 pb-3 flex gap-2">
+            <Input
+              placeholder="Add equipment for this event only"
+              value={newEquipName}
+              onValueChange={setNewEquipName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addCustomEquipment();
+                }
+              }}
+              variant="flat"
+              size="lg"
+              classNames={{
+                input: 'text-surface-light text-sm outline-none focus:outline-none data-[focus=true]:outline-none',
+                inputWrapper: 'rounded-large px-4 hover:bg-surface-deep',
+              }}
+            />
+            <Button
+              isIconOnly
+              size="lg"
+              onPress={addCustomEquipment}
+              className="flex-shrink-0 bg-accent hover:bg-accent/90 text-surface-light"
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <ScrollShadow className="space-y-1.5 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
+            {customEquipment.map((equip) => (
+              <div key={equip.id} className="rounded-sm p-3 bg-default/40">
                 <div className="flex items-center gap-3">
-                  <Checkbox
-                    isSelected={isSelected}
-                    onValueChange={(checked) => {
-                      if (checked) {
-                        setEventData((prev) => ({
-                          ...prev,
-                          eventEquipment: [...prev.eventEquipment, { ...equip, defaultLocation: undefined }],
-                        }));
-                      } else {
-                        setEventData((prev) => ({
-                          ...prev,
-                          eventEquipment: prev.eventEquipment.filter((e) => e.id !== equip.id),
-                        }));
-                      }
-                    }}
-                  />
                   <span className="text-surface-light font-medium flex-shrink-0">{equip.name}</span>
-                  {isSelected && (
-                    <Select
-                      variant="flat"
-                      color="default"
-                      placeholder="Select Default Location"
-                      selectedKeys={selectedEquip?.defaultLocation ? [selectedEquip.defaultLocation] : []}
-                      onSelectionChange={(keys) => {
-                        const locName = Array.from(keys)[0] as string;
-                        setEventData((prev) => ({
-                          ...prev,
-                          eventEquipment: prev.eventEquipment.map((e) =>
-                            e.id === equip.id ? { ...e, defaultLocation: locName } : e
-                          ),
-                        }));
-                      }}
-                      classNames={{
-                        ...selectClassNames,
-                        base: 'max-w-[200px]',
-                      }}
-                      size="sm"
-                      className="ml-auto"
-                    >
-                      {allPosts.map((post) => {
-                        const postName = getPostName(post);
-                        return <SelectItem key={postName}>{postName}</SelectItem>;
-                      })}
-                    </Select>
-                  )}
+                  <Chip size="sm" variant="flat" className="bg-accent/20 text-accent">
+                    Event only
+                  </Chip>
+                  <Select
+                    variant="flat"
+                    color="default"
+                    placeholder="Select Default Location"
+                    selectedKeys={equip.defaultLocation ? [equip.defaultLocation] : []}
+                    onSelectionChange={(keys) => {
+                      const locName = Array.from(keys)[0] as string;
+                      setCustomEquipmentLocation(equip.id, locName);
+                    }}
+                    classNames={{
+                      ...selectClassNames,
+                      base: 'max-w-[200px]',
+                    }}
+                    size="sm"
+                    className="ml-auto"
+                  >
+                    {allPosts.map((post) => {
+                      const postName = getPostName(post);
+                      return <SelectItem key={postName}>{postName}</SelectItem>;
+                    })}
+                  </Select>
+                  <button
+                    type="button"
+                    onClick={() => removeCustomEquipment(equip.id)}
+                    className="p-1 rounded bg-transparent flex-shrink-0"
+                    aria-label="Remove equipment"
+                  >
+                    <Trash2 className="h-4 w-4 text-surface-light" />
+                  </button>
                 </div>
               </div>
-            );
-          })}
-        </ScrollShadow>
+            ))}
+
+            {eventData.venue?.equipment?.map((equip) => {
+              const selectedEquip = eventData.eventEquipment.find((e) => e.id === equip.id);
+              const isSelected = !!selectedEquip;
+              return (
+                <div key={equip.id} className="rounded-sm p-3 bg-default/40">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      isSelected={isSelected}
+                      classNames={{ wrapper: 'after:bg-accent' }}
+                      onValueChange={(checked) => {
+                        if (checked) {
+                          setEventData((prev) => ({
+                            ...prev,
+                            // Inherits the venue's own configured default location (if any) —
+                            // still just a starting point, adjustable per event via the Select below.
+                            eventEquipment: [...prev.eventEquipment, { ...equip, defaultLocation: equip.location }],
+                          }));
+                        } else {
+                          setEventData((prev) => ({
+                            ...prev,
+                            eventEquipment: prev.eventEquipment.filter((e) => e.id !== equip.id),
+                          }));
+                        }
+                      }}
+                    />
+                    <span className="text-surface-light font-medium flex-shrink-0">{equip.name}</span>
+                    {isSelected && (
+                      <Select
+                        variant="flat"
+                        color="default"
+                        placeholder="Select Default Location"
+                        selectedKeys={selectedEquip?.defaultLocation ? [selectedEquip.defaultLocation] : []}
+                        onSelectionChange={(keys) => {
+                          const locName = Array.from(keys)[0] as string;
+                          setEventData((prev) => ({
+                            ...prev,
+                            eventEquipment: prev.eventEquipment.map((e) =>
+                              e.id === equip.id ? { ...e, defaultLocation: locName } : e
+                            ),
+                          }));
+                        }}
+                        classNames={{
+                          ...selectClassNames,
+                          base: 'max-w-[200px]',
+                        }}
+                        size="sm"
+                        className="ml-auto"
+                      >
+                        {allPosts.map((post) => {
+                          const postName = getPostName(post);
+                          return <SelectItem key={postName}>{postName}</SelectItem>;
+                        })}
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </ScrollShadow>
+        </>
       )}
     </div>
   );

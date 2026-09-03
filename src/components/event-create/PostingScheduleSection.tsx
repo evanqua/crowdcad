@@ -1,15 +1,10 @@
 import React from 'react';
-import { TimeInput, Input, Chip } from '@heroui/react';
-import { Time } from '@internationalized/date';
+import { Input, Chip } from '@heroui/react';
 
 type ScheduleChip = { id: string; time: string; editable: boolean };
 
 type Props = {
   postsEnabled: boolean;
-  scheduleFrom: Time;
-  setScheduleFrom: (time: Time) => void;
-  scheduleTo: Time;
-  setScheduleTo: (time: Time) => void;
   scheduleBy: string;
   setScheduleBy: (value: string) => void;
   scheduleChips: ScheduleChip[];
@@ -28,10 +23,6 @@ type Props = {
 
 export default function PostingScheduleSection({
   postsEnabled,
-  scheduleFrom,
-  setScheduleFrom,
-  scheduleTo,
-  setScheduleTo,
   scheduleBy,
   setScheduleBy,
   scheduleChips,
@@ -47,36 +38,11 @@ export default function PostingScheduleSection({
     <div className="space-y-3 mt-6">
       <h3 className="text-surface-light font-semibold text-lg">Schedule</h3>
 
-      <div className="grid grid-cols-3 gap-3 rounded-2xl pb-3">
-        {/* From/To define the event's own start/end — kept enabled and
-            required regardless of postsEnabled, since they're used for
-            reporting (the summary page's analytics window) independent of
-            whether auto-posting is turned on. Only the interval ("By") and
-            the generated posting chips below are specific to posting. */}
-        <TimeInput
-          label="From"
-          labelPlacement="inside"
-          variant="flat"
-          color="default"
-          value={scheduleFrom}
-          onChange={(value) => value && setScheduleFrom(value)}
-          hourCycle={24}
-          isRequired
-          classNames={inputClassNames}
-          size="md"
-        />
-        <TimeInput
-          label="To"
-          labelPlacement="inside"
-          variant="flat"
-          color="default"
-          value={scheduleTo}
-          onChange={(value) => value && setScheduleTo(value)}
-          hourCycle={24}
-          isRequired
-          classNames={inputClassNames}
-          size="md"
-        />
+      <div className="max-w-[10rem] pb-3">
+        {/* The event's own start/end now live as "Start Time"/"End Time" on
+            the Event Configuration step (see MetadataSection) — only the
+            posting interval ("By") and the generated posting chips below
+            are specific to posting. */}
         <Input
           label="By"
           labelPlacement="inside"

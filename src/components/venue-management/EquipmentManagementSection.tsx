@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Button, Card, Input, ScrollShadow } from '@heroui/react';
+import { Button, Input, ScrollShadow, Select, SelectItem } from '@heroui/react';
 import { Edit2, Plus, Trash2 } from 'lucide-react';
 import type { Equipment } from '@/app/types';
 
@@ -17,7 +17,19 @@ interface EquipmentManagementSectionProps {
   cancelEquipmentEdit: () => void;
   startEditEquipment: (idx: number) => void;
   removeEquipment: (idx: number) => void;
+  // Locations already placed on the venue, offered as the equipment item's
+  // default location — the same location the event builder pre-fills from
+  // when that item is added to an event, and can still adjust from there.
+  locationOptions: string[];
+  onSetLocation: (idx: number, location: string | undefined) => void;
 }
+
+const selectClassNames = {
+  trigger: 'rounded-large px-3 hover:bg-surface-deep data-[focus=true]:outline-none',
+  value: 'text-surface-light',
+  popover: 'bg-surface-deepest border border-surface-liner rounded-large',
+  listbox: 'p-1 [&_[data-hover=true]]:bg-surface-deep [&_[data-selected=true]]:bg-surface-deep',
+} as const;
 
 export default function EquipmentManagementSection({
   equipmentInput,
@@ -31,12 +43,14 @@ export default function EquipmentManagementSection({
   cancelEquipmentEdit,
   startEditEquipment,
   removeEquipment,
+  locationOptions,
+  onSetLocation,
 }: EquipmentManagementSectionProps) {
   return (
     <>
-      <label className="mb-2 block text-sm font-medium text-surface-light">
-        Equipment <span className="text-surface-light text-xs">(Optional)</span>
-      </label>
+      <h3 className="mb-2 text-surface-light font-semibold text-xl">
+        Equipment <span className="text-surface-faint text-sm font-normal">(Optional)</span>
+      </h3>
       <div className="flex gap-2 mb-3">
         <Input
           placeholder="e.g., Gurney 1"
@@ -65,12 +79,12 @@ export default function EquipmentManagementSection({
       {equipment.length > 0 && (
         <ScrollShadow className="space-y-2 pr-2 max-h-[calc(100vh-430px)] scrollbar-hide">
           {equipment.map((item, idx) => (
-            <Card
+            <div
               key={item.id}
-              isBlurred
-              className="border-2 rounded-2xl border-default-200 bg-transparent"
+              data-testid="equipment-row"
+              className="rounded-sm p-1 bg-default/40"
             >
-              <div className="flex items-center justify-between px-3 py-2">
+              <div className="flex items-center gap-2 px-2 py-1">
                 {editingEquipmentIndex === idx ? (
                   <>
                     <Input
@@ -119,10 +133,28 @@ export default function EquipmentManagementSection({
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-sm text-surface-light truncate">{item.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
+                    <span className="text-sm text-surface-light truncate flex-shrink-0">{item.name}</span>
+                    <Select
+                      variant="flat"
+                      color="default"
+                      placeholder="Select Default Location"
+                      selectedKeys={item.location ? [item.location] : []}
+                      onSelectionChange={(keys) => {
+                        const locName = Array.from(keys)[0] as string | undefined;
+                        onSetLocation(idx, locName);
+                      }}
+                      classNames={{
+                        ...selectClassNames,
+                        base: 'max-w-[200px]',
+                      }}
+                      size="sm"
+                      className="ml-auto"
+                    >
+                      {locationOptions.map((name) => (
+                        <SelectItem key={name}>{name}</SelectItem>
+                      ))}
+                    </Select>
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <Button
                         isIconOnly
                         size="sm"
@@ -148,7 +180,7 @@ export default function EquipmentManagementSection({
                   </>
                 )}
               </div>
-            </Card>
+            </div>
           ))}
         </ScrollShadow>
       )}

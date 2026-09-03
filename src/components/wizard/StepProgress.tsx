@@ -28,52 +28,74 @@ const DOT_CLASS: Record<WizardStepStatus, string> = {
 };
 
 /**
- * The "dot-line-dot" progress indicator: one dot per step connected by a
- * line segment, reading as percent-complete. A completed step's dot (or the
- * current one, a no-op) can be clicked to jump there; an upcoming step's dot
- * is inert until it becomes reachable (i.e. completed).
+ * The "dot-line-dot" progress indicator. Dots and labels sit in the same
+ * N-column grid (one column per step) so a dot and its label are always
+ * exactly aligned regardless of label width. The connecting line is a
+ * single element positioned behind the dots, spanning from the first dot's
+ * center to the last dot's center — computed in JS (percentages of the
+ * grid, not per-dot DOM measurement) so it's exact at any width, including
+ * when this bar is stretched across a much wider column than the step
+ * content below it.
  */
 export default function StepProgress({ steps, currentStepId, onStepChange, className }: Props) {
   const currentIndex = steps.findIndex((s) => s.id === currentStepId);
+  const n = steps.length;
+  const gridStyle = { gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` };
+
+  // Each dot sits centered in its own 100/n-wide column, so the first dot's
+  // center is inset from the left edge by half a column, and symmetrically
+  // for the last dot on the right.
+  const insetPct = n > 0 ? 50 / n : 0;
+  const spanPct = 100 - 2 * insetPct;
+  const completedPct = n > 1 ? (Math.max(currentIndex, 0) / (n - 1)) * spanPct : 0;
 
   return (
-    <ol aria-label="Progress" className={`flex items-start w-full ${className ?? ''}`}>
-      {steps.map((step, idx) => {
-        const status = getStatus(step, currentStepId);
-        const clickable = status !== 'upcoming';
-        const isLast = idx === steps.length - 1;
+    <div className={`w-full ${className ?? ''}`}>
+      <div className="relative h-4">
+        <div
+          aria-hidden="true"
+          role="presentation"
+          className="absolute top-1/2 -translate-y-1/2 h-0.5 rounded-full bg-surface-liner"
+          style={{ left: `${insetPct}%`, right: `${insetPct}%` }}
+        />
+        <div
+          aria-hidden="true"
+          role="presentation"
+          className="absolute top-1/2 -translate-y-1/2 h-0.5 rounded-full bg-accent transition-[width]"
+          style={{ left: `${insetPct}%`, width: `${completedPct}%` }}
+        />
 
-        return (
-          <li key={step.id} className={`flex items-start min-w-0 ${isLast ? '' : 'flex-1'}`}>
-            <div className="flex flex-col items-center min-w-0">
-              <button
-                type="button"
-                disabled={!clickable}
-                aria-current={status === 'current' ? 'step' : undefined}
-                aria-label={`${step.label}: ${STATUS_ANNOUNCEMENT[status]}`}
-                onClick={() => clickable && onStepChange(step.id)}
-                className={`shrink-0 rounded-full transition-all disabled:cursor-not-allowed ${DOT_CLASS[status]}`}
-              />
-              <span
-                aria-hidden="true"
-                className="mt-1.5 w-full max-w-[5.5rem] text-center text-[11px] leading-tight text-surface-faint break-words"
-              >
-                {step.label}
-              </span>
-            </div>
+        <ol aria-label="Progress" className="relative grid h-full" style={gridStyle}>
+          {steps.map((step) => {
+            const status = getStatus(step, currentStepId);
+            const clickable = status !== 'upcoming';
 
-            {!isLast && (
-              <div
-                aria-hidden="true"
-                role="presentation"
-                className={`mt-1.5 h-0.5 flex-1 min-w-[0.5rem] mx-1.5 rounded-full ${
-                  idx < currentIndex ? 'bg-accent' : 'bg-surface-liner'
-                }`}
-              />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+            return (
+              <li key={step.id} className="flex items-center justify-center">
+                <button
+                  type="button"
+                  disabled={!clickable}
+                  aria-current={status === 'current' ? 'step' : undefined}
+                  aria-label={`${step.label}: ${STATUS_ANNOUNCEMENT[status]}`}
+                  onClick={() => clickable && onStepChange(step.id)}
+                  className={`shrink-0 rounded-full transition-all disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-deepest ${DOT_CLASS[status]}`}
+                />
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
+      <div aria-hidden="true" className="grid mt-2" style={gridStyle}>
+        {steps.map((step) => (
+          <div
+            key={step.id}
+            className="text-center text-sm leading-tight text-surface-faint whitespace-nowrap overflow-hidden text-ellipsis px-1"
+          >
+            {step.label}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
