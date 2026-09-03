@@ -54,7 +54,12 @@ export default function EventCreation() {
     surgeLimitPercent: 70,
   });
 
-  const STEP_ORDER = ['basics', 'teams', 'equipment', 'postschedule', 'review'] as const;
+  // A venue with no equipment of its own skips the Equipment step entirely.
+  const hasVenueEquipment = (eventData.venue?.equipment?.length ?? 0) > 0;
+  type StepId = 'basics' | 'teams' | 'equipment' | 'postschedule' | 'review';
+  const STEP_ORDER: StepId[] = hasVenueEquipment
+    ? ['basics', 'teams', 'equipment', 'postschedule', 'review']
+    : ['basics', 'teams', 'postschedule', 'review'];
   const [currentStepId, setCurrentStepId] = useState<string>('basics');
   const [currentLayer, setCurrentLayer] = useState(0);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -654,10 +659,15 @@ export default function EventCreation() {
   // Event name and date are required before advancing past Event Configuration.
   const hasRequiredBasics = !!eventData.name?.trim() && !!eventData.date;
 
+  // A venue with nothing defined in its own equipment list has nothing for
+  // this step to offer beyond the "event only" add flow — skip it entirely
+  // rather than show an empty tab.
   const steps: WizardStep[] = [
     { id: 'basics', label: 'Event Configuration', component: basicsStep, isComplete: hasRequiredBasics },
     { id: 'teams', label: 'Staff Assignments', component: teamsSupervisorsStep, isComplete: hasRequiredBasics },
-    { id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: hasRequiredBasics },
+    ...(hasVenueEquipment
+      ? [{ id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: hasRequiredBasics }]
+      : []),
     { id: 'postschedule', label: 'Post schedule', component: postScheduleStep, isComplete: hasRequiredBasics },
     { id: 'review', label: 'Review', component: reviewStep, isComplete: hasRequiredBasics },
   ];
@@ -701,12 +711,12 @@ export default function EventCreation() {
           currentStepId={currentStepId}
           onStepChange={setCurrentStepId}
           hideProgress
-          className="flex-1 min-h-0 px-6"
+          className={`flex-1 min-h-0 pl-6 ${showMapColumn ? 'pr-3' : 'pr-6'}`}
         />
       </div>
 
       {showMapColumn ? (
-        <div className="flex px-6 pt-4 pb-4 flex-shrink-0">{backButton}</div>
+        <div className="flex pl-6 pr-3 pt-4 pb-4 flex-shrink-0">{backButton}</div>
       ) : (
         <div className="flex items-center justify-between px-6 pt-4 pb-4 flex-shrink-0">
           <div>{backButton}</div>
@@ -717,7 +727,7 @@ export default function EventCreation() {
   );
 
   const rightPanelContent = (
-    <div className="flex flex-col h-full relative px-6 pt-4 pb-4 overflow-hidden">
+    <div className="flex flex-col h-full relative pl-3 pr-6 pt-4 pb-4 overflow-hidden">
       <div className="flex flex-col gap-2 flex-1 min-h-0">
         {/* Map — this panel only renders when showMapColumn is true, which already
             requires hasMap, so there's no "no map" fallback to render here. Reuses

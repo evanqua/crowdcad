@@ -11,6 +11,11 @@ Given('I have a venue ready for event creation', async ({ page, scenarioState })
   await page.goto('/venues/management', { timeout: NAV_TIMEOUT });
   await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => {});
   await page.getByPlaceholder('e.g., Convention Center Hall A').fill(scenarioState.eventVenueName);
+  // Add equipment so downstream event-creation scenarios can reach the
+  // Equipment step, which now only appears when the venue actually has some.
+  await page.getByRole('button', { name: /^Equipment:/ }).click();
+  await page.getByPlaceholder('e.g., Gurney 1').fill('Gurney 1');
+  await page.keyboard.press('Enter');
   await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Venue' }).click();
   await page.waitForURL('/venues/selection', { timeout: NAV_TIMEOUT });

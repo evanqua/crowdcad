@@ -726,10 +726,20 @@ export default function VenueManagementPageClient() {
     setIsNewLayerModalOpen(false);
   };
 
-  // Handle deleting layer
+  // Handle deleting layer — a venue always needs at least one layer, so
+  // deleting the only one just clears its map (and any pending unsaved
+  // upload) instead of removing the layer itself.
   const deleteLayer = () => {
     if (venueData.layers.length <= 1) {
-      alert('Cannot delete the last layer');
+      const confirmReset = window.confirm('This is the only floor — remove its map and start over?');
+      if (!confirmReset) return;
+      setVenueData(prev => {
+        const newLayers = [...prev.layers];
+        newLayers[currentLayer] = { ...newLayers[currentLayer], mapUrl: undefined };
+        return { ...prev, layers: newLayers };
+      });
+      setMapFile(null);
+      setPendingLayer(null);
       return;
     }
     const confirmDelete = window.confirm('Are you sure you want to delete this layer?');
@@ -760,7 +770,6 @@ export default function VenueManagementPageClient() {
   // need a plain reference view, matching event creation's read-only map
   // panel exactly. The Map step renders its own dedicated interactive map
   // below, outside this left/right split entirely.
-  const isInteractiveMapStep = currentStepId === 'locations';
 
   // The map/floor-controls header for the Map step: floor name top-left,
   // Add Markers top-right.
@@ -815,11 +824,52 @@ export default function VenueManagementPageClient() {
     </div>
   );
 
-  // Interactive map panel (place/drag markers) for the Map and Locations
-  // steps — same checkerboard/sharp-corner/merged-bar treatment as the
-  // read-only panel below, so both read as the same surface.
-  const interactiveMapPanel = (
-    <div className="flex flex-col h-full">
+  // Simple read-only layer indicator + prev/next nav — used everywhere
+  // except the Map step itself, which is the only place layers can be
+  // added, replaced, or deleted (via the richer LayerControlBar below).
+  const simpleLayerBar = (
+    <Card radius="none" className="rounded-b-sm bg-default/40 w-full px-3 py-2 flex-shrink-0">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-surface-light">
+          {venueData.layers?.[currentLayer]?.name || 'Main Floor'}
+        </span>
+        {venueData.layers.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              isIconOnly
+              size="sm"
+              radius="full"
+              variant="flat"
+              onPress={() => setCurrentLayer((prev) => Math.max(0, prev - 1))}
+              isDisabled={currentLayer === 0}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-surface-light">
+              {currentLayer + 1} / {venueData.layers.length}
+            </span>
+            <Button
+              isIconOnly
+              size="sm"
+              radius="full"
+              variant="flat"
+              onPress={() => setCurrentLayer((prev) => Math.min(venueData.layers.length - 1, prev + 1))}
+              isDisabled={currentLayer === venueData.layers.length - 1}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+
+  // Interactive map area (place/drag markers), shared by the Map and
+  // Locations steps — same checkerboard/sharp-corner treatment as the
+  // read-only panel below, so both read as the same surface. Only the
+  // bottom bar differs between the two (see interactiveMapPanel /
+  // locationsMapPanel below).
+  const interactiveMapTop = (
       <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-t-sm" style={MAP_CHECKER_BG}>
         <MapPanSurface
           containerRef={imgContainerRef}
@@ -897,7 +947,12 @@ export default function VenueManagementPageClient() {
         {/* Instructions overlay - Top Left */}
         {isAddMarkerMode && !pendingMarker && <MarkerPlacementInstruction />}
       </div>
+  );
 
+  // Map step: the only place layers can be added, replaced, or deleted.
+  const interactiveMapPanel = (
+    <div className="flex flex-col h-full">
+      {interactiveMapTop}
       <LayerControlBar
         mapFileName={mapFileName}
         onReplaceMap={() => fileInputRef.current?.click()}
@@ -909,6 +964,16 @@ export default function VenueManagementPageClient() {
         onDeleteLayer={deleteLayer}
         onAddLayer={() => setIsNewLayerModalOpen(true)}
       />
+    </div>
+  );
+
+  // Locations step: same interactive map (placing a location directly on
+  // it), but only the simple read-only layer bar — adding/replacing/
+  // deleting a layer is Map-step-only.
+  const locationsMapPanel = (
+    <div className="flex flex-col h-full">
+      {interactiveMapTop}
+      {simpleLayerBar}
     </div>
   );
 
@@ -942,45 +1007,11 @@ export default function VenueManagementPageClient() {
           resetButtonClassName="bg-surface-deepest/90 backdrop-blur"
         />
       </div>
-
-      <Card radius="none" className="rounded-b-sm bg-default/40 w-full px-3 py-2 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-surface-light">
-            {venueData.layers?.[currentLayer]?.name || 'Main Floor'}
-          </span>
-          {venueData.layers.length > 1 && (
-            <div className="flex items-center gap-2">
-              <Button
-                isIconOnly
-                size="sm"
-                radius="full"
-                variant="flat"
-                onPress={() => setCurrentLayer((prev) => Math.max(0, prev - 1))}
-                isDisabled={currentLayer === 0}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-surface-light">
-                {currentLayer + 1} / {venueData.layers.length}
-              </span>
-              <Button
-                isIconOnly
-                size="sm"
-                radius="full"
-                variant="flat"
-                onPress={() => setCurrentLayer((prev) => Math.min(venueData.layers.length - 1, prev + 1))}
-                isDisabled={currentLayer === venueData.layers.length - 1}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </Card>
+      {simpleLayerBar}
     </div>
   );
 
-  const rightPanelContent = isInteractiveMapStep ? interactiveMapPanel : readOnlyMapPanel;
+  const rightPanelContent = currentStepId === 'locations' ? locationsMapPanel : readOnlyMapPanel;
 
   const basicsStep = (
     <div className="flex h-full items-center justify-center">
@@ -1214,7 +1245,7 @@ export default function VenueManagementPageClient() {
 
   const leftPanelContent = (
     <div className="flex flex-col h-full relative overflow-hidden">
-      <div className="flex-1 flex flex-col overflow-hidden pt-2 pb-4 px-6">
+      <div className={`flex-1 flex flex-col overflow-hidden pt-2 pb-4 pl-6 ${showMapColumn ? 'pr-3' : 'pr-6'}`}>
         <WizardShell
           steps={steps}
           currentStepId={currentStepId}
@@ -1225,7 +1256,7 @@ export default function VenueManagementPageClient() {
       </div>
 
       {showMapColumn ? (
-        <div className="flex px-6 pt-4 pb-4 flex-shrink-0">{leftFooterButton}</div>
+        <div className="flex pl-6 pr-3 pt-4 pb-4 flex-shrink-0">{leftFooterButton}</div>
       ) : (
         <div className="flex items-center justify-between px-6 pt-4 pb-4 flex-shrink-0">
           <div>{leftFooterButton}</div>
@@ -1236,7 +1267,7 @@ export default function VenueManagementPageClient() {
   );
 
   const rightPanel = (
-    <div className="flex flex-col h-full relative px-6 pt-4 pb-4 overflow-hidden">
+    <div className="flex flex-col h-full relative pl-3 pr-6 pt-4 pb-4 overflow-hidden">
       <div className="flex-1 min-h-0">{rightPanelContent}</div>
       <div className="flex justify-end pt-4 flex-shrink-0">{rightFooterButtons}</div>
     </div>

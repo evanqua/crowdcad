@@ -38,6 +38,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **Event Name and Event Date are now required** before advancing past Event Configuration, matching venue creation's existing name requirement — the other steps' progress dots stay locked until both are filled, and Create Event itself checks the name too.
 - Venue creation's Locations, Equipment, and Review steps now give the map 2/3 of the screen (was half), matching how much room venue creation gave it before this whole restructure — event creation's own map-showing steps are unchanged at half.
 - Review step label/value pairs (both venue and event creation) use a slightly larger font, and both now have a "Review" heading matching the other section headers. Section headers in every step that shows the map alongside it (Equipment/Post schedule/Review in event creation; Locations/Equipment/Review in venue creation) are now a consistent, larger size.
+- **Deleting a venue's only floor now clears its map instead of being blocked** — a venue always needs at least one layer, so this used to just show a "Cannot delete the last layer" alert; it now resets that floor back to "no map uploaded" (after confirming), the same as if you'd never uploaded one.
+- Event creation now skips the Equipment step entirely for a venue with no equipment of its own defined, instead of showing an empty tab.
+- Reduced the padding between the left column's content and the map column on every split-screen step (both venue and event creation), giving the left column more usable width.
+- Venue creation's Locations step now shows the same simple, read-only floor indicator as Equipment/Review instead of the full layer control bar (replace map, add/delete layer) — adding, replacing, or deleting a layer is Map-step-only now.
 
 ### Fixed
 
