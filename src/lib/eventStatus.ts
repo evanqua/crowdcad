@@ -55,6 +55,29 @@ export function getLastActivityTimestamp(
 }
 
 /**
+ * The true end of the reporting window for an event, no matter how old or
+ * forgotten it is: whichever comes later of the event's own designated end
+ * time and one hour past the last dispatch log entry recorded for it — the
+ * same backstop `isEventEnded` uses, so charts/stats never cut off activity
+ * that ran past a stale scheduled end, and never stay unbounded for an
+ * event nobody remembered to end. An explicitly-ended event uses the moment
+ * it was actually ended instead, a deliberate stop rather than an inferred one.
+ */
+export function getEffectiveEndTime(event: Event): number | null {
+  if (event.ended && typeof event.endedAt === 'number') {
+    return event.endedAt;
+  }
+
+  const designatedEnd = getEventEndTime(event);
+  const lastActivity = getLastActivityTimestamp(event);
+  const activityBackstop = lastActivity !== null ? lastActivity + HOUR_MS : null;
+
+  if (designatedEnd === null) return activityBackstop;
+  if (activityBackstop === null) return designatedEnd;
+  return Math.max(designatedEnd, activityBackstop);
+}
+
+/**
  * Whether data collection should be considered stopped for this event:
  * either a dispatcher explicitly ended it, or its designated end time has
  * passed and an hour has gone by with no dispatch activity logged since —

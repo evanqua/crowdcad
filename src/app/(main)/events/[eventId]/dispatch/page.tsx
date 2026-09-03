@@ -7,6 +7,7 @@ import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
 import AddTeamModal, { TeamDraft } from "@/components/modals/event/addteammodal";
 import AddSupervisorModal from "@/components/modals/event/addsupervisormodal";
+import EndEventModal from "@/components/modals/event/endeventmodal";
 import TransportUnitModal from "@/components/modals/event/transportunitmodal";
 import React from 'react';
 import { dbService, ServiceError } from '@/lib/services';
@@ -42,6 +43,7 @@ import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
 import { isEventEnded } from '@/lib/eventStatus';
+import { formatLogTimestampForCsv } from '@/lib/csvFormat';
 
 interface DispatchRoutePageProps {
   params: Promise<{ eventId: string }>;
@@ -250,7 +252,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         const currentEvent = normalizeLiteDraftToEvent(currentDraft);
 
         if (!options?.bypassEndedCheck && isEventEnded(currentEvent)) {
-          toast.error(t('This event has ended. Data collection is locked — view the summary instead.'));
+          console.warn('Blocked update: event has ended.');
           return;
         }
 
@@ -296,13 +298,13 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       });
     } catch (error) {
       if (error instanceof Error && error.message === 'EVENT_ENDED') {
-        toast.error(t('This event has ended. Data collection is locked — view the summary instead.'));
+        console.warn('Blocked update: event has ended.');
         return;
       }
       console.error("Update failed:", error);
       toast.error("Failed to save changes. Please try again.");
     }
-  }, [eventId, isLiteMode, t]);
+  }, [eventId, isLiteMode]);
 
   const handlePostAssignment = useCallback(async (time: string, post: string, team: string) => {
     await updateEvent((currentEvent) => {
@@ -2852,7 +2854,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   }
 
   const formatSummaryTimestamp = useCallback((timestamp: number): string => {
-    return Number.isFinite(timestamp) ? timestamp.toFixed(2) : '';
+    return formatLogTimestampForCsv(timestamp);
   }, []);
 
   const generateSummaryCSVData = useCallback((): string => {
@@ -2928,27 +2930,25 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const eventEnded = useMemo(() => (event ? isEventEnded(event, nowTick) : false), [event, nowTick]);
 
+  const goToSummary = useCallback(() => {
+    if (!eventId) return;
+    router.push(`/events/${eventId}/summary`);
+  }, [eventId, router]);
+
+  const [showEndEventModal, setShowEndEventModal] = useState(false);
+
   const handleEndEvent = useCallback(async () => {
     if (!event || !eventId) return;
-    if (eventEnded) {
-      toast.info(t('This event has already ended.'));
-      return;
-    }
-
-    const confirmed = window.confirm(
-      t(
-        'End this event now? Data collection and dispatch logs will stop immediately — no further calls, status changes, or activity can be logged after this. View the Event Summary for a read-only record instead. This cannot be undone.'
-      )
-    );
-    if (!confirmed) return;
 
     await updateEvent(() => ({ ended: true, endedAt: Date.now() }), { bypassEndedCheck: true });
-    toast.success(t('Event ended. Data collection has stopped.'));
+    setShowEndEventModal(false);
 
     if (!isLiteMode) {
       window.dispatchEvent(new CustomEvent('dispatch-event-ended'));
     }
-  }, [event, eventId, eventEnded, updateEvent, t, isLiteMode]);
+
+    goToSummary();
+  }, [event, eventId, updateEvent, isLiteMode, goToSummary]);
 
   const [showVenueMap, setShowVenueMap] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
@@ -2959,7 +2959,13 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     const openPosting = () => setShowPostingSchedule(true);
     const openEventSummary = () => setShowEventSummary(true);
     const openEndEvent = () => {
-      void handleEndEvent();
+      // Already ended (manually, or by the 1-hour-no-activity backup) — just
+      // take them straight to the summary instead of asking again.
+      if (eventEnded) {
+        goToSummary();
+        return;
+      }
+      setShowEndEventModal(true);
     };
     const openLiteClear = () => {
       void handleClearLiteEvent();
@@ -2989,7 +2995,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         window.removeEventListener('open-end-event', openEndEvent);
       }
     };
-  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv, handleEndEvent]);
+  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv, eventEnded, goToSummary]);
 
   // Tab cycling for left sidebar tabs
   useEffect(() => {
@@ -3493,21 +3499,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       {/* Main Layout */}
       <div className="w-full bg-surface-deepest h-[calc(100vh-72px)]">
         <div className="max-w-[1750px] mx-auto px-2 sm:px-4 h-full">
-
-          {eventEnded && (
-            <div className="flex flex-wrap items-center justify-between gap-2 mt-2 mb-2 px-3 py-2 rounded-lg bg-status-red/10 border border-status-red/40 text-sm">
-              <span className="text-surface-light">
-                {t('This event has ended. Data collection is locked — no new calls, status changes, or activity can be logged.')}
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowEventSummary(true)}
-                className="font-semibold text-status-red hover:text-status-red/80 underline underline-offset-2 whitespace-nowrap"
-              >
-                {t('View Event Summary')}
-              </button>
-            </div>
-          )}
 
           {isAdmin && (
             <button 
@@ -4266,6 +4257,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             onClose={() => setShowEventSummary(false)}
             onExportCsv={handleExportSummaryCsv}
             eventId={event.id}
+          />
+
+          <EndEventModal
+            isOpen={showEndEventModal}
+            onClose={() => setShowEndEventModal(false)}
+            onConfirm={handleEndEvent}
           />
         </>
       )}
