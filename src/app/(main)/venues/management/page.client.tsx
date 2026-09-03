@@ -1080,7 +1080,7 @@ export default function VenueManagementPageClient() {
             const isPending = pendingMarker?.layerIdx === item.layerIdx && pendingMarker?.postIdx === item.postIdx;
 
             return (
-              <div key={idx} className="rounded-sm bg-default/40">
+              <div key={idx} data-testid="location-row" className="rounded-sm bg-default/40">
                 <div className="flex items-center justify-between px-3 py-2">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     {isClinicPost(post) ? (

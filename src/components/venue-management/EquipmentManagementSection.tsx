@@ -81,6 +81,7 @@ export default function EquipmentManagementSection({
           {equipment.map((item, idx) => (
             <div
               key={item.id}
+              data-testid="equipment-row"
               className="rounded-sm p-1 bg-default/40"
             >
               <div className="flex items-center gap-2 px-2 py-1">
