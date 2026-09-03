@@ -411,10 +411,9 @@ export default function VenueSelection() {
                     <Card
                       key={venue.id}
                       isPressable
-                      radius="none"
                       onPress={() => setSelectedVenueId(venue.id)}
                       classNames={{
-                        base: "bg-surface-deep/50 backdrop-blur-sm w-full"
+                        base: "rounded-sm hover:bg-surface-deep backdrop-blur-sm w-full"
                       }}
                     >
                       <CardBody className="p-4">
@@ -541,7 +540,7 @@ export default function VenueSelection() {
               <h2 className="text-lg font-semibold mb-3">Recent Events</h2>
               
               {selectedVenueEvents.length === 0 ? (
-                <Card radius="none" classNames={{ base: "bg-surface-deep/50 border border-default w-full" }}>
+                <Card classNames={{ base: "rounded-sm bg-surface-deep/50 w-full" }}>
                   <CardBody className="text-center py-8 text-surface-light">
                     No events yet. Start your first event at this venue!
                   </CardBody>
@@ -552,10 +551,9 @@ export default function VenueSelection() {
                     <Card
                       key={event.id}
                       isPressable
-                      radius="none"
                       onPress={() => router.push(`/events/${event.id}/dispatch`)}
                       classNames={{
-                        base: "bg-surface-deep/50 backdrop-blur-sm border border-default w-full"
+                        base: "rounded-sm bg-surface-deep/50 backdrop-blur-sm w-full"
                       }}
                     >
                       <CardBody className="p-4">
@@ -579,7 +577,7 @@ export default function VenueSelection() {
                             </div>
 
                             {event.status === 'draft' && (
-                              <Chip size="sm" color="warning" className="mt-2">Draft</Chip>
+                              <Chip size="sm" variant="flat" className="mt-2 bg-status-orange/20 text-status-orange">Draft</Chip>
                             )}
                             {event.isOrgEvent && (
                               <Chip size="sm" variant="flat" className="mt-2 bg-accent/20 text-accent">Org</Chip>
@@ -723,11 +721,10 @@ export default function VenueSelection() {
                   return (
                     <Card
                       key={venue.id}
-                      radius="none"
                       classNames={{
-                        base: `${isSelected
+                        base: `rounded-sm ${isSelected
                           ? 'bg-status-blue/20'
-                          : 'bg-surface-deep/50'
+                          : 'hover:bg-surface-deep'
                         } backdrop-blur-sm transition-all w-full`
                       }}
                     >
@@ -814,7 +811,7 @@ export default function VenueSelection() {
             {/* RIGHT PANEL - Event Table/Details */}
             <div className="flex-1 flex flex-col min-h-[calc(100vh-16rem)]">
               {!selectedVenueId ? (
-                <Card radius="none" classNames={{ base: "flex-1 bg-surface-deep/50 border border-default" }}>
+                <Card classNames={{ base: "rounded-sm flex-1 bg-surface-deep/50" }}>
                   <CardBody className="flex items-center justify-center">
                     <div className="text-center text-surface-light">
                       <MapPin className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -852,7 +849,7 @@ export default function VenueSelection() {
                     </div>
                   </div>
 
-                  <Card radius="none" classNames={{ base: "flex-1 bg-surface-deep/50 border border-default overflow-hidden" }}>
+                  <Card classNames={{ base: "rounded-sm flex-1 bg-surface-deep/50 overflow-hidden" }}>
                     <CardBody className="p-0">
                       {selectedVenueEvents.length === 0 ? (
                         <div className="flex items-center justify-center h-full text-surface-light">
@@ -864,50 +861,57 @@ export default function VenueSelection() {
                         </div>
                       ) : (
                         <div className="minimal-scrollbar overflow-auto h-full min-w-[500px]">
-                          <table className="w-full">
-                            <thead className="sticky top-0 bg-default border-b border-default">
-                              <tr>
-                                <th className="text-left p-4 font-semibold">Event Name</th>
-                                <th className="text-left p-4 font-semibold">Date</th>
-                                <th className="text-left p-4 font-semibold">Teams</th>
-                                <th className="text-left p-4 font-semibold">Calls</th>
-                                <th className="text-right p-4 font-semibold">Actions</th>
+                          <table className="w-full table-fixed border-separate border-spacing-0">
+                            <colgroup>
+                              <col className="w-[36%]" />
+                              <col className="w-[20%]" />
+                              <col className="w-[14%]" />
+                              <col className="w-[14%]" />
+                              <col className="w-[16%]" />
+                            </colgroup>
+                            <thead className="sticky top-0 bg-surface-deep">
+                              <tr className="border-b-2 border-surface-liner">
+                                <th className="text-left px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Event Name</th>
+                                <th className="text-left px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Date</th>
+                                <th className="text-left px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Teams</th>
+                                <th className="text-left px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Calls</th>
+                                <th className="text-right px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Actions</th>
                               </tr>
                             </thead>
-                            <tbody>
+                            <tbody className="[&>tr>td]:border-b [&>tr>td]:border-surface-liner">
                               {selectedVenueEvents.map((event) => (
-                                <tr 
+                                <tr
                                   key={event.id}
-                                  className="border-b border-default hover:bg-surface-deeper/50 cursor-pointer transition-colors"
+                                  className="hover:bg-surface-deep cursor-pointer transition-colors"
                                   onClick={() => router.push(`/events/${event.id}/dispatch`)}
                                 >
-                                  <td className="p-4">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium">{event.name || 'Untitled Event'}</span>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="font-medium truncate">{event.name || 'Untitled Event'}</span>
                                       {event.isOrgEvent && (
-                                        <Chip size="sm" variant="flat" className="bg-accent/20 text-accent">Org</Chip>
+                                        <Chip size="sm" variant="flat" className="bg-accent/20 text-accent flex-shrink-0">Org</Chip>
                                       )}
                                     </div>
                                   </td>
-                                  <td className="p-4 text-surface-light">
+                                  <td className="px-4 py-3 text-surface-light">
                                     <div className="flex items-center gap-2">
-                                      <Calendar className="w-4 h-4" />
-                                      {new Date(event.date).toLocaleDateString()}
+                                      <Calendar className="w-4 h-4 flex-shrink-0" />
+                                      <span className="truncate">{new Date(event.date).toLocaleDateString()}</span>
                                     </div>
                                   </td>
-                                  <td className="p-4 text-surface-light">
+                                  <td className="px-4 py-3 text-surface-light">
                                     <div className="flex items-center gap-2">
-                                      <Users className="w-4 h-4" />
+                                      <Users className="w-4 h-4 flex-shrink-0" />
                                       {event.staff?.length || 0}
                                     </div>
                                   </td>
-                                  <td className="p-4 text-surface-light">
+                                  <td className="px-4 py-3 text-surface-light">
                                     <div className="flex items-center gap-2">
-                                      <Phone className="w-4 h-4" />
+                                      <Phone className="w-4 h-4 flex-shrink-0" />
                                       {event.calls?.length || 0}
                                     </div>
                                   </td>
-                                  <td className="p-4 text-right">
+                                  <td className="px-4 py-3 text-right">
                                     <div
                                       onClick={(e) => e.stopPropagation()}
                                       onKeyDown={(e) => e.stopPropagation()}
