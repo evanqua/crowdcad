@@ -34,7 +34,7 @@ Given('I have a venue with location {string} and equipment {string} and am on th
   await page.waitForURL(/\/events\/.*\/create/, { timeout: NAV_TIMEOUT });
 
   await page.getByPlaceholder('Enter event name').fill(`Adv Event ${uniqueSuffix()}`);
-  await page.getByRole('button', { name: /^Review & launch:/ }).click();
+  await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Event' }).click();
   await page.waitForURL(/\/events\/.*\/dispatch/, { timeout: NAV_TIMEOUT });
   await page.locator('[aria-label="Select section"]').waitFor({ state: 'visible', timeout: 20_000 });

@@ -28,24 +28,25 @@ const DOT_CLASS: Record<WizardStepStatus, string> = {
 };
 
 /**
- * The "dot-line-dot" progress indicator: one dot per step connected by a
- * line segment, reading as percent-complete. A completed step's dot (or the
- * current one, a no-op) can be clicked to jump there; an upcoming step's dot
- * is inert until it becomes reachable (i.e. completed).
+ * The "dot-line-dot" progress indicator. Dots and connecting lines share one
+ * flex row so a line always starts at its left dot's edge and ends at its
+ * right dot's edge — no gap, regardless of label width. Labels render in a
+ * separate row below, in matching flex-1 columns; the accessible name lives
+ * on each dot's own aria-label, so the label row is decorative (aria-hidden).
  */
 export default function StepProgress({ steps, currentStepId, onStepChange, className }: Props) {
   const currentIndex = steps.findIndex((s) => s.id === currentStepId);
 
   return (
-    <ol aria-label="Progress" className={`flex items-start w-full ${className ?? ''}`}>
-      {steps.map((step, idx) => {
-        const status = getStatus(step, currentStepId);
-        const clickable = status !== 'upcoming';
-        const isLast = idx === steps.length - 1;
+    <div className={`w-full ${className ?? ''}`}>
+      <ol aria-label="Progress" className="flex items-center w-full">
+        {steps.map((step, idx) => {
+          const status = getStatus(step, currentStepId);
+          const clickable = status !== 'upcoming';
+          const isLast = idx === steps.length - 1;
 
-        return (
-          <li key={step.id} className={`flex items-start min-w-0 ${isLast ? '' : 'flex-1'}`}>
-            <div className="flex flex-col items-center min-w-0">
+          return (
+            <li key={step.id} className={`flex items-center ${isLast ? '' : 'flex-1'}`}>
               <button
                 type="button"
                 disabled={!clickable}
@@ -54,26 +55,31 @@ export default function StepProgress({ steps, currentStepId, onStepChange, class
                 onClick={() => clickable && onStepChange(step.id)}
                 className={`shrink-0 rounded-full transition-all disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-deepest ${DOT_CLASS[status]}`}
               />
-              <span
-                aria-hidden="true"
-                className="mt-1.5 w-full max-w-[5.5rem] text-center text-[11px] leading-tight text-surface-faint break-words"
-              >
-                {step.label}
-              </span>
-            </div>
 
-            {!isLast && (
-              <div
-                aria-hidden="true"
-                role="presentation"
-                className={`mt-1.5 h-0.5 flex-1 min-w-[0.5rem] rounded-full ${
-                  idx < currentIndex ? 'bg-accent' : 'bg-surface-liner'
-                }`}
-              />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+              {!isLast && (
+                <div
+                  aria-hidden="true"
+                  role="presentation"
+                  className={`h-0.5 flex-1 rounded-full ${
+                    idx < currentIndex ? 'bg-accent' : 'bg-surface-liner'
+                  }`}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      <div aria-hidden="true" className="flex w-full mt-1.5">
+        {steps.map((step) => (
+          <div
+            key={step.id}
+            className="flex-1 min-w-0 text-center text-[11px] leading-tight text-surface-faint whitespace-nowrap overflow-hidden text-ellipsis px-0.5"
+          >
+            {step.label}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

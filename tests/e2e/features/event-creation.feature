@@ -25,7 +25,7 @@ Feature: Event creation
 
   Scenario: Creating event navigates to dispatch
     When I fill the event name with "Test Event"
-    And I go to the "Review & launch" step
+    And I go to the "Review" step
     And I click the "Create Event" button
     Then the URL should contain "/dispatch"
 

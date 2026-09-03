@@ -26,7 +26,6 @@ import AddTeamModal, { TeamDraft } from '@/components/modals/event/addteammodal'
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
 import BulkImportModal from '@/components/modals/event/bulkimportmodal';
 import LoadingScreen from '@/components/ui/loading-screen';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 // Helper to get post name regardless of type
 const getPostName = (post: Post): string => {
@@ -709,10 +708,11 @@ export default function EventCreation() {
     { id: 'teams', label: 'Staff Assignments', component: teamsSupervisorsStep, isComplete: true },
     { id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: true },
     { id: 'postschedule', label: 'Post schedule', component: postScheduleStep, isComplete: true },
-    { id: 'review', label: 'Review & launch', component: reviewStep, isComplete: true },
+    { id: 'review', label: 'Review', component: reviewStep, isComplete: true },
   ];
 
   const showMapPanel = currentStepId === 'equipment' || currentStepId === 'postschedule';
+  const showMapColumn = showMapPanel && hasMap;
 
   const stepIdx = STEP_ORDER.indexOf(currentStepId as (typeof STEP_ORDER)[number]);
   const isFirstStep = stepIdx <= 0;
@@ -724,6 +724,22 @@ export default function EventCreation() {
     if (stepIdx > 0) setCurrentStepId(STEP_ORDER[stepIdx - 1]);
   };
 
+  const backButton = !isFirstStep && (
+    <Button variant="flat" size="sm" onPress={goBack} className="px-6">
+      Back
+    </Button>
+  );
+
+  const continueButton = !isLastStep && (
+    <Button
+      size="sm"
+      onPress={goNext}
+      className="px-6 bg-accent hover:bg-accent/90 text-surface-light"
+    >
+      Continue
+    </Button>
+  );
+
   const leftPanelContent = (
     <div className="flex flex-col h-full relative overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden py-4">
@@ -733,132 +749,122 @@ export default function EventCreation() {
           onStepChange={setCurrentStepId}
           className="flex-1 min-h-0 px-6"
         />
-
-        <div className="flex gap-3 px-6 pt-4 flex-shrink-0">
-          {!isFirstStep && (
-            <Button variant="flat" onPress={goBack} className="flex-1">
-              Back
-            </Button>
-          )}
-          {!isLastStep && (
-            <Button
-              onPress={goNext}
-              className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
-            >
-              Continue
-            </Button>
-          )}
-        </div>
       </div>
+
+      {showMapColumn ? (
+        <div className="flex px-6 pt-4 pb-4 flex-shrink-0">{backButton}</div>
+      ) : (
+        <div className="flex items-center justify-between px-6 pt-4 pb-4 flex-shrink-0">
+          <div>{backButton}</div>
+          <div>{continueButton}</div>
+        </div>
+      )}
     </div>
   );
 
   const rightPanelContent = (
     <div className="flex flex-col h-full relative px-6 pt-2 pb-4 overflow-hidden">
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 flex-1 min-h-0">
         <div className="flex items-center flex-shrink-0">
           {hasVenue && <h2 className="text-surface-light text-xl font-semibold">{eventData.venue?.name}</h2>}
         </div>
 
-        {/* Map */}
-        {hasMap ? (
-          <div className="w-full flex flex-col gap-3">
-            <div className="relative w-full overflow-hidden rounded-2xl">
-              <MapPanSurface
-                containerRef={imgContainerRef}
-                onWheel={handleWheel}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
+        {/* Map — this panel only renders when showMapColumn is true, which already
+            requires hasMap, so there's no "no map" fallback to render here. */}
+        <div className="w-full flex flex-col gap-3 flex-1 min-h-0">
+          <div className="relative w-full overflow-hidden rounded-2xl">
+            <MapPanSurface
+              containerRef={imgContainerRef}
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              style={{
+                cursor: isPanning ? 'grabbing' : 'grab',
+                maxHeight: 'calc(100vh - 215px)',
+              }}
+            >
+              <div
+                className="relative"
                 style={{
-                  cursor: isPanning ? 'grabbing' : 'grab',
-                  maxHeight: 'calc(100vh - 215px)',
+                  transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                  transformOrigin: 'center center',
+                  transition: isPanning ? 'none' : 'transform 0.1s ease-out',
                 }}
               >
-                <div
-                  className="relative"
-                  style={{
-                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                    transformOrigin: 'center center',
-                    transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+                <Image
+                  ref={imgRef}
+                  src={eventData.venue?.layers?.[currentLayer]?.mapUrl || ''}
+                  alt={`${eventData.venue?.layers?.[currentLayer]?.name || 'Venue'} map`}
+                  width={1200}
+                  height={800}
+                  className="w-full h-auto"
+                  unoptimized
+                  onLoad={(e) => {
+                    const t = e.currentTarget as HTMLImageElement;
+                    if (t && t.naturalWidth && t.naturalHeight) {
+                      setNaturalSize({ width: t.naturalWidth, height: t.naturalHeight });
+                    }
                   }}
-                >
-                  <Image
-                    ref={imgRef}
-                    src={eventData.venue?.layers?.[currentLayer]?.mapUrl || ''}
-                    alt={`${eventData.venue?.layers?.[currentLayer]?.name || 'Venue'} map`}
-                    width={1200}
-                    height={800}
-                    className="w-full h-auto"
-                    unoptimized
-                    onLoad={(e) => {
-                      const t = e.currentTarget as HTMLImageElement;
-                      if (t && t.naturalWidth && t.naturalHeight) {
-                        setNaturalSize({ width: t.naturalWidth, height: t.naturalHeight });
-                      }
-                    }}
-                  />
-                  {renderMarkers()}
-                </div>
-              </MapPanSurface>
-
-              <MapZoomControls
-                onZoomIn={handleZoomIn}
-                onZoomOut={handleZoomOut}
-                onReset={handleResetZoom}
-                buttonClassName="bg-surface-deepest/90 backdrop-blur"
-                resetButtonClassName="bg-surface-deepest/90 backdrop-blur"
-              />
-            </div>
-
-            {/* Bottom Control Bar */}
-            <Card
-              isBlurred
-              className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-surface-light">Layer:</span>
-                  <span className="text-sm font-medium text-surface-light">
-                    {eventData.venue?.layers?.[currentLayer]?.name || 'Main Floor'}
-                  </span>
-                </div>
-                {eventData.venue?.layers && eventData.venue.layers.length > 1 && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      radius="full"
-                      variant="flat"
-                      onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
-                      isDisabled={currentLayer === 0}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-xs text-surface-light">
-                      {currentLayer + 1} / {eventData.venue.layers.length}
-                    </span>
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      radius="full"
-                      variant="flat"
-                      onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
-                      isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+                />
+                {renderMarkers()}
               </div>
-            </Card>
+            </MapPanSurface>
+
+            <MapZoomControls
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onReset={handleResetZoom}
+              buttonClassName="bg-surface-deepest/90 backdrop-blur"
+              resetButtonClassName="bg-surface-deepest/90 backdrop-blur"
+            />
           </div>
-        ) : (
-          <div className="bg-surface-deep rounded-2xl p-8 text-center text-surface-faint">
-            No map available
-          </div>
-        )}
+
+          {/* Bottom Control Bar */}
+          <Card
+            isBlurred
+            className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-surface-light">Layer:</span>
+                <span className="text-sm font-medium text-surface-light">
+                  {eventData.venue?.layers?.[currentLayer]?.name || 'Main Floor'}
+                </span>
+              </div>
+              {eventData.venue?.layers && eventData.venue.layers.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    radius="full"
+                    variant="flat"
+                    onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
+                    isDisabled={currentLayer === 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs text-surface-light">
+                    {currentLayer + 1} / {eventData.venue.layers.length}
+                  </span>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    radius="full"
+                    variant="flat"
+                    onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
+                    isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
+
+      <div className="flex justify-end pt-4 flex-shrink-0">{continueButton}</div>
     </div>
   );
 
@@ -867,20 +873,17 @@ export default function EventCreation() {
       <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden">
         <div className="h-full overflow-hidden">
           <div className="flex h-full overflow-hidden">
-            {showMapPanel ? (
-              <PanelGroup direction="horizontal">
-                <Panel defaultSize={46} minSize={35} maxSize={60}>
+            {showMapColumn ? (
+              <>
+                <div className="w-1/3 h-full flex-shrink-0 border-r border-surface-liner overflow-hidden">
                   {leftPanelContent}
-                </Panel>
-                <PanelResizeHandle className="w-1 bg-surface-liner transition-colors cursor-col-resize flex items-center justify-center group">
-                  <div className="w-0.5 h-8 bg-surface-light/30 rounded-full transition-colors" />
-                </PanelResizeHandle>
-                <Panel defaultSize={54} minSize={40}>
+                </div>
+                <div className="w-2/3 h-full flex-shrink-0 overflow-hidden">
                   {rightPanelContent}
-                </Panel>
-              </PanelGroup>
+                </div>
+              </>
             ) : (
-              <div className="w-full max-w-xl mx-auto h-full overflow-hidden">
+              <div className="w-full h-full overflow-hidden">
                 {leftPanelContent}
               </div>
             )}
