@@ -7,7 +7,7 @@ import { authService, dbService } from '@/lib/services';
 import Image from 'next/image';
 import { Button, Card, ScrollShadow } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { syncClinicsFromVenue } from '@/lib/clinics';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
@@ -488,7 +488,47 @@ export default function EventCreation() {
       });
   };
 
+  // Equipment assigned a default location shows a small icon next to that
+  // location's marker, the same way it'll appear once the event is live.
+  const renderEquipmentMarkers = () => {
+    type CoordinatedPost = { name: string; x: number; y: number };
+    const coordinatedPosts = currentLayerPosts.filter((post): post is CoordinatedPost =>
+      typeof post === 'object' &&
+      post !== null &&
+      'name' in post &&
+      typeof post.x === 'number' &&
+      typeof post.y === 'number' &&
+      post.x !== null &&
+      post.y !== null
+    );
 
+    const byLocation = new Map<string, EventEquipment[]>();
+    for (const item of eventData.eventEquipment) {
+      if (!item.defaultLocation) continue;
+      const list = byLocation.get(item.defaultLocation) || [];
+      list.push(item);
+      byLocation.set(item.defaultLocation, list);
+    }
+
+    return Array.from(byLocation.entries()).flatMap(([locationName, items]) => {
+      const post = coordinatedPosts.find((p) => p.name === locationName);
+      if (!post) return [];
+      return items.map((item, i) => {
+        const left = `calc(${post.x}% + ${14 + i * 10}px - 8px)`;
+        const top = `calc(${post.y}% - 22px)`;
+        return (
+          <div
+            key={item.id}
+            style={{ left, top }}
+            title={item.name}
+            className="absolute z-10 flex h-4 w-4 items-center justify-center rounded-full bg-status-blue border border-surface-deepest"
+          >
+            <Package className="h-2.5 w-2.5 text-surface-light" />
+          </div>
+        );
+      });
+    });
+  };
 
   useEffect(() => {
     if (eventData.venue && Object.keys(eventData.venue).length > 0) {
@@ -607,8 +647,8 @@ export default function EventCreation() {
   );
 
   const equipmentStep = (
-    <div className="flex flex-col h-full overflow-hidden px-6 pt-4">
-      <div className="flex-shrink-0 pb-3 flex items-center justify-between">
+    <div className="flex flex-col h-full overflow-hidden px-3 pt-4">
+      <div className="flex-shrink-0 pb-3 pl-3 flex items-center justify-between">
         <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
       </div>
       <EquipmentSelectionSection
@@ -771,12 +811,8 @@ export default function EventCreation() {
   );
 
   const rightPanelContent = (
-    <div className="flex flex-col h-full relative px-6 pt-2 pb-4 overflow-hidden">
+    <div className="flex flex-col h-full relative px-6 pt-4 pb-4 overflow-hidden">
       <div className="flex flex-col gap-2 flex-1 min-h-0">
-        <div className="flex items-center flex-shrink-0">
-          {hasVenue && <h2 className="text-surface-light text-xl font-semibold">{eventData.venue?.name}</h2>}
-        </div>
-
         {/* Map — this panel only renders when showMapColumn is true, which already
             requires hasMap, so there's no "no map" fallback to render here. */}
         <div className="w-full flex flex-col gap-3 flex-1 min-h-0">
@@ -816,6 +852,7 @@ export default function EventCreation() {
                   }}
                 />
                 {renderMarkers()}
+                {renderEquipmentMarkers()}
               </div>
             </MapPanSurface>
 
@@ -886,7 +923,7 @@ export default function EventCreation() {
           <div className="flex h-full overflow-hidden">
             {showMapColumn ? (
               <>
-                <div className="w-1/3 h-full flex-shrink-0 border-r border-surface-liner overflow-hidden">
+                <div className="w-1/3 h-full flex-shrink-0 overflow-hidden">
                   {leftPanelContent}
                 </div>
                 <div className="w-2/3 h-full flex-shrink-0 overflow-hidden">
