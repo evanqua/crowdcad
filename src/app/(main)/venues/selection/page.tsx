@@ -870,12 +870,12 @@ export default function VenueSelection() {
                               <col className="w-[16%]" />
                             </colgroup>
                             <thead className="sticky top-0 bg-surface-deep">
-                              <tr className="border-b-2 border-surface-liner">
-                                <th className="text-left px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Event Name</th>
-                                <th className="text-left px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Date</th>
-                                <th className="text-left px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Teams</th>
-                                <th className="text-left px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Calls</th>
-                                <th className="text-right px-4 py-5 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Actions</th>
+                              <tr className="border-b border-surface-liner">
+                                <th className="text-left px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Event Name</th>
+                                <th className="text-left px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Date</th>
+                                <th className="text-left px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Teams</th>
+                                <th className="text-left px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Calls</th>
+                                <th className="text-right px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Actions</th>
                               </tr>
                             </thead>
                             <tbody className="[&>tr>td]:border-b [&>tr>td]:border-surface-liner">
