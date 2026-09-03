@@ -9,6 +9,10 @@ type Props = {
   currentStepId: string;
   onStepChange: (stepId: string) => void;
   className?: string;
+  /** Skip rendering the built-in StepProgress bar — for a caller that
+   *  renders its own full-width progress bar outside this component's own
+   *  (possibly narrower) column, e.g. above a split wizard/map layout. */
+  hideProgress?: boolean;
 };
 
 /**
@@ -19,7 +23,7 @@ type Props = {
  * above it. Adding a step is adding one entry to `steps` — nothing here
  * special-cases a particular step.
  */
-export default function WizardShell({ steps, currentStepId, onStepChange, className }: Props) {
+export default function WizardShell({ steps, currentStepId, onStepChange, className, hideProgress }: Props) {
   const currentStep = steps.find((s) => s.id === currentStepId) ?? steps[0];
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +41,9 @@ export default function WizardShell({ steps, currentStepId, onStepChange, classN
 
   return (
     <div className={`flex flex-col gap-6 ${className ?? ''}`}>
-      <StepProgress steps={steps} currentStepId={currentStep.id} onStepChange={onStepChange} />
+      {!hideProgress && (
+        <StepProgress steps={steps} currentStepId={currentStep.id} onStepChange={onStepChange} />
+      )}
       <div
         ref={contentRef}
         tabIndex={-1}

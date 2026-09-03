@@ -12,7 +12,7 @@ import { syncClinicsFromVenue } from '@/lib/clinics';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import MapPanSurface from '@/components/ui/map-pan-surface';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
-import { scheduleTimesToWindow } from '@/lib/scheduleUtils';
+import { scheduleTimesToWindow, formatTimeValue } from '@/lib/scheduleUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import { useCertifications } from '@/hooks/useCertifications';
 import MetadataSection from '@/components/event-create/MetadataSection';
@@ -20,7 +20,7 @@ import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
 import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
 import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
 import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/event-create/PostsEquipmentSection';
-import { WizardShell, type WizardStep } from '@/components/wizard';
+import { WizardShell, StepProgress, type WizardStep } from '@/components/wizard';
 import { stripUndefined } from '@/lib/utils';
 import AddTeamModal, { TeamDraft } from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
@@ -661,45 +661,51 @@ export default function EventCreation() {
   );
 
   const reviewStep = (
-    <div className="px-6 pt-4 h-full max-w-md">
-      <Card isBlurred className="border-2 border-default-200 bg-transparent p-5 space-y-4">
-        <div>
-          <span className="text-xs text-surface-faint">Event name</span>
-          <p className="text-surface-light font-medium">{eventData.name?.trim() || '(untitled)'}</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Surge limit</span>
-          <p className="text-surface-light">{eventData.surgeLimitPercent ?? 70}%</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Teams</span>
-          <p className="text-surface-light">{(eventData.staff || []).length} team{(eventData.staff || []).length === 1 ? '' : 's'}</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Supervisors</span>
-          <p className="text-surface-light">{(eventData.supervisor || []).length} supervisor{(eventData.supervisor || []).length === 1 ? '' : 's'}</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Equipment</span>
-          <p className="text-surface-light">{eventData.eventEquipment.length} item{eventData.eventEquipment.length === 1 ? '' : 's'}</p>
-        </div>
-        <div>
-          <span className="text-xs text-surface-faint">Post schedule</span>
-          <p className="text-surface-light">
-            {postsEnabled
-              ? `${(eventData.eventPosts || []).length} post${(eventData.eventPosts || []).length === 1 ? '' : 's'} · ${scheduleChips.length} repost time${scheduleChips.length === 1 ? '' : 's'}`
-              : 'Not enabled'}
-          </p>
-        </div>
-      </Card>
-      <Button
-        onPress={handleSubmit}
-        size="md"
-        radius="lg"
-        className="mt-4 bg-accent hover:bg-accent/90 text-surface-light"
-      >
-        Create Event
-      </Button>
+    <div className="px-6 pt-4 h-full max-w-md space-y-4">
+      <div>
+        <span className="text-xs text-surface-faint">Event name</span>
+        <p className="text-surface-light font-medium">{eventData.name?.trim() || '(untitled)'}</p>
+      </div>
+      <div>
+        <span className="text-xs text-surface-faint">Venue</span>
+        <p className="text-surface-light">{eventData.venue?.name || '(none)'}</p>
+      </div>
+      <div>
+        <span className="text-xs text-surface-faint">Date</span>
+        <p className="text-surface-light">
+          {eventData.date ? new Date(eventData.date).toLocaleDateString() : '—'}
+        </p>
+      </div>
+      <div>
+        <span className="text-xs text-surface-faint">Start / End time</span>
+        <p className="text-surface-light">
+          {formatTimeValue(scheduleFrom)} – {formatTimeValue(scheduleTo)}
+        </p>
+      </div>
+      <div>
+        <span className="text-xs text-surface-faint">Surge limit</span>
+        <p className="text-surface-light">{eventData.surgeLimitPercent ?? 70}%</p>
+      </div>
+      <div>
+        <span className="text-xs text-surface-faint">Teams</span>
+        <p className="text-surface-light">{(eventData.staff || []).length} team{(eventData.staff || []).length === 1 ? '' : 's'}</p>
+      </div>
+      <div>
+        <span className="text-xs text-surface-faint">Supervisors</span>
+        <p className="text-surface-light">{(eventData.supervisor || []).length} supervisor{(eventData.supervisor || []).length === 1 ? '' : 's'}</p>
+      </div>
+      <div>
+        <span className="text-xs text-surface-faint">Equipment</span>
+        <p className="text-surface-light">{eventData.eventEquipment.length} item{eventData.eventEquipment.length === 1 ? '' : 's'}</p>
+      </div>
+      <div>
+        <span className="text-xs text-surface-faint">Post schedule</span>
+        <p className="text-surface-light">
+          {postsEnabled
+            ? `${(eventData.eventPosts || []).length} post${(eventData.eventPosts || []).length === 1 ? '' : 's'} · ${scheduleChips.length} repost time${scheduleChips.length === 1 ? '' : 's'}`
+            : 'Not enabled'}
+        </p>
+      </div>
     </div>
   );
 
@@ -711,7 +717,7 @@ export default function EventCreation() {
     { id: 'review', label: 'Review', component: reviewStep, isComplete: true },
   ];
 
-  const showMapPanel = currentStepId === 'equipment' || currentStepId === 'postschedule';
+  const showMapPanel = currentStepId === 'equipment' || currentStepId === 'postschedule' || currentStepId === 'review';
   const showMapColumn = showMapPanel && hasMap;
 
   const stepIdx = STEP_ORDER.indexOf(currentStepId as (typeof STEP_ORDER)[number]);
@@ -725,28 +731,30 @@ export default function EventCreation() {
   };
 
   const backButton = !isFirstStep && (
-    <Button variant="flat" size="sm" onPress={goBack} className="px-6">
+    <Button variant="flat" size="md" onPress={goBack} className="px-6">
       Back
     </Button>
   );
 
-  const continueButton = !isLastStep && (
+  // The last step's primary action creates the event instead of advancing.
+  const primaryButton = (
     <Button
-      size="sm"
-      onPress={goNext}
+      size="md"
+      onPress={isLastStep ? handleSubmit : goNext}
       className="px-6 bg-accent hover:bg-accent/90 text-surface-light"
     >
-      Continue
+      {isLastStep ? 'Create Event' : 'Continue'}
     </Button>
   );
 
   const leftPanelContent = (
     <div className="flex flex-col h-full relative overflow-hidden">
-      <div className="flex-1 flex flex-col overflow-hidden py-4">
+      <div className="flex-1 flex flex-col overflow-hidden pt-2 pb-4">
         <WizardShell
           steps={steps}
           currentStepId={currentStepId}
           onStepChange={setCurrentStepId}
+          hideProgress
           className="flex-1 min-h-0 px-6"
         />
       </div>
@@ -756,7 +764,7 @@ export default function EventCreation() {
       ) : (
         <div className="flex items-center justify-between px-6 pt-4 pb-4 flex-shrink-0">
           <div>{backButton}</div>
-          <div>{continueButton}</div>
+          <div>{primaryButton}</div>
         </div>
       )}
     </div>
@@ -864,14 +872,17 @@ export default function EventCreation() {
         </div>
       </div>
 
-      <div className="flex justify-end pt-4 flex-shrink-0">{continueButton}</div>
+      <div className="flex justify-end pt-4 flex-shrink-0">{primaryButton}</div>
     </div>
   );
 
   return (
     <main className="relative bg-surface-deepest text-surface-light h-[calc(100dvh-3.5rem)] overflow-hidden leading-none">
-      <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden">
-        <div className="h-full overflow-hidden">
+      <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden flex flex-col">
+        <div className="px-6 pt-4 flex-shrink-0">
+          <StepProgress steps={steps} currentStepId={currentStepId} onStepChange={setCurrentStepId} />
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden">
           <div className="flex h-full overflow-hidden">
             {showMapColumn ? (
               <>
