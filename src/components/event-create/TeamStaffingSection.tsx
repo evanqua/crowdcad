@@ -61,7 +61,7 @@ export default function TeamStaffingSection({
       <div className="px-4 py-3 flex-1 min-h-0 flex flex-col">
         <ScrollShadow className="space-y-2 pr-2 scrollbar-hide flex-1 min-h-0" hideScrollBar style={{ overflow: 'auto' }}>
           {staff.map((team, idx) => (
-            <Card key={idx} isBlurred radius="sm" className="bg-default/40">
+            <Card key={idx} radius="sm" className="bg-default/40">
               <div
                 className="flex items-center justify-between px-3 py-2 gap-2 cursor-pointer"
                 onClick={() => setOpenTeams((prev) => ({ ...prev, [idx]: !prev[idx] }))}

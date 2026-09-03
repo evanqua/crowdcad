@@ -760,7 +760,6 @@ export default function EventCreation() {
           {/* Bottom Control Bar — merges flush with the map above: square where
               they meet, sharp radius only at the map's top and this bar's bottom. */}
           <Card
-            isBlurred
             radius="none"
             className="rounded-b-sm bg-default/40 w-full px-3 py-2 flex-shrink-0"
           >
