@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { DateValue, Time } from '@internationalized/date';
-import { DatePicker, Input, TimeInput } from '@heroui/react';
-import { ChevronDown } from 'lucide-react';
+import { DatePicker, Input, TimeInput, Tooltip } from '@heroui/react';
+import { ChevronDown, CircleHelp } from 'lucide-react';
 import type { Event } from '@/app/types';
 import SurgeCriteriaSection from './SurgeCriteriaSection';
 
@@ -71,7 +71,14 @@ export default function MetadataSection({
           size="lg"
         />
         <TimeInput
-          label="Start Time"
+          label={
+            <span className="inline-flex items-center gap-1">
+              Start Time
+              <Tooltip content="When the event's scheduled window begins. The event itself goes active as soon as you create it, not at this time." placement="top">
+                <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+              </Tooltip>
+            </span>
+          }
           labelPlacement="outside"
           variant="flat"
           color="default"
@@ -83,7 +90,14 @@ export default function MetadataSection({
           size="lg"
         />
         <TimeInput
-          label="End Time"
+          label={
+            <span className="inline-flex items-center gap-1">
+              End Time
+              <Tooltip content="Doesn't end the event automatically. The event stays open until you mark it finished, or until an hour passes with no activity after this time." placement="top">
+                <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+              </Tooltip>
+            </span>
+          }
           labelPlacement="outside"
           variant="flat"
           color="default"

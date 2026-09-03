@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { X, Plus } from "lucide-react";
+import { X, Plus, CircleHelp } from "lucide-react";
 import {
   Modal,
   ModalContent,
@@ -14,6 +14,7 @@ import {
   Select,
   SelectItem,
   Checkbox,
+  Tooltip,
 } from "@heroui/react";
 import { Role } from "@/app/types";
 import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
@@ -249,7 +250,12 @@ export default function AddTeamModal({
                 <div className="grid grid-cols-[1fr_10rem_3.5rem_2rem] gap-2 px-1 text-xs text-surface-faint">
                   <span>{t("Member name")}</span>
                   <span>{t("Certification")}</span>
-                  <span>{t("Lead")}</span>
+                  <span className="inline-flex items-center gap-1">
+                    {t("Lead")}
+                    <Tooltip content="Marks this member as the team's point of contact for radio/dispatch communication." placement="top">
+                      <CircleHelp className="w-3 h-3 text-surface-faint" />
+                    </Tooltip>
+                  </span>
                   <span />
                 </div>
 

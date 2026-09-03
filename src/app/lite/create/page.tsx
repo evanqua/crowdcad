@@ -2,9 +2,9 @@
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, Card, Input, ScrollShadow } from '@heroui/react';
+import { Button, Card, Input, ScrollShadow, Tooltip } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today, Time } from '@internationalized/date';
-import { Pencil, Trash2 } from 'lucide-react';
+import { CircleHelp, Pencil, Trash2 } from 'lucide-react';
 import type { Event, EventEquipment, Post, Staff, Supervisor, Venue } from '@/app/types';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
@@ -620,7 +620,12 @@ function LiteCreateContent() {
     <div className="flex h-full px-6 pt-4">
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <div className="flex-shrink-0 pb-3 flex items-center justify-between">
-          <h3 className="text-surface-light font-semibold text-lg">Locations</h3>
+          <h3 className="text-surface-light font-semibold text-lg inline-flex items-center gap-1.5">
+            Locations
+            <Tooltip content="Posts or areas teams can be assigned to and dispatched between during the event (e.g., Main Entrance, First Aid Tent)." placement="top">
+              <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+            </Tooltip>
+          </h3>
         </div>
         <div className="flex-shrink-0 flex gap-2 pb-3">
           <Input
@@ -661,7 +666,12 @@ function LiteCreateContent() {
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <div className="flex-shrink-0 pb-3 flex items-center justify-between">
-          <h3 className="text-surface-light font-semibold text-lg">Equipment</h3>
+          <h3 className="text-surface-light font-semibold text-lg inline-flex items-center gap-1.5">
+            Equipment
+            <Tooltip content="Trackable gear (e.g., a gurney or AED) that can be assigned a default location and its status followed during dispatch." placement="top">
+              <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+            </Tooltip>
+          </h3>
         </div>
         <div className="flex-shrink-0 flex gap-2 pb-3">
           <Input
@@ -736,7 +746,12 @@ function LiteCreateContent() {
   const equipmentStep = (
     <div className="flex flex-col h-full overflow-hidden px-3 pt-4">
       <div className="flex-shrink-0 pb-3 pl-3 flex items-center justify-between">
-        <h3 className="text-surface-light font-semibold text-xl">Equipment</h3>
+        <h3 className="text-surface-light font-semibold text-xl inline-flex items-center gap-1.5">
+          Equipment
+          <Tooltip content="Select venue equipment for this event, or add equipment that only exists for this event and won't be saved to the venue." placement="top">
+            <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+          </Tooltip>
+        </h3>
       </div>
       <EquipmentSelectionSection
         hasVenue

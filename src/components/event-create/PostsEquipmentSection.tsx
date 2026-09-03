@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button, Checkbox, Chip, Input, ScrollShadow, Select, SelectItem } from '@heroui/react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Button, Checkbox, Chip, Input, ScrollShadow, Select, SelectItem, Tooltip } from '@heroui/react';
+import { CircleHelp, Plus, Trash2 } from 'lucide-react';
 import type { Event, Post, Venue, EventEquipment } from '@/app/types';
 
 type FlattenedPost = {
@@ -44,7 +44,12 @@ export function PostsSelectionSection({
   return (
     <>
       <div className="flex-shrink-0 pb-3 pt-0.5 flex items-center justify-between">
-        <h3 className="text-surface-light font-semibold text-xl">Posts</h3>
+        <h3 className="text-surface-light font-semibold text-xl inline-flex items-center gap-1.5">
+          Posts
+          <Tooltip content="Which locations get auto-generated posting assignments on the repost schedule below. Teams can still be manually assigned to any location regardless of this selection." placement="top">
+            <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+          </Tooltip>
+        </h3>
         <Checkbox
           isSelected={postsEnabled}
           onValueChange={setPostsEnabled}
