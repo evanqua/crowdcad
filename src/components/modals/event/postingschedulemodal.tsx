@@ -448,7 +448,7 @@ export default function PostingScheduleModal({
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-surface-liner">
-                      <th className="p-3 text-left font-semibold sticky left-0 bg-transparent z-10 w-1 whitespace-nowrap border-r border-surface-liner">
+                      <th className="p-3 text-left font-semibold sticky left-0 bg-surface-deepest z-10 w-1 whitespace-nowrap border-r border-surface-liner">
                         Post
                       </th>
                       {times.map(time => {
@@ -496,7 +496,7 @@ export default function PostingScheduleModal({
                   <tbody>
                     {posts.map((post) => (
                       <tr key={getPostKey(post)} className="border-b border-surface-liner">
-                        <td className="p-3 font-medium sticky left-0 bg-transparent z-10 w-1 whitespace-nowrap border-r border-surface-liner">
+                        <td className="p-3 font-medium sticky left-0 bg-surface-deepest z-10 w-1 whitespace-nowrap border-r border-surface-liner">
                           {getPostKey(post)}
                         </td>
                         {times.map((time) => {
