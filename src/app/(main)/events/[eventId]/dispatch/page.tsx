@@ -41,6 +41,7 @@ import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResol
 import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
+import { isEventEnded } from '@/lib/eventStatus';
 
 interface DispatchRoutePageProps {
   params: Promise<{ eventId: string }>;
@@ -234,7 +235,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   };
 
   const updateEvent = useCallback(async (
-    updateInput: Partial<Event> | ((current: Event) => Partial<Event>)
+    updateInput: Partial<Event> | ((current: Event) => Partial<Event>),
+    options?: { bypassEndedCheck?: boolean }
   ) => {
     if (!eventId) return;
 
@@ -246,6 +248,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         }
 
         const currentEvent = normalizeLiteDraftToEvent(currentDraft);
+
+        if (!options?.bypassEndedCheck && isEventEnded(currentEvent)) {
+          toast.error(t('This event has ended. Data collection is locked — view the summary instead.'));
+          return;
+        }
+
         const updates =
           typeof updateInput === 'function' ? updateInput(currentEvent) : updateInput;
 
@@ -273,6 +281,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
         const currentEvent = snap.data;
 
+        if (!options?.bypassEndedCheck && isEventEnded(currentEvent)) {
+          throw new Error('EVENT_ENDED');
+        }
+
         let updates: Partial<Event>;
         if (typeof updateInput === 'function') {
           updates = updateInput(currentEvent);
@@ -283,10 +295,14 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         tx.update('events', eventId, removeUndefinedDeep(updates));
       });
     } catch (error) {
+      if (error instanceof Error && error.message === 'EVENT_ENDED') {
+        toast.error(t('This event has ended. Data collection is locked — view the summary instead.'));
+        return;
+      }
       console.error("Update failed:", error);
       toast.error("Failed to save changes. Please try again.");
     }
-  }, [eventId, isLiteMode]);
+  }, [eventId, isLiteMode, t]);
 
   const handlePostAssignment = useCallback(async (time: string, post: string, team: string) => {
     await updateEvent((currentEvent) => {
@@ -1822,7 +1838,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // Lazily backfill/refresh event.clinics from the venue's clinic-flagged posts
   // (additive — never removes an entry, so existing calls' clinicId never orphans).
   useEffect(() => {
-    if (!event) return;
+    if (!event || isEventEnded(event)) return;
     const synced = syncClinicsFromVenue(event.venue, event.clinics);
     if (!isEqual(synced, event.clinics || [])) {
       void updateEvent({ clinics: synced });
@@ -2900,6 +2916,40 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     }
   }, [isLiteMode, eventId, router]);
 
+  // Ticks every 30s so the "ended by the 1-hour-no-activity backup" state
+  // (a pure function of wall-clock time against the event's own End Time,
+  // see src/lib/eventStatus.ts) is re-evaluated even when nothing about the
+  // event itself has changed to trigger a re-render on its own.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const eventEnded = useMemo(() => (event ? isEventEnded(event, nowTick) : false), [event, nowTick]);
+
+  const handleEndEvent = useCallback(async () => {
+    if (!event || !eventId) return;
+    if (eventEnded) {
+      toast.info(t('This event has already ended.'));
+      return;
+    }
+
+    const confirmed = window.confirm(
+      t(
+        'End this event now? Data collection and dispatch logs will stop immediately — no further calls, status changes, or activity can be logged after this. View the Event Summary for a read-only record instead. This cannot be undone.'
+      )
+    );
+    if (!confirmed) return;
+
+    await updateEvent(() => ({ ended: true, endedAt: Date.now() }), { bypassEndedCheck: true });
+    toast.success(t('Event ended. Data collection has stopped.'));
+
+    if (!isLiteMode) {
+      window.dispatchEvent(new CustomEvent('dispatch-event-ended'));
+    }
+  }, [event, eventId, eventEnded, updateEvent, t, isLiteMode]);
+
   const [showVenueMap, setShowVenueMap] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
   const [showEventSummary, setShowEventSummary] = useState(false);
@@ -2908,6 +2958,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     const openVenue = () => setShowVenueMap(true);
     const openPosting = () => setShowPostingSchedule(true);
     const openEventSummary = () => setShowEventSummary(true);
+    const openEndEvent = () => {
+      void handleEndEvent();
+    };
     const openLiteClear = () => {
       void handleClearLiteEvent();
     };
@@ -2922,6 +2975,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (!isLiteMode) {
       window.addEventListener('open-venue-map', openVenue);
       window.addEventListener('open-event-summary', openEventSummary);
+      window.addEventListener('open-end-event', openEndEvent);
     }
 
     return () => {
@@ -2932,9 +2986,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       if (!isLiteMode) {
         window.removeEventListener('open-venue-map', openVenue);
         window.removeEventListener('open-event-summary', openEventSummary);
+        window.removeEventListener('open-end-event', openEndEvent);
       }
     };
-  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv]);
+  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv, handleEndEvent]);
 
   // Tab cycling for left sidebar tabs
   useEffect(() => {
@@ -2976,7 +3031,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // re-triggers it.
   const wasAboveSurgeThresholdRef = useRef(false);
   useEffect(() => {
-    if (!event) return;
+    if (!event || isEventEnded(event)) return;
     const summary = getTeamAvailabilitySummary(event);
     const threshold = getSurgeLimitPercent(event);
     const aboveThreshold = isSurging(summary.percentOnCalls, threshold);
@@ -3439,6 +3494,20 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       <div className="w-full bg-surface-deepest h-[calc(100vh-72px)]">
         <div className="max-w-[1750px] mx-auto px-2 sm:px-4 h-full">
 
+          {eventEnded && (
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-2 mb-2 px-3 py-2 rounded-lg bg-status-red/10 border border-status-red/40 text-sm">
+              <span className="text-surface-light">
+                {t('This event has ended. Data collection is locked — no new calls, status changes, or activity can be logged.')}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowEventSummary(true)}
+                className="font-semibold text-status-red hover:text-status-red/80 underline underline-offset-2 whitespace-nowrap"
+              >
+                {t('View Event Summary')}
+              </button>
+            </div>
+          )}
 
           {isAdmin && (
             <button 

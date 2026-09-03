@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import { authService, dbService } from "@/lib/services";
 import { useAuth } from "@/hooks/useauth";
 import { useDispatchVocabulary } from "@/hooks/useDispatchVocabulary";
+import { isEventEnded } from "@/lib/eventStatus";
 import type { Event } from "@/app/types";
 
 import {
@@ -94,6 +95,7 @@ export default function AppNavbar() {
   // avoid the buttons popping in after a flash of nothing.
   const [hasVenueMap, setHasVenueMap] = useState(true);
   const [postingScheduleEnabled, setPostingScheduleEnabled] = useState(true);
+  const [eventEnded, setEventEnded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +104,7 @@ export default function AppNavbar() {
       if (!isDispatch || !dispatchEventId) {
         setHasVenueMap(true);
         setPostingScheduleEnabled(true);
+        setEventEnded(false);
         return;
       }
 
@@ -115,6 +118,7 @@ export default function AppNavbar() {
 
         setHasVenueMap(hasMap);
         setPostingScheduleEnabled((data?.postingTimes?.length ?? 0) > 0);
+        setEventEnded(data ? isEventEnded(data) : false);
       } catch {
         if (!cancelled) {
           setHasVenueMap(true);
@@ -129,6 +133,14 @@ export default function AppNavbar() {
       cancelled = true;
     };
   }, [isDispatch, dispatchEventId]);
+
+  // Flip instantly on the dispatch page's own "End Event" action, instead of
+  // waiting on the one-time fetch above to notice.
+  useEffect(() => {
+    const onEnded = () => setEventEnded(true);
+    window.addEventListener('dispatch-event-ended', onEnded);
+    return () => window.removeEventListener('dispatch-event-ended', onEnded);
+  }, []);
 
   const dispatchItems = [
     ...(hasVenueMap
@@ -146,6 +158,10 @@ export default function AppNavbar() {
     {
       label: "Event Summary",
       onClick: () => window.dispatchEvent(new CustomEvent('open-event-summary'))
+    },
+    {
+      label: eventEnded ? "Event Ended" : "End Event",
+      onClick: () => window.dispatchEvent(new CustomEvent('open-end-event')),
     },
     {
       label: "Venues",

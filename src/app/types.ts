@@ -52,6 +52,8 @@ export interface Event {
   eventPosts: Post[];
   eventEquipment: EventEquipment[];
   ended?: boolean;
+  /** Epoch ms when the event was ended (manually, or by the 1-hour-no-activity backup) — unset while active. */
+  endedAt?: number;
   postAssignments?: PostAssignment;
   clinics?: Clinic[];
 
