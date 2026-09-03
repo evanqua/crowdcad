@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import {
   Modal,
   ModalContent,
@@ -315,6 +315,26 @@ export default function AddTeamModal({
                     </Button>
                   </div>
                 ))}
+
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="flex-1 h-px bg-surface-liner" />
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    radius="full"
+                    variant="flat"
+                    aria-label={t("Add member")}
+                    className="shrink-0 text-surface-light bg-surface-deeperer hover:bg-surface-deep"
+                    onPress={() => {
+                      const newRow = emptyRow(defaultCert());
+                      focusMemberIdRef.current = newRow.id;
+                      setRows((current) => [...current, newRow]);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <div className="flex-1 h-px bg-surface-liner" />
+                </div>
               </div>
             </ModalBody>
 

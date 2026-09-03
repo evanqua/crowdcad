@@ -8,14 +8,14 @@ Feature: Event creation
 
   Scenario: Form renders correctly
     Then I should see the "Enter event name" placeholder
-    When I go to the "Teams & supervisors" step
+    When I go to the "Staff Assignments" step
     Then I should see the heading "Teams"
     And I should see the heading "Supervisors"
     When I go to the "Equipment" step
     Then I should see the heading "Equipment"
 
   Scenario: Add a team via modal
-    When I go to the "Teams & supervisors" step
+    When I go to the "Staff Assignments" step
     And I click the add team button
     And I fill the "Team Name" field with "Alpha"
     And I fill the "Member name" field with "John"
@@ -34,7 +34,7 @@ Feature: Event creation
     Then I should see the heading "Equipment"
 
   Scenario: A supervisor can be added during event creation
-    When I go to the "Teams & supervisors" step
+    When I go to the "Staff Assignments" step
     And I click the add event supervisor button
     And I fill the supervisor call sign with "Lead-1"
     And I select event supervisor certification "EMT-B"
@@ -47,11 +47,12 @@ Feature: Event creation
 
   Scenario: Non-linear navigation preserves entered data across steps
     When I fill the event name with "Preserved Event"
-    And I go to the "Surge criteria" step
+    And I click the "Advanced settings" button
     And I fill the surge limit with "85"
-    And I go to the "Basics" step
+    And I go to the "Staff Assignments" step
+    And I go to the "Event Configuration" step
     Then the event name input should show "Preserved Event"
-    When I go to the "Surge criteria" step
+    When I click the "Advanced settings" button
     Then the surge limit input should show "85"
 
   Scenario: Advancing a step moves focus to the new step's content

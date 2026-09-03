@@ -66,7 +66,7 @@ export default function StepProgress({ steps, currentStepId, onStepChange, class
               <div
                 aria-hidden="true"
                 role="presentation"
-                className={`mt-1.5 h-0.5 flex-1 min-w-[0.5rem] mx-1.5 rounded-full ${
+                className={`mt-1.5 h-0.5 flex-1 min-w-[0.5rem] rounded-full ${
                   idx < currentIndex ? 'bg-accent' : 'bg-surface-liner'
                 }`}
               />

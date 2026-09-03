@@ -16,7 +16,6 @@ import { scheduleTimesToWindow } from '@/lib/scheduleUtils';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import { useCertifications } from '@/hooks/useCertifications';
 import MetadataSection from '@/components/event-create/MetadataSection';
-import SurgeCriteriaSection from '@/components/event-create/SurgeCriteriaSection';
 import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
 import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
 import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
@@ -57,10 +56,11 @@ export default function EventCreation() {
     surgeLimitPercent: 70,
   });
 
-  const STEP_ORDER = ['basics', 'surge', 'teams', 'equipment', 'postschedule', 'review'] as const;
+  const STEP_ORDER = ['basics', 'teams', 'equipment', 'postschedule', 'review'] as const;
   const [currentStepId, setCurrentStepId] = useState<string>('basics');
   const [currentLayer, setCurrentLayer] = useState(0);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [editingTeamIndex, setEditingTeamIndex] = useState<number | null>(null);
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
   const [bulkImportMode, setBulkImportMode] = useState<'team' | 'supervisor' | null>(null);
   
@@ -291,18 +291,37 @@ export default function EventCreation() {
   //   };
   // }, [eventId]);
 
-  const handleSaveTeam = (team: TeamDraft) => {
+  const handleSaveTeam = (team: TeamDraft, editIdx: number | null) => {
     const members = team.members.map(
       m => `${m.name} [${m.cert}]${m.lead ? " (Lead)" : ""}`
     );
-    const newStaff: Staff = {
-      team: team.name,
-      location: "No Post",
-      status: "On Break",
-      members,
-    };
-    setEventData(prev => ({ ...prev, staff: [...(prev.staff || []), newStaff] }));
+    setEventData(prev => {
+      if (editIdx !== null) {
+        const staff = [...(prev.staff || [])];
+        staff[editIdx] = { ...staff[editIdx], team: team.name, members };
+        return { ...prev, staff };
+      }
+      const newStaff: Staff = {
+        team: team.name,
+        location: "No Post",
+        status: "On Break",
+        members,
+      };
+      return { ...prev, staff: [...(prev.staff || []), newStaff] };
+    });
   };
+
+  // Reverses the "Name [CERT] (Lead)" string format handleSaveTeam writes,
+  // so an existing Staff record can prefill AddTeamModal for editing.
+  const parseTeamForEdit = (team: Staff): TeamDraft => ({
+    name: team.team,
+    members: team.members.map((m) => {
+      const match = m.match(/^(.*) \[(.*)\](?: \(Lead\))?$/);
+      const lead = / \(Lead\)$/.test(m);
+      if (!match) return { name: m, cert: '', lead };
+      return { name: match[1], cert: match[2], lead };
+    }),
+  });
 
   const handleAddSamUnit = () => {
     if (!samName.trim() || !samCert) return;
@@ -546,34 +565,36 @@ export default function EventCreation() {
         eventData={eventData}
         setEventData={setEventData}
         getCalendarDate={getCalendarDate}
-        inputClassNames={inputClassNames}
-      />
-    </div>
-  );
-
-  const surgeStep = (
-    <div className="px-6 pt-4 h-full">
-      <SurgeCriteriaSection
-        eventData={eventData}
-        setEventData={setEventData}
+        scheduleFrom={scheduleFrom}
+        setScheduleFrom={setScheduleFrom}
+        scheduleTo={scheduleTo}
+        setScheduleTo={setScheduleTo}
         inputClassNames={inputClassNames}
       />
     </div>
   );
 
   const teamsSupervisorsStep = (
-    <div className="flex flex-col h-full gap-4 px-6 pt-4">
-      <div className="flex-1 min-h-0 rounded-2xl border border-surface-liner overflow-hidden">
+    <div className="flex h-full px-6 pt-4">
+      <div className="flex-1 min-w-0">
         <TeamStaffingSection
           staff={eventData.staff || []}
           openTeams={openTeams}
           setOpenTeams={setOpenTeams}
           onDeleteTeam={handleDeleteTeam}
-          onAddTeam={() => setIsTeamModalOpen(true)}
+          onEditTeam={(idx) => {
+            setEditingTeamIndex(idx);
+            setIsTeamModalOpen(true);
+          }}
+          onAddTeam={() => {
+            setEditingTeamIndex(null);
+            setIsTeamModalOpen(true);
+          }}
           onUploadCSV={() => setBulkImportMode('team')}
         />
       </div>
-      <div className="flex-1 min-h-0 rounded-2xl border border-surface-liner overflow-hidden">
+      <div className="w-px bg-surface-liner mx-2 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
         <SupervisorStaffingSection
           supervisors={eventData.supervisor || []}
           openSupervisors={openSupervisors}
@@ -620,10 +641,6 @@ export default function EventCreation() {
         />
         <PostingScheduleSection
           postsEnabled={postsEnabled}
-          scheduleFrom={scheduleFrom}
-          setScheduleFrom={setScheduleFrom}
-          scheduleTo={scheduleTo}
-          setScheduleTo={setScheduleTo}
           scheduleBy={scheduleBy}
           setScheduleBy={setScheduleBy}
           scheduleChips={scheduleChips}
@@ -688,13 +705,14 @@ export default function EventCreation() {
   );
 
   const steps: WizardStep[] = [
-    { id: 'basics', label: 'Basics', component: basicsStep, isComplete: true },
-    { id: 'surge', label: 'Surge criteria', component: surgeStep, isComplete: true },
-    { id: 'teams', label: 'Teams & supervisors', component: teamsSupervisorsStep, isComplete: true },
+    { id: 'basics', label: 'Event Configuration', component: basicsStep, isComplete: true },
+    { id: 'teams', label: 'Staff Assignments', component: teamsSupervisorsStep, isComplete: true },
     { id: 'equipment', label: 'Equipment', component: equipmentStep, isComplete: true },
     { id: 'postschedule', label: 'Post schedule', component: postScheduleStep, isComplete: true },
     { id: 'review', label: 'Review & launch', component: reviewStep, isComplete: true },
   ];
+
+  const showMapPanel = currentStepId === 'equipment' || currentStepId === 'postschedule';
 
   const stepIdx = STEP_ORDER.indexOf(currentStepId as (typeof STEP_ORDER)[number]);
   const isFirstStep = stepIdx <= 0;
@@ -706,172 +724,193 @@ export default function EventCreation() {
     if (stepIdx > 0) setCurrentStepId(STEP_ORDER[stepIdx - 1]);
   };
 
+  const leftPanelContent = (
+    <div className="flex flex-col h-full relative overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden py-4">
+        <WizardShell
+          steps={steps}
+          currentStepId={currentStepId}
+          onStepChange={setCurrentStepId}
+          className="flex-1 min-h-0 px-6"
+        />
+
+        <div className="flex gap-3 px-6 pt-4 flex-shrink-0">
+          {!isFirstStep && (
+            <Button variant="flat" onPress={goBack} className="flex-1">
+              Back
+            </Button>
+          )}
+          {!isLastStep && (
+            <Button
+              onPress={goNext}
+              className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
+            >
+              Continue
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const rightPanelContent = (
+    <div className="flex flex-col h-full relative px-6 pt-2 pb-4 overflow-hidden">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center flex-shrink-0">
+          {hasVenue && <h2 className="text-surface-light text-xl font-semibold">{eventData.venue?.name}</h2>}
+        </div>
+
+        {/* Map */}
+        {hasMap ? (
+          <div className="w-full flex flex-col gap-3">
+            <div className="relative w-full overflow-hidden rounded-2xl">
+              <MapPanSurface
+                containerRef={imgContainerRef}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                style={{
+                  cursor: isPanning ? 'grabbing' : 'grab',
+                  maxHeight: 'calc(100vh - 215px)',
+                }}
+              >
+                <div
+                  className="relative"
+                  style={{
+                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                    transformOrigin: 'center center',
+                    transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+                  }}
+                >
+                  <Image
+                    ref={imgRef}
+                    src={eventData.venue?.layers?.[currentLayer]?.mapUrl || ''}
+                    alt={`${eventData.venue?.layers?.[currentLayer]?.name || 'Venue'} map`}
+                    width={1200}
+                    height={800}
+                    className="w-full h-auto"
+                    unoptimized
+                    onLoad={(e) => {
+                      const t = e.currentTarget as HTMLImageElement;
+                      if (t && t.naturalWidth && t.naturalHeight) {
+                        setNaturalSize({ width: t.naturalWidth, height: t.naturalHeight });
+                      }
+                    }}
+                  />
+                  {renderMarkers()}
+                </div>
+              </MapPanSurface>
+
+              <MapZoomControls
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                onReset={handleResetZoom}
+                buttonClassName="bg-surface-deepest/90 backdrop-blur"
+                resetButtonClassName="bg-surface-deepest/90 backdrop-blur"
+              />
+            </div>
+
+            {/* Bottom Control Bar */}
+            <Card
+              isBlurred
+              className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-surface-light">Layer:</span>
+                  <span className="text-sm font-medium text-surface-light">
+                    {eventData.venue?.layers?.[currentLayer]?.name || 'Main Floor'}
+                  </span>
+                </div>
+                {eventData.venue?.layers && eventData.venue.layers.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      radius="full"
+                      variant="flat"
+                      onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
+                      isDisabled={currentLayer === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs text-surface-light">
+                      {currentLayer + 1} / {eventData.venue.layers.length}
+                    </span>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      radius="full"
+                      variant="flat"
+                      onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
+                      isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        ) : (
+          <div className="bg-surface-deep rounded-2xl p-8 text-center text-surface-faint">
+            No map available
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <main className="relative bg-surface-deepest text-surface-light h-[calc(100dvh-3.5rem)] overflow-hidden leading-none">
       <div className="relative z-10 max-w-[1200px] mx-auto h-full overflow-hidden">
         <div className="h-full overflow-hidden">
           <div className="flex h-full overflow-hidden">
-            <PanelGroup direction="horizontal">
-              <Panel defaultSize={46} minSize={35} maxSize={60}>
-                <div className="flex flex-col h-full relative overflow-hidden">
-                  <div className="flex-1 flex flex-col overflow-hidden py-4">
-                    <WizardShell
-                      steps={steps}
-                      currentStepId={currentStepId}
-                      onStepChange={setCurrentStepId}
-                      className="flex-1 min-h-0 px-6"
-                    />
-
-                    <div className="flex gap-3 px-6 pt-4 flex-shrink-0">
-                      {!isFirstStep && (
-                        <Button variant="flat" onPress={goBack} className="flex-1">
-                          Back
-                        </Button>
-                      )}
-                      {!isLastStep && (
-                        <Button
-                          onPress={goNext}
-                          className="flex-1 bg-accent hover:bg-accent/90 text-surface-light"
-                        >
-                          Continue
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Panel>
-              <PanelResizeHandle className="w-1 bg-surface-liner transition-colors cursor-col-resize flex items-center justify-center group">
-                <div className="w-0.5 h-8 bg-surface-light/30 rounded-full transition-colors" />
-              </PanelResizeHandle>
-              <Panel defaultSize={54} minSize={40}>
-                <div className="flex flex-col h-full relative px-6 pt-2 pb-4 overflow-hidden">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center flex-shrink-0">
-                      {hasVenue && <h2 className="text-surface-light text-xl font-semibold">{eventData.venue?.name}</h2>}
-                    </div>
-
-                {/* Map */}
-                {hasMap ? (
-                  <div className="w-full flex flex-col gap-3">
-                    <div className="relative w-full overflow-hidden rounded-2xl">
-                        <MapPanSurface
-                          containerRef={imgContainerRef}
-                          onWheel={handleWheel}
-                          onMouseDown={handleMouseDown}
-                          onMouseMove={handleMouseMove}
-                          onMouseUp={handleMouseUp}
-                          style={{
-                            cursor: isPanning ? 'grabbing' : 'grab',
-                            maxHeight: 'calc(100vh - 215px)',
-                          }}
-                        >
-                        <div
-                          className="relative"
-                          style={{
-                            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                            transformOrigin: 'center center',
-                            transition: isPanning ? 'none' : 'transform 0.1s ease-out',
-                          }}
-                        >
-                          <Image
-                            ref={imgRef}
-                            src={eventData.venue?.layers?.[currentLayer]?.mapUrl || ''}
-                            alt={`${eventData.venue?.layers?.[currentLayer]?.name || 'Venue'} map`}
-                            width={1200}
-                            height={800}
-                            className="w-full h-auto"
-                            unoptimized
-                            onLoad={(e) => {
-                              const t = e.currentTarget as HTMLImageElement;
-                              if (t && t.naturalWidth && t.naturalHeight) {
-                                setNaturalSize({ width: t.naturalWidth, height: t.naturalHeight });
-                              }
-                            }}
-                          />
-                          {renderMarkers()}
-                        </div>
-                      </MapPanSurface>
-
-                      <MapZoomControls
-                        onZoomIn={handleZoomIn}
-                        onZoomOut={handleZoomOut}
-                        onReset={handleResetZoom}
-                        buttonClassName="bg-surface-deepest/90 backdrop-blur"
-                        resetButtonClassName="bg-surface-deepest/90 backdrop-blur"
-                      />
-                    </div>
-
-                    {/* Bottom Control Bar */}
-                    <Card
-                      isBlurred
-                      className="border-2 border-default-200 bg-transparent w-full px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-surface-light">Layer:</span>
-                          <span className="text-sm font-medium text-surface-light">
-                            {eventData.venue?.layers?.[currentLayer]?.name || 'Main Floor'}
-                          </span>
-                        </div>
-                        {eventData.venue?.layers && eventData.venue.layers.length > 1 && (
-                          <div className="flex items-center gap-2">
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              radius="full"
-                              variant="flat"
-                              onPress={() => setCurrentLayer(prev => Math.max(0, prev - 1))}
-                              isDisabled={currentLayer === 0}
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <span className="text-xs text-surface-light">
-                              {currentLayer + 1} / {eventData.venue.layers.length}
-                            </span>
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              radius="full"
-                              variant="flat"
-                              onPress={() => setCurrentLayer(prev => Math.min((eventData.venue?.layers?.length || 1) - 1, prev + 1))}
-                              isDisabled={currentLayer === (eventData.venue?.layers?.length || 1) - 1}
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </Card>
-                  </div>
-                ) : (
-                  <div className="bg-surface-deep rounded-2xl p-8 text-center text-surface-faint">
-                    No map available
-                  </div>
-                )}
-                      </div>
-                    </div>
-                  </Panel>
-                </PanelGroup>
+            {showMapPanel ? (
+              <PanelGroup direction="horizontal">
+                <Panel defaultSize={46} minSize={35} maxSize={60}>
+                  {leftPanelContent}
+                </Panel>
+                <PanelResizeHandle className="w-1 bg-surface-liner transition-colors cursor-col-resize flex items-center justify-center group">
+                  <div className="w-0.5 h-8 bg-surface-light/30 rounded-full transition-colors" />
+                </PanelResizeHandle>
+                <Panel defaultSize={54} minSize={40}>
+                  {rightPanelContent}
+                </Panel>
+              </PanelGroup>
+            ) : (
+              <div className="w-full max-w-xl mx-auto h-full overflow-hidden">
+                {leftPanelContent}
               </div>
-            </div>
+            )}
           </div>
-          {tooltip && (
-            <div
-              style={{ left: tooltip.left, top: tooltip.top }}
-              className="pointer-events-none fixed z-50 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
-            >
-              {tooltip.text}
-            </div>
-          )}
+        </div>
+      </div>
+      {tooltip && (
+        <div
+          style={{ left: tooltip.left, top: tooltip.top }}
+          className="pointer-events-none fixed z-50 rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg border border-default whitespace-nowrap"
+        >
+          {tooltip.text}
+        </div>
+      )}
 
       {/* Modals */}
       <AddTeamModal
         isOpen={isTeamModalOpen}
-        onClose={() => setIsTeamModalOpen(false)}
-        mode="create"
-        titleOverride="Add New Team"
-        existingTeamNames={(eventData.staff || []).map(s => s.team)}
-        onSave={(team) => handleSaveTeam(team)}
+        onClose={() => {
+          setIsTeamModalOpen(false);
+          setEditingTeamIndex(null);
+        }}
+        mode={editingTeamIndex !== null ? 'edit' : 'create'}
+        titleOverride={editingTeamIndex !== null ? 'Edit Team' : 'Add New Team'}
+        submitLabelOverride={editingTeamIndex !== null ? 'Save Changes' : undefined}
+        existingTeamNames={(eventData.staff || [])
+          .map(s => s.team)
+          .filter((_, i) => i !== editingTeamIndex)}
+        initialTeam={editingTeamIndex !== null ? parseTeamForEdit((eventData.staff || [])[editingTeamIndex]) : undefined}
+        onSave={(team) => handleSaveTeam(team, editingTeamIndex)}
         roles={certifications.map(name => ({ name, fullName: name }))}
       />
 
