@@ -3342,6 +3342,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // Venue-designated clinics, falling back to a single default "Clinic" for
   // events created before multi-clinic support existed.
   const clinics: Clinic[] = getEventClinics(event.clinics);
+  const mobileClinicId = clinics.some(c => c.id === mobileSelectedClinicId) ? mobileSelectedClinicId : (clinics[0]?.id ?? '');
 
   // Layers shown on the Map tab: the venue's own multi-layer array when
   // present, falling back to a single synthetic layer built from the
@@ -3639,7 +3640,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         setClinicCall={setClinicCall}
         formatAgeSex={formatAgeSex}
         parseAgeSex={parseAgeSex}
-        clinicId={clinics.find(c => c.id === selectedRightTab)?.id || clinics[0]?.id}
+        clinicId={isMobile ? mobileClinicId : (clinics.find(c => c.id === selectedRightTab)?.id || clinics[0]?.id)}
       />
       <TransportUnitModal
         isOpen={showTransportUnitModal}
@@ -4310,14 +4311,13 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         <Tooltip content={t('Add Call')} placement="top">
                           <div>
                             <Button
-                              isIconOnly
-                              size="md"
-                              variant="light"
-                              className="!bg-surface-liner"
+                              size="sm"
+                              variant="flat"
+                              className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
                               aria-label={t('Add Call')}
                               onPress={() => openAddCallModal()}
                             >
-                              <Plus className="h-5 w-5" />
+                              {t('Add Call')}
                             </Button>
                           </div>
                         </Tooltip>
@@ -4418,21 +4418,57 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 </div>
               </Tab>
 
-              {/* CLINIC TABS - one per venue-designated clinic */}
-              {clinics.map((clinic) => (
-              <Tab key={clinic.id} title={clinic.name}>
+              {/* CLINIC TAB - single tab, switch clinic via the dropdown when multiple are configured */}
+              <Tab key="clinic" title={<HousePlus className="h-6 w-6" />} aria-label={t('Clinic')}>
                 <div className="space-y-6 pb-20">
                   <div>
+                    <div className="flex justify-between items-center mb-2">
+                      {clinics.length > 1 ? (
+                        <Select
+                          selectedKeys={mobileClinicId ? [mobileClinicId] : []}
+                          onSelectionChange={(keys) => {
+                            const selected = Array.from(keys)[0] as string;
+                            if (selected) setMobileSelectedClinicId(selected);
+                          }}
+                          aria-label="Select clinic"
+                          className="w-auto min-w-[160px]"
+                          classNames={{
+                            trigger: "bg-surface-deep border border-surface-liner rounded-full hover:bg-surface-liner h-10 min-h-10",
+                            value: "text-surface-light",
+                            popoverContent: "bg-surface-deep border-surface-liner",
+                          }}
+                        >
+                          {clinics.map((clinic) => (
+                            <SelectItem key={clinic.id}>{clinic.name}</SelectItem>
+                          ))}
+                        </Select>
+                      ) : (
+                        <h2 className="text-xl font-bold text-surface-light">{clinics[0]?.name ?? t('Clinic')}</h2>
+                      )}
+                      <Tooltip content={t('Add Patient')} placement="top">
+                        <div>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                            aria-label={t('Add Patient')}
+                            onPress={() => setShowQuickClinicCallForm(true)}
+                          >
+                            {t('Add Patient')}
+                          </Button>
+                        </div>
+                      </Tooltip>
+                    </div>
                     <div className="space-y-3">
                       {isMobile && [
                         // Unresolved clinic (Delivered with no outcome)
                         ...(event.calls || [])
-                          .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
+                          .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
                           .sort((a, b) => parseInt(a.id) - parseInt(b.id)),
                         // Resolved clinic (Delivered with an outcome) when toggled on
                         ...(showResolvedClinicCalls
                           ? (event.calls || [])
-                              .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
+                              .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
                               .sort((a, b) => parseInt(a.id) - parseInt(b.id))
                           : [])
                       ].map((call: Call) => (
@@ -4496,7 +4532,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           updateEvent={updateEvent}
                         />
                       ))}
-                      {getClinicCalls(clinic.id).length === 0 && (
+                      {getClinicCalls(mobileClinicId).length === 0 && (
                         <div className="text-center text-surface-light/50 py-8">
                           {t('No clinic calls')}
                         </div>
@@ -4514,7 +4550,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                   </div>
                 </div>
               </Tab>
-              ))}
 
               {hasVenueMapImage && (
                 <Tab key="map" title={<MapIcon className="h-6 w-6" />} aria-label={t('Map')}>
