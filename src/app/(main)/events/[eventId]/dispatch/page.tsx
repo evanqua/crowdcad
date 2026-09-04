@@ -7,6 +7,7 @@ import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
 import AddTeamModal, { TeamDraft } from "@/components/modals/event/addteammodal";
 import AddSupervisorModal from "@/components/modals/event/addsupervisormodal";
+import AddEquipmentModal from "@/components/modals/event/addequipmentmodal";
 import EndEventModal from "@/components/modals/event/endeventmodal";
 import TransportUnitModal from "@/components/modals/event/transportunitmodal";
 import React from 'react';
@@ -181,6 +182,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const quickCallRef = useRef<HTMLFormElement>(null);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
   const [showEditTeamModal, setShowEditTeamModal] = useState(false);
+  const [showAddEquipmentModal, setShowAddEquipmentModal] = useState(false);
   const [quickCall, setQuickCall] = useState({
     location: '',
     source: '',
@@ -561,6 +563,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     setMemberName('');      // Supervisor Name (optional)
     setMemberCert('');      // Certification (required)
     setShowAddSupervisorModal(true);
+  }, []);
+
+  const handleAddNewEquipment = useCallback(() => {
+    setShowAddEquipmentModal(true);
   }, []);
 
   // at top of the component (with other hooks)
@@ -1166,6 +1172,30 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     toast.success('Equipment locations reset to defaults');
   }, [event, updateEvent]);
 
+  // getEquipmentItems() (above) only renders event.eventEquipment once it has
+  // any items at all — otherwise it falls back to showing the venue's raw
+  // catalog. Appending straight onto an empty eventEquipment array would flip
+  // that fallback off and make every other venue equipment card vanish, so
+  // any add-equipment path materializes the venue catalog into eventEquipment
+  // first (a no-op once it's already populated).
+  const materializeEventEquipment = useCallback((currentEvent: Event): EventEquipment[] => {
+    if (currentEvent.eventEquipment && currentEvent.eventEquipment.length > 0) {
+      return currentEvent.eventEquipment;
+    }
+    return (currentEvent.venue?.equipment || []).map(v => {
+      const name = typeof v === 'string' ? v : v.name;
+      const location = typeof v === 'string' ? 'Staging' : (v.location || 'Staging');
+      return {
+        id: `eq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        name,
+        status: 'Available' as EquipmentStatus,
+        location,
+        defaultLocation: location,
+        assignedTeam: null,
+      };
+    });
+  }, []);
+
   const handleAddVenueEquipment = useCallback(async (equipmentName: string) => {
     if (!event) return;
 
@@ -1189,11 +1219,38 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     };
 
     await updateEvent({
-      eventEquipment: [...(event.eventEquipment || []), newEquipment]
+      eventEquipment: [...materializeEventEquipment(event), newEquipment]
     });
 
     toast.success(`Added equipment: ${name}`);
-  }, [event, updateEvent]);
+  }, [event, updateEvent, materializeEventEquipment]);
+
+  // Adds a one-off item that exists only for this event (not part of the
+  // venue's equipment catalog) — e.g. a piece of gear borrowed just for
+  // today. Opened via the "+" dropdown's "Add Equipment" option.
+  const handleAddTemporaryEquipment = useCallback(async (name: string, location?: string) => {
+    if (!event) return;
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
+    const startLocation = location?.trim() || 'Staging';
+
+    const newEquipment: EventEquipment = {
+      id: `eq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      name: trimmedName,
+      status: 'Available' as EquipmentStatus,
+      location: startLocation,
+      defaultLocation: startLocation,
+      assignedTeam: null,
+      notes: 'Temporary — added for this event only',
+    };
+
+    await updateEvent({
+      eventEquipment: [...materializeEventEquipment(event), newEquipment]
+    });
+
+    toast.success(`Added equipment: ${trimmedName}`);
+  }, [event, updateEvent, materializeEventEquipment]);
 
   // Get venue equipment that's not yet on the dispatch page
   const getAvailableVenueEquipment = useCallback(() => {
@@ -3094,6 +3151,33 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // surge back off isn't immediately re-flipped while the team is still above
   // threshold — only a fresh crossing (drop below, then rise above again)
   // re-triggers it.
+  // Appends a new open period to the event's surge history and flips the
+  // live flags on — shared by the auto-trigger effect and the manual toggle
+  // so every activation, however it happens, ends up in `surgeLog` for the
+  // after-event logs and the summary's availability graph.
+  function withSurgeStarted(current: Event, startedAt: number): Partial<Event> {
+    return {
+      manualSurgeActive: true,
+      manualSurgeStartedAt: startedAt,
+      surgeLog: [...(current.surgeLog || []), { startedAt }],
+    };
+  }
+
+  // Closes the currently-open surge period (if any) and flips the live flags off.
+  function withSurgeEnded(current: Event, endedAt: number): Partial<Event> {
+    const log = current.surgeLog || [];
+    const lastOpenIndex = log.length - 1;
+    const closedLog =
+      lastOpenIndex >= 0 && log[lastOpenIndex].endedAt === undefined
+        ? log.map((period, i) => (i === lastOpenIndex ? { ...period, endedAt } : period))
+        : log;
+    return {
+      manualSurgeActive: false,
+      manualSurgeStartedAt: undefined,
+      surgeLog: closedLog,
+    };
+  }
+
   const wasAboveSurgeThresholdRef = useRef(false);
   useEffect(() => {
     if (!event || isEventEnded(event)) return;
@@ -3107,7 +3191,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       // (or that this effect itself already started a moment ago) never gets
       // its start time clobbered by a second, redundant Date.now().
       updateEvent((current) =>
-        current.manualSurgeActive ? {} : { manualSurgeActive: true, manualSurgeStartedAt: Date.now() }
+        current.manualSurgeActive ? {} : withSurgeStarted(current, Date.now())
       );
     }
     wasAboveSurgeThresholdRef.current = aboveThreshold;
@@ -3280,7 +3364,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (event.manualSurgeActive) {
       if (!window.confirm(t('Are you sure you want to disable surge?'))) return;
       await updateEvent((current) =>
-        current.manualSurgeActive ? { manualSurgeActive: false, manualSurgeStartedAt: undefined } : {}
+        current.manualSurgeActive ? withSurgeEnded(current, Date.now()) : {}
       );
     } else {
       if (!window.confirm(t('Are you sure you want to enable surge?'))) return;
@@ -3288,7 +3372,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       // effect or another dispatcher) between this click and the transaction
       // running, keep its original start time instead of overwriting it.
       await updateEvent((current) =>
-        current.manualSurgeActive ? {} : { manualSurgeActive: true, manualSurgeStartedAt: Date.now() }
+        current.manualSurgeActive ? {} : withSurgeStarted(current, Date.now())
       );
     }
   };
@@ -3360,11 +3444,14 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                   handleAddNewTeam();
                 } else if (key === 'supervisor') {
                   handleAddNewSupervisor();
+                } else if (key === 'equipment') {
+                  handleAddNewEquipment();
                 }
               }}
             >
               <DropdownItem key="team">{t('Add Team')}</DropdownItem>
               <DropdownItem key="supervisor">{t('Add Supervisor')}</DropdownItem>
+              <DropdownItem key="equipment">{t('Add Equipment')}</DropdownItem>
             </DropdownMenu>
           </Dropdown>
         </div>
@@ -3572,6 +3659,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         memberCert={memberCert}
         setMemberCert={setMemberCert}
         roles={LICENSES.map(name => ({ name, fullName: name }))}
+      />
+      <AddEquipmentModal
+        isOpen={showAddEquipmentModal}
+        onClose={() => setShowAddEquipmentModal(false)}
+        onSubmit={(name, location) => handleAddTemporaryEquipment(name, location)}
+        locations={(event?.venue?.posts || []).map(p => (typeof p === 'string' ? p : p.name))}
       />
       <DebugModal
         isOpen={showDebugModal}

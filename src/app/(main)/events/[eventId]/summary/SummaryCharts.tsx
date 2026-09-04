@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   ResponsiveContainer,
-  ComposedChart, BarChart, Bar, LineChart, Line,
+  ComposedChart, BarChart, Bar, LineChart, Line, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 import { STATUS_COLORS_HEX } from '@/lib/colorTokens';
@@ -36,13 +36,23 @@ export default function SummaryCharts({
     <>
       <div className={GRID_WRAPPER}>
         <div className={`${GRID_CELL} p-6`}>
-          <h2 className="text-xl font-semibold mb-4">Total Team Availability</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xl font-semibold">Total Team Availability</h2>
+            {availabilitySeries.some((p) => p.surging) && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-surface-faint">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: STATUS_COLORS_HEX.alarm, opacity: 0.35 }} />
+                Surge active
+              </span>
+            )}
+          </div>
           <div className="w-full h-[360px]">
             <ResponsiveContainer width="100%" height="100%">
-              {/* One bar per 10 minutes of the event (see teamAvailabilitySeries)
-                  — interval={5} skips 5 of every 6 ticks so the x-axis still
-                  only labels the top of each hour. */}
-              <BarChart data={availabilitySeries} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
+              {/* One bar per 10 minutes of the event (see teamAvailabilitySeries).
+                  The Area (drawn first, so it sits behind the Bar) shades the
+                  full column height orange for any bucket that overlapped an
+                  active surge — interval={5} skips 5 of every 6 x-axis ticks
+                  so it still only labels the top of each hour. */}
+              <ComposedChart data={availabilitySeries} margin={{ top: 8, right: 16, left: 12, bottom: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="label" interval={5} />
                 <YAxis allowDecimals={false} unit="%" domain={[0, 100]} />
@@ -50,13 +60,26 @@ export default function SummaryCharts({
                   contentStyle={TOOLTIP_CONTENT_STYLE}
                   labelStyle={TOOLTIP_LABEL_STYLE}
                   itemStyle={TOOLTIP_ITEM_STYLE}
-                  formatter={(value) => {
+                  formatter={(value, name) => {
+                    if (name === 'Surge active') {
+                      return [value ? 'Yes' : 'No', name];
+                    }
                     const normalized = Array.isArray(value) ? value[0] : value;
                     return [`${Number(normalized ?? 0)}%`, 'Avg. teams available'];
                   }}
                 />
+                <Area
+                  dataKey={(point: { surging?: boolean }) => (point.surging ? 100 : 0)}
+                  name="Surge active"
+                  type="step"
+                  stroke="none"
+                  fill={STATUS_COLORS_HEX.alarm}
+                  fillOpacity={0.35}
+                  isAnimationActive={false}
+                  legendType="none"
+                />
                 <Bar dataKey="availability" name="Teams available" fill={STATUS_COLORS_HEX.green} isAnimationActive={false} />
-              </BarChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
