@@ -54,13 +54,28 @@ service cloud.firestore {
     // the event is flagged `isOrgEvent` — needs write access too, not just
     // read. Without this, the dispatch page's client-side check (which
     // already accounts for sharedWith/isOrgEvent) would let a member in but
-    // every dispatch action would then fail with permission-denied. Delete
-    // stays owner/admin-only, same as venues: a shared or org member
+    // every dispatch action would then fail with permission-denied.
+    //
+    // That broad grant is field-limited for a non-owner, non-admin writer
+    // (a shared user or an org member riding `isOrgEvent`): they can touch
+    // ordinary dispatch fields, but not `userId`, `sharedWith`, `isOrgEvent`,
+    // `ended`, or `endedAt` (see isEventProtectedFieldsUnchanged) — those
+    // control who owns, can see, or can end the event, and none of them are
+    // ever legitimately written by dispatching. Without this, any shared or
+    // org-event member could invite more people into a private event via
+    // `sharedWith`, flip `isOrgEvent` to expose someone else's private
+    // event to the whole org, or end an event out from under its owner —
+    // all with a direct Firestore write, no UI needed, since the app's own
+    // "only the owner or an admin" buttons are a client-side convenience
+    // only and enforce nothing by themselves. The owner and admins are
+    // exempt from this restriction — they may still change anything.
+    // Delete stays owner/admin-only, same as venues: a shared or org member
     // shouldn't be able to delete someone else's show.
     match /events/{eventId} {
       allow read: if isEventVisibleToUser();
       allow create: if request.auth != null && request.resource.data.get('userId', null) == request.auth.uid;
-      allow update: if isEventOwnerOrOrgMember() || isEventSharedWithRequester() || isEventOrgShow() || isRequestingUserAdmin();
+      allow update: if isEventOwnerOrOrgMember() || isRequestingUserAdmin() ||
+        ((isEventSharedWithRequester() || isEventOrgShow()) && isEventProtectedFieldsUnchanged());
       allow delete: if isEventOwnerOrOrgMember() || isRequestingUserAdmin();
     }
 
@@ -170,6 +185,15 @@ service cloud.firestore {
     // orgId comments above), mirroring how isOrgVenue already works.
     function isEventOrgShow() {
       return request.auth != null && resource.data.get('isOrgEvent', false) == true;
+    }
+
+    // The event fields a non-owner, non-admin writer (a shared user, or an
+    // org member via isEventOrgShow) must not be able to change: who owns
+    // the event, who it's shared with, whether it's an org-wide show, and
+    // whether/when it's ended. See the events match block above for why.
+    function isEventProtectedFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['userId', 'sharedWith', 'isOrgEvent', 'ended', 'endedAt']);
     }
   }
 }
