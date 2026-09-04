@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState, useRef, useCallback, use } from 'react';
 import PostingScheduleModal from '@/components/modals/event/postingschedulemodal';
-import VenueMapTab, { type TeamFocusRequest } from '@/components/dispatch/venuemaptab';
+import VenueMapTab, { type TeamFocusRequest, type SupervisorFocusRequest, type EquipmentFocusRequest } from '@/components/dispatch/venuemaptab';
 import EventSummaryModal from '@/components/modals/event/eventsummarymodal';
 import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
@@ -1733,6 +1733,18 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     setMapTeamFocusRequest({ teamName, requestId: Date.now() });
     setSelectedRightTab('map');
   };
+  // Same as mapTeamFocusRequest/viewTeamOnMap, for a supervisor card's "view on map" button.
+  const [mapSupervisorFocusRequest, setMapSupervisorFocusRequest] = useState<SupervisorFocusRequest | null>(null);
+  const viewSupervisorOnMap = (supervisorName: string) => {
+    setMapSupervisorFocusRequest({ supervisorName, requestId: Date.now() });
+    setSelectedRightTab('map');
+  };
+  // Same as mapTeamFocusRequest/viewTeamOnMap, for an equipment card's "view on map" button.
+  const [mapEquipmentFocusRequest, setMapEquipmentFocusRequest] = useState<EquipmentFocusRequest | null>(null);
+  const viewEquipmentOnMap = (equipmentName: string) => {
+    setMapEquipmentFocusRequest({ equipmentName, requestId: Date.now() });
+    setSelectedRightTab('map');
+  };
 
   // Matches the lg breakpoint used by the desktop/mobile CSS split below —
   // keeps CallTrackingTable/Card and ClinicTrackingTable/Card from both being
@@ -3233,6 +3245,20 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // navbar used for its old "Venue Map" shortcut.
   const hasVenueMapImage = venueLayers.some((layer) => !!layer.mapUrl);
 
+  // Every post name actually placeable on the map (has x/y coordinates) —
+  // plain string posts and free-text locations (Roaming, In Clinic, a typed
+  // custom value) have nowhere to be pinned, so a team/supervisor/equipment
+  // card's "view on map" button is disabled unless its location is in here.
+  const knownMapLocations = new Set(
+    venueLayers.flatMap((layer) =>
+      (layer.posts || [])
+        .filter((post): post is { name: string; x: number; y: number } =>
+          typeof post === 'object' && post !== null && typeof post.x === 'number' && typeof post.y === 'number'
+        )
+        .map((post) => post.name)
+    )
+  );
+
   // Calls delivered before per-clinic routing existed (or with no clinicId set) all
   // land in the first/default clinic, so nothing gets silently hidden or duplicated.
   const getClinicCalls = (clinicId: string) => (event.calls || []).filter(
@@ -3656,6 +3682,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 cardViewMode={cardViewMode}
                                 hasVenueMap={hasVenueMapImage}
                                 onViewOnMap={viewTeamOnMap}
+                                knownMapLocations={knownMapLocations}
                               />
                             ))}
                           {(!event?.staff || event.staff.length === 0) && (
@@ -3701,9 +3728,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                     onRefreshTeamPost={refreshTeamFromSchedule}
                                     updateEvent={updateEvent}
                                     cardViewMode={cardViewMode}
-                                    // Supervisors aren't rendered as map markers (VenueMapWithPosts
-                                    // only plots event.staff), so there's nothing for this to jump to.
-                                    hasVenueMap={false}
+                                    hasVenueMap={hasVenueMapImage}
+                                    onViewOnMap={viewSupervisorOnMap}
+                                    knownMapLocations={knownMapLocations}
                                   />
                                 );
                               })
@@ -3737,6 +3764,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                     onMarkReady={handleEquipmentMarkReady}
                                     onDelete={handleEquipmentDelete}
                                     updateEvent={updateEvent}
+                                    hasVenueMap={hasVenueMapImage}
+                                    onViewOnMap={viewEquipmentOnMap}
+                                    canLocateOnMap={
+                                      !!(equipmentItem.currentLocation || equipmentItem.stagingLocation) &&
+                                      knownMapLocations.has((equipmentItem.currentLocation || equipmentItem.stagingLocation) as string)
+                                    }
                                   />
                                 ))}
                             </>
@@ -3939,6 +3972,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           onAddCallAtPost={(location) => openAddCallModal({ location })}
                           onAddCallForTeam={(assignedTeam) => openAddCallModal({ assignedTeam })}
                           focusTeamRequest={mapTeamFocusRequest}
+                          focusSupervisorRequest={mapSupervisorFocusRequest}
+                          focusEquipmentRequest={mapEquipmentFocusRequest}
                         />
                       </div>
                     )}
@@ -4007,6 +4042,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               cardViewMode={cardViewMode}
                                 hasVenueMap={hasVenueMapImage}
                                 onViewOnMap={viewTeamOnMap}
+                                knownMapLocations={knownMapLocations}
                             />
                           ))}
                       </div>
@@ -4047,9 +4083,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 onRefreshTeamPost={refreshTeamFromSchedule}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
-                                // Supervisors aren't rendered as map markers (VenueMapWithPosts
-                                // only plots event.staff), so there's nothing for this to jump to.
-                                hasVenueMap={false}
+                                hasVenueMap={hasVenueMapImage}
+                                onViewOnMap={viewSupervisorOnMap}
+                                knownMapLocations={knownMapLocations}
                               />
                             );
                           })}
@@ -4086,6 +4122,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 onMarkReady={handleEquipmentMarkReady}
                                 onDelete={handleEquipmentDelete}
                                 updateEvent={updateEvent}
+                                hasVenueMap={hasVenueMapImage}
+                                onViewOnMap={viewEquipmentOnMap}
+                                canLocateOnMap={
+                                  !!(equipmentItem.currentLocation || equipmentItem.stagingLocation) &&
+                                  knownMapLocations.has((equipmentItem.currentLocation || equipmentItem.stagingLocation) as string)
+                                }
                               />
                             ))}
                         </div>
@@ -4328,6 +4370,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       onAddCallAtPost={(location) => openAddCallModal({ location })}
                       onAddCallForTeam={(assignedTeam) => openAddCallModal({ assignedTeam })}
                       focusTeamRequest={mapTeamFocusRequest}
+                      focusSupervisorRequest={mapSupervisorFocusRequest}
+                      focusEquipmentRequest={mapEquipmentFocusRequest}
                     />
                   </div>
                 </Tab>

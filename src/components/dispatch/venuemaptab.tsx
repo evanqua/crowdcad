@@ -18,6 +18,18 @@ export interface TeamFocusRequest {
   requestId: number;
 }
 
+/** Same as TeamFocusRequest, for a supervisor card's "view on map" button. */
+export interface SupervisorFocusRequest {
+  supervisorName: string;
+  requestId: number;
+}
+
+/** Same as TeamFocusRequest, for an equipment card's "view on map" button — matched by name, the same identity equipment cards use elsewhere. */
+export interface EquipmentFocusRequest {
+  equipmentName: string;
+  requestId: number;
+}
+
 interface VenueMapTabProps {
   layers: Layer[];
   staff: Staff[];
@@ -31,6 +43,8 @@ interface VenueMapTabProps {
   /** Clicking a team marker shows a small "Add Call" button under it prefilled with that team assigned. */
   onAddCallForTeam?: (teamName: string) => void;
   focusTeamRequest?: TeamFocusRequest | null;
+  focusSupervisorRequest?: SupervisorFocusRequest | null;
+  focusEquipmentRequest?: EquipmentFocusRequest | null;
 }
 
 function isCoordinatedPost(post: Post): post is { name: string; x: number; y: number } {
@@ -59,11 +73,15 @@ export default function VenueMapTab({
   onAddCallAtPost,
   onAddCallForTeam,
   focusTeamRequest,
+  focusSupervisorRequest,
+  focusEquipmentRequest,
 }: VenueMapTabProps) {
   const [currentLayer, setCurrentLayer] = useState(0);
   const [searchInput, setSearchInput] = useState('');
   const [selectedPostName, setSelectedPostName] = useState<string | null>(null);
   const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
+  const [selectedSupervisorName, setSelectedSupervisorName] = useState<string | null>(null);
+  const [selectedEquipmentName, setSelectedEquipmentName] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
   const {
@@ -97,6 +115,18 @@ export default function VenueMapTab({
     return () => clearTimeout(timeout);
   }, [selectedTeamName]);
 
+  useEffect(() => {
+    if (!selectedSupervisorName) return;
+    const timeout = setTimeout(() => setSelectedSupervisorName(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [selectedSupervisorName]);
+
+  useEffect(() => {
+    if (!selectedEquipmentName) return;
+    const timeout = setTimeout(() => setSelectedEquipmentName(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [selectedEquipmentName]);
+
   // A team card's "view on map" button. requestId (not just the team name)
   // is the dependency so re-clicking the same team while this tab is
   // already open still re-triggers the jump/highlight.
@@ -114,6 +144,38 @@ export default function VenueMapTab({
     resetZoom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTeamRequest?.requestId]);
+
+  // Same as the team focus effect above, for a supervisor card's "view on map" button.
+  useEffect(() => {
+    if (!focusSupervisorRequest) return;
+    const sup = supervisor.find((s) => s.team === focusSupervisorRequest.supervisorName);
+    const location = sup?.location;
+    if (location) {
+      const layerIdx = layers.findIndex((layer) =>
+        (layer.posts || []).some((post) => isCoordinatedPost(post) && post.name === location)
+      );
+      if (layerIdx >= 0) setCurrentLayer(layerIdx);
+    }
+    setSelectedSupervisorName(focusSupervisorRequest.supervisorName);
+    resetZoom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSupervisorRequest?.requestId]);
+
+  // Same as the team focus effect above, for an equipment card's "view on map" button.
+  useEffect(() => {
+    if (!focusEquipmentRequest) return;
+    const equip = equipment.find((e) => e.name === focusEquipmentRequest.equipmentName);
+    const location = equip?.location;
+    if (location) {
+      const layerIdx = layers.findIndex((layer) =>
+        (layer.posts || []).some((post) => isCoordinatedPost(post) && post.name === location)
+      );
+      if (layerIdx >= 0) setCurrentLayer(layerIdx);
+    }
+    setSelectedEquipmentName(focusEquipmentRequest.equipmentName);
+    resetZoom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusEquipmentRequest?.requestId]);
 
   const searchItems = useMemo(() => {
     const items: SearchItem[] = [];
@@ -234,6 +296,8 @@ export default function VenueMapTab({
           imageRadiusClassName="rounded-lg"
           selectedPostName={selectedPostName}
           selectedTeamName={selectedTeamName}
+          selectedSupervisorName={selectedSupervisorName}
+          selectedEquipmentName={selectedEquipmentName}
           onAddCallAtPost={onAddCallAtPost}
           onAddCallForTeam={onAddCallForTeam}
         />

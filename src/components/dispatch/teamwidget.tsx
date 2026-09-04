@@ -17,6 +17,8 @@ type TeamWidgetProps = {
   cardViewMode?: 'normal' | 'condensed';
   hasVenueMap?: boolean;
   onViewOnMap?: (teamName: string) => void;
+  /** Every post name actually placeable on the map — gates whether the "view on map" button is clickable (disabled if this team/supervisor's location isn't one of them). */
+  knownMapLocations?: Set<string>;
 };
 
 const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
@@ -33,9 +35,11 @@ const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
     cardViewMode = 'normal',
     hasVenueMap,
     onViewOnMap,
+    knownMapLocations,
   } = props;
 
   const CardComponent = cardViewMode === 'condensed' ? TeamCardCondensed : TeamCard;
+  const canLocateOnMap = !!hasVenueMap && !!staff.location && !!knownMapLocations?.has(staff.location);
 
   return (
     <CardComponent
@@ -50,6 +54,7 @@ const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
       updateEvent={updateEvent}
       hasVenueMap={hasVenueMap}
       onViewOnMap={onViewOnMap}
+      canLocateOnMap={canLocateOnMap}
     />
   );
 });

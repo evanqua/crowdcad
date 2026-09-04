@@ -7,7 +7,7 @@ import {
   Card, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Select, SelectItem, Autocomplete, AutocompleteItem
 } from '@heroui/react';
-import { ChevronDown, ChevronUp, MapPin, MoreVertical } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, MoreVertical, Map as MapIcon } from 'lucide-react';
 import type { Event, EquipmentItem } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
@@ -20,6 +20,11 @@ type EquipmentCardProps = {
   onMarkReady?: (equipmentName: string) => void;
   onDelete?: (equipmentName: string) => void;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
+  /** Whether the venue has a map uploaded — gates the "view on map" button. */
+  hasVenueMap?: boolean;
+  onViewOnMap?: (equipmentName: string) => void;
+  /** Whether this item's current location is an actual pin on the map — the button still shows, but disabled, when it's a free-text/non-post value or unset. */
+  canLocateOnMap?: boolean;
 };
 
 function equipmentStatusTone(status: string) {
@@ -48,7 +53,10 @@ export default function EquipmentCard({
   onLocationChange,
   onMarkReady,
   onDelete,
-  updateEvent
+  updateEvent,
+  hasVenueMap,
+  onViewOnMap,
+  canLocateOnMap,
 }: EquipmentCardProps) {
   const { t } = useDispatchTerms();
   const [expanded, setExpanded] = useState(false);
@@ -105,6 +113,23 @@ export default function EquipmentCard({
           <div className="text-surface-light/70">
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
+
+          {hasVenueMap && (
+            <button
+              type="button"
+              disabled={!canLocateOnMap}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!canLocateOnMap) return;
+                onViewOnMap?.(equipment.name);
+              }}
+              className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-surface-light"
+              aria-label="View on map"
+              title={canLocateOnMap ? 'View on map' : "This item's location isn't on the map"}
+            >
+              <MapIcon className="h-4 w-4" />
+            </button>
+          )}
 
           <div
             onClick={e => e.stopPropagation()}

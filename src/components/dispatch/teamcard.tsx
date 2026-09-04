@@ -27,6 +27,8 @@ type TeamCardProps = {
   /** Whether the venue has a map uploaded — gates the "view on map" button. */
   hasVenueMap?: boolean;
   onViewOnMap?: (teamName: string) => void;
+  /** Whether this team's current location is an actual pin on the map — the button still shows, but disabled, when it's a free-text/non-post value like Roaming or an unrecognized location. */
+  canLocateOnMap?: boolean;
 };
 
 function useMMSS(since?: number) {
@@ -57,7 +59,7 @@ export default function TeamCard({
   staff, event, sinceMs,
   onStatusChange, onLocationChange,
   onEdit, onDelete, onRefreshPost, updateEvent,
-  hasVenueMap, onViewOnMap,
+  hasVenueMap, onViewOnMap, canLocateOnMap,
 }: TeamCardProps) {
   const { t } = useDispatchTerms();
   const [expanded, setExpanded] = useState(false);
@@ -149,13 +151,15 @@ export default function TeamCard({
           {hasVenueMap && (
             <button
               type="button"
+              disabled={!canLocateOnMap}
               onClick={(e) => {
                 e.stopPropagation();
+                if (!canLocateOnMap) return;
                 onViewOnMap?.(staff.team);
               }}
-              className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
+              className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-surface-light"
               aria-label="View on map"
-              title="View on map"
+              title={canLocateOnMap ? 'View on map' : `${staff.location || 'This location'} isn't on the map`}
             >
               <MapIcon className="h-4 w-4" />
             </button>
