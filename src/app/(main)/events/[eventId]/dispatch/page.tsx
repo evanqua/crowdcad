@@ -3931,6 +3931,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         <VenueMapTab
                           layers={venueLayers}
                           staff={event.staff || []}
+                          supervisor={event.supervisor || []}
                           equipment={event.eventEquipment || []}
                           teamTimers={teamTimers}
                           calls={event.calls || []}
@@ -4319,6 +4320,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                     <VenueMapTab
                       layers={venueLayers}
                       staff={event.staff || []}
+                      supervisor={event.supervisor || []}
                       equipment={event.eventEquipment || []}
                       teamTimers={teamTimers}
                       calls={event.calls || []}
