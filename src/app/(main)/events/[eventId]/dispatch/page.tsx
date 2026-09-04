@@ -4417,7 +4417,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           ))}
                         {(!event?.staff || event.staff.length === 0) && (
                           <div className="text-center text-surface-light/50 py-8">
-                            {t('No teams available')}
+                            {t('No teams added yet')}
                           </div>
                         )}
                       </div>
@@ -4465,7 +4465,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           })
                         ) : (
                           <div className="text-center text-surface-light/50 py-8">
-                            {t('No supervisors assigned')}
+                            {t('No supervisors added yet')}
                           </div>
                         )}
                       </div>
