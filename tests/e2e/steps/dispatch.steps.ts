@@ -29,6 +29,14 @@ Given('I have created an event and am on the dispatch page', async ({ page }) =>
   // Name and launch the event (auth.currentUser stays set across SPA navigation)
   const eventName = `Test Event ${uniqueSuffix()}`;
   await page.getByPlaceholder('Enter event name').fill(eventName);
+
+  // Enable posts so a posting schedule gets generated — several scenarios in
+  // this feature (e.g. "Posting Schedule modal opens") depend on the
+  // Posting Schedule nav item existing, which now only appears once
+  // postingTimes is actually non-empty.
+  await page.getByRole('button', { name: /^Post schedule:/ }).click();
+  await page.getByText('Enable Posts').click();
+
   await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Event' }).click();
   await page.waitForURL(/\/events\/.*\/dispatch/, { timeout: NAV_TIMEOUT });
