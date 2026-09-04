@@ -21,7 +21,8 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useCertifications } from '@/hooks/useCertifications';
 import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
-import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4, Map as MapIcon } from "lucide-react";
+import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4, Map as MapIcon, Users, BriefcaseMedical, HousePlus } from "lucide-react";
+import { FaWalkieTalkie } from "react-icons/fa6";
 import TeamWidget from '@/components/dispatch/teamwidget';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CallTrackingTable } from '@/components/dispatch/calltracking';
@@ -4104,23 +4105,25 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
           {/* Mobile/Tablet Layout - Bottom Tabs */}
           <div className="lg:hidden">
-            {event && <AvailabilitySurgeStrip event={event} />}
-            {/* Background rectangle to cover bottom radius space */}
-            <div className="fixed bottom-0 left-0 right-0 h-5 bg-surface-deep z-40"></div>
+            {event && (
+              <div className="sticky top-14 z-40 bg-surface-deep">
+                <AvailabilitySurgeStrip event={event} />
+              </div>
+            )}
             <Tabs
-              aria-label="Dispatch sections" 
+              aria-label="Dispatch sections"
               placement="bottom"
-              radius="full"
+              radius="none"
               classNames={{
                 base: "w-full",
-                tabList: "fixed bottom-0 left-0 right-0 w-full bg-surface-deep border-t border-surface-light/10 z-50",
-                cursor: "bg-blue-600",
-                tab: "h-10",
-                tabContent: "text-lg text-surface-light group-data-[selected=true]:text-surface-light"
+                tabList: "fixed bottom-0 left-0 right-0 w-full rounded-none bg-surface-deep border-t border-surface-light/10 z-50 gap-0",
+                cursor: "rounded-none bg-accent",
+                tab: "h-16 rounded-none",
+                tabContent: "text-surface-light group-data-[selected=true]:text-surface-light"
               }}
             >
               {/* TEAMS TAB */}
-              <Tab key="teams" title={t('Teams')}>
+              <Tab key="teams" title={<Users className="h-6 w-6" />} aria-label={t('Teams')}>
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="flex justify-between items-center mb-2">
@@ -4215,7 +4218,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               </Tab>
 
               {/* EQUIPMENT TAB */}
-              <Tab key="equipment" title={t('Equipment')}>
+              <Tab key="equipment" title={<BriefcaseMedical className="h-6 w-6" />} aria-label={t('Equipment')}>
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="flex justify-between items-center mb-2">
@@ -4260,7 +4263,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 </div>
               </Tab>
 
-              <Tab key="calls" title={t('Calls')}>
+              <Tab key="calls" title={<FaWalkieTalkie className="h-5 w-5" />} aria-label={t('Calls')}>
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="flex justify-between items-center mb-2">
@@ -4476,7 +4479,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               ))}
 
               {hasVenueMapImage && (
-                <Tab key="map" title={<MapIcon className="h-4 w-4" />} aria-label={t('Map')}>
+                <Tab key="map" title={<MapIcon className="h-6 w-6" />} aria-label={t('Map')}>
                   <div className="h-[70vh] pb-20">
                     <VenueMapTab
                       layers={venueLayers}
