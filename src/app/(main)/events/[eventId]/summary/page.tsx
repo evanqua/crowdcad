@@ -6,7 +6,7 @@ import { dbService } from '@/lib/services';
 import { Event, Call, TeamLogEntry, CallLogEntry, InteractionSession } from '@/app/types';
 import dynamic from 'next/dynamic';
 import { Button } from '@heroui/react';
-import { getScheduleWindow, teamStatusBreakdown, teamAvailabilitySeries } from '@/lib/analyticsUtils';
+import { getScheduleWindow, teamStatusBreakdown, teamAvailabilitySeries, getSurgeIntervals } from '@/lib/analyticsUtils';
 import { formatLogTimestampForCsv } from '@/lib/csvFormat';
 import { GRID_WRAPPER, GRID_CELL } from './summaryGrid';
 
@@ -20,6 +20,7 @@ export default function SummaryPage() {
 
   const [openStaff, setOpenStaff] = useState(false);
   const [openCalls,  setOpenCalls]  = useState(false);
+  const [openSurge, setOpenSurge] = useState(false);
   const [event, setEvent]         = useState<Event | null>(null);
   const [openDataCollection, setOpenDataCollection] = useState(false);
 
@@ -49,10 +50,15 @@ export default function SummaryPage() {
     return teamStatusBreakdown(event, scheduleWindow.start, scheduleWindow.end);
   }, [event, scheduleWindow.start, scheduleWindow.end]);
 
+  const surgeIntervals = useMemo(() => {
+    if (!event) return [];
+    return getSurgeIntervals(event, scheduleWindow.end);
+  }, [event, scheduleWindow.end]);
+
   const availabilitySeries = useMemo(() => {
     if (!event) return [];
-    return teamAvailabilitySeries(event, scheduleWindow.start, scheduleWindow.end);
-  }, [event, scheduleWindow.start, scheduleWindow.end]);
+    return teamAvailabilitySeries(event, scheduleWindow.start, scheduleWindow.end, surgeIntervals);
+  }, [event, scheduleWindow.start, scheduleWindow.end, surgeIntervals]);
 
   const interactionSessions = useMemo<InteractionSession[]>(() => event?.interactionSessions || [], [event?.interactionSessions]);
 
@@ -104,6 +110,15 @@ export default function SummaryPage() {
       (call.log || []).forEach((entry: CallLogEntry) => {
         csvRows.push(`Call,${call.id},${formatTimestamp(entry.timestamp)},"${entry.message}"`);
       });
+    });
+
+    // Surge Log
+    (event.surgeLog || []).forEach((period) => {
+      csvRows.push(`Surge,-,${formatTimestamp(period.startedAt)},"Surge activated"`);
+      if (period.endedAt) {
+        const minutes = Math.round((period.endedAt - period.startedAt) / 60000);
+        csvRows.push(`Surge,-,${formatTimestamp(period.endedAt)},"Surge deactivated (active for ${minutes} min)"`);
+      }
     });
 
     return csvRows.join('\n');
@@ -384,6 +399,39 @@ export default function SummaryPage() {
               </div>
             )}
           </div>
+
+          {/* Surge Log */}
+          {(event.surgeLog || []).length > 0 && (
+            <div className={GRID_CELL}>
+              <div className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <span className="font-semibold">Surge Log</span>
+                  <div className="text-sm text-surface-faint">{event.surgeLog!.length} activation{event.surgeLog!.length === 1 ? '' : 's'}</div>
+                </div>
+                <div>
+                  <Button size="sm" radius="full" variant="flat" onPress={() => setOpenSurge(v => !v)}>
+                    {openSurge ? 'Hide' : 'Show'}
+                  </Button>
+                </div>
+              </div>
+              {openSurge && (
+                <div className="px-4 pb-4 space-y-2">
+                  {event.surgeLog!.map((period, idx) => {
+                    const stillActive = !period.endedAt;
+                    const durationMin = Math.round(((period.endedAt ?? Date.now()) - period.startedAt) / 60000);
+                    return (
+                      <div key={idx} className="bg-surface-deepest p-3 text-sm">
+                        <span className="font-semibold">{formatTimestamp(period.startedAt)}</span>
+                        {' — '}
+                        {stillActive ? 'still active' : formatTimestamp(period.endedAt!)}
+                        <span className="text-surface-faint"> ({durationMin} min{stillActive ? ' so far' : ''})</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Data Collection Details */}
           {totalSessions > 0 && (
