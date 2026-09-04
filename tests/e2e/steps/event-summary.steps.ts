@@ -60,7 +60,7 @@ Given('I have ended an event and am on the summary page', async ({ page }) => {
 
   // 6. Progress through call lifecycle: En Route → Transporting → Delivered
   await page.getByTestId('team-chip-SummaryTeam').locator('button').first().click();
-  await page.getByRole('menuitem', { name: 'Transporting' }).click();
+  await page.getByRole('menuitem', { name: 'Transporting to' }).click();
   await page.getByTestId('team-chip-SummaryTeam').locator('button').first().click();
   await page.getByRole('menuitem', { name: 'Delivered' }).click();
 

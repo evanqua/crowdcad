@@ -95,8 +95,8 @@ Feature: Dispatch board
     And I open the quick call modal
     And I log a call assigned to team "Foxtrot" at location "Medical Tent" with complaint "Seizure"
     Then the team "Foxtrot" should have status "En Route"
-    When I change team "Foxtrot" status on the call to "Transporting"
-    Then the team "Foxtrot" should have status "Transporting"
+    When I change team "Foxtrot" status on the call to "Transporting to"
+    Then the team "Foxtrot" should have status "Transporting to"
     When I change team "Foxtrot" status on the call to "Delivered"
     Then the team "Foxtrot" should have status "In Clinic"
 

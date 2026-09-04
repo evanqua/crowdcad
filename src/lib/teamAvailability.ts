@@ -2,6 +2,8 @@ import type { Event } from '@/app/types';
 import { deriveTeamVisualStatus } from '@/lib/statusColors';
 
 export const DEFAULT_SURGE_LIMIT_PERCENT = 70;
+export const DEFAULT_PENDING_TRANSPORT_SURGE_THRESHOLD = 3;
+export const DEFAULT_UNASSIGNED_CALL_SURGE_SECONDS = 120;
 
 const ON_CALL_STATUSES = new Set(['En Route', 'On Scene', 'Transporting', 'En Route Eq', 'Assisting']);
 const BREAK_OR_CLINIC_STATUSES = new Set(['On Break', 'In Clinic']);
@@ -55,4 +57,16 @@ export function getSurgeLimitPercent(event: Event): number {
 
 export function isSurging(percentOnCalls: number, surgeLimitPercent: number): boolean {
   return percentOnCalls >= surgeLimitPercent;
+}
+
+/** Combined calls+clinic pending-transport count at which a surge alert fires. Defaults to 3 when unset. */
+export function getPendingTransportSurgeThreshold(event: Event): number {
+  const value = event.pendingTransportSurgeThreshold;
+  return typeof value === 'number' && Number.isFinite(value) ? value : DEFAULT_PENDING_TRANSPORT_SURGE_THRESHOLD;
+}
+
+/** Seconds an unassigned ("Pending") call may sit before a surge alert fires. Defaults to 120 (2:00) when unset. */
+export function getUnassignedCallSurgeSeconds(event: Event): number {
+  const value = event.unassignedCallSurgeSeconds;
+  return typeof value === 'number' && Number.isFinite(value) ? value : DEFAULT_UNASSIGNED_CALL_SURGE_SECONDS;
 }

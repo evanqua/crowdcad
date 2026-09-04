@@ -9,7 +9,7 @@ Feature: Event summary page
     Then I should see the text "Event Summary:"
     And I should see the text "Total Calls"
     And I should see the text "Delivered to Clinic"
-    And I should see the text "Transported"
+    And I should see the text "Transports"
     And I should see a "Export Logs" button
 
   Scenario: Staff Logs and Call Logs sections are displayed and can be toggled

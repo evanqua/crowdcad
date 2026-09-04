@@ -49,6 +49,8 @@ export function normalizeLiteDraftToEvent(draft: LiteEventDraft): Event {
     postAssignments: draft.postAssignments || {},
     pendingAssignments: draft.pendingAssignments || {},
     surgeLimitPercent: draft.surgeLimitPercent,
+    pendingTransportSurgeThreshold: draft.pendingTransportSurgeThreshold,
+    unassignedCallSurgeSeconds: draft.unassignedCallSurgeSeconds,
     clinics: draft.clinics || [],
   };
 }
@@ -75,6 +77,8 @@ export function toLiteDraftFromEvent(nextEvent: Event, previousDraft: LiteEventD
     postAssignments: nextEvent.postAssignments || {},
     pendingAssignments: nextEvent.pendingAssignments || {},
     surgeLimitPercent: nextEvent.surgeLimitPercent ?? previousDraft.surgeLimitPercent,
+    pendingTransportSurgeThreshold: nextEvent.pendingTransportSurgeThreshold ?? previousDraft.pendingTransportSurgeThreshold,
+    unassignedCallSurgeSeconds: nextEvent.unassignedCallSurgeSeconds ?? previousDraft.unassignedCallSurgeSeconds,
     clinics: nextEvent.clinics ?? previousDraft.clinics,
     createdAt:
       typeof nextEvent.createdAt === 'string' ? nextEvent.createdAt : previousDraft.createdAt,

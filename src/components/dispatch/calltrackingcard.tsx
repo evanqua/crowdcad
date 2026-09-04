@@ -19,6 +19,7 @@ import {
 import type { Event, Call, DetachedTeam } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import DispatchMotionCell from '@/components/dispatch/motioncell';
+import StatusLabel from '@/components/dispatch/statuslabel';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
 import { getStatusColor } from '@/lib/statusColors';
@@ -34,6 +35,7 @@ type CallTrackingCardProps = {
   onRemoveTeamFromCall: (callId: string, team: string) => Promise<void>;
   onAddTeamToCall: (callId: string, team: string) => Promise<void>;
   handleTeamStatusChange: (callId: string, team: string, newStatus: string, clinicId?: string) => void;
+  onTransportToAmbulance: (callId: string, team: string) => void;
   handleRevertDetachment: (callId: string, team: string) => void;
   handleMarkDuplicate: (callId: string) => void;
   handleTogglePriority: (callId: string) => void;
@@ -60,6 +62,7 @@ export default function CallTrackingCard({
   onRemoveTeamFromCall,
   onAddTeamToCall,
   handleTeamStatusChange,
+  onTransportToAmbulance,
   handleRevertDetachment,
   handleMarkDuplicate,
   handleTogglePriority,
@@ -304,7 +307,7 @@ export default function CallTrackingCard({
             const isEquipmentOnlyTeam = call.equipmentTeams?.includes(team);
             const statusOptions = isEquipmentOnlyTeam
               ? ['En Route Eq', 'Assisting', 'Delivered Eq']
-              : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
+              : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Pending Transport', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
             
             // Same resolution desktop's CallTrackingTable uses: a per-call
             // override (teamStatusMap) takes priority over the team's own
@@ -363,7 +366,10 @@ export default function CallTrackingCard({
                           }}
                           className="text-xs text-surface-faint hover:text-surface-light transition-colors"
                         >
-                          {currentStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentStatus)} ▼
+                          <StatusLabel
+                            status={currentStatus}
+                            text={currentStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentStatus)}
+                          /> ▼
                         </button>
                       </DropdownTrigger>
                       <DropdownMenu
@@ -373,11 +379,17 @@ export default function CallTrackingCard({
                             setClinicPickTeam(team);
                             return;
                           }
+                          if (key === 'Rolled from Scene') {
+                            onTransportToAmbulance(call.id, team);
+                            return;
+                          }
                           handleTeamStatusChange(call.id, team, key as string, key === 'Transporting' ? clinics[0]?.id : undefined);
                         }}
                       >
                         {statusOptions.map(status => (
-                          <DropdownItem key={status}>{t(status)}</DropdownItem>
+                          <DropdownItem key={status}>
+                            <StatusLabel status={status} text={t(status)} />
+                          </DropdownItem>
                         ))}
                       </DropdownMenu>
                     </Dropdown>

@@ -32,6 +32,21 @@ function terms(category: DispatchTermCategory, keys: string[]): DispatchTerm[] {
   return keys.map((key) => ({ key, category, defaultLabel: key }));
 }
 
+/**
+ * Default-label overrides for keys whose internal identifier (kept stable
+ * for stored-data/comparison purposes — see the "never rename a key" note
+ * above) no longer matches the phrasing shown to dispatchers. Applied after
+ * the `terms()`-built array below, whose `defaultLabel` otherwise mirrors
+ * `key` verbatim. The status pill/dropdown for these also renders a small
+ * icon alongside the label (see `components/dispatch/statuslabel.tsx`).
+ */
+const LABEL_OVERRIDES: Record<string, string> = {
+  Transporting: 'Transporting to',
+  'Rolled from Scene': 'Transferred to',
+  Transported: 'Transferred to',
+  'Pending Transport': 'Pending',
+};
+
 export const DISPATCH_TERMS: DispatchTerm[] = [
   // Entities & roles — nouns for the people/things being dispatched.
   ...terms('entities', [
@@ -55,6 +70,7 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'En Route',
     'On Scene',
     'Transporting',
+    'Pending Transport',
     'Delivered',
     'Refusal',
     'NMM',
@@ -78,8 +94,10 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
   // Equipment.
   ...terms('equipment', ['In Use']),
 
-  // ClinicOutcome union (app/types.ts).
-  ...terms('clinicOutcomes', ['Discharged', 'AMA', 'Rolled from Clinic', 'Transported', 'Pending Transport']),
+  // ClinicOutcome union (app/types.ts). 'Pending Transport' is declared once,
+  // under callStatuses above — it's shared verbatim between a call's
+  // "Pending" transport-marker status and this same-named clinic outcome.
+  ...terms('clinicOutcomes', ['Discharged', 'AMA', 'Rolled from Clinic', 'Transported']),
 
   // UI copy: buttons, headers, field labels, empty states, menu items.
   ...terms('actions', [
@@ -168,7 +186,8 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'On Calls',
     'On Break/Clinic',
     'Surge limit reached',
-    'Call pending 1 minute — surge alert activated',
+    'Call pending',
+    'surge alert activated',
     'Surge alert: multiple clinic calls pending transport',
     'Reopen Call',
     'Revert this status and reopen the call?',
@@ -178,7 +197,7 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'Transport Unit #',
     'Enter Transport Unit',
   ]),
-];
+].map((term) => (LABEL_OVERRIDES[term.key] ? { ...term, defaultLabel: LABEL_OVERRIDES[term.key] } : term));
 
 export const DISPATCH_TERM_KEYS: string[] = DISPATCH_TERMS.map((t) => t.key);
 

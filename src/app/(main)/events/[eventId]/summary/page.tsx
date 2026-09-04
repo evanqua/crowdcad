@@ -82,8 +82,12 @@ export default function SummaryPage() {
   const totalDeliveredToClinic =
     event.calls.filter(c => c.status === 'Delivered' || c.clinic === true).length;
 
-  const totalTransported =
-    event.calls.filter(c => c.outcome === 'Rolled from Clinic' || c.status === 'Rolled from Scene').length;
+  // "Transports" counts both a clinic patient transferred to an ambulance
+  // (outcome === 'Transported') and a call resolved directly to an ambulance
+  // from the scene (status === 'Rolled from Scene'). 'Rolled from Clinic' is
+  // kept for legacy data — the outcome dropdown no longer offers it.
+  const totalTransports =
+    event.calls.filter(c => c.outcome === 'Transported' || c.outcome === 'Rolled from Clinic' || c.status === 'Rolled from Scene').length;
 
   const formatTimestamp = (timestamp: number) => {
     return formatLogTimestampForCsv(timestamp);
@@ -296,8 +300,8 @@ export default function SummaryPage() {
           </div>
 
           <div className={`${GRID_CELL} p-6`}>
-            <div className="text-sm opacity-70">Transported</div>
-            <div className="text-6xl md:text-7xl font-extrabold leading-none mt-1">{totalTransported}</div>
+            <div className="text-sm opacity-70">Transports</div>
+            <div className="text-6xl md:text-7xl font-extrabold leading-none mt-1">{totalTransports}</div>
           </div>
         </div>
 
