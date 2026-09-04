@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button, Card } from '@heroui/react';
-import { ChevronLeft, ChevronRight, MapPinned, Plus, Trash2, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Map as MapIcon, MapPinned, Plus, Trash2, Upload } from 'lucide-react';
 
 interface LayerControlBarProps {
   mapFileName: string;
@@ -14,6 +14,7 @@ interface LayerControlBarProps {
   onNextLayer: () => void;
   onDeleteLayer: () => void;
   onAddLayer: () => void;
+  onImportGeoJson: () => void;
 }
 
 export default function LayerControlBar({
@@ -26,6 +27,7 @@ export default function LayerControlBar({
   onNextLayer,
   onDeleteLayer,
   onAddLayer,
+  onImportGeoJson,
 }: LayerControlBarProps) {
   return (
     <Card
@@ -96,6 +98,18 @@ export default function LayerControlBar({
             title="Add layer"
           >
             <Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            isIconOnly
+            size="sm"
+            radius="full"
+            variant="flat"
+            data-testid="import-geojson-layer-button"
+            onPress={onImportGeoJson}
+            aria-label="Import GIS map"
+            title="Import GIS map"
+          >
+            <MapIcon className="h-4 w-4" />
           </Button>
         </div>
       </div>
