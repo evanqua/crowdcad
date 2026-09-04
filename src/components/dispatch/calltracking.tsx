@@ -15,6 +15,7 @@ import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment, Detach
 import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
 import DispatchMotionCell from './motioncell';
+import StatusLabel from './statuslabel';
 import TrackingTableBase from './trackingtablebase';
 import PendingCallChip from './pendingcallchip';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
@@ -56,6 +57,7 @@ interface CallTrackingTableProps {
   handleTogglePriorityFromMenu: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
   handleTeamStatusChange: (callId: string, team: string, newStatus: string, clinicId?: string) => void;
+  onTransportToAmbulance: (callId: string, team: string) => void;
   handleRemoveTeamFromCall: (callId: string, team: string) => Promise<void>;
   handleAddTeamToCall: (callId: string, team: string) => Promise<void>;
   handleRevertDetachment: (callId: string, team: string) => void;
@@ -99,6 +101,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   handleTogglePriorityFromMenu,
   handleDeleteCall,
   handleTeamStatusChange,
+  onTransportToAmbulance,
   handleRemoveTeamFromCall,
   handleAddTeamToCall,
   handleRevertDetachment,
@@ -397,7 +400,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                               const isEquipmentOnlyTeam = call.equipmentTeams?.includes(team);
                               const statusOptions = isEquipmentOnlyTeam
                                 ? ['En Route Eq', 'Assisting', 'Delivered Eq',]
-                                : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
+                                : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Pending Transport', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
                               const currentTeamStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
                               const teamStatusColor = getStatusColor(currentTeamStatus);
                            
@@ -473,7 +476,10 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                             variant="light"
                                             className="min-w-0 h-6 px-2 text-xs shrink-0"
                                           >
-                                            {currentTeamStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentTeamStatus)}
+                                            <StatusLabel
+                                              status={currentTeamStatus}
+                                              text={currentTeamStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentTeamStatus)}
+                                            />
                                           </Button>
                                         </DropdownTrigger>
                                         <DropdownMenu
@@ -484,11 +490,17 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                               setOpenMenuToken(`team-clinic-pick:${call.id}:${team}`);
                                               return;
                                             }
+                                            if (key === 'Rolled from Scene') {
+                                              onTransportToAmbulance(call.id, team);
+                                              return;
+                                            }
                                             handleTeamStatusChange(call.id, team, key as string, key === 'Transporting' ? clinics[0]?.id : undefined);
                                           }}
                                         >
                                           {statusOptions.map((status: string) => (
-                                            <DropdownItem key={status}>{t(status)}</DropdownItem>
+                                            <DropdownItem key={status}>
+                                              <StatusLabel status={status} text={t(status)} />
+                                            </DropdownItem>
                                           ))}
                                         </DropdownMenu>
                                       </Dropdown>

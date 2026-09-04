@@ -12,6 +12,7 @@ import {
 import { MoreVertical, RotateCw } from 'lucide-react';
 import type { Event, Call, CallLogEntry, Clinic } from '@/app/types';
 import DispatchMotionCell from './motioncell';
+import StatusLabel from './statuslabel';
 import TrackingTableBase from './trackingtablebase';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
@@ -388,7 +389,7 @@ export default function ClinicTrackingTable({
                               isDisabled={isResolvedClinicCall}
                               className={`min-w-0 h-8 px-2 text-xs justify-start bg-transparent ${isResolvedClinicCall ? 'opacity-100 cursor-default' : 'hover:bg-surface-muted'}`}
                             >
-                              {t(call.outcome || 'In Clinic')}
+                              <StatusLabel status={call.outcome || 'In Clinic'} text={t(call.outcome || 'In Clinic')} />
                             </Button>
                           </DropdownTrigger>
                           <DropdownMenu
@@ -399,8 +400,8 @@ export default function ClinicTrackingTable({
                             }}
                           >
                             <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
-                            <DropdownItem key="Pending Transport">{t('Pending Transport')}</DropdownItem>
-                            <DropdownItem key="Transported">{t('Transported')}</DropdownItem>
+                            <DropdownItem key="Pending Transport"><StatusLabel status="Pending Transport" text={t('Pending Transport')} /></DropdownItem>
+                            <DropdownItem key="Transported"><StatusLabel status="Transported" text={t('Transported')} /></DropdownItem>
                             <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
                             <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
                           </DropdownMenu>

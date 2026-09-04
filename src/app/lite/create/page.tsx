@@ -74,6 +74,8 @@ const fromSectionData = (current: LiteEventDraft, next: SectionEventData): LiteE
   name: next.name ?? current.name,
   date: next.date ?? current.date,
   surgeLimitPercent: next.surgeLimitPercent,
+  pendingTransportSurgeThreshold: next.pendingTransportSurgeThreshold,
+  unassignedCallSurgeSeconds: next.unassignedCallSurgeSeconds,
   eventEquipment: next.eventEquipment,
   eventPosts: next.eventPosts ?? current.eventPosts,
   venue: {
@@ -810,6 +812,16 @@ function LiteCreateContent() {
       <div>
         <span className="text-sm text-surface-faint">Surge limit</span>
         <p className="text-surface-light text-lg">{eventDraft.surgeLimitPercent ?? 70}%</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Pending transport surge</span>
+        <p className="text-surface-light text-lg">{eventDraft.pendingTransportSurgeThreshold ?? 3} patients</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Unassigned call surge</span>
+        <p className="text-surface-light text-lg">
+          {Math.floor((eventDraft.unassignedCallSurgeSeconds ?? 120) / 60)}:{String((eventDraft.unassignedCallSurgeSeconds ?? 120) % 60).padStart(2, '0')}
+        </p>
       </div>
       <div>
         <span className="text-sm text-surface-faint">Teams</span>

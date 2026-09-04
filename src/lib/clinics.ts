@@ -105,17 +105,23 @@ function withClinicDestination(
 }
 
 /**
- * Status pill label for a team that's Transporting. Only decorates with a
- * destination when more than one clinic exists and the clinicId resolves —
- * single-clinic events keep the plain "Transporting" label. The resolved
- * clinic name is user-authored text and is never passed through `t()`.
+ * Status pill label for a team that's Transporting. The 'Transporting' term
+ * itself already reads as "Transporting to" (see dispatchVocabulary label
+ * override), so — unlike `getDeliveredLabel` — this appends the clinic name
+ * directly rather than routing through `withClinicDestination`'s injected
+ * `t('to')`, which would otherwise double up ("Transporting to to X").
+ * Only decorates with a destination when more than one clinic exists and the
+ * clinicId resolves — single-clinic events keep the plain label. The
+ * resolved clinic name is user-authored text and is never passed through `t()`.
  */
 export function getTransportingLabel(
   t: (key: string) => string,
   clinics: Clinic[],
   clinicId: string | undefined
 ): string {
-  return withClinicDestination(t, t('Transporting'), clinics, clinicId);
+  const label = t('Transporting');
+  const clinicName = getClinicName(clinics, clinicId);
+  return clinicName ? `${label} ${clinicName}` : label;
 }
 
 /**

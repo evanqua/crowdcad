@@ -55,6 +55,8 @@ export interface LiteEventDraft {
   createdAt: string;
   updatedAt: string;
   surgeLimitPercent?: number;
+  pendingTransportSurgeThreshold?: number;
+  unassignedCallSurgeSeconds?: number;
   scheduleStart?: string | number;
   scheduleEnd?: string | number;
 }
@@ -175,6 +177,8 @@ export function createDefaultLiteEventDraft(eventId: string, eventName = ''): Li
     createdAt: now,
     updatedAt: now,
     surgeLimitPercent: 70,
+    pendingTransportSurgeThreshold: 3,
+    unassignedCallSurgeSeconds: 120,
   };
 }
 

@@ -52,6 +52,8 @@ export default function EventCreation() {
     eventPosts: [],
     eventEquipment: [],
     surgeLimitPercent: 70,
+    pendingTransportSurgeThreshold: 3,
+    unassignedCallSurgeSeconds: 120,
   });
 
   // A venue with no equipment of its own skips the Equipment step entirely.
@@ -622,6 +624,16 @@ export default function EventCreation() {
       <div>
         <span className="text-sm text-surface-faint">Surge limit</span>
         <p className="text-surface-light text-lg">{eventData.surgeLimitPercent ?? 70}%</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Pending transport surge</span>
+        <p className="text-surface-light text-lg">{eventData.pendingTransportSurgeThreshold ?? 3} patients</p>
+      </div>
+      <div>
+        <span className="text-sm text-surface-faint">Unassigned call surge</span>
+        <p className="text-surface-light text-lg">
+          {Math.floor((eventData.unassignedCallSurgeSeconds ?? 120) / 60)}:{String((eventData.unassignedCallSurgeSeconds ?? 120) % 60).padStart(2, '0')}
+        </p>
       </div>
       <div>
         <span className="text-sm text-surface-faint">Teams</span>

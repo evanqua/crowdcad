@@ -81,6 +81,12 @@ export interface Event {
   /** Percent of teams actively on calls at which the surge display turns red. Defaults to 70 when unset. */
   surgeLimitPercent?: number;
 
+  /** Combined count of calls + clinic patients marked pending transport at which a surge alert fires. Defaults to 3 when unset. */
+  pendingTransportSurgeThreshold?: number;
+
+  /** Seconds an unassigned ("Pending") call may sit without a team before a surge alert fires. Defaults to 120 (2:00) when unset. */
+  unassignedCallSurgeSeconds?: number;
+
   /** Manually declared "surge" state for the ops team, toggled via the Surge button beside the Calls/Clinic tabs — distinct from the automatic `surgeLimitPercent` threshold indicator. */
   manualSurgeActive?: boolean;
   /** Epoch ms when the current manual surge was started; cleared when surge is turned off. */

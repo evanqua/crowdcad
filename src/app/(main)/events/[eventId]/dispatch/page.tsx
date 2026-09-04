@@ -38,7 +38,7 @@ import EquipmentCard from '@/components/dispatch/equipmentcard';
 import AvailabilitySurgeStrip from '@/components/dispatch/availabilitysurgestrip';
 import SurgeToggleButton from '@/components/dispatch/surgetogglebutton';
 import { TrackingInsightsRow } from '@/components/dispatch/trackinginsights';
-import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging } from '@/lib/teamAvailability';
+import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging, getPendingTransportSurgeThreshold, getUnassignedCallSurgeSeconds } from '@/lib/teamAvailability';
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
@@ -115,12 +115,14 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     wasSurgingRef.current = surging;
   }, [event, t]);
 
-  const PENDING_TRANSPORT_SURGE_THRESHOLD = 3;
   const wasPendingTransportSurgingRef = useRef(false);
   useEffect(() => {
     if (!event) return;
-    const pendingTransportCount = (event.calls || []).filter(c => c.outcome === 'Pending Transport').length;
-    const surging = pendingTransportCount >= PENDING_TRANSPORT_SURGE_THRESHOLD;
+    // Combines calls-side "Pending" (status) with clinic-side "Pending Transport"
+    // (outcome) — both mark a patient waiting on an ambulance, so they count
+    // toward the same configurable threshold.
+    const pendingTransportCount = (event.calls || []).filter(c => c.outcome === 'Pending Transport' || c.status === 'Pending Transport').length;
+    const surging = pendingTransportCount >= getPendingTransportSurgeThreshold(event);
     if (surging && !wasPendingTransportSurgingRef.current) {
       toast.warning(`${t('Surge alert: multiple clinic calls pending transport')} (${pendingTransportCount})`, {
         position: 'top-right',
@@ -144,10 +146,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   eventRef.current = event;
   const toastedPendingCallIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const PENDING_ALARM_MS = 60 * 1000;
     const interval = setInterval(() => {
       const currentEvent = eventRef.current;
       if (!currentEvent) return;
+      const alarmMs = getUnassignedCallSurgeSeconds(currentEvent) * 1000;
       const stillPendingIds = new Set(
         (currentEvent.calls || []).filter(c => c.status === 'Pending').map(c => c.id)
       );
@@ -160,10 +162,13 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         if (call.status !== 'Pending') continue;
         if (toastedPendingCallIdsRef.current.has(call.id)) continue;
         const createdAt = call.log?.[0]?.timestamp;
-        if (!createdAt || Date.now() - createdAt < PENDING_ALARM_MS) continue;
+        if (!createdAt || Date.now() - createdAt < alarmMs) continue;
 
         toastedPendingCallIdsRef.current.add(call.id);
-        toast.warning(`${t('Call')} #${call.order}: ${t('Call pending 1 minute — surge alert activated')}`, {
+        const minutes = Math.floor(alarmMs / 60000);
+        const seconds = Math.round((alarmMs % 60000) / 1000);
+        const durationLabel = `${minutes}:${String(seconds).padStart(2, '0')}`;
+        toast.warning(`${t('Call')} #${call.order}: ${t('Call pending')} ${durationLabel} — ${t('surge alert activated')}`, {
           position: 'top-right',
           autoClose: 10000,
           closeOnClick: true,
@@ -243,6 +248,21 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [showTransportUnitModal, setShowTransportUnitModal] = useState(false);
   const [transportUnitCallId, setTransportUnitCallId] = useState<string | null>(null);
   const [transportUnitValue, setTransportUnitValue] = useState('');
+
+  // Call-side "Transferred to ambulance" (Rolled from Scene) unit-number
+  // prompt — same modal component as the clinic one above, separate state
+  // since it also needs to remember which team on the call is transferring.
+  const [showCallTransportUnitModal, setShowCallTransportUnitModal] = useState(false);
+  const [callTransportUnitCallId, setCallTransportUnitCallId] = useState<string | null>(null);
+  const [callTransportUnitTeam, setCallTransportUnitTeam] = useState<string | null>(null);
+  const [callTransportUnitValue, setCallTransportUnitValue] = useState('');
+
+  const openCallTransportUnitModal = useCallback((callId: string, team: string) => {
+    setCallTransportUnitCallId(callId);
+    setCallTransportUnitTeam(team);
+    setCallTransportUnitValue('');
+    setShowCallTransportUnitModal(true);
+  }, []);
   
   // Configure admin emails here or load from environment / Firestore for your deployment.
   const ADMIN_EMAILS: string[] = [];
@@ -1268,11 +1288,16 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   }, [event]);
 
 
-  const handleTeamStatusChange = (callId: string, team: string, newStatus: string, clinicId?: string) => {
+  // Statuses that fully resolve a call — per any one of these on any one team,
+  // the whole call closes out and every other team/supervisor/equipment still
+  // on it releases back to post, not just the team that reported it.
+  const RESOLVING_STATUSES = ['Delivered', 'Refusal', 'NMM', 'Unable to Locate', 'Rolled from Scene'];
+
+  const handleTeamStatusChange = (callId: string, team: string, newStatus: string, clinicId?: string, transportUnitValue?: string) => {
     console.log("FUNCTION CALLED", { callId, team, newStatus });
     setTeamStatusMap(prev => {
       const updatedStatusMap = { ...prev };
-      if (['Delivered', 'Refusal', 'NMM', 'Detached', 'Delivering', 'Delivered Eq'].includes(newStatus)) {
+      if ([...RESOLVING_STATUSES, 'Detached', 'Delivering', 'Delivered Eq'].includes(newStatus)) {
         // Remove team's status from this call in teamStatusMap when detaching
         if (updatedStatusMap[callId]) {
           delete updatedStatusMap[callId][team];
@@ -1296,11 +1321,25 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     const destinationClinicName = ['Transporting', 'Delivered'].includes(newStatus)
       ? getClinicName(clinics, resolvedClinicId)
       : undefined;
-    const logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
+    let logMessage: string;
+    if (newStatus === 'Transporting') {
+      logMessage = `${hhmm} - ${team} transporting to ${destinationClinicName || 'clinic'}`;
+    } else if (newStatus === 'Rolled from Scene') {
+      logMessage = `${hhmm} - ${team} Transferred to ambulance${transportUnitValue ? `, unit #: ${transportUnitValue}` : ''}`;
+    } else {
+      logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
+    }
 
     // DECLARE newCallStatus here with proper initialization
     let newCallStatus = latestCall.status; // Initialize with current status
-    
+
+    // Every other team still on the call when a resolving status closes it
+    // out — used below to release them (staff/supervisor/equipment) along
+    // with the acting team, instead of leaving them assigned indefinitely.
+    const otherAssignedTeams = RESOLVING_STATUSES.includes(newStatus)
+      ? (latestCall.assignedTeam || []).filter(tm => tm !== team)
+      : [];
+
     const isEqDetaching = ['Delivered Eq'].includes(newStatus);
     // Status the team held immediately before this change, captured here (before teamStatusMap
     // is overwritten above) so a later revert can restore it.
@@ -1311,7 +1350,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       console.log('call updated');
       if (c.id !== callId) return c;
 
-      const isDetaching = ['Delivered', 'Refusal', 'Unable to Locate', 'NMM', 'Detached', 'Delivering', 'Rolled from Scene'].includes(newStatus);
+      const isResolvingCascade = RESOLVING_STATUSES.includes(newStatus);
+      const isDetaching = isResolvingCascade || ['Detached', 'Delivering'].includes(newStatus);
 
       const updatedLog = [...(c.log || []), { timestamp: Date.now(), message: logMessage }];
 
@@ -1340,12 +1380,13 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         }
       } else if (isDetaching) {
         // Original detachment logic for regular teams
-        // remove team from assigned list
-        updatedAssignedTeam = updatedAssignedTeam.filter(t => t !== team);
+        // remove team from assigned list — a resolving cascade clears every
+        // team on the call at once, not just the one that reported it
+        updatedAssignedTeam = isResolvingCascade ? [] : updatedAssignedTeam.filter(t => t !== team);
         // Also remove from equipment teams if present
-        updatedEquipmentTeams = updatedEquipmentTeams.filter(t => t !== team);
+        updatedEquipmentTeams = isResolvingCascade ? [] : updatedEquipmentTeams.filter(t => t !== team);
 
-        // record one-time detachment
+        // record one-time detachment for the acting team
         if (!updatedDetachedTeams.some(t => t.team === team)) {
           updatedDetachedTeams.push({
             team,
@@ -1356,8 +1397,23 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           });
         }
 
-        // Auto-detach supervisors when any team is detached with resolving status
-        if (['Delivered', 'Refusal', 'NMM'].includes(newStatus)) {
+        // Auto-detach every other team still on the call once it resolves —
+        // delivered/refusal/nmm/unable-to-locate/transferred-to-ambulance all
+        // close the call out for everyone on it, not just the reporting team.
+        if (isResolvingCascade) {
+          otherAssignedTeams.forEach(otherTeam => {
+            if (updatedDetachedTeams.some(t => t.team === otherTeam)) return;
+            const otherStaff = event?.staff.find(s => s.team === otherTeam);
+            updatedDetachedTeams.push({
+              team: otherTeam,
+              reason: 'Auto-detached',
+              kind: c.equipmentTeams?.includes(otherTeam) ? 'equipment' : 'team',
+              previousStatus: otherStaff?.status,
+              previousLocation: otherStaff?.location,
+            });
+          });
+
+          // Auto-detach supervisors on the call too
           const supervisorsOnCall = event?.supervisor?.filter(s =>
             c.assignedTeam?.includes(s.team)
           ) || [];
@@ -1373,9 +1429,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               });
             }
           });
-          
-          // Remove supervisors from assigned teams
-          updatedAssignedTeam = updatedAssignedTeam.filter(teamName => 
+
+          // Remove supervisors from assigned teams (moot now assignedTeam is
+          // already cleared above, kept for the non-resolving Detached path)
+          updatedAssignedTeam = updatedAssignedTeam.filter(teamName =>
             !event?.supervisor?.some(s => s.team === teamName)
           );
         }
@@ -1408,6 +1465,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         // standard transitions while still assigned
         if (newStatus === 'On Scene') newCallStatus = 'On Scene';
         else if (newStatus === 'Transporting') newCallStatus = 'Transporting';
+        else if (newStatus === 'Pending Transport') newCallStatus = 'Pending Transport';
       }
 
       // IMPORTANT: set clinic flag here (no second pass / no self-reference)
@@ -1430,54 +1488,71 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         log: updatedLog,
         assignedTeam: updatedAssignedTeam,
         equipmentTeams: updatedEquipmentTeams,
-        detachedTeams: updatedDetachedTeams
+        detachedTeams: updatedDetachedTeams,
+        ...(newStatus === 'Rolled from Scene' && transportUnitValue ? { transportUnit: transportUnitValue } : {}),
       };
     });
 
     // Rest of the function continues as before...
     const updatedStaff = event?.staff.map(t => {
-      console.log('idk')
-      if (t.team !== team) return t;
+      if (t.team === team) {
+        let updatedLocation = t.location;
+        let updatedStatus = newStatus;
 
-      let updatedLocation = t.location;
-      let updatedStatus = newStatus;
+        // Handle equipment detachment statuses
+        if (['Delivered Eq', 'Detached'].includes(newStatus)) {
+          updatedLocation = t.originalPost || 'Unknown';
+          updatedStatus = 'Available';
+        } else if (newStatus === 'Delivered') {
+          updatedLocation = 'Clinic';
+          updatedStatus = 'In Clinic';
+        } else if (['En Route', 'On Scene', 'Transporting', 'Pending Transport'].includes(newStatus)) {
+          updatedLocation = latestCall.location;
+          updatedStatus = newStatus;
+        } else if (['En Route Eq', 'Assisting'].includes(newStatus)) {
+          // Equipment assistance statuses
+          updatedLocation = latestCall.location;
+          updatedStatus = newStatus;
+        } else if (['Refusal', 'NMM', 'Detached', 'Unable to Locate', 'Rolled from Scene'].includes(newStatus)) {
+          updatedLocation = t.originalPost || 'Unknown';
+          updatedStatus = 'Available';
+        } else if (newStatus === 'In Clinic') {
+          updatedLocation = 'Clinic';
+          updatedStatus = 'In Clinic';
+        }
 
-      // Handle equipment detachment statuses
-      if (['Delivered Eq', 'Detached'].includes(newStatus)) {
-        updatedLocation = t.originalPost || 'Unknown';
-        updatedStatus = 'Available';
-      } else if (newStatus === 'Delivered') {
-        updatedLocation = 'Clinic';
-        updatedStatus = 'In Clinic';
-      } else if (['En Route', 'On Scene', 'Transporting'].includes(newStatus)) {
-        updatedLocation = latestCall.location;
-        updatedStatus = newStatus;
-      } else if (['En Route Eq', 'Assisting'].includes(newStatus)) {
-        // Equipment assistance statuses
-        updatedLocation = latestCall.location;
-        updatedStatus = newStatus;
-      } else if (['Refusal', 'NMM', 'Detached', 'Unable to Locate', 'Rolled from Scene'].includes(newStatus)) { 
-        updatedLocation = t.originalPost || 'Unknown';
-        updatedStatus = 'Available';
-      } else if (newStatus === 'In Clinic') {
-        updatedLocation = 'Clinic';
-        updatedStatus = 'In Clinic';
+        return {
+          ...t,
+          status: updatedStatus,
+          location: updatedLocation,
+        };
       }
 
-      return {
-        ...t,
-        status: updatedStatus,
-        location: updatedLocation,
-      };
+      // Auto-return every other team on the call once it resolves via any
+      // one team — they weren't the one who reported the resolution, but
+      // the call is closed for everyone on it now.
+      if (otherAssignedTeams.includes(t.team)) {
+        return {
+          ...t,
+          status: 'Available',
+          location: t.originalPost || 'Unknown',
+          log: [...(t.log || []), {
+            timestamp: now.getTime(),
+            message: `${hhmm} - auto-detached from completed call, status set to Available at ${t.originalPost || 'Unknown'}`
+          }],
+        };
+      }
+
+      return t;
     });
 
     // Handle supervisor status updates when call is complete
     let updatedSupervisor = event?.supervisor;
-    if (['Delivered', 'Refusal', 'NMM', 'Rolled'].includes(newCallStatus)) {
-      const supervisorsOnCall = event?.supervisor?.filter(s => 
+    if (RESOLVING_STATUSES.includes(newStatus)) {
+      const supervisorsOnCall = event?.supervisor?.filter(s =>
         latestCall.assignedTeam?.includes(s.team)
       ) || [];
-      
+
       if (supervisorsOnCall.length > 0) {
         updatedSupervisor = event?.supervisor?.map(s => {
           if (supervisorsOnCall.some(supervisor => supervisor.team === s.team)) {
@@ -1507,8 +1582,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       (callAfterUpdate?.equipment || []).map((n: unknown) => (typeof n === 'string' ? n : (n as { name?: string }).name || ''))
     );
 
-    // Equipment currently held by the team that just changed status OR listed on the call
-    const teamEquipment = (event?.eventEquipment || []).filter(eq => eq.assignedTeam === team || callEquipmentNames.has(eq.name));
+    // The acting team plus every other team the resolving cascade above just
+    // released — equipment held by any of them needs to come back too.
+    const resolvingTeams = [team, ...otherAssignedTeams];
+
+    // Equipment currently held by the team(s) that just changed status OR listed on the call
+    const teamEquipment = (event?.eventEquipment || []).filter(eq => resolvingTeams.includes(eq.assignedTeam || '') || callEquipmentNames.has(eq.name));
 
     if (teamEquipment.length > 0) {
       const callAfterUpdate = (updatedCalls || event?.calls || []).find(c => c.id === callId);
@@ -1548,11 +1627,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           const resolvedStatus = callAfterUpdate?.status || newCallStatus;
           if (resolvedStatus === 'Delivered') {
             updatedEquipment = event?.eventEquipment?.map(eq =>
-              eq.assignedTeam === team
+              resolvingTeams.includes(eq.assignedTeam || '')
                 ? {
                     ...eq,
                     // keep assignedTeam so history shows who delivered it
-                    assignedTeam: team,
+                    assignedTeam: eq.assignedTeam,
                     status: 'In Clinic' as EquipmentStatus,
                     location: 'Clinic'
                   }
@@ -1560,7 +1639,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             );
           } else {
             updatedEquipment = event?.eventEquipment?.map(eq =>
-              eq.assignedTeam === team
+              resolvingTeams.includes(eq.assignedTeam || '')
                 ? {
                     ...eq,
                     assignedTeam: null,
@@ -1768,7 +1847,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         transportUnit: unit || undefined,
         log: [
           ...(callToUpdate.log || []),
-          { timestamp: now.getTime(), message: unit ? `${hhmm} - Transported by ${unit}` : `${hhmm} - Clinic Status: Transported` }
+          { timestamp: now.getTime(), message: unit ? `${hhmm} - Transferred to ambulance, unit #: ${unit}` : `${hhmm} - Transferred to ambulance` }
         ]
       };
       return { calls: current.calls.map(c => c.id === callId ? updatedCall : c) };
@@ -1778,6 +1857,20 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     setTransportUnitCallId(null);
     setTransportUnitValue('');
   }, [transportUnitCallId, transportUnitValue, updateEvent]);
+
+  // Calls-side "Transferred to ambulance" (Rolled from Scene) — same unit-number
+  // prompt pattern as the clinic modal above, then routes through the normal
+  // handleTeamStatusChange resolving cascade with the entered unit attached.
+  const handleSubmitCallTransportUnit = useCallback(async () => {
+    if (!callTransportUnitCallId || !callTransportUnitTeam) return;
+    const unit = callTransportUnitValue.trim();
+    handleTeamStatusChange(callTransportUnitCallId, callTransportUnitTeam, 'Rolled from Scene', undefined, unit || undefined);
+
+    setShowCallTransportUnitModal(false);
+    setCallTransportUnitCallId(null);
+    setCallTransportUnitTeam(null);
+    setCallTransportUnitValue('');
+  }, [callTransportUnitCallId, callTransportUnitTeam, callTransportUnitValue, handleTeamStatusChange]);
 
   const handleRevertClinicOutcome = useCallback(async (callId: string) => {
     if (!confirm(t('Revert this clinic outcome?'))) return;
@@ -3773,6 +3866,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       onRemoveTeamFromCall={handleRemoveTeamFromCall}
       onAddTeamToCall={handleAddTeamToCall}
       handleTeamStatusChange={handleTeamStatusChange}
+      onTransportToAmbulance={openCallTransportUnitModal}
       handleRevertDetachment={handleRevertDetachment}
       handleMarkDuplicate={handleMarkDuplicate}
       handleTogglePriority={handleTogglePriorityFromMenu}
@@ -3884,6 +3978,18 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         onSubmit={handleSubmitTransportUnit}
         value={transportUnitValue}
         onValueChange={setTransportUnitValue}
+      />
+      <TransportUnitModal
+        isOpen={showCallTransportUnitModal}
+        onClose={() => {
+          setShowCallTransportUnitModal(false);
+          setCallTransportUnitCallId(null);
+          setCallTransportUnitTeam(null);
+          setCallTransportUnitValue('');
+        }}
+        onSubmit={handleSubmitCallTransportUnit}
+        value={callTransportUnitValue}
+        onValueChange={setCallTransportUnitValue}
       />
       <AddTeamModal
         isOpen={showAddTeamModal}
@@ -4253,6 +4359,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
                             handleDeleteCall={handleDeleteCall}
                             handleTeamStatusChange={handleTeamStatusChange}
+                            onTransportToAmbulance={openCallTransportUnitModal}
                             handleRemoveTeamFromCall={handleRemoveTeamFromCall}
                             handleAddTeamToCall={handleAddTeamToCall}
                             handleRevertDetachment={handleRevertDetachment}
