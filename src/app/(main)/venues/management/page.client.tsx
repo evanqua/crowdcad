@@ -123,7 +123,11 @@ export default function VenueManagementPageClient() {
     zoomOut,
     resetZoom,
   } = useZoomPan({
-    minScale: 1,
+    // Was 1 — the same as the initial fit-to-width scale, so there was no
+    // room to zoom out at all once a map image loaded. 0.5 matches the
+    // dispatch board's own Map tab (VenueMapTab), letting this map zoom out
+    // past its initial fit the same way that one does.
+    minScale: 0.5,
     maxScale: 5,
     disablePan: () => isAddMarkerMode || draggingIdx !== null,
   });

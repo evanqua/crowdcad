@@ -129,7 +129,7 @@ function PostMarker({ post, rect, scale, isSelected, onAddCall }: PostMarkerProp
         // only set translateY and would silently replace the centering
         // translateX for the whole time it runs. The wrapper centers; only the
         // icon inside it bounces.
-        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: '100%', marginBottom: 6 }}>
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: '100%', marginBottom: 2 }}>
           <ArrowBigDown
             className="animate-bounce"
             size={40}
@@ -248,6 +248,8 @@ interface EquipmentMarkerProps {
   post: Post;
   rect: ImageRect;
   scale: number;
+  /** True when this equipment item was just navigated to (e.g. via its card's "view on map" button) — draws the same attention arrow/enlarge a selected post gets. */
+  isSelected?: boolean;
 }
 
 function EquipmentMarker({
@@ -255,6 +257,7 @@ function EquipmentMarker({
   post,
   rect,
   scale,
+  isSelected,
 }: EquipmentMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -276,6 +279,8 @@ function EquipmentMarker({
 
   const iconType = getEquipmentIcon(equipment);
   const badgeColor = getEquipmentMarkerColor(equipment);
+  // Same hover/selected enlarge as every other marker (see PostMarker).
+  const emphasis = (hovered || isSelected ? 1.15 : 1) / scale;
 
   const handleMouseEnter = () => {
     setHovered(true);
@@ -295,14 +300,27 @@ function EquipmentMarker({
         top: `${top}px`,
         // Counter-scale against ambient map zoom so the icon stays a
         // constant on-screen size, same treatment as PostMarker/TeamMarker.
-        transform: `translate(-50%, -50%) scale(${1 / scale})`,
+        transform: `translate(-50%, -50%) scale(${emphasis})`,
         transformOrigin: 'center center',
-        zIndex: 15,
+        zIndex: isSelected ? 999 : 15,
         cursor: 'pointer',
+        transition: 'transform 0.15s ease-out',
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
     >
+      {isSelected && (
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: '100%', marginBottom: 2 }}>
+          <ArrowBigDown
+            className="animate-bounce"
+            size={40}
+            strokeWidth={1.5}
+            fill="#f97316"
+            stroke="white"
+            style={{ filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' }}
+          />
+        </div>
+      )}
       <div
         style={{
           width: 26,
@@ -445,7 +463,7 @@ function TeamMarker({
   // between a team and its post stays a constant size across zoom levels
   // (same treatment as the icon's own counter-scale below), instead of
   // growing when zoomed out and shrinking when zoomed in.
-  const teamOffset = 16 / scale;
+  const teamOffset = 10 / scale;
   // Extra teams sharing this exact post (e.g. several teams attached to the
   // same call) step further right one at a time, also counter-scaled so the
   // on-screen spacing between them stays constant too.
@@ -461,6 +479,9 @@ function TeamMarker({
   const statusLabel = team.status === 'Transporting'
     ? getTransportingLabel((key) => key, clinics, activeCall?.clinicId)
     : (team.status || 'Unknown');
+
+  // Same hover/selected enlarge as every other marker (see PostMarker).
+  const emphasis = (hovered || isSelected ? 1.15 : 1) / scale;
 
   const handleMouseEnter = () => {
     setHovered(true);
@@ -481,10 +502,11 @@ function TeamMarker({
         top: `${top}px`,
         // Counter-scale against ambient map zoom so the icon stays a
         // constant on-screen size, same treatment as PostMarker/EquipmentMarker.
-        transform: `translate(-50%, -50%) scale(${1 / scale})`,
+        transform: `translate(-50%, -50%) scale(${emphasis})`,
         transformOrigin: 'center center',
         zIndex: isSelected || expanded ? 999 : 25,
         cursor: 'pointer',
+        transition: 'transform 0.15s ease-out',
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
@@ -494,7 +516,7 @@ function TeamMarker({
       }}
     >
       {isSelected && (
-        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: '100%', marginBottom: 6 }}>
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: '100%', marginBottom: 2 }}>
           <ArrowBigDown
             className="animate-bounce"
             size={40}
@@ -565,9 +587,11 @@ interface SupervisorMarkerProps {
   post: Post;
   rect: ImageRect;
   scale: number;
+  /** True when this supervisor was just navigated to (e.g. via their card's "view on map" button) — draws the same attention arrow/enlarge a selected post gets. */
+  isSelected?: boolean;
 }
 
-function SupervisorMarker({ supervisor, post, rect, scale }: SupervisorMarkerProps) {
+function SupervisorMarker({ supervisor, post, rect, scale, isSelected }: SupervisorMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
@@ -580,11 +604,13 @@ function SupervisorMarker({ supervisor, post, rect, scale }: SupervisorMarkerPro
   // equipment item sharing the exact same post don't stack on top of each
   // other. Counter-scaled the same way as the other markers' offsets so the
   // on-screen gap stays constant across zoom levels.
-  const supervisorOffset = 16 / scale;
+  const supervisorOffset = 10 / scale;
   const left = rect.x + (post.x / 100) * rect.width + supervisorOffset;
   const top = rect.y + (post.y / 100) * rect.height + supervisorOffset;
 
   const { color } = getTeamMarkerColors(supervisor);
+  // Same hover/selected enlarge as every other marker (see PostMarker).
+  const emphasis = (hovered || isSelected ? 1.15 : 1) / scale;
 
   const handleMouseEnter = () => {
     setHovered(true);
@@ -604,14 +630,27 @@ function SupervisorMarker({ supervisor, post, rect, scale }: SupervisorMarkerPro
         top: `${top}px`,
         // Counter-scale against ambient map zoom so the icon stays a
         // constant on-screen size, same treatment as every other marker.
-        transform: `translate(-50%, -50%) scale(${1 / scale})`,
+        transform: `translate(-50%, -50%) scale(${emphasis})`,
         transformOrigin: 'center center',
-        zIndex: 25,
+        zIndex: isSelected ? 999 : 25,
         cursor: 'default',
+        transition: 'transform 0.15s ease-out',
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
     >
+      {isSelected && (
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: '100%', marginBottom: 2 }}>
+          <ArrowBigDown
+            className="animate-bounce"
+            size={40}
+            strokeWidth={1.5}
+            fill="#f97316"
+            stroke="white"
+            style={{ filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' }}
+          />
+        </div>
+      )}
       <ShieldUser
         size={26}
         strokeWidth={1.5}
@@ -670,6 +709,10 @@ export interface VenueMapWithPostsProps {
   selectedPostName?: string | null;
   /** Name of a team on the current layer to draw the same attention arrow around — e.g. a team card's "view on map" button. */
   selectedTeamName?: string | null;
+  /** Same, for a supervisor's "view on map" button. */
+  selectedSupervisorName?: string | null;
+  /** Same, for an equipment item's "view on map" button (matched by name, same identity equipment cards use elsewhere). */
+  selectedEquipmentName?: string | null;
   /** Clicking a post pin shows a small "Add Call" button under it prefilled with that location; omit to disable (event creation/venue management have no Calls). */
   onAddCallAtPost?: (postName: string) => void;
   /** Same, but from clicking a team marker — prefills the assigned team instead of the location. */
@@ -698,6 +741,8 @@ export function VenueMapWithPosts({
   imgRef,
   selectedPostName,
   selectedTeamName,
+  selectedSupervisorName,
+  selectedEquipmentName,
   onAddCallAtPost,
   onAddCallForTeam,
 }: VenueMapWithPostsProps) {
@@ -886,6 +931,7 @@ export function VenueMapWithPosts({
                   post={postObj}
                   rect={rect}
                   scale={scale}
+                  isSelected={!!selectedEquipmentName && equip.name === selectedEquipmentName}
                 />
               );
             })}
@@ -930,6 +976,7 @@ export function VenueMapWithPosts({
                   post={postObj}
                   rect={rect}
                   scale={scale}
+                  isSelected={!!selectedSupervisorName && sup.team === selectedSupervisorName}
                 />
               );
             })}
