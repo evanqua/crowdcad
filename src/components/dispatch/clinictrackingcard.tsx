@@ -9,6 +9,7 @@ import {
 import { MoreVertical, RotateCw } from 'lucide-react';
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import DispatchMotionCell from '@/components/dispatch/motioncell';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { useMMSS } from '@/hooks/useMMSS';
 import { isClinicCallResolved } from '@/lib/clinics';
@@ -108,6 +109,7 @@ export default function ClinicTrackingCard({
 
   const timer = useMMSS(callTimestamp);
   const bg = getCallRowClass(call) || callBg();
+  const isActive = bg === 'bg-status-card-red';
   const isResolved = isClinicCallResolved(call);
 
   // Get primary team (first assigned team or first detached team)
@@ -122,7 +124,13 @@ export default function ClinicTrackingCard({
   }, [call.assignedTeam, call.detachedTeams]);
 
   return (
-    <Card className={`rounded-2xl shadow-sm border-0 ${bg}`}>
+    <Card
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${
+        expanded
+          ? `rounded-lg shadow-sm ${isActive ? 'bg-status-card-red' : 'bg-surface-deep'}`
+          : `rounded-none shadow-none ${isActive ? 'bg-status-card-red hover:bg-status-card-red' : 'bg-transparent hover:bg-surface-deep'}`
+      }`}
+    >
       {/* HEADER */}
       <CardHeader 
         onClick={() => setExpanded(v => !v)}
@@ -304,8 +312,12 @@ export default function ClinicTrackingCard({
         </div>
 
         {/* Expanded section: Notes and Log */}
-        {expanded && (
-          <div className="pt-3 border-t border-surface-liner space-y-3" onClick={e => e.stopPropagation()}>
+        <DispatchMotionCell isOpen={expanded} animate overflowVisibleWhenOpen>
+          <div
+            className="pt-3 border-t border-surface-liner space-y-3"
+            onClick={e => e.stopPropagation()}
+            aria-hidden={!expanded}
+          >
             {call.priority && (
               <div className="bg-status-red text-surface-light p-2 rounded">
                 ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
@@ -388,7 +400,7 @@ export default function ClinicTrackingCard({
               />
             </div>
           </div>
-        )}
+        </DispatchMotionCell>
       </CardBody>
     </Card>
   );

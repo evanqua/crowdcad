@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { Event, Call, DetachedTeam } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import DispatchMotionCell from '@/components/dispatch/motioncell';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
 import { getStatusColor } from '@/lib/statusColors';
@@ -139,6 +140,7 @@ export default function CallTrackingCard({
 
   const timer = useMMSS(callTimestamp);
   const bg = getCallRowClass(call) || callBg(call, event);
+  const isActive = bg === 'bg-status-card-red';
 
   // Get available teams for dropdown (including On Break and In Clinic)
   const availableStaff = useMemo(() => {
@@ -168,7 +170,13 @@ export default function CallTrackingCard({
   }, [event.staff]);
 
   return (
-    <Card className={`rounded-lg shadow-sm border-0 ${bg}`}>
+    <Card
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${
+        expanded
+          ? `rounded-lg shadow-sm ${isActive ? 'bg-status-card-red' : 'bg-surface-deep'}`
+          : `rounded-none shadow-none ${isActive ? 'bg-status-card-red hover:bg-status-card-red' : 'bg-transparent hover:bg-surface-deep'}`
+      }`}
+    >
       {/* HEADER */}
       <CardHeader 
         onClick={() => setExpanded(v => !v)}
@@ -605,8 +613,12 @@ export default function CallTrackingCard({
         </div>
 
         {/* Expanded section: Notes and Log */}
-        {expanded && (
-          <div className="pt-3 border-t border-surface-liner space-y-3" onClick={e => e.stopPropagation()}>
+        <DispatchMotionCell isOpen={expanded} animate overflowVisibleWhenOpen>
+          <div
+            className="pt-3 border-t border-surface-liner space-y-3"
+            onClick={e => e.stopPropagation()}
+            aria-hidden={!expanded}
+          >
             {call.priority && (
               <div className="bg-status-red text-surface-light p-2 rounded">
                 ⚠️ PRIORITY CALL: Life threat to patient/provider
@@ -689,7 +701,7 @@ export default function CallTrackingCard({
               />
             </div>
           </div>
-        )}
+        </DispatchMotionCell>
       </CardBody>
     </Card>
   );

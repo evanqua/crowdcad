@@ -24,6 +24,7 @@ import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventSto
 import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4, Map as MapIcon, Users, BriefcaseMedical, HousePlus } from "lucide-react";
 import { FaWalkieTalkie } from "react-icons/fa6";
 import TeamWidget from '@/components/dispatch/teamwidget';
+import DispatchMotionCell from '@/components/dispatch/motioncell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CallTrackingTable } from '@/components/dispatch/calltracking';
 import ClinicTrackingTable from '@/components/dispatch/clinictracking';
@@ -3612,6 +3613,134 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     </div>
   );
 
+  const renderMobileCallCard = (call: Call) => (
+    <CallTrackingCard
+      key={call.id}
+      call={call}
+      callDisplayNumber={callDisplayNumberMap.get(call.id) || 0}
+      event={event}
+      onLocationChange={async (callId, newLocation) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          location: newLocation,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Location changed to ${newLocation}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onAgeSexChange={async (callId, ageSexValue) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const { age, gender } = parseAgeSex(ageSexValue);
+        const newAge = age || '';
+        const newGender = gender || '';
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          age: newAge,
+          gender: newGender,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Age/Sex set to ${formatAgeSex(newAge, newGender) || 'N/A'}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onChiefComplaintChange={async (callId, newChiefComplaint) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          chiefComplaint: newChiefComplaint,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Chief Complaint changed to ${newChiefComplaint}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onRemoveTeamFromCall={handleRemoveTeamFromCall}
+      onAddTeamToCall={handleAddTeamToCall}
+      handleTeamStatusChange={handleTeamStatusChange}
+      handleRevertDetachment={handleRevertDetachment}
+      handleMarkDuplicate={handleMarkDuplicate}
+      handleTogglePriority={handleTogglePriorityFromMenu}
+      handleDeleteCall={handleDeleteCall}
+      getCallRowClass={getCallRowClass}
+      formatAgeSex={formatAgeSex}
+      updateEvent={updateEvent}
+    />
+  );
+
+  const renderMobileClinicCard = (call: Call) => (
+    <ClinicTrackingCard
+      key={call.id}
+      call={call}
+      callDisplayNumber={callDisplayNumberMap.get(call.id) || 0}
+      event={event}
+      onLocationChange={async (callId, newLocation) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          location: newLocation,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Location changed to ${newLocation}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onAgeSexChange={async (callId, ageSexValue) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const { age, gender } = parseAgeSex(ageSexValue);
+        const newAge = age || '';
+        const newGender = gender || '';
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          age: newAge,
+          gender: newGender,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Age/Sex set to ${formatAgeSex(newAge, newGender) || 'N/A'}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onChiefComplaintChange={async (callId, newChiefComplaint) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          chiefComplaint: newChiefComplaint,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Chief Complaint changed to ${newChiefComplaint}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onOutcomeChange={handleClinicOutcomeChange}
+      onRevertOutcome={handleRevertClinicOutcome}
+      handleDeleteCall={handleDeleteCall}
+      getCallRowClass={getCallRowClass}
+      formatAgeSex={formatAgeSex}
+      updateEvent={updateEvent}
+    />
+  );
+
   return (
     <DispatchVocabularyProvider terms={vocabularyTerms}>
       <ToastContainer
@@ -4323,89 +4452,25 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         </Tooltip>
                       </div>
                     </div>
-                    <div className="space-y-3">
-                      {isMobile && [
-                        // Active calls first
-                        ...event.calls
-                          .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status))
-                          .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id)),
-                        // Show resolved calls when showResolvedCalls is true
-                        ...(showResolvedCalls
-                          ? event.calls
-                              .filter((c: Call) => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(c.status))
-                              .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id))
-                          : [])
-                      ].map((call: Call) => (
-                        <CallTrackingCard
-                          key={call.id}
-                          call={call}
-                          callDisplayNumber={callDisplayNumberMap.get(call.id) || 0}
-                          event={event}
-                          onLocationChange={async (callId, newLocation) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              location: newLocation,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Location changed to ${newLocation}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onAgeSexChange={async (callId, ageSexValue) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const { age, gender } = parseAgeSex(ageSexValue);
-                            const newAge = age || '';
-                            const newGender = gender || '';
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              age: newAge,
-                              gender: newGender,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Age/Sex set to ${formatAgeSex(newAge, newGender) || 'N/A'}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onChiefComplaintChange={async (callId, newChiefComplaint) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              chiefComplaint: newChiefComplaint,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Chief Complaint changed to ${newChiefComplaint}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onRemoveTeamFromCall={handleRemoveTeamFromCall}
-                          onAddTeamToCall={handleAddTeamToCall}
-                          handleTeamStatusChange={handleTeamStatusChange}
-                          handleRevertDetachment={handleRevertDetachment}
-                          handleMarkDuplicate={handleMarkDuplicate}
-                          handleTogglePriority={handleTogglePriorityFromMenu}
-                          handleDeleteCall={handleDeleteCall}
-                          getCallRowClass={getCallRowClass}
-                          formatAgeSex={formatAgeSex}
-                          updateEvent={updateEvent}
-                        />
-                      ))}
+                    <div className="dispatch-shell-list">
+                      {isMobile && event.calls
+                        .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status))
+                        .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id))
+                        .map(renderMobileCallCard)}
                       {(!event.calls || event.calls.length === 0) && (
                         <div className="text-center text-surface-light/50 py-8">
                           {t('No calls')}
                         </div>
                       )}
                     </div>
+                    <DispatchMotionCell isOpen={showResolvedCalls} animate>
+                      <div className="dispatch-shell-list">
+                        {isMobile && event.calls
+                          .filter((c: Call) => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(c.status))
+                          .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id))
+                          .map(renderMobileCallCard)}
+                      </div>
+                    </DispatchMotionCell>
                     <div className="flex justify-center pt-3">
                       <button
                         onClick={() => setShowResolvedCalls(prev => !prev)}
@@ -4459,85 +4524,25 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         </div>
                       </Tooltip>
                     </div>
-                    <div className="space-y-3">
-                      {isMobile && [
-                        // Unresolved clinic (Delivered with no outcome)
-                        ...(event.calls || [])
-                          .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
-                          .sort((a, b) => parseInt(a.id) - parseInt(b.id)),
-                        // Resolved clinic (Delivered with an outcome) when toggled on
-                        ...(showResolvedClinicCalls
-                          ? (event.calls || [])
-                              .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
-                              .sort((a, b) => parseInt(a.id) - parseInt(b.id))
-                          : [])
-                      ].map((call: Call) => (
-                        <ClinicTrackingCard
-                          key={call.id}
-                          call={call}
-                          callDisplayNumber={callDisplayNumberMap.get(call.id) || 0}
-                          event={event}
-                          onLocationChange={async (callId, newLocation) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              location: newLocation,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Location changed to ${newLocation}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onAgeSexChange={async (callId, ageSexValue) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const { age, gender } = parseAgeSex(ageSexValue);
-                            const newAge = age || '';
-                            const newGender = gender || '';
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              age: newAge,
-                              gender: newGender,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Age/Sex set to ${formatAgeSex(newAge, newGender) || 'N/A'}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onChiefComplaintChange={async (callId, newChiefComplaint) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              chiefComplaint: newChiefComplaint,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Chief Complaint changed to ${newChiefComplaint}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onOutcomeChange={handleClinicOutcomeChange}
-                          onRevertOutcome={handleRevertClinicOutcome}
-                          handleDeleteCall={handleDeleteCall}
-                          getCallRowClass={getCallRowClass}
-                          formatAgeSex={formatAgeSex}
-                          updateEvent={updateEvent}
-                        />
-                      ))}
+                    <div className="dispatch-shell-list">
+                      {isMobile && (event.calls || [])
+                        .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
+                        .sort((a, b) => parseInt(a.id) - parseInt(b.id))
+                        .map(renderMobileClinicCard)}
                       {getClinicCalls(mobileClinicId).length === 0 && (
                         <div className="text-center text-surface-light/50 py-8">
                           {t('No clinic calls')}
                         </div>
                       )}
                     </div>
+                    <DispatchMotionCell isOpen={showResolvedClinicCalls} animate>
+                      <div className="dispatch-shell-list">
+                        {isMobile && (event.calls || [])
+                          .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
+                          .sort((a, b) => parseInt(a.id) - parseInt(b.id))
+                          .map(renderMobileClinicCard)}
+                      </div>
+                    </DispatchMotionCell>
                     <div className="flex justify-center pt-3">
                       <button
                         onClick={() => setShowResolvedClinicCalls(prev => !prev)}
