@@ -42,7 +42,7 @@ import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging, getPending
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
-import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResolved } from '@/lib/clinics';
+import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResolved, RESOLVED_CALL_STATUSES } from '@/lib/clinics';
 import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
@@ -1738,7 +1738,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       let clinicId = c.clinicId;
       let outcome = c.outcome;
 
-      if (kind === 'team') {
+      // Only the team whose OWN status change actually resolved the call
+      // (reason is the resolving status itself, not 'Auto-detached') reopens
+      // it on revert — reverting one of the other teams/equipment the
+      // resolving cascade auto-released just restores that one team; the
+      // call stays resolved via whichever distinction is still recorded.
+      if (kind === 'team' && detachedEntry.reason !== 'Auto-detached') {
         if (restoredStatus === 'Transporting') newCallStatus = 'Transporting';
         else if (restoredStatus === 'On Scene') newCallStatus = 'On Scene';
         else newCallStatus = 'En Route';
@@ -3453,14 +3458,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   if (!event) return <LoadingScreen label="Loading event…" />;
 
-  const resolvedCallStatuses = [
-    'Delivered',
-    'Refusal',
-    'NMM',
-    'Rolled',
-    'Resolved',
-    'Unable to Locate',
-  ];
+  const resolvedCallStatuses = RESOLVED_CALL_STATUSES;
 
   const activeCallsList = (event.calls || []).filter(
     call => !resolvedCallStatuses.includes(call.status)

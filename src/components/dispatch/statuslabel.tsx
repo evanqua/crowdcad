@@ -42,3 +42,20 @@ export default function StatusLabel({ status, text, showIcon = true, className }
     </span>
   );
 }
+
+/**
+ * Word appended to a status's label in a dropdown MENU (list of choices),
+ * standing in for the icon shown on the equivalent PILL (persistent current-
+ * value display) — icons are reserved for the pill; menu options spell the
+ * same thing out as a word instead. Derived from STATUS_ICONS so the two
+ * never drift apart.
+ */
+const MENU_LABEL_SUFFIX: Record<string, string> = Object.fromEntries(
+  Object.entries(STATUS_ICONS).map(([status, Icon]) => [status, Icon === HousePlus ? 'Clinic' : 'Ambulance'])
+);
+
+/** Plain-text label for a status/outcome inside a dropdown menu — no icon, just the word the pill's icon stands for appended (e.g. "Transporting to Clinic", "Transferred to Ambulance"). */
+export function getMenuLabel(status: string, t: (key: string) => string): string {
+  const suffix = MENU_LABEL_SUFFIX[status];
+  return suffix ? `${t(status)} ${suffix}` : t(status);
+}

@@ -94,6 +94,23 @@ export function getClinicName(clinics: Clinic[], clinicId: string | undefined): 
   return clinics.find(c => c.id === clinicId)?.name;
 }
 
+/**
+ * Call.status values that mean the call itself is fully closed out — every
+ * team/supervisor/equipment still on it has been auto-returned to post (see
+ * the resolving cascade in dispatch/page.tsx's handleTeamStatusChange). A
+ * call resolved via "Transferred to ambulance" (Rolled from Scene) ends up
+ * with status 'Resolved' here, same as any other non-Delivered/Refusal/NMM/
+ * Unable-to-Locate resolution — see the note on totalTransports in
+ * summary/page.tsx for how that specific case is still distinguished when
+ * needed via `detachedTeams`.
+ */
+export const RESOLVED_CALL_STATUSES = ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'];
+
+/** True once a call's status is one of RESOLVED_CALL_STATUSES. */
+export function isCallResolved(call: Call): boolean {
+  return RESOLVED_CALL_STATUSES.includes(call.status);
+}
+
 /** A status pill's display text, and whether its status icon should still render alongside it. */
 export type DestinationLabel = { text: string; showIcon: boolean };
 

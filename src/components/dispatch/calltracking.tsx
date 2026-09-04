@@ -15,12 +15,12 @@ import type { Event, Call, EquipmentStatus, Supervisor, Staff, Equipment, Detach
 import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
 import DispatchMotionCell from './motioncell';
-import StatusLabel from './statuslabel';
+import StatusLabel, { getMenuLabel } from './statuslabel';
 import TrackingTableBase from './trackingtablebase';
 import PendingCallChip from './pendingcallchip';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
+import { getEventClinics, getTransportingLabel, getDeliveredLabel, RESOLVED_CALL_STATUSES } from '@/lib/clinics';
 import { withPendingSuffix } from '@/lib/callTiming';
 
 import {
@@ -146,10 +146,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
     markPendingValue,
   } = useCallTrackingState(event, formatAgeSex);
 
-  const resolvedCallStatuses = React.useMemo(
-    () => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'],
-    []
-  );
+  const resolvedCallStatuses = RESOLVED_CALL_STATUSES;
 
   const resolvedCalls = event.calls
     .filter((call: Call) => resolvedCallStatuses.includes(call.status))
@@ -512,9 +509,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                           }}
                                         >
                                           {statusOptions.map((status: string) => (
-                                            <DropdownItem key={status}>
-                                              <StatusLabel status={status} text={t(status)} />
-                                            </DropdownItem>
+                                            <DropdownItem key={status}>{getMenuLabel(status, t)}</DropdownItem>
                                           ))}
                                         </DropdownMenu>
                                       </Dropdown>
@@ -550,7 +545,9 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                               </Chip>
                             ))}
 
-                            {/* Add Team Button with shadcn DropdownMenu */}
+                            {/* Add Team Button with shadcn DropdownMenu — disabled once the
+                                call is resolved; only reopening it via handleRevertDetachment
+                                re-enables this. */}
                             <Dropdownmenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -558,6 +555,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   size="sm"
                                   variant="flat"
                                   aria-label="Add"
+                                  isDisabled={isResolvedCall}
                                   className="w-8 h-8 rounded-full hover:bg-surface-liner shrink-0"
                                 >
                                   <Plus className="h-4 w-4" />

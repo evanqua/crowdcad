@@ -19,9 +19,9 @@ import {
 import type { Event, Call, DetachedTeam } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import DispatchMotionCell from '@/components/dispatch/motioncell';
-import StatusLabel from '@/components/dispatch/statuslabel';
+import StatusLabel, { getMenuLabel } from '@/components/dispatch/statuslabel';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
+import { getEventClinics, getTransportingLabel, getDeliveredLabel, isCallResolved } from '@/lib/clinics';
 import { getStatusColor } from '@/lib/statusColors';
 import { useMMSS } from '@/hooks/useMMSS';
 
@@ -73,6 +73,7 @@ export default function CallTrackingCard({
 }: CallTrackingCardProps) {
   const { t } = useDispatchTerms();
   const clinics = getEventClinics(event.clinics);
+  const isResolved = isCallResolved(call);
   const [clinicPickTeam, setClinicPickTeam] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [locationInput, setLocationInput] = useState(call.location || '');
@@ -401,9 +402,7 @@ export default function CallTrackingCard({
                         }}
                       >
                         {statusOptions.map(status => (
-                          <DropdownItem key={status}>
-                            <StatusLabel status={status} text={t(status)} />
-                          </DropdownItem>
+                          <DropdownItem key={status}>{getMenuLabel(status, t)}</DropdownItem>
                         ))}
                       </DropdownMenu>
                     </Dropdown>
@@ -439,7 +438,9 @@ export default function CallTrackingCard({
             </Chip>
           ))}
 
-          {/* Add Team Button */}
+          {/* Add Team Button — disabled once the call is resolved (delivered,
+              refusal, nmm, unable to locate, transferred to ambulance); only
+              reopening it via handleRevertDetachment re-enables this. */}
           <Dropdownmenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -447,6 +448,7 @@ export default function CallTrackingCard({
                 size="sm"
                 variant="flat"
                 aria-label="Add"
+                isDisabled={isResolved}
                 className="w-8 h-8 rounded-full hover:bg-surface-liner"
               >
                 <Plus className="h-4 w-4" />
