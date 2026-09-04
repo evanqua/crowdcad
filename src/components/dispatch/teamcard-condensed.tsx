@@ -11,8 +11,10 @@ import type {Event, Staff} from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 import DispatchMotionCell from './motioncell';
+import EquipmentTypeIcon, { getEquipmentStatusWord } from './equipmenttypeicon';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getClinicName } from '@/lib/clinics';
+import { getEquipmentIconType } from '@/lib/equipmentIcon';
 
 type TeamCardCondensedProps = {
   staff: Staff;
@@ -105,6 +107,14 @@ export default function TeamCardCondensed({
       ? ['En Route', 'On Scene', 'Transporting']
       : ['Available', 'On Break', 'In Clinic'];
 
+  // Equipment this team/supervisor is actually running — same icon
+  // convention as the call tracker's team chip (see equipmenttypeicon.tsx).
+  const teamEquipment = isOnEq
+    ? (event.eventEquipment || []).filter(eq => eq.assignedTeam === staff.team)
+    : [];
+  const teamEquipmentNames = teamEquipment.map(eq => eq.name).join(', ');
+  const teamEquipmentIconType = teamEquipment[0] ? getEquipmentIconType(teamEquipment[0].name) : null;
+
   const postOptions: string[] = React.useMemo(() => {
     const base: string[] = ['Clinic'];
     const posts = (event.venue?.posts || []).map(p => (typeof p === 'string' ? p : p.name));
@@ -148,6 +158,11 @@ export default function TeamCardCondensed({
               <>
                 <ArrowRight className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
                 <span className="truncate">{getClinicName(clinics, activeCall?.clinicId)}</span>
+              </>
+            ) : (staff.status === 'Delivered Eq' || staff.status === 'En Route Eq') && teamEquipmentIconType ? (
+              <>
+                <span className="truncate">{getEquipmentStatusWord(staff.status)}</span>
+                <EquipmentTypeIcon type={teamEquipmentIconType} />
               </>
             ) : (
               t(staff.status)
@@ -289,6 +304,14 @@ export default function TeamCardCondensed({
                     }
                     return t('Transporting');
                   }
+                  if ((key === 'Delivered Eq' || key === 'En Route Eq') && teamEquipmentIconType) {
+                    return (
+                      <span className="inline-flex items-center gap-1 min-w-0">
+                        <span className="truncate">{getEquipmentStatusWord(key)}</span>
+                        <EquipmentTypeIcon type={teamEquipmentIconType} />
+                      </span>
+                    );
+                  }
                   return t(key);
                 }}
                 classNames={{
@@ -297,7 +320,11 @@ export default function TeamCardCondensed({
                 }}
               >
                 {statusOptions.map((s) => (
-                  <SelectItem key={s}>{t(s)}</SelectItem>
+                  <SelectItem key={s}>
+                    {(s === 'Delivered Eq' || s === 'En Route Eq') && teamEquipmentNames
+                      ? `${s === 'En Route Eq' ? 'En Route -' : 'Delivered'} ${teamEquipmentNames}`
+                      : t(s)}
+                  </SelectItem>
                 ))}
               </Select>
               )}

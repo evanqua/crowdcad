@@ -38,7 +38,7 @@ export default function StatusLabel({ status, text, showIcon = true, className }
   return (
     <span className={`inline-flex items-center gap-1 ${className || ''}`}>
       <span>{text}</span>
-      {Icon && <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
+      {Icon && <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />}
     </span>
   );
 }

@@ -12,6 +12,8 @@ import type { Event, EquipmentItem } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getStatusColor } from '@/lib/statusColors';
+import EquipmentTypeIcon from '@/components/dispatch/equipmenttypeicon';
+import { getEquipmentIconType } from '@/lib/equipmentIcon';
 
 type EquipmentCardProps = {
   equipment: EquipmentItem;
@@ -100,7 +102,10 @@ export default function EquipmentCard({
         className="relative flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none"
       >
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-          <div className="font-semibold text-[15px] sm:text-base text-surface-light">{equipment.name}</div>
+          <div className="flex items-center gap-1.5 font-semibold text-[15px] sm:text-base text-surface-light">
+            <EquipmentTypeIcon type={getEquipmentIconType(equipment.name)} className="w-4 h-4 shrink-0" />
+            <span className="truncate">{equipment.name}</span>
+          </div>
         </div>
 
         <div className="absolute top-3 right-3 flex items-center gap-2">

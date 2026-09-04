@@ -136,12 +136,24 @@ export default function CallTrackingCard({
 
   // Detached-team pill label — 'Delivered' gets the same clinic-name
   // decoration (and icon-suppression once a real name is shown) as the
-  // active Transporting pill above; every other reason is a plain
-  // status label.
-  const renderDetachedReason = (reason: string) => {
+  // active Transporting pill above; 'Delivered Eq' shows the equipment's
+  // own icon, using the equipmentNames captured at detach time (the
+  // equipment record itself is no longer linked to this team by the time
+  // it's rendered here — delivering unassigns it, see handleTeamStatusChange's
+  // isEqDetaching branch); every other reason is a plain status label.
+  const renderDetachedReason = (detachedTeam: DetachedTeam) => {
+    const { reason, equipmentNames } = detachedTeam;
     if (reason === 'Delivered') {
       const { text, showIcon } = getDeliveredLabel(t, clinics, call.clinicId);
       return <StatusLabel status="Delivered" text={text} showIcon={showIcon} />;
+    }
+    if (reason === 'Delivered Eq' && equipmentNames?.[0]) {
+      return (
+        <span className="inline-flex items-center gap-1">
+          <span>{getEquipmentStatusWord('Delivered Eq')}</span>
+          <EquipmentTypeIcon type={getEquipmentIconType(equipmentNames[0])} />
+        </span>
+      );
     }
     return <StatusLabel status={reason} text={t(reason)} />;
   };
@@ -357,6 +369,12 @@ export default function CallTrackingCard({
             const teamEquipmentNames = teamEquipment.map(eq => eq.name).join(', ');
             const teamEquipmentIconType = teamEquipment[0] ? getEquipmentIconType(teamEquipment[0].name) : null;
             const isEqStatus = currentStatus === 'Delivered Eq' || currentStatus === 'En Route Eq';
+            // Reuses the chip's own translucent status fill on the status
+            // button — stacked on top of the chip's already-tinted
+            // background, the same semi-transparent token reads visibly
+            // darker/more saturated, marking this piece out as a button
+            // without introducing a whole new color.
+            const statusButtonClass = `inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-surface-light ${teamStatusColor.fillClass} hover:brightness-110 transition-all`;
 
             return (
               <Chip
@@ -382,7 +400,7 @@ export default function CallTrackingCard({
                       <DropdownTrigger>
                         <button
                           onClick={(e) => e.stopPropagation()}
-                          className="text-xs text-surface-faint hover:text-surface-light transition-colors"
+                          className={statusButtonClass}
                         >
                           {t('Select clinic')} ▼
                         </button>
@@ -406,7 +424,7 @@ export default function CallTrackingCard({
                           onClick={(e) => {
                             e.stopPropagation();
                           }}
-                          className="text-xs text-surface-faint hover:text-surface-light transition-colors"
+                          className={statusButtonClass}
                         >
                           {isEqStatus && teamEquipmentIconType ? (
                             <span className="inline-flex items-center gap-1">
@@ -440,7 +458,7 @@ export default function CallTrackingCard({
                         {statusOptions.map(status => (
                           <DropdownItem key={status}>
                             {(status === 'Delivered Eq' || status === 'En Route Eq') && teamEquipmentNames
-                              ? `${getEquipmentStatusWord(status)} ${teamEquipmentNames}`
+                              ? `${status === 'En Route Eq' ? 'En Route -' : 'Delivered'} ${teamEquipmentNames}`
                               : getMenuLabel(status, t)}
                           </DropdownItem>
                         ))}
@@ -473,7 +491,7 @@ export default function CallTrackingCard({
                 isDisabled
                 className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
               >
-                {renderDetachedReason(detachedTeam.reason)}
+                {renderDetachedReason(detachedTeam)}
               </Button>
             </Chip>
           ))}

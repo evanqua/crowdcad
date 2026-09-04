@@ -18,12 +18,12 @@ type Props = {
  * but without the map's forced white-on-badge styling: these inherit the
  * surrounding text color like every other status icon.
  */
-export default function EquipmentTypeIcon({ type, className = 'w-3.5 h-3.5 shrink-0' }: Props) {
+export default function EquipmentTypeIcon({ type, className = 'w-4 h-4 shrink-0' }: Props) {
   if (type === 'wheelchair') {
-    return <Image src="/map/wheelchair.svg" alt="Wheelchair" width={14} height={14} className={className} />;
+    return <Image src="/map/wheelchair.svg" alt="Wheelchair" width={16} height={16} className={className} />;
   }
   if (type === 'stretcher') {
-    return <Image src="/map/gurney.svg" alt="Gurney" width={14} height={14} className={className} />;
+    return <Image src="/map/gurney.svg" alt="Gurney" width={16} height={16} className={className} />;
   }
   return <Briefcase className={className} aria-hidden="true" />;
 }
@@ -38,6 +38,6 @@ export default function EquipmentTypeIcon({ type, className = 'w-3.5 h-3.5 shrin
  */
 export function getEquipmentStatusWord(status: string): string {
   if (status === 'Delivered Eq') return 'Delivered';
-  if (status === 'En Route Eq') return 'En Route -';
+  if (status === 'En Route Eq') return 'En Route';
   return status;
 }

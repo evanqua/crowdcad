@@ -11,8 +11,10 @@ import type {Event, Staff} from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 import DispatchMotionCell from './motioncell';
+import EquipmentTypeIcon, { getEquipmentStatusWord } from './equipmenttypeicon';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getClinicName } from '@/lib/clinics';
+import { getEquipmentIconType } from '@/lib/equipmentIcon';
 
 type TeamCardProps = {
   staff: Staff;
@@ -116,6 +118,14 @@ export default function TeamCard({
     : isOnAnyActiveCall
       ? ['En Route', 'On Scene', 'Transporting']
       : ['Available', 'On Break', 'In Clinic'];
+
+  // Equipment this team/supervisor is actually running — same icon
+  // convention as the call tracker's team chip (see equipmenttypeicon.tsx).
+  const teamEquipment = isOnEq
+    ? (event.eventEquipment || []).filter(eq => eq.assignedTeam === staff.team)
+    : [];
+  const teamEquipmentNames = teamEquipment.map(eq => eq.name).join(', ');
+  const teamEquipmentIconType = teamEquipment[0] ? getEquipmentIconType(teamEquipment[0].name) : null;
 
   const postOptions: string[] = React.useMemo(() => {
     const base: string[] = ['Clinic']; // Only Clinic, not Transporting
@@ -277,6 +287,14 @@ export default function TeamCard({
                   }
                   return t('Transporting');
                 }
+                if ((key === 'Delivered Eq' || key === 'En Route Eq') && teamEquipmentIconType) {
+                  return (
+                    <span className="inline-flex items-center gap-1 min-w-0">
+                      <span className="truncate">{getEquipmentStatusWord(key)}</span>
+                      <EquipmentTypeIcon type={teamEquipmentIconType} />
+                    </span>
+                  );
+                }
                 return t(key);
               }}
               classNames={{
@@ -285,7 +303,11 @@ export default function TeamCard({
               }}
             >
               {statusOptions.map((s) => (
-                <SelectItem key={s}>{t(s)}</SelectItem>
+                <SelectItem key={s}>
+                  {(s === 'Delivered Eq' || s === 'En Route Eq') && teamEquipmentNames
+                    ? `${s === 'En Route Eq' ? 'En Route -' : 'Delivered'} ${teamEquipmentNames}`
+                    : t(s)}
+                </SelectItem>
               ))}
             </Select>
             )}

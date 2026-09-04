@@ -130,11 +130,24 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
   // Detached-team pill label — 'Delivered' gets the same clinic-name
   // decoration (and icon-suppression once a real name is shown) as the
-  // active Transporting pill; every other reason is a plain status label.
-  const renderDetachedReason = (reason: string, call: Call) => {
+  // active Transporting pill; 'Delivered Eq' shows the equipment's own icon,
+  // using the equipmentNames captured at detach time (the equipment record
+  // itself is no longer linked to this team by the time it's rendered here —
+  // delivering unassigns it, see handleTeamStatusChange's isEqDetaching
+  // branch); every other reason is a plain status label.
+  const renderDetachedReason = (detachedTeam: DetachedTeam, call: Call) => {
+    const { reason, equipmentNames } = detachedTeam;
     if (reason === 'Delivered') {
       const { text, showIcon } = getDeliveredLabel(t, clinics, call.clinicId);
       return <StatusLabel status="Delivered" text={text} showIcon={showIcon} />;
+    }
+    if (reason === 'Delivered Eq' && equipmentNames?.[0]) {
+      return (
+        <span className="inline-flex items-center gap-1">
+          <span>{getEquipmentStatusWord('Delivered Eq')}</span>
+          <EquipmentTypeIcon type={getEquipmentIconType(equipmentNames[0])} />
+        </span>
+      );
     }
     return <StatusLabel status={reason} text={t(reason)} />;
   };
@@ -411,12 +424,16 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                           </DispatchMotionCell>
                         </td>
                         
-                        {/* Team - Updated with larger Chips and shadcn dropdown */}
+                        {/* Team - Updated with larger Chips and shadcn dropdown. Chips wrap
+                            onto additional lines (instead of forcing the cell to grow
+                            arbitrarily wide) so a call with several teams grows the row's
+                            height, not its width into neighboring columns like the
+                            3-dot menu. */}
                         <td
-                          className="p-0 relative z-0 whitespace-nowrap"
+                          className="p-0 relative z-0"
                         >
                           <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5">
-                            <div className="relative z-0 flex flex-nowrap items-center gap-2 min-w-max w-max">
+                            <div className="relative z-0 flex flex-wrap items-center gap-2">
                             {(call.assignedTeam || []).length === 0 && !isResolvedCall && (
                               <PendingCallChip since={call.log?.[0]?.timestamp} label={t('Pending')} />
                             )}
@@ -439,6 +456,12 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                               const teamEquipmentNames = teamEquipment.map(eq => eq.name).join(', ');
                               const teamEquipmentIconType = teamEquipment[0] ? getEquipmentIconType(teamEquipment[0].name) : null;
                               const isEqStatus = currentTeamStatus === 'Delivered Eq' || currentTeamStatus === 'En Route Eq';
+                              // Reuses the chip's own translucent status fill on the status
+                              // button — stacked on top of the chip's already-tinted
+                              // background, the same semi-transparent token reads visibly
+                              // darker/more saturated, marking this piece out as a button
+                              // without introducing a whole new color.
+                              const statusButtonClass = `min-w-0 h-7 px-2 shrink-0 text-surface-light ${teamStatusColor.fillClass} hover:brightness-110`;
 
                               return (
                                 <Chip
@@ -467,7 +490,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                             size="sm"
                                             radius="full"
                                             variant="light"
-                                            className="min-w-0 h-6 px-2 text-xs shrink-0"
+                                            className={statusButtonClass}
                                           >
                                             {t('Select clinic')}
                                           </Button>
@@ -510,7 +533,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                             size="sm"
                                             radius="full"
                                             variant="light"
-                                            className="min-w-0 h-6 px-2 text-xs shrink-0"
+                                            className={statusButtonClass}
                                           >
                                             {isEqStatus && teamEquipmentIconType ? (
                                               <span className="inline-flex items-center gap-1">
@@ -545,7 +568,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                           {statusOptions.map((status: string) => (
                                             <DropdownItem key={status}>
                                               {(status === 'Delivered Eq' || status === 'En Route Eq') && teamEquipmentNames
-                                                ? `${getEquipmentStatusWord(status)} ${teamEquipmentNames}`
+                                                ? `${status === 'En Route Eq' ? 'En Route -' : 'Delivered'} ${teamEquipmentNames}`
                                                 : getMenuLabel(status, t)}
                                             </DropdownItem>
                                           ))}
@@ -578,7 +601,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   isDisabled
                                   className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
                                 >
-                                  {renderDetachedReason(detachedTeam.reason, call)}
+                                  {renderDetachedReason(detachedTeam, call)}
                                 </Button>
                               </Chip>
                             ))}
