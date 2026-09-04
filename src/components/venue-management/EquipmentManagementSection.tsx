@@ -1,8 +1,8 @@
 "use client";
 
 import React from 'react';
-import { Button, Input, ScrollShadow, Select, SelectItem } from '@heroui/react';
-import { Edit2, Plus, Trash2 } from 'lucide-react';
+import { Button, Input, ScrollShadow, Select, SelectItem, Tooltip } from '@heroui/react';
+import { CircleHelp, Edit2, Plus, Trash2 } from 'lucide-react';
 import type { Equipment } from '@/app/types';
 
 interface EquipmentManagementSectionProps {
@@ -48,8 +48,11 @@ export default function EquipmentManagementSection({
 }: EquipmentManagementSectionProps) {
   return (
     <>
-      <h3 className="mb-2 text-surface-light font-semibold text-xl">
+      <h3 className="mb-2 text-surface-light font-semibold text-xl inline-flex items-center gap-1.5">
         Equipment <span className="text-surface-faint text-sm font-normal">(Optional)</span>
+        <Tooltip content="Trackable gear stored on this venue (e.g., a gurney or AED) that events can pull in and assign a default location to." placement="top">
+          <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+        </Tooltip>
       </h3>
       <div className="flex gap-2 mb-3">
         <Input

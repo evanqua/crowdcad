@@ -4,8 +4,9 @@
 import * as React from "react";
 import {
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
-  Button, Input, Select, SelectItem,
+  Button, Input, Select, SelectItem, Tooltip,
 } from "@heroui/react";
+import { CircleHelp } from "lucide-react";
 import { Role } from "@/app/types";
 import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
 
@@ -93,7 +94,14 @@ export default function AddSupervisorModal({
 
             <ModalBody className="space-y-3">
               <Input
-                label={t("Supervisor Call Sign")}
+                label={
+                  <span className="inline-flex items-center gap-1">
+                    {t("Supervisor Call Sign")}
+                    <Tooltip content="The radio call sign this supervisor unit will be identified by on the dispatch board, not a person's name." placement="top">
+                      <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+                    </Tooltip>
+                  </span>
+                }
                 labelPlacement="inside"
                 variant="flat"
                 size="lg"

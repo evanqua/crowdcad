@@ -31,6 +31,7 @@ import {
   Input,
   Card,
   ScrollShadow,
+  Tooltip,
 } from '@heroui/react';
 import {
   ChevronLeft,
@@ -41,6 +42,7 @@ import {
   Trash2,
   Edit2,
   MapPinned,
+  CircleHelp,
   HousePlus,
 } from 'lucide-react';
 
@@ -1026,8 +1028,11 @@ export default function VenueManagementPageClient() {
 
   const locationsStep = (
     <div className="flex flex-col h-full">
-      <h3 className="mb-2 flex-shrink-0 text-surface-light font-semibold text-xl">
+      <h3 className="mb-2 flex-shrink-0 text-surface-light font-semibold text-xl inline-flex items-center gap-1.5">
         Locations
+        <Tooltip content="Posts or areas teams can be assigned to and dispatched between during an event (e.g., Main Entrance, First Aid Tent). Pin them on the map, or add by name below." placement="top">
+          <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+        </Tooltip>
       </h3>
       <div className="flex gap-2 flex-shrink-0">
         <Input

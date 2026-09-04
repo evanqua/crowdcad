@@ -1,5 +1,6 @@
 import React from 'react';
-import { Input, Chip } from '@heroui/react';
+import { Input, Chip, Tooltip } from '@heroui/react';
+import { CircleHelp } from 'lucide-react';
 
 type ScheduleChip = { id: string; time: string; editable: boolean };
 
@@ -36,7 +37,12 @@ export default function PostingScheduleSection({
 }: Props) {
   return (
     <div className="space-y-3 mt-6">
-      <h3 className="text-surface-light font-semibold text-lg">Schedule</h3>
+      <h3 className="text-surface-light font-semibold text-lg inline-flex items-center gap-1.5">
+        Schedule
+        <Tooltip content="How often, in minutes, posts are automatically regenerated between the event's Start and End time." placement="top">
+          <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />
+        </Tooltip>
+      </h3>
 
       <div className="max-w-[10rem] pb-3">
         {/* The event's own start/end now live as "Start Time"/"End Time" on
