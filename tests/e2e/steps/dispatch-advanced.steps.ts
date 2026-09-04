@@ -34,13 +34,6 @@ Given('I have a venue with location {string} and equipment {string} and am on th
   await page.waitForURL(/\/events\/.*\/create/, { timeout: NAV_TIMEOUT });
 
   await page.getByPlaceholder('Enter event name').fill(`Adv Event ${uniqueSuffix()}`);
-
-  // Enable posts so a posting schedule gets generated — "Posting Schedule
-  // modal opens" depends on the Posting Schedule nav item existing, which
-  // now only appears once postingTimes is actually non-empty.
-  await page.getByRole('button', { name: /^Post schedule:/ }).click();
-  await page.getByText('Enable Posts').click();
-
   await page.getByRole('button', { name: /^Review:/ }).click();
   await page.getByRole('button', { name: 'Create Event' }).click();
   await page.waitForURL(/\/events\/.*\/dispatch/, { timeout: NAV_TIMEOUT });
