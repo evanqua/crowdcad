@@ -79,7 +79,7 @@ export default function EndEventModal({ isOpen, onClose, onConfirm }: Props) {
                 variant="flat"
                 size="lg"
                 radius="lg"
-                classNames={inputClassNames}
+                classNames={{ ...inputClassNames, base: "pt-2" }}
                 value={value}
                 onValueChange={setValue}
                 onKeyDown={(e) => {

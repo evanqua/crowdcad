@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { authService, dbService } from "@/lib/services";
 import { useAuth } from "@/hooks/useauth";
+import { useAdmin } from "@/hooks/useAdmin";
 import { useDispatchVocabulary } from "@/hooks/useDispatchVocabulary";
 import { isEventEnded } from "@/lib/eventStatus";
 import type { Event } from "@/app/types";
@@ -47,6 +48,7 @@ export default function AppNavbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, ready } = useAuth();
+  const { isAdmin } = useAdmin();
   const { activePreset: dispatchVocabularyPreset } = useDispatchVocabulary();
   const t = useCallback(
     (key: string) => dispatchVocabularyPreset.terms[key] ?? key,
@@ -96,6 +98,7 @@ export default function AppNavbar() {
   const [hasVenueMap, setHasVenueMap] = useState(true);
   const [postingScheduleEnabled, setPostingScheduleEnabled] = useState(true);
   const [eventEnded, setEventEnded] = useState(false);
+  const [eventOwnerId, setEventOwnerId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +108,7 @@ export default function AppNavbar() {
         setHasVenueMap(true);
         setPostingScheduleEnabled(true);
         setEventEnded(false);
+        setEventOwnerId(null);
         return;
       }
 
@@ -119,6 +123,7 @@ export default function AppNavbar() {
         setHasVenueMap(hasMap);
         setPostingScheduleEnabled((data?.postingTimes?.length ?? 0) > 0);
         setEventEnded(data ? isEventEnded(data) : false);
+        setEventOwnerId(data?.userId ?? null);
       } catch {
         if (!cancelled) {
           setHasVenueMap(true);
@@ -133,6 +138,9 @@ export default function AppNavbar() {
       cancelled = true;
     };
   }, [isDispatch, dispatchEventId]);
+
+  // Only the event's creator or a site admin can end it.
+  const canEndEvent = isAdmin || (!!user && !!eventOwnerId && user.uid === eventOwnerId);
 
   // Flip instantly on the dispatch page's own "End Event" action, instead of
   // waiting on the one-time fetch above to notice.
@@ -159,10 +167,12 @@ export default function AppNavbar() {
       label: "Event Summary",
       onClick: () => window.dispatchEvent(new CustomEvent('open-event-summary'))
     },
-    {
-      label: eventEnded ? "Event Ended" : "End Event",
-      onClick: () => window.dispatchEvent(new CustomEvent('open-end-event')),
-    },
+    ...(canEndEvent
+      ? [{
+          label: eventEnded ? "Event Ended" : "End Event",
+          onClick: () => window.dispatchEvent(new CustomEvent('open-end-event')),
+        }]
+      : []),
     {
       label: "Venues",
       onClick: () => router.push('/venues/selection'),

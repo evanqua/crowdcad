@@ -16,6 +16,7 @@ import { toast, Slide, ToastContainer } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
 import { useAuth } from '@/hooks/useauth';
+import { useAdmin } from '@/hooks/useAdmin';
 import { useCertifications } from '@/hooks/useCertifications';
 import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
@@ -83,6 +84,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const { user: authUser, ready: authReady } = useAuth();
   const user = isLiteMode ? null : authUser;
   const ready = isLiteMode ? true : authReady;
+  const { isAdmin: isOrgAdmin } = useAdmin();
   const { activePreset: dispatchVocabularyPreset } = useDispatchVocabulary();
   const vocabularyTerms = dispatchVocabularyPreset.terms;
   const t = useCallback((key: string) => vocabularyTerms[key] ?? key, [vocabularyTerms]);
@@ -2930,6 +2932,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const eventEnded = useMemo(() => (event ? isEventEnded(event, nowTick) : false), [event, nowTick]);
 
+  // Only the event's creator or a site admin can end it.
+  const canEndEvent = isLiteMode || isOrgAdmin || (!!user && !!event && event.userId === user.uid);
+
   const goToSummary = useCallback(() => {
     if (!eventId) return;
     router.push(`/events/${eventId}/summary`);
@@ -2938,7 +2943,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [showEndEventModal, setShowEndEventModal] = useState(false);
 
   const handleEndEvent = useCallback(async () => {
-    if (!event || !eventId) return;
+    if (!event || !eventId || !canEndEvent) return;
 
     await updateEvent(() => ({ ended: true, endedAt: Date.now() }), { bypassEndedCheck: true });
     setShowEndEventModal(false);
@@ -2948,7 +2953,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     }
 
     goToSummary();
-  }, [event, eventId, updateEvent, isLiteMode, goToSummary]);
+  }, [event, eventId, canEndEvent, updateEvent, isLiteMode, goToSummary]);
 
   const [showVenueMap, setShowVenueMap] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
@@ -2959,6 +2964,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     const openPosting = () => setShowPostingSchedule(true);
     const openEventSummary = () => setShowEventSummary(true);
     const openEndEvent = () => {
+      if (!canEndEvent) return;
       // Already ended (manually, or by the 1-hour-no-activity backup) — just
       // take them straight to the summary instead of asking again.
       if (eventEnded) {
@@ -2995,7 +3001,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         window.removeEventListener('open-end-event', openEndEvent);
       }
     };
-  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv, eventEnded, goToSummary]);
+  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv, eventEnded, goToSummary, canEndEvent]);
 
   // Tab cycling for left sidebar tabs
   useEffect(() => {
@@ -3497,7 +3503,18 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         event={event}
       />
       {/* Main Layout */}
-      <div className="w-full bg-surface-deepest h-[calc(100vh-72px)]">
+      <div className="relative w-full bg-surface-deepest h-[calc(100vh-72px)]">
+        {eventEnded && (
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-neutral-700/70 text-center px-6">
+            <p className="text-xl font-semibold text-surface-light">{t('This event has ended')}</p>
+            <p className="text-sm text-surface-light/80 max-w-sm">
+              {t('Data collection is locked. Go to the Event Summary for a read-only record.')}
+            </p>
+            <Button onPress={goToSummary} className="mt-1 bg-accent hover:bg-accent/90 text-surface-light">
+              {t('Go to Event Summary')}
+            </Button>
+          </div>
+        )}
         <div className="max-w-[1750px] mx-auto px-2 sm:px-4 h-full">
 
           {isAdmin && (
