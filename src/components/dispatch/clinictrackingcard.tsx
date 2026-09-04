@@ -260,7 +260,7 @@ export default function ClinicTrackingCard({
                   className={`w-full h-full justify-start bg-surface-deep border border-surface-liner text-surface-light px-2 ${isResolved ? 'opacity-100 cursor-default' : 'hover:bg-surface-muted'}`}
                 >
                   <div className="text-left flex-4 pl-0.5">
-                    <div className="text-xs text-[#d4d4d8] pb-0.5">{t('Status')}</div>
+                    <div className="text-xs text-surface-faint pb-0.5">{t('Status')}</div>
                     <div className="text-sm">{t(call.outcome || 'In Clinic')}</div>
                   </div>
                 </Button>
@@ -292,7 +292,7 @@ export default function ClinicTrackingCard({
           {/* Primary Team (read-only) */}
           <div className="flex-1">
             <div className="h-full px-2.5 py-2 bg-surface-deep border border-surface-liner rounded-xl flex flex-col justify-center">
-              <div className="text-xs text-[#d4d4d8] mb-0.5">{t('Primary Team')}</div>
+              <div className="text-xs text-surface-faint mb-0.5">{t('Primary Team')}</div>
               <div className="text-sm">{t(primaryTeam)}</div>
             </div>
           </div>

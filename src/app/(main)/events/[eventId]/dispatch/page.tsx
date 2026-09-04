@@ -4607,7 +4607,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
               {hasVenueMapImage && (
                 <Tab key="map" title={<MapIcon className="h-6 w-6" />} aria-label={t('Map')}>
-                  <div className="h-[70vh] pb-20">
+                  <div className="h-[70vh] pt-3 pb-20">
                     <VenueMapTab
                       layers={venueLayers}
                       staff={event.staff || []}
