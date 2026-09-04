@@ -1804,6 +1804,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
   const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
+  const [mobileTeamsSubTab, setMobileTeamsSubTab] = useState<'teams' | 'supervisors'>('teams');
+  const [mobileSelectedClinicId, setMobileSelectedClinicId] = useState<string>('');
   // Set alongside switching to the Map tab from a team card's "view on
   // map" button. requestId must change on every click (not just teamName)
   // since the Map tab may already be open and wouldn't otherwise notice a
@@ -3210,6 +3212,16 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     wasAboveSurgeThresholdRef.current = aboveThreshold;
   }, [event, updateEvent]);
 
+  // Keeps the mobile Clinic tab's selected clinic valid as `event.clinics`
+  // is added to (new venue posts flagged as clinics) or the selection is
+  // stale from a previous event.
+  useEffect(() => {
+    const currentClinics = getEventClinics(event?.clinics);
+    if (!currentClinics.some(c => c.id === mobileSelectedClinicId)) {
+      setMobileSelectedClinicId(currentClinics[0]?.id ?? '');
+    }
+  }, [event?.clinics, mobileSelectedClinicId]);
+
   // Return early if auth is not ready or user is not authenticated
   if (!isLiteMode && !ready) {
     return <LoadingScreen label="Loading…" />;
@@ -4127,9 +4139,26 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 <div className="space-y-6 pb-20">
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">{t('Teams')}</h2>
-                      <TeamActionButtonGroup selectedTab="teams" />
+                      <Select
+                        selectedKeys={[mobileTeamsSubTab]}
+                        onSelectionChange={(keys) => {
+                          const selected = Array.from(keys)[0] as 'teams' | 'supervisors';
+                          if (selected) setMobileTeamsSubTab(selected);
+                        }}
+                        aria-label="Select section"
+                        className="w-auto min-w-[160px]"
+                        classNames={{
+                          trigger: "bg-surface-deep border border-surface-liner rounded-full hover:bg-surface-liner h-10 min-h-10",
+                          value: "text-surface-light",
+                          popoverContent: "bg-surface-deep border-surface-liner",
+                        }}
+                      >
+                        <SelectItem key="teams">{t('Teams')}</SelectItem>
+                        <SelectItem key="supervisors">{t('Supervisors')}</SelectItem>
+                      </Select>
+                      <TeamActionButtonGroup selectedTab={mobileTeamsSubTab} />
                     </div>
+                    {mobileTeamsSubTab === 'teams' && (
                     <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
                       <div className="dispatch-shell-list">
                         {[...(event?.staff || [])]
@@ -4167,18 +4196,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 knownMapLocations={knownMapLocations}
                             />
                           ))}
+                        {(!event?.staff || event.staff.length === 0) && (
+                          <div className="text-center text-surface-light/50 py-8">
+                            {t('No teams available')}
+                          </div>
+                        )}
                       </div>
                     </div>
+                    )}
                   </div>
 
-                  {event?.supervisor && event.supervisor.length > 0 && (
+                  {mobileTeamsSubTab === 'supervisors' && (
                     <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-xl font-bold text-surface-light">{t('Supervisors')}</h2>
-                      </div>
                       <div className="dispatch-shell-list">
-                        {event.supervisor
-                          ?.sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
+                        {event?.supervisor && event.supervisor.length > 0 ? (
+                        event.supervisor
+                          .sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
                           .map(supervisor => {
                             const supervisorAsStaff: Staff = {
                               team: supervisor.team,
@@ -4210,7 +4243,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 knownMapLocations={knownMapLocations}
                               />
                             );
-                          })}
+                          })
+                        ) : (
+                          <div className="text-center text-surface-light/50 py-8">
+                            {t('No supervisors assigned')}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
