@@ -725,6 +725,15 @@ export default function VenueManagementPageClient() {
     posts: Post[],
     geoBounds: GeoBounds
   ) => {
+    // This handler is reachable from two places with different meanings:
+    // the empty-map prompt (current layer has no map yet — e.g. the
+    // venue's initial "Floor 1" — where the import should fill that layer
+    // in place, same as picking a plain image there would) and the
+    // LayerControlBar button (current layer already has a map, where it
+    // should add a new layer, like Add Layer does). Deciding by whether
+    // the current layer already has a mapUrl covers both without a prop.
+    const isFillingEmptyLayer = !venueData.layers[currentLayer]?.mapUrl;
+
     setIsUploading(true);
     try {
       const mapUrl = await storageService.uploadFile(`venue_maps/${Date.now()}_${imageFile.name}`, imageFile);
@@ -738,12 +747,20 @@ export default function VenueManagementPageClient() {
         posts: postsWithClinicIds,
         geoBounds,
       };
-      const newLayers = [...venueData.layers, newLayer];
-      setVenueData(prev => ({
-        ...prev,
-        layers: newLayers,
-      }));
-      setCurrentLayer(newLayers.length - 1);
+      if (isFillingEmptyLayer) {
+        setVenueData(prev => {
+          const newLayers = [...prev.layers];
+          newLayers[currentLayer] = newLayer;
+          return { ...prev, layers: newLayers };
+        });
+      } else {
+        const newLayers = [...venueData.layers, newLayer];
+        setVenueData(prev => ({
+          ...prev,
+          layers: newLayers,
+        }));
+        setCurrentLayer(newLayers.length - 1);
+      }
     } catch (error) {
       console.error('Error importing GIS layer:', error);
       alert('Failed to import GIS layer');
