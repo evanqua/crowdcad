@@ -186,7 +186,25 @@ module.exports = {
       themes: {
         light: {
           colors: {
-            primary: { DEFAULT: "#2f8fd6", foreground: "#ffffff" },
+            // Derived from the `accent` token above (#3eb1fd) rather than an
+            // arbitrary unrelated blue — mirrors dark mode's rationale below
+            // (HeroUI's flat/light/etc. variants read the numbered shades,
+            // not just DEFAULT, or they silently fall back to HeroUI's own
+            // built-in blue scale).
+            primary: {
+              50: "#f5fbfe",
+              100: "#e2f3fe",
+              200: "#bbe4fe",
+              300: "#95d4fe",
+              400: "#65c1fd",
+              500: "#3eb1fd",
+              600: "#3596d7",
+              700: "#2b7cb1",
+              800: "#22618b",
+              900: "#194765",
+              DEFAULT: "#3eb1fd",
+              foreground: "#ffffff",
+            },
             background: "#f4f7fb",
             foreground: "#111827",
           },
