@@ -3628,7 +3628,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               const selected = Array.from(keys)[0] as 'teams' | 'supervisors';
               if (selected) setMobileTeamsSubTab(selected);
             }}
-            aria-label="Select section"
+            aria-label="Select teams or supervisors"
             className="w-auto min-w-[160px]"
             classNames={{
               trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
@@ -3704,7 +3704,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 size="sm"
                 variant="flat"
                 className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                aria-label={t('Add Patient')}
+                aria-label={t('Add patient (mobile)')}
                 onPress={() => setShowQuickClinicCallForm(true)}
               >
                 {t('Add Patient')}
