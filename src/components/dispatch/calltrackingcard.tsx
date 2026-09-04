@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Card, CardHeader, CardBody, Input, Chip, Button,
-  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem
+  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Autocomplete, AutocompleteItem
 } from '@heroui/react';
 import { Plus, MoreVertical, RotateCw } from 'lucide-react';
 import {
@@ -21,7 +21,7 @@ import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import DispatchMotionCell from '@/components/dispatch/motioncell';
 import StatusLabel, { getMenuLabel } from '@/components/dispatch/statuslabel';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getTransportingLabel, getDeliveredLabel, isCallResolved } from '@/lib/clinics';
+import { getEventClinics, getTransportingLabel, getDeliveredLabel, isCallResolved, getVenueLocationOptions } from '@/lib/clinics';
 import { getStatusColor } from '@/lib/statusColors';
 import { useMMSS } from '@/hooks/useMMSS';
 
@@ -75,6 +75,9 @@ export default function CallTrackingCard({
   const clinics = getEventClinics(event.clinics);
   const isResolved = isCallResolved(call);
   const [clinicPickTeam, setClinicPickTeam] = useState<string | null>(null);
+  // Which status opened the clinic picker — 'Transporting' or 'Delivered',
+  // both of which need a destination clinic recorded when more than one exists.
+  const [clinicPickStatus, setClinicPickStatus] = useState<string>('Transporting');
   const [expanded, setExpanded] = useState(false);
   const [locationInput, setLocationInput] = useState(call.location || '');
   const [ageSexInput, setAgeSexInput] = useState(formatAgeSex(call.age, call.gender) || '');
@@ -140,6 +143,8 @@ export default function CallTrackingCard({
     }
     return <StatusLabel status={reason} text={t(reason)} />;
   };
+
+  const locationOptions = useMemo(() => getVenueLocationOptions(event.venue), [event.venue]);
 
   // Get available teams for dropdown (including On Break and In Clinic)
   const availableStaff = useMemo(() => {
@@ -241,11 +246,15 @@ export default function CallTrackingCard({
       <CardBody className="px-4 pb-3 space-y-3">
         {/* Row 1: Location */}
         <div className="flex gap-2">
-          <Input
+          <Autocomplete
+            aria-label="Location"
             label="Location"
             labelPlacement="inside"
-            value={locationInput}
-            onChange={(e) => setLocationInput(e.target.value)}
+            inputValue={locationInput}
+            onInputChange={(v) => setLocationInput(v)}
+            onSelectionChange={(key) => {
+              if (key) onLocationChange(call.id, key as string);
+            }}
             onBlur={() => {
               if (locationInput !== call.location) {
                 onLocationChange(call.id, locationInput);
@@ -256,13 +265,20 @@ export default function CallTrackingCard({
                 (e.target as HTMLInputElement).blur();
               }
             }}
+            allowsCustomValue
             variant="flat"
-            classNames={{
-              input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none",
-              inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep"
+            inputProps={{
+              classNames: {
+                input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none",
+                inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep"
+              }
             }}
             className="flex-1"
-          />
+          >
+            {locationOptions.map((loc) => (
+              <AutocompleteItem key={loc}>{loc}</AutocompleteItem>
+            ))}
+          </Autocomplete>
         </div>
 
         {/* Row 2: Age/Sex (1/4) + Chief Complaint (3/4) */}
@@ -363,7 +379,7 @@ export default function CallTrackingCard({
                         aria-label="Select destination clinic"
                         onAction={(key) => {
                           setClinicPickTeam(null);
-                          handleTeamStatusChange(call.id, team, 'Transporting', key as string);
+                          handleTeamStatusChange(call.id, team, clinicPickStatus, key as string);
                         }}
                       >
                         {clinics.map((clinic) => (
@@ -390,15 +406,16 @@ export default function CallTrackingCard({
                       <DropdownMenu
                         aria-label="Team Status"
                         onAction={(key) => {
-                          if (key === 'Transporting' && clinics.length > 1) {
+                          if ((key === 'Transporting' || key === 'Delivered') && clinics.length > 1) {
                             setClinicPickTeam(team);
+                            setClinicPickStatus(key as string);
                             return;
                           }
                           if (key === 'Rolled from Scene') {
                             onTransportToAmbulance(call.id, team);
                             return;
                           }
-                          handleTeamStatusChange(call.id, team, key as string, key === 'Transporting' ? clinics[0]?.id : undefined);
+                          handleTeamStatusChange(call.id, team, key as string, (key === 'Transporting' || key === 'Delivered') ? clinics[0]?.id : undefined);
                         }}
                       >
                         {statusOptions.map(status => (

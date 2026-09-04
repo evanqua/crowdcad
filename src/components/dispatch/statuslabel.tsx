@@ -54,8 +54,19 @@ const MENU_LABEL_SUFFIX: Record<string, string> = Object.fromEntries(
   Object.entries(STATUS_ICONS).map(([status, Icon]) => [status, Icon === HousePlus ? 'Clinic' : 'Ambulance'])
 );
 
+/**
+ * Full-text replacements for a dropdown MENU option only — the pill keeps
+ * showing the short/abbreviated form (via `t(status)`). NMM reads as jargon
+ * in a list of choices a dispatcher is actively picking from, but the
+ * abbreviation is worth keeping on the persistent pill once selected.
+ */
+const MENU_LABEL_OVERRIDES: Record<string, string> = {
+  NMM: 'No Medical Merit',
+};
+
 /** Plain-text label for a status/outcome inside a dropdown menu — no icon, just the word the pill's icon stands for appended (e.g. "Transporting to Clinic", "Transferred to Ambulance"). */
 export function getMenuLabel(status: string, t: (key: string) => string): string {
+  if (MENU_LABEL_OVERRIDES[status]) return MENU_LABEL_OVERRIDES[status];
   const suffix = MENU_LABEL_SUFFIX[status];
   return suffix ? `${t(status)} ${suffix}` : t(status);
 }

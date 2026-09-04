@@ -27,6 +27,11 @@ export function getVenuePosts(venue: PostsSource | Venue | undefined | null): Po
   return (venue.layers || []).flatMap(layer => layer.posts || []);
 }
 
+/** Every post name placed on the venue's map, deduplicated — offered as autocomplete suggestions for free-text location fields (a call's Location, quick-call creation), never an exclusive/enum choice. */
+export function getVenueLocationOptions(venue: PostsSource | Venue | undefined | null): string[] {
+  return Array.from(new Set(getVenuePosts(venue).map(p => (typeof p === 'string' ? p : p.name))));
+}
+
 /**
  * Additively merges clinic-flagged venue posts into an event's existing
  * clinics list, matched by the post's stable `clinicId`. Never removes an

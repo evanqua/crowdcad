@@ -10,11 +10,14 @@ import {
   ModalFooter,
   Button,
   Input,
+  Autocomplete,
+  AutocompleteItem,
   Select,
   SelectItem,
 } from "@heroui/react";
 import type { Event, Staff, Call, TeamLogEntry } from "@/app/types";
 import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
+import { getVenueLocationOptions } from "@/lib/clinics";
 
 type QuickCallState = {
   location: string;
@@ -53,6 +56,8 @@ export default function QuickCallModal({
 }: Props) {
   const { t } = useDispatchTerms();
   const [submitting, setSubmitting] = React.useState(false);
+
+  const locationOptions = React.useMemo(() => getVenueLocationOptions(event?.venue), [event?.venue]);
 
   // Replace the postedTeams useMemo
   const { availableTeams, inactiveTeams } = React.useMemo(() => {
@@ -233,17 +238,26 @@ export default function QuickCallModal({
             </ModalHeader>
 
             <ModalBody className="">
-              <Input
+              <Autocomplete
                 autoFocus={firstEmptyField === "location"}
+                aria-label="Location"
                 label={t("Location")}
                 labelPlacement="inside"
                 variant="flat"
                 size="lg"
                 radius="lg"
-                classNames={inputClassNames}
-                value={quickCall.location}
-                onValueChange={(v) => setQuickCall((p) => ({ ...p, location: v }))}
-              />
+                inputProps={{ classNames: inputClassNames }}
+                inputValue={quickCall.location}
+                onInputChange={(v) => setQuickCall((p) => ({ ...p, location: v }))}
+                onSelectionChange={(key) => {
+                  if (key) setQuickCall((p) => ({ ...p, location: key as string }));
+                }}
+                allowsCustomValue
+              >
+                {locationOptions.map((loc) => (
+                  <AutocompleteItem key={loc}>{loc}</AutocompleteItem>
+                ))}
+              </Autocomplete>
               <div className="flex gap-2">
                 <Input
                   autoFocus={firstEmptyField === "source"}

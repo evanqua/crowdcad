@@ -20,7 +20,7 @@ import TrackingTableBase from './trackingtablebase';
 import PendingCallChip from './pendingcallchip';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getTransportingLabel, getDeliveredLabel, RESOLVED_CALL_STATUSES } from '@/lib/clinics';
+import { getEventClinics, getTransportingLabel, getDeliveredLabel, RESOLVED_CALL_STATUSES, getVenueLocationOptions } from '@/lib/clinics';
 import { withPendingSuffix } from '@/lib/callTiming';
 
 import {
@@ -112,6 +112,10 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   // const ButtonRefs = useRef<Record<string, HTMLElement | null>>({});
   const [closingCallId, setClosingCallId] = React.useState<string | null>(null);
   const [openMenuToken, setOpenMenuToken] = React.useState<string | null>(null);
+  // Which status opened the "team-clinic-pick" token — 'Transporting' or
+  // 'Delivered', both of which need a destination clinic recorded when more
+  // than one exists.
+  const [clinicPickStatus, setClinicPickStatus] = React.useState<string>('Transporting');
   const previousOpenCallIdRef = React.useRef<string | null>(null);
   // HeroUI/react-aria's Popover can spuriously fire onOpenChange(false) a few
   // milliseconds after opening, with no user interaction (a known upstream
@@ -120,6 +124,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   // unless they came from an actual selection (onAction).
   const { t } = useDispatchTerms();
   const clinics = getEventClinics(event.clinics);
+  const locationOptions = React.useMemo(() => getVenueLocationOptions(event.venue), [event.venue]);
 
   // Detached-team pill label — 'Delivered' gets the same clinic-name
   // decoration (and icon-suppression once a real name is shown) as the
@@ -370,25 +375,34 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                         <td className="p-0" onClick={() => handleCellClick(call.id, 'location', call.location)}>
                           <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 truncate">
                             {editingCell?.callId === call.id && editingCell.field === 'location' ? (
-                              <input
-                                type="text"
-                                value={editValue}
-                                autoFocus
-                                onChange={e => setEditValue(e.target.value)}
-                                onFocus={e => {
-                                  // If the value is "Unknown", select all text so it's easy to replace
-                                  if (editValue === 'Unknown') {
-                                    e.target.select();
-                                  }
-                                }}
-                                onBlur={() => handleCellBlur(call.id, 'location')}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    (e.target as HTMLInputElement).blur();
-                                  }
-                                }}
-                                className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
-                              />
+                              <>
+                                <input
+                                  type="text"
+                                  list={`location-options-${call.id}`}
+                                  value={editValue}
+                                  autoFocus
+                                  onChange={e => setEditValue(e.target.value)}
+                                  onFocus={e => {
+                                    // If the value is "Unknown", select all text so it's easy to replace
+                                    if (editValue === 'Unknown') {
+                                      e.target.select();
+                                    }
+                                  }}
+                                  onBlur={() => handleCellBlur(call.id, 'location')}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                  className="w-full bg-transparent text-surface-light px-0 py-0 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                                />
+                                {/* Native datalist: suggests existing venue locations while still accepting free text. */}
+                                <datalist id={`location-options-${call.id}`}>
+                                  {locationOptions.map(loc => (
+                                    <option key={loc} value={loc} />
+                                  ))}
+                                </datalist>
+                              </>
                             ) : (
                               call.location || <span className="text-surface-light whitespace-nowrap">[Edit]</span>
                             )}
@@ -450,7 +464,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                           aria-label="Select destination clinic"
                                           onAction={(key) => {
                                             setOpenMenuToken(null);
-                                            handleTeamStatusChange(call.id, team, 'Transporting', key as string);
+                                            handleTeamStatusChange(call.id, team, clinicPickStatus, key as string);
                                           }}
                                         >
                                           {clinics.map((clinic) => (
@@ -497,15 +511,16 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                           aria-label="Team status"
                                           onAction={(key) => {
                                             teamStatusMenuSelectedRef.current = true;
-                                            if (key === 'Transporting' && clinics.length > 1) {
+                                            if ((key === 'Transporting' || key === 'Delivered') && clinics.length > 1) {
                                               setOpenMenuToken(`team-clinic-pick:${call.id}:${team}`);
+                                              setClinicPickStatus(key as string);
                                               return;
                                             }
                                             if (key === 'Rolled from Scene') {
                                               onTransportToAmbulance(call.id, team);
                                               return;
                                             }
-                                            handleTeamStatusChange(call.id, team, key as string, key === 'Transporting' ? clinics[0]?.id : undefined);
+                                            handleTeamStatusChange(call.id, team, key as string, (key === 'Transporting' || key === 'Delivered') ? clinics[0]?.id : undefined);
                                           }}
                                         >
                                           {statusOptions.map((status: string) => (
