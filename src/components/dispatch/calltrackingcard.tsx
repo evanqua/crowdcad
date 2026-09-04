@@ -39,24 +39,8 @@ type CallTrackingCardProps = {
   handleTogglePriority: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
   formatAgeSex: (age?: string | number, gender?: string) => string;
-  getCallRowClass: (call: Call) => string;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
-
-function callBg(call: Call, event: Event) {
-  // Check if any assigned team has active status
-  if (!Array.isArray(call.assignedTeam)) return 'bg-surface-deep';
-  
-  const statuses = call.assignedTeam
-    .map(t => event?.staff?.find(s => s.team === t)?.status)
-    .filter((status): status is string => status !== undefined);
-
-  if (statuses.some(status => ['En Route', 'On Scene', 'Transporting'].includes(status))) {
-    return 'bg-status-card-red';
-  }
-
-  return 'bg-surface-deep';
-}
 
 const dropdownMotionProps = {
   initial: { opacity: 0, y: -8, scale: 0.98 },
@@ -80,7 +64,6 @@ export default function CallTrackingCard({
   handleTogglePriority,
   handleDeleteCall,
   formatAgeSex,
-  getCallRowClass,
   updateEvent,
 }: CallTrackingCardProps) {
   const { t } = useDispatchTerms();
@@ -139,8 +122,6 @@ export default function CallTrackingCard({
   }, [call.log]);
 
   const timer = useMMSS(callTimestamp);
-  const bg = getCallRowClass(call) || callBg(call, event);
-  const isActive = bg === 'bg-status-card-red';
 
   // Get available teams for dropdown (including On Break and In Clinic)
   const availableStaff = useMemo(() => {
@@ -171,11 +152,7 @@ export default function CallTrackingCard({
 
   return (
     <Card
-      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${
-        expanded
-          ? `rounded-lg shadow-sm ${isActive ? 'bg-status-card-red' : 'bg-surface-deep'}`
-          : `rounded-none shadow-none ${isActive ? 'bg-status-card-red hover:bg-status-card-red' : 'bg-transparent hover:bg-surface-deep'}`
-      }`}
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-lg bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
     >
       {/* HEADER */}
       <CardHeader 

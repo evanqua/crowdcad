@@ -25,14 +25,8 @@ type ClinicTrackingCardProps = {
   onRevertOutcome: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
   formatAgeSex: (age?: string | number, gender?: string) => string;
-  getCallRowClass: (call: Call) => string;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
-
-function callBg() {
-  // Clinic calls always use default background
-  return 'bg-surface-deep';
-}
 const dropdownMotionProps = {
   initial: { opacity: 0, y: -8, scale: 0.98 },
   animate: { opacity: 1, y: 0, scale: 1 },
@@ -51,7 +45,6 @@ export default function ClinicTrackingCard({
   onRevertOutcome,
   handleDeleteCall,
   formatAgeSex,
-  getCallRowClass,
   updateEvent,
 }: ClinicTrackingCardProps) {
   const { t } = useDispatchTerms();
@@ -108,8 +101,6 @@ export default function ClinicTrackingCard({
   }, [call.log]);
 
   const timer = useMMSS(callTimestamp);
-  const bg = getCallRowClass(call) || callBg();
-  const isActive = bg === 'bg-status-card-red';
   const isResolved = isClinicCallResolved(call);
 
   // Get primary team (first assigned team or first detached team)
@@ -125,11 +116,7 @@ export default function ClinicTrackingCard({
 
   return (
     <Card
-      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${
-        expanded
-          ? `rounded-lg shadow-sm ${isActive ? 'bg-status-card-red' : 'bg-surface-deep'}`
-          : `rounded-none shadow-none ${isActive ? 'bg-status-card-red hover:bg-status-card-red' : 'bg-transparent hover:bg-surface-deep'}`
-      }`}
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-lg bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
     >
       {/* HEADER */}
       <CardHeader 

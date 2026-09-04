@@ -3673,7 +3673,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       handleMarkDuplicate={handleMarkDuplicate}
       handleTogglePriority={handleTogglePriorityFromMenu}
       handleDeleteCall={handleDeleteCall}
-      getCallRowClass={getCallRowClass}
       formatAgeSex={formatAgeSex}
       updateEvent={updateEvent}
     />
@@ -3735,7 +3734,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       onOutcomeChange={handleClinicOutcomeChange}
       onRevertOutcome={handleRevertClinicOutcome}
       handleDeleteCall={handleDeleteCall}
-      getCallRowClass={getCallRowClass}
       formatAgeSex={formatAgeSex}
       updateEvent={updateEvent}
     />
@@ -4248,7 +4246,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           {/* Mobile/Tablet Layout - Bottom Tabs */}
           <div className="lg:hidden">
             {event && (
-              <div className="sticky top-14 z-40 bg-surface-deep">
+              <div className="sticky top-14 z-40">
                 <AvailabilitySurgeStrip event={event} />
               </div>
             )}
@@ -4259,7 +4257,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               classNames={{
                 base: "w-full",
                 tabList: "fixed bottom-0 left-0 right-0 w-full rounded-none bg-surface-deep border-t border-surface-light/10 z-50 gap-0",
-                cursor: "rounded-none bg-accent",
+                cursor: "rounded-none bg-surface-liner",
                 tab: "h-16 rounded-none",
                 tabContent: "text-surface-light group-data-[selected=true]:text-surface-light"
               }}
@@ -4268,7 +4266,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Tab key="teams" title={<Users className="h-6 w-6" />} aria-label={t('Teams')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="sticky top-24 z-30 bg-surface-deepest flex justify-between items-center py-2">
                       <Select
                         selectedKeys={[mobileTeamsSubTab]}
                         onSelectionChange={(keys) => {
@@ -4278,7 +4276,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         aria-label="Select section"
                         className="w-auto min-w-[160px]"
                         classNames={{
-                          trigger: "bg-surface-deep border border-surface-liner rounded-full hover:bg-surface-liner h-10 min-h-10",
+                          trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
                           value: "text-surface-light",
                           popoverContent: "bg-surface-deep border-surface-liner",
                         }}
@@ -4389,7 +4387,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Tab key="equipment" title={<BriefcaseMedical className="h-6 w-6" />} aria-label={t('Equipment')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="sticky top-24 z-30 bg-surface-deepest flex justify-between items-center py-2">
                       <h2 className="text-xl font-bold text-surface-light">{t('Equipment')}</h2>
                       <TeamActionButtonGroup selectedTab="equipment" />
                     </div>
@@ -4434,7 +4432,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Tab key="calls" title={<FaWalkieTalkie className="h-5 w-5" />} aria-label={t('Calls')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="sticky top-24 z-30 bg-surface-deepest flex justify-between items-center py-2">
                       <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
                       <div className="flex items-center gap-2">
                         <Tooltip content={t('Add Call')} placement="top">
@@ -4487,7 +4485,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Tab key="clinic" title={<HousePlus className="h-6 w-6" />} aria-label={t('Clinic')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="sticky top-24 z-30 bg-surface-deepest flex justify-between items-center py-2">
                       {clinics.length > 1 ? (
                         <Select
                           selectedKeys={mobileClinicId ? [mobileClinicId] : []}
@@ -4498,7 +4496,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           aria-label="Select clinic"
                           className="w-auto min-w-[160px]"
                           classNames={{
-                            trigger: "bg-surface-deep border border-surface-liner rounded-full hover:bg-surface-liner h-10 min-h-10",
+                            trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
                             value: "text-surface-light",
                             popoverContent: "bg-surface-deep border-surface-liner",
                           }}
