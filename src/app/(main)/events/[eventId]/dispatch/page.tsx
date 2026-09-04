@@ -1806,6 +1806,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
   const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
   const [mobileTeamsSubTab, setMobileTeamsSubTab] = useState<'teams' | 'supervisors'>('teams');
+  const [mobileActiveTab, setMobileActiveTab] = useState<string>('teams');
   const [mobileSelectedClinicId, setMobileSelectedClinicId] = useState<string>('');
   // Set alongside switching to the Map tab from a team card's "view on
   // map" button. requestId must change on every click (not just teamName)
@@ -3613,6 +3614,109 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     </div>
   );
 
+  // Rendered once, above the mobile <Tabs>, inside the same sticky container
+  // as AvailabilitySurgeStrip — sharing one sticky box with the availability
+  // strip means there's no gap between them for scrolling cards to peek
+  // through, unlike two independently-offset sticky elements would have.
+  const renderMobileTabHeader = () => {
+    if (mobileActiveTab === 'teams') {
+      return (
+        <>
+          <Select
+            selectedKeys={[mobileTeamsSubTab]}
+            onSelectionChange={(keys) => {
+              const selected = Array.from(keys)[0] as 'teams' | 'supervisors';
+              if (selected) setMobileTeamsSubTab(selected);
+            }}
+            aria-label="Select section"
+            className="w-auto min-w-[160px]"
+            classNames={{
+              trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
+              value: "text-surface-light",
+              popoverContent: "bg-surface-deep border-surface-liner",
+            }}
+          >
+            <SelectItem key="teams">{t('Teams')}</SelectItem>
+            <SelectItem key="supervisors">{t('Supervisors')}</SelectItem>
+          </Select>
+          <TeamActionButtonGroup selectedTab={mobileTeamsSubTab} />
+        </>
+      );
+    }
+    if (mobileActiveTab === 'equipment') {
+      return (
+        <>
+          <h2 className="text-xl font-bold text-surface-light">{t('Equipment')}</h2>
+          <TeamActionButtonGroup selectedTab="equipment" />
+        </>
+      );
+    }
+    if (mobileActiveTab === 'calls') {
+      return (
+        <>
+          <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
+          <div className="flex items-center gap-2">
+            <Tooltip content={t('Add Call')} placement="top">
+              <div>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                  aria-label={t('Add Call')}
+                  onPress={() => openAddCallModal()}
+                >
+                  {t('Add Call')}
+                </Button>
+              </div>
+            </Tooltip>
+          </div>
+        </>
+      );
+    }
+    if (mobileActiveTab === 'clinic') {
+      return (
+        <>
+          {clinics.length > 1 ? (
+            <Select
+              selectedKeys={mobileClinicId ? [mobileClinicId] : []}
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as string;
+                if (selected) setMobileSelectedClinicId(selected);
+              }}
+              aria-label="Select clinic"
+              className="w-auto min-w-[160px]"
+              classNames={{
+                trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
+                value: "text-surface-light",
+                popoverContent: "bg-surface-deep border-surface-liner",
+              }}
+            >
+              {clinics.map((clinic) => (
+                <SelectItem key={clinic.id}>{clinic.name}</SelectItem>
+              ))}
+            </Select>
+          ) : (
+            <h2 className="text-xl font-bold text-surface-light">{clinics[0]?.name ?? t('Clinic')}</h2>
+          )}
+          <Tooltip content={t('Add Patient')} placement="top">
+            <div>
+              <Button
+                size="sm"
+                variant="flat"
+                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                aria-label={t('Add Patient')}
+                onPress={() => setShowQuickClinicCallForm(true)}
+              >
+                {t('Add Patient')}
+              </Button>
+            </div>
+          </Tooltip>
+        </>
+      );
+    }
+    return null;
+  };
+
   const renderMobileCallCard = (call: Call) => (
     <CallTrackingCard
       key={call.id}
@@ -3674,6 +3778,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       handleTogglePriority={handleTogglePriorityFromMenu}
       handleDeleteCall={handleDeleteCall}
       formatAgeSex={formatAgeSex}
+      teamStatusMap={teamStatusMap}
       updateEvent={updateEvent}
     />
   );
@@ -4245,47 +4350,33 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
           {/* Mobile/Tablet Layout - Bottom Tabs */}
           <div className="lg:hidden">
-            {event && (
-              <div className="sticky top-14 z-40">
-                <AvailabilitySurgeStrip event={event} />
-              </div>
-            )}
+            <div className="sticky top-14 z-40 bg-surface-deepest">
+              {event && <AvailabilitySurgeStrip event={event} />}
+              {mobileActiveTab !== 'map' && (
+                <div className="flex justify-between items-center py-2">
+                  {renderMobileTabHeader()}
+                </div>
+              )}
+            </div>
             <Tabs
               aria-label="Dispatch sections"
               placement="bottom"
               radius="none"
+              selectedKey={mobileActiveTab}
+              onSelectionChange={(key) => setMobileActiveTab(String(key))}
               classNames={{
                 base: "w-full",
                 tabList: "fixed bottom-0 left-0 right-0 w-full rounded-none bg-surface-deep border-t border-surface-light/10 z-50 gap-0",
                 cursor: "rounded-none bg-surface-liner",
                 tab: "h-16 rounded-none",
-                tabContent: "text-surface-light group-data-[selected=true]:text-surface-light"
+                tabContent: "text-surface-light group-data-[selected=true]:text-surface-light",
+                panel: "pt-0"
               }}
             >
               {/* TEAMS TAB */}
               <Tab key="teams" title={<Users className="h-6 w-6" />} aria-label={t('Teams')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="sticky top-24 z-30 bg-surface-deepest flex justify-between items-center py-2">
-                      <Select
-                        selectedKeys={[mobileTeamsSubTab]}
-                        onSelectionChange={(keys) => {
-                          const selected = Array.from(keys)[0] as 'teams' | 'supervisors';
-                          if (selected) setMobileTeamsSubTab(selected);
-                        }}
-                        aria-label="Select section"
-                        className="w-auto min-w-[160px]"
-                        classNames={{
-                          trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
-                          value: "text-surface-light",
-                          popoverContent: "bg-surface-deep border-surface-liner",
-                        }}
-                      >
-                        <SelectItem key="teams">{t('Teams')}</SelectItem>
-                        <SelectItem key="supervisors">{t('Supervisors')}</SelectItem>
-                      </Select>
-                      <TeamActionButtonGroup selectedTab={mobileTeamsSubTab} />
-                    </div>
                     {mobileTeamsSubTab === 'teams' && (
                     <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
                       <div className="dispatch-shell-list">
@@ -4387,10 +4478,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Tab key="equipment" title={<BriefcaseMedical className="h-6 w-6" />} aria-label={t('Equipment')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="sticky top-24 z-30 bg-surface-deepest flex justify-between items-center py-2">
-                      <h2 className="text-xl font-bold text-surface-light">{t('Equipment')}</h2>
-                      <TeamActionButtonGroup selectedTab="equipment" />
-                    </div>
                     <div className="space-y-3">
                       {(event?.venue?.equipment?.length || event?.eventEquipment?.length) ? (
                         <div className="dispatch-shell-list">
@@ -4432,43 +4519,36 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Tab key="calls" title={<FaWalkieTalkie className="h-5 w-5" />} aria-label={t('Calls')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="sticky top-24 z-30 bg-surface-deepest flex justify-between items-center py-2">
-                      <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
-                      <div className="flex items-center gap-2">
-                        <Tooltip content={t('Add Call')} placement="top">
-                          <div>
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                              aria-label={t('Add Call')}
-                              onPress={() => openAddCallModal()}
-                            >
-                              {t('Add Call')}
-                            </Button>
-                          </div>
-                        </Tooltip>
-                      </div>
-                    </div>
-                    <div className="dispatch-shell-list">
-                      {isMobile && event.calls
+                    {(() => {
+                      const activeMobileCalls = event.calls
                         .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status))
-                        .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id))
-                        .map(renderMobileCallCard)}
-                      {(!event.calls || event.calls.length === 0) && (
-                        <div className="text-center text-surface-light/50 py-8">
-                          {t('No calls')}
-                        </div>
-                      )}
-                    </div>
-                    <DispatchMotionCell isOpen={showResolvedCalls} animate>
-                      <div className="dispatch-shell-list">
-                        {isMobile && event.calls
-                          .filter((c: Call) => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(c.status))
-                          .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id))
-                          .map(renderMobileCallCard)}
-                      </div>
-                    </DispatchMotionCell>
+                        .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
+                      const resolvedMobileCalls = event.calls
+                        .filter((c: Call) => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(c.status))
+                        .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
+                      return (
+                        <>
+                          <div className="dispatch-shell-list">
+                            {isMobile && activeMobileCalls.map(renderMobileCallCard)}
+                            {(!event.calls || event.calls.length === 0) && (
+                              <div className="text-center text-surface-light/50 py-8">
+                                {t('No calls')}
+                              </div>
+                            )}
+                          </div>
+                          <DispatchMotionCell isOpen={showResolvedCalls} animate>
+                            {/* Manual top border (rather than the shared .dispatch-shell-list
+                                adjacent-sibling CSS) since this list is a separate DOM subtree
+                                from the active list above, so the sibling-based divider rule
+                                can't bridge the seam between the last active and first
+                                resolved card. */}
+                            <div className={`dispatch-shell-list ${activeMobileCalls.length > 0 ? 'border-t border-surface-liner/60' : ''}`}>
+                              {isMobile && resolvedMobileCalls.map(renderMobileCallCard)}
+                            </div>
+                          </DispatchMotionCell>
+                        </>
+                      );
+                    })()}
                     <div className="flex justify-center pt-3">
                       <button
                         onClick={() => setShowResolvedCalls(prev => !prev)}
@@ -4485,62 +4565,33 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Tab key="clinic" title={<HousePlus className="h-6 w-6" />} aria-label={t('Clinic')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="sticky top-24 z-30 bg-surface-deepest flex justify-between items-center py-2">
-                      {clinics.length > 1 ? (
-                        <Select
-                          selectedKeys={mobileClinicId ? [mobileClinicId] : []}
-                          onSelectionChange={(keys) => {
-                            const selected = Array.from(keys)[0] as string;
-                            if (selected) setMobileSelectedClinicId(selected);
-                          }}
-                          aria-label="Select clinic"
-                          className="w-auto min-w-[160px]"
-                          classNames={{
-                            trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
-                            value: "text-surface-light",
-                            popoverContent: "bg-surface-deep border-surface-liner",
-                          }}
-                        >
-                          {clinics.map((clinic) => (
-                            <SelectItem key={clinic.id}>{clinic.name}</SelectItem>
-                          ))}
-                        </Select>
-                      ) : (
-                        <h2 className="text-xl font-bold text-surface-light">{clinics[0]?.name ?? t('Clinic')}</h2>
-                      )}
-                      <Tooltip content={t('Add Patient')} placement="top">
-                        <div>
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                            aria-label={t('Add Patient')}
-                            onPress={() => setShowQuickClinicCallForm(true)}
-                          >
-                            {t('Add Patient')}
-                          </Button>
-                        </div>
-                      </Tooltip>
-                    </div>
-                    <div className="dispatch-shell-list">
-                      {isMobile && (event.calls || [])
+                    {(() => {
+                      const activeMobileClinicCalls = (event.calls || [])
                         .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
-                        .sort((a, b) => parseInt(a.id) - parseInt(b.id))
-                        .map(renderMobileClinicCard)}
-                      {getClinicCalls(mobileClinicId).length === 0 && (
-                        <div className="text-center text-surface-light/50 py-8">
-                          {t('No clinic calls')}
-                        </div>
-                      )}
-                    </div>
-                    <DispatchMotionCell isOpen={showResolvedClinicCalls} animate>
-                      <div className="dispatch-shell-list">
-                        {isMobile && (event.calls || [])
-                          .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
-                          .sort((a, b) => parseInt(a.id) - parseInt(b.id))
-                          .map(renderMobileClinicCard)}
-                      </div>
-                    </DispatchMotionCell>
+                        .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                      const resolvedMobileClinicCalls = (event.calls || [])
+                        .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
+                        .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                      return (
+                        <>
+                          <div className="dispatch-shell-list">
+                            {isMobile && activeMobileClinicCalls.map(renderMobileClinicCard)}
+                            {getClinicCalls(mobileClinicId).length === 0 && (
+                              <div className="text-center text-surface-light/50 py-8">
+                                {t('No clinic calls')}
+                              </div>
+                            )}
+                          </div>
+                          <DispatchMotionCell isOpen={showResolvedClinicCalls} animate>
+                            {/* See the Calls tab's identical comment: manual border since this
+                                is a separate DOM subtree from the active list above. */}
+                            <div className={`dispatch-shell-list ${activeMobileClinicCalls.length > 0 ? 'border-t border-surface-liner/60' : ''}`}>
+                              {isMobile && resolvedMobileClinicCalls.map(renderMobileClinicCard)}
+                            </div>
+                          </DispatchMotionCell>
+                        </>
+                      );
+                    })()}
                     <div className="flex justify-center pt-3">
                       <button
                         onClick={() => setShowResolvedClinicCalls(prev => !prev)}

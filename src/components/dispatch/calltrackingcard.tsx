@@ -39,6 +39,7 @@ type CallTrackingCardProps = {
   handleTogglePriority: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
   formatAgeSex: (age?: string | number, gender?: string) => string;
+  teamStatusMap: { [callId: string]: { [team: string]: string } };
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
 
@@ -64,6 +65,7 @@ export default function CallTrackingCard({
   handleTogglePriority,
   handleDeleteCall,
   formatAgeSex,
+  teamStatusMap,
   updateEvent,
 }: CallTrackingCardProps) {
   const { t } = useDispatchTerms();
@@ -304,9 +306,12 @@ export default function CallTrackingCard({
               ? ['En Route Eq', 'Assisting', 'Delivered Eq']
               : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
             
-            // Get current team status from event
-            const teamStaff = event.staff?.find(s => s.team === team) || event.supervisor?.find(s => s.team === team);
-            const currentStatus = teamStaff?.status || 'Unknown';
+            // Same resolution desktop's CallTrackingTable uses: a per-call
+            // override (teamStatusMap) takes priority over the team's own
+            // current status, so the pill reflects and resets exactly like
+            // the real call does.
+            const currentStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
+            const teamStatusColor = getStatusColor(currentStatus);
 
             return (
               <Chip
@@ -314,7 +319,7 @@ export default function CallTrackingCard({
                 size="lg"
                 variant="flat"
                 color="default"
-                className="text-surface-light h-9"
+                className={`text-surface-light h-9 ${teamStatusColor.chipClass}`}
                 onClose={() => onRemoveTeamFromCall(call.id, team)}
               >
                 <div className="flex items-center gap-2" data-testid={`team-chip-${team}`}>
