@@ -1719,7 +1719,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [showResolvedCalls, setShowResolvedCalls] = useState(false);
 
-  const [teamSortMode, setTeamSortMode] = useState<'availability' | 'asc' | 'desc'>('availability');
+  const [teamSortMode, setTeamSortMode] = useState<'availability' | 'asc' | 'desc'>('asc');
   const [cardViewMode, setCardViewMode] = useState<'normal' | 'condensed'>('normal');
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
@@ -3432,13 +3432,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 <div className="h-px" />
               </DropdownItem>
               <DropdownItem
-                key="availability"
-                onClick={() => setTeamSortMode('availability')}
-                className={teamSortMode === 'availability' ? 'bg-surface-liner' : ''}
-              >
-                Availability
-              </DropdownItem>
-              <DropdownItem
                 key="asc"
                 onClick={() => setTeamSortMode('asc')}
                 className={teamSortMode === 'asc' ? 'bg-surface-liner' : ''}
@@ -3451,6 +3444,13 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 className={teamSortMode === 'desc' ? 'bg-surface-liner' : ''}
               >
                 Descending
+              </DropdownItem>
+              <DropdownItem
+                key="availability"
+                onClick={() => setTeamSortMode('availability')}
+                className={teamSortMode === 'availability' ? 'bg-surface-liner' : ''}
+              >
+                Availability
               </DropdownItem>
             </DropdownMenu>
           </Dropdown>
@@ -3547,8 +3547,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         setMemberCert={setMemberCert}
         roles={LICENSES.map(name => ({ name, fullName: name }))}
       />
-      <DebugModal 
-        isOpen={showDebugModal} 
+      <DebugModal
+        isOpen={showDebugModal}
         onClose={() => setShowDebugModal(false)}
         onPopulate={handlePopulateTestData}
         onReset={handleResetAllStatuses}

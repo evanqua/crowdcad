@@ -1,5 +1,5 @@
 import { Event, Staff } from '@/app/types';
-import { getEffectiveEndTime } from './eventStatus';
+import { getLastActivityTimestamp } from './eventStatus';
 
 const TWO_HOURS = 2 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -12,16 +12,25 @@ const IN_CLINIC = 'In Clinic';
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
- * The reporting window used for the summary page's charts and stats. New
- * events always carry an explicit scheduleStart/scheduleEnd (event setup's
- * From/To, now mandatory) — when present, the window starts there, and ends
- * at whichever comes later of the designated end and one hour past the
- * event's last dispatch log entry (`getEffectiveEndTime`, see
- * src/lib/eventStatus.ts) — so an event that ran (or was simply forgotten)
- * past its scheduled end still gets its actual activity represented, no
- * matter how old the event is. Events created before scheduleStart/End
- * existed fall back to a padded window derived from the earliest/latest
- * call log timestamp, so old data doesn't just disappear.
+ * The reporting window used for the summary page's charts and stats.
+ *
+ * Start: the later of the event's designated start (event setup's From,
+ * now mandatory on new events — `scheduleStart`/`postingStart`/`startTime`/
+ * `start`, earliest of whichever are present) and when the event was
+ * actually initialized (`createdAt`). An event created ahead of its own
+ * start time has no real data before that start, so the window doesn't
+ * waste space on it; an event created (and so actually begun) after its
+ * designated start — a late setup — starts the window there instead, since
+ * nothing happened before that either.
+ *
+ * End: the most recent real dispatch activity (`getLastActivityTimestamp`)
+ * — not the designated end or any "still running" backstop — so checking an
+ * event's summary (or its designated end) early doesn't stretch the chart
+ * out to cover dead time nothing has happened in yet.
+ *
+ * Events created before scheduleStart/End existed, with neither field nor
+ * any recorded activity, fall back to a padded window derived from the
+ * earliest/latest call log timestamp, so old data doesn't just disappear.
  */
 export function getScheduleWindow(event: Event): { start: number; end: number } {
   const getNum = (v: unknown): number | undefined => {
@@ -37,12 +46,20 @@ export function getScheduleWindow(event: Event): { start: number; end: number } 
 
   const starts = startFields
     .map((k) => getNum(event[k as keyof Event]))
-    .filter(Boolean) as number[];
+    .filter((v): v is number => v !== undefined);
 
-  const effectiveEnd = getEffectiveEndTime(event);
+  const designatedStart = starts.length ? Math.min(...starts) : undefined;
+  const createdAt = getNum(event.createdAt);
 
-  if (starts.length && effectiveEnd !== null) {
-    return { start: Math.min(...starts), end: Math.max(effectiveEnd, ...starts) };
+  const start =
+    designatedStart !== undefined && createdAt !== undefined
+      ? Math.max(designatedStart, createdAt)
+      : designatedStart ?? createdAt;
+
+  const lastActivity = getLastActivityTimestamp(event);
+
+  if (start !== undefined && lastActivity !== null) {
+    return { start, end: Math.max(lastActivity, start) };
   }
 
   let minTs = Number.POSITIVE_INFINITY;
@@ -59,9 +76,9 @@ export function getScheduleWindow(event: Event): { start: number; end: number } 
   const derivedStart = Number.isFinite(minTs) ? minTs : Date.now();
   const derivedEnd = Number.isFinite(maxTs) ? maxTs : derivedStart + 4 * 60 * 60 * 1000;
 
-  const start = (starts.length ? Math.min(...starts) : derivedStart) - TWO_HOURS;
-  const end = (effectiveEnd ?? derivedEnd) + TWO_HOURS;
-  return { start, end };
+  const fallbackStart = (start ?? derivedStart) - TWO_HOURS;
+  const fallbackEnd = (lastActivity ?? derivedEnd) + TWO_HOURS;
+  return { start: fallbackStart, end: fallbackEnd };
 }
 
 export function callsByTeam(event: Event): { team: string; count: number }[] {
