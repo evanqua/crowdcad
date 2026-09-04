@@ -198,16 +198,36 @@ export function teamStatusBreakdown(
   });
 }
 
-export type AvailabilityPoint = { ts: number; label: string; availability: number };
+export type AvailabilityPoint = { ts: number; label: string; availability: number; surging: boolean };
+
+export type SurgeInterval = { start: number; end: number };
+
+/**
+ * Every surge period this event has had, as closed [start, end) intervals —
+ * a currently-open period (no `endedAt` yet, i.e. surge is still active as
+ * of viewing) is closed at `windowEnd` so it still renders on a live event's
+ * summary instead of being dropped.
+ */
+export function getSurgeIntervals(event: Event, windowEnd: number): SurgeInterval[] {
+  return (event.surgeLog || [])
+    .map((period) => ({ start: period.startedAt, end: period.endedAt ?? windowEnd }))
+    .filter((interval) => interval.end > interval.start);
+}
 
 /**
  * Average percent of teams sitting Available, in 10-minute buckets across
  * the event (six buckets per hour). Every bucket carries an HH:MM label,
  * but bucket boundaries stay hour-aligned (the window is floored/ceiled to
  * the hour) so the chart's x-axis can show a tick only on the hour while
- * still plotting a bar every 10 minutes.
+ * still plotting a bar every 10 minutes. `surging` is true for any bucket
+ * that overlapped an active surge period at all (see `getSurgeIntervals`).
  */
-export function teamAvailabilitySeries(event: Event, start: number, end: number): AvailabilityPoint[] {
+export function teamAvailabilitySeries(
+  event: Event,
+  start: number,
+  end: number,
+  surgeIntervals: SurgeInterval[] = []
+): AvailabilityPoint[] {
   const s = Math.floor(start / HOUR) * HOUR;
   const e = Math.ceil(end / HOUR) * HOUR;
   const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -220,9 +240,10 @@ export function teamAvailabilitySeries(event: Event, start: number, end: number)
     const bucketEnd = t + TEN_MINUTES;
     const bucketDate = new Date(t);
     const label = `${pad2(bucketDate.getHours())}:${pad2(bucketDate.getMinutes())}`;
+    const surging = surgeIntervals.some((iv) => iv.start < bucketEnd && iv.end > t);
 
     if (teams.length === 0) {
-      buckets.push({ ts: t, label, availability: 0 });
+      buckets.push({ ts: t, label, availability: 0, surging });
       continue;
     }
 
@@ -236,7 +257,7 @@ export function teamAvailabilitySeries(event: Event, start: number, end: number)
     }
 
     const availability = (availableMs / (TEN_MINUTES * teams.length)) * 100;
-    buckets.push({ ts: t, label, availability: round1(availability) });
+    buckets.push({ ts: t, label, availability: round1(availability), surging });
   }
 
   return buckets;

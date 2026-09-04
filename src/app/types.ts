@@ -85,6 +85,14 @@ export interface Event {
   manualSurgeActive?: boolean;
   /** Epoch ms when the current manual surge was started; cleared when surge is turned off. */
   manualSurgeStartedAt?: number;
+  /** Every surge period this event has had, oldest first. The last entry's `endedAt` is unset while a surge is currently active (mirrors `manualSurgeActive`/`manualSurgeStartedAt`). */
+  surgeLog?: SurgePeriod[];
+}
+
+export interface SurgePeriod {
+  startedAt: number;
+  /** Unset while this surge is still active. */
+  endedAt?: number;
 }
 
 export interface TeamLogEntry {
