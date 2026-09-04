@@ -13,7 +13,3 @@ Feature: Dispatch board — advanced (venue with locations and equipment)
     When I switch to the "Equipment" section
     And I change equipment "Wheelchair 1" status to "In Use"
     Then the equipment "Wheelchair 1" should show status "In Use"
-
-  Scenario: Posting Schedule modal opens
-    When I click the "Posting Schedule" button
-    Then I should see the heading "Schedule"

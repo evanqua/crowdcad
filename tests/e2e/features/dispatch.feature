@@ -123,12 +123,8 @@ Feature: Dispatch board
     When I delete the team "Hotel"
     Then the team "Hotel" should not be visible
 
-  Scenario: Venue Map button is hidden when the venue has no map
-    Then I should not see a "Venue Map" button
-
-  Scenario: Posting Schedule modal opens
-    When I click the "Posting Schedule" button
-    Then I should see the heading "Schedule"
+  Scenario: Map tab is hidden when the venue has no map
+    Then I should not see a "Map" button
 
   Scenario: Equipment section shows empty state when no equipment is configured
     When I switch to the "Equipment" section

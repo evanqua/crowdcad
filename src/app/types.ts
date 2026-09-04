@@ -6,6 +6,8 @@ export type Post =
     y: number | null; // percentage of height
     isClinic?: boolean;
     clinicId?: string; // stable id, set once when isClinic first becomes true
+    lat?: number | null; // source lat/long from a GIS import, for provenance only — rendering always uses x/y
+    lng?: number | null;
   };
 
 export interface Clinic {
@@ -13,11 +15,19 @@ export interface Clinic {
   name: string;
 }
 
+export interface GeoBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 export interface Layer {
   id: string;
   name: string;
   mapUrl?: string;
   posts: Post[];
+  geoBounds?: GeoBounds; // present when this layer's mapUrl was georeferenced via a GIS import
 }
 
 export interface Venue {

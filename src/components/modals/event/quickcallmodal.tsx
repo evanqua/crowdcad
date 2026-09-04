@@ -189,6 +189,24 @@ export default function QuickCallModal({
     value: "text-surface-light",
   } as const;
 
+  // Focus should land on whichever field is first (in on-screen order)
+  // still empty, not always Location — a map-click prefill (location or
+  // assigned team) shouldn't leave the cursor sitting in an already-filled
+  // field. React's autoFocus only fires once per mount, and this modal's
+  // content remounts each time it opens, so recomputing it per-render is
+  // safe: it only actually takes effect at that fresh mount.
+  const firstEmptyField = !quickCall.location.trim()
+    ? "location"
+    : !quickCall.source.trim()
+    ? "source"
+    : !quickCall.age.trim() && !quickCall.gender.trim()
+    ? "ageSex"
+    : !quickCall.chiefComplaint.trim()
+    ? "chiefComplaint"
+    : !quickCall.assignedTeam
+    ? "assignedTeam"
+    : null;
+
 
   return (
     <Modal
@@ -216,7 +234,7 @@ export default function QuickCallModal({
 
             <ModalBody className="">
               <Input
-                autoFocus
+                autoFocus={firstEmptyField === "location"}
                 label={t("Location")}
                 labelPlacement="inside"
                 variant="flat"
@@ -227,6 +245,7 @@ export default function QuickCallModal({
                 onValueChange={(v) => setQuickCall((p) => ({ ...p, location: v }))}
               />
               <Input
+                autoFocus={firstEmptyField === "source"}
                 label={t("Source")}
                 labelPlacement="inside"
                 variant="flat"
@@ -238,6 +257,7 @@ export default function QuickCallModal({
                 aria-label="Source"
               />
               <Input
+                autoFocus={firstEmptyField === "ageSex"}
                 label={t("Age/Sex")}
                 labelPlacement="inside"
                 variant="flat"
@@ -253,6 +273,7 @@ export default function QuickCallModal({
               />
 
               <Input
+                autoFocus={firstEmptyField === "chiefComplaint"}
                 label={t("Chief Complaint")}
                 labelPlacement="inside"
                 variant="flat"
@@ -264,6 +285,7 @@ export default function QuickCallModal({
                 aria-label="Chief Complaint"
               />
               <Select
+              autoFocus={firstEmptyField === "assignedTeam"}
               label={t("Assign Team")}
               placeholder={t("Select a team")}
               selectedKeys={quickCall.assignedTeam ? new Set([quickCall.assignedTeam]) : new Set()}

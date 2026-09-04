@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState, useRef, useCallback, use } from 'react';
 import PostingScheduleModal from '@/components/modals/event/postingschedulemodal';
-import VenueMapModal from '@/components/modals/event/venuemapmodal';
+import VenueMapTab, { type TeamFocusRequest } from '@/components/dispatch/venuemaptab';
 import EventSummaryModal from '@/components/modals/event/eventsummarymodal';
 import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
@@ -11,7 +11,7 @@ import EndEventModal from "@/components/modals/event/endeventmodal";
 import TransportUnitModal from "@/components/modals/event/transportunitmodal";
 import React from 'react';
 import { dbService, ServiceError } from '@/lib/services';
-import { PostAssignment, Event, Staff, Supervisor, Call, EquipmentStatus, CallLogEntry, TeamLogEntry, EquipmentItem, EventEquipment, ClinicOutcome, Clinic } from '@/app/types';
+import { PostAssignment, Event, Staff, Supervisor, Call, EquipmentStatus, CallLogEntry, TeamLogEntry, EquipmentItem, EventEquipment, ClinicOutcome, Clinic, Layer } from '@/app/types';
 import { toast, Slide, ToastContainer } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
@@ -20,7 +20,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useCertifications } from '@/hooks/useCertifications';
 import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
-import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4} from "lucide-react";
+import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4, Map as MapIcon } from "lucide-react";
 import TeamWidget from '@/components/dispatch/teamwidget';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CallTrackingTable } from '@/components/dispatch/calltracking';
@@ -189,6 +189,23 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     chiefComplaint: '',
     assignedTeam: '',
   });
+
+  // Opens the Add Call modal fresh each time — resets any fields left over
+  // from a previous open before applying prefill (a map pin/team marker
+  // click prefills location or assignedTeam; a plain "Add Call" button
+  // passes none).
+  const openAddCallModal = (prefill?: Partial<typeof quickCall>) => {
+    setQuickCall({
+      location: '',
+      source: '',
+      age: '',
+      gender: '',
+      chiefComplaint: '',
+      assignedTeam: '',
+      ...prefill,
+    });
+    setShowQuickCallForm(true);
+  };
   const [clinicCall, setClinicCall] = useState({
     age: '',
     gender: '',
@@ -1707,6 +1724,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
   const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
+  // Set alongside switching to the Map tab from a team card's "view on
+  // map" button. requestId must change on every click (not just teamName)
+  // since the Map tab may already be open and wouldn't otherwise notice a
+  // repeat request for the same team.
+  const [mapTeamFocusRequest, setMapTeamFocusRequest] = useState<TeamFocusRequest | null>(null);
+  const viewTeamOnMap = (teamName: string) => {
+    setMapTeamFocusRequest({ teamName, requestId: Date.now() });
+    setSelectedRightTab('map');
+  };
 
   // Matches the lg breakpoint used by the desktop/mobile CSS split below —
   // keeps CallTrackingTable/Card and ClinicTrackingTable/Card from both being
@@ -2134,7 +2160,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         return {
             ...s,
             status: newStatus,
-            location: newStatus === 'Available' ? (s.originalPost || 'Roaming') : s.location,
+            // Location is never this handler's call — teamcard.tsx/
+            // teamcard-condensed.tsx already compute the right destination
+            // (originalPost, a pending assignment, or the last valid
+            // location) and apply it via their own onLocationChange before
+            // calling this. Overwriting it here with a cruder originalPost-
+            // or-'Roaming' fallback used to stomp on that right after.
             log: [...(s.log || []), teamLogEntry]
         };
       });
@@ -2955,12 +2986,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     goToSummary();
   }, [event, eventId, canEndEvent, updateEvent, isLiteMode, goToSummary]);
 
-  const [showVenueMap, setShowVenueMap] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
   const [showEventSummary, setShowEventSummary] = useState(false);
 
   useEffect(() => {
-    const openVenue = () => setShowVenueMap(true);
     const openPosting = () => setShowPostingSchedule(true);
     const openEventSummary = () => setShowEventSummary(true);
     const openEndEvent = () => {
@@ -2985,7 +3014,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     window.addEventListener('open-lite-export-summary', openLiteExport);
 
     if (!isLiteMode) {
-      window.addEventListener('open-venue-map', openVenue);
       window.addEventListener('open-event-summary', openEventSummary);
       window.addEventListener('open-end-event', openEndEvent);
     }
@@ -2996,7 +3024,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       window.removeEventListener('open-lite-export-summary', openLiteExport);
 
       if (!isLiteMode) {
-        window.removeEventListener('open-venue-map', openVenue);
         window.removeEventListener('open-event-summary', openEventSummary);
         window.removeEventListener('open-end-event', openEndEvent);
       }
@@ -3181,6 +3208,31 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // events created before multi-clinic support existed.
   const clinics: Clinic[] = getEventClinics(event.clinics);
 
+  // Layers shown on the Map tab: the venue's own multi-layer array when
+  // present, falling back to a single synthetic layer built from the
+  // venue's legacy single mapUrl/eventPosts for venues saved before layers
+  // existed. Same derivation the old VenueMapModal render used.
+  const venueLayers: Layer[] = event.venue
+    ? event.venue.layers && event.venue.layers.length
+      ? event.venue.layers
+      : [
+          {
+            id:
+              typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                ? (crypto as unknown as { randomUUID?: () => string }).randomUUID?.() ?? `layer-${Date.now()}`
+                : `layer-${Date.now()}`,
+            name: event.venue.name || 'Main Floor',
+            posts: event.eventPosts || [],
+            mapUrl: event.venue.mapUrl,
+          },
+        ]
+    : [];
+
+  // The Map tab only makes sense once an image actually exists to show —
+  // a venue with no map uploaded to any layer gets no tab, same rule the
+  // navbar used for its old "Venue Map" shortcut.
+  const hasVenueMapImage = venueLayers.some((layer) => !!layer.mapUrl);
+
   // Calls delivered before per-clinic routing existed (or with no clinicId set) all
   // land in the first/default clinic, so nothing gets silently hidden or duplicated.
   const getClinicCalls = (clinicId: string) => (event.calls || []).filter(
@@ -3205,6 +3257,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         current.manualSurgeActive ? { manualSurgeActive: false, manualSurgeStartedAt: undefined } : {}
       );
     } else {
+      if (!window.confirm(t('Are you sure you want to enable surge?'))) return;
       // Functional form: if a surge was already started (by the auto-trigger
       // effect or another dispatcher) between this click and the transaction
       // running, keep its original start time instead of overwriting it.
@@ -3303,7 +3356,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             className="rounded-full bg-transparent hover:bg-surface-liner"
             onPress={refreshAllPostsFromSchedule}
             aria-label="Update all posts"
-            isDisabled={selectedTab === 'supervisors' || selectedTab === 'equipment'}
+            isDisabled={selectedTab === 'supervisors' || selectedTab === 'equipment' || !((event.postingTimes?.length ?? 0) > 0)}
           >
             <RotateCw className="h-5 w-5" />
           </Button>
@@ -3601,6 +3654,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 onRefreshTeamPost={refreshTeamFromSchedule}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
+                                hasVenueMap={hasVenueMapImage}
+                                onViewOnMap={viewTeamOnMap}
                               />
                             ))}
                           {(!event?.staff || event.staff.length === 0) && (
@@ -3646,6 +3701,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                     onRefreshTeamPost={refreshTeamFromSchedule}
                                     updateEvent={updateEvent}
                                     cardViewMode={cardViewMode}
+                                    // Supervisors aren't rendered as map markers (VenueMapWithPosts
+                                    // only plots event.staff), so there's nothing for this to jump to.
+                                    hasVenueMap={false}
                                   />
                                 );
                               })
@@ -3723,6 +3781,19 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             {clinic.name} ({getClinicCalls(clinic.id).filter(c => !c.outcome).length})
                           </button>
                         ))}
+
+                        {hasVenueMapImage && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRightTab('map')}
+                            className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'map' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                            aria-pressed={selectedRightTab === 'map'}
+                            aria-label={t('Map')}
+                            title={t('Map')}
+                          >
+                            <MapIcon className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
 
                       <SurgeToggleButton
@@ -3753,7 +3824,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                   className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
                                   aria-label={t('Add Call')}
                                   data-testid="add-call-button"
-                                  onPress={() => setShowQuickCallForm(true)}
+                                  onPress={() => openAddCallModal()}
                                 >
                                   {t('Add Call')}
                                 </Button>
@@ -3854,6 +3925,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         </div>
                       </div>
                     ))}
+
+                    {selectedRightTab === 'map' && !isMobile && hasVenueMapImage && (
+                      <div className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 flex flex-col flex-1 min-h-0">
+                        <VenueMapTab
+                          layers={venueLayers}
+                          staff={event.staff || []}
+                          equipment={event.eventEquipment || []}
+                          teamTimers={teamTimers}
+                          calls={event.calls || []}
+                          clinics={clinics}
+                          onAddCallAtPost={(location) => openAddCallModal({ location })}
+                          onAddCallForTeam={(assignedTeam) => openAddCallModal({ assignedTeam })}
+                          focusTeamRequest={mapTeamFocusRequest}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </ResizablePanel>
@@ -3917,6 +4004,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               onRefreshTeamPost={refreshTeamFromSchedule}
                               updateEvent={updateEvent}
                               cardViewMode={cardViewMode}
+                                hasVenueMap={hasVenueMapImage}
+                                onViewOnMap={viewTeamOnMap}
                             />
                           ))}
                       </div>
@@ -3957,6 +4046,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 onRefreshTeamPost={refreshTeamFromSchedule}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
+                                // Supervisors aren't rendered as map markers (VenueMapWithPosts
+                                // only plots event.staff), so there's nothing for this to jump to.
+                                hasVenueMap={false}
                               />
                             );
                           })}
@@ -4020,7 +4112,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               variant="light"
                               className="!bg-surface-liner"
                               aria-label={t('Add Call')}
-                              onPress={() => setShowQuickCallForm(true)}
+                              onPress={() => openAddCallModal()}
                             >
                               <Plus className="h-5 w-5" />
                             </Button>
@@ -4220,6 +4312,24 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 </div>
               </Tab>
               ))}
+
+              {hasVenueMapImage && (
+                <Tab key="map" title={<MapIcon className="h-4 w-4" />} aria-label={t('Map')}>
+                  <div className="h-[70vh] pb-20">
+                    <VenueMapTab
+                      layers={venueLayers}
+                      staff={event.staff || []}
+                      equipment={event.eventEquipment || []}
+                      teamTimers={teamTimers}
+                      calls={event.calls || []}
+                      clinics={clinics}
+                      onAddCallAtPost={(location) => openAddCallModal({ location })}
+                      onAddCallForTeam={(assignedTeam) => openAddCallModal({ assignedTeam })}
+                      focusTeamRequest={mapTeamFocusRequest}
+                    />
+                  </div>
+                </Tab>
+              )}
             </Tabs>
           </div>
         </div>
@@ -4242,33 +4352,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       {!isLiteMode && (
         <>
           {/* Cloud-only modals */}
-          {event?.venue && (
-            <VenueMapModal
-              isOpen={showVenueMap}
-              onClose={() => setShowVenueMap(false)}
-              layers={
-                event.venue.layers && event.venue.layers.length
-                  ? event.venue.layers
-                  : [
-                      {
-                        id:
-                          typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                            ? (crypto as unknown as { randomUUID?: () => string }).randomUUID?.() ?? `layer-${Date.now()}`
-                            : `layer-${Date.now()}`,
-                        name: event.venue.name || 'Main Floor',
-                        posts: event.eventPosts || [],
-                        mapUrl: event.venue.mapUrl,
-                      },
-                    ]
-              }
-              staff={event.staff || []}
-              equipment={event.eventEquipment || []}
-              teamTimers={teamTimers}
-              calls={event.calls || []}
-              clinics={clinics}
-            />
-          )}
-
           <EventSummaryModal
             open={showEventSummary}
             onClose={() => setShowEventSummary(false)}

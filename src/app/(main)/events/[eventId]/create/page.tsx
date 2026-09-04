@@ -98,6 +98,12 @@ export default function EventCreation() {
   };
   const handleMouseUp = () => setIsPanning(false);
 
+  const [postsEnabled, setPostsEnabled] = useState(false);
+
+  // enabled must track postsEnabled — without it, postingTimes is always
+  // generated regardless of whether "Enable Posts" is checked, which made
+  // the navbar's "Posting Schedule" item show up for every event (it goes
+  // off event.postingTimes.length > 0).
   const {
     scheduleFrom,
     setScheduleFrom,
@@ -106,14 +112,13 @@ export default function EventCreation() {
     scheduleBy,
     setScheduleBy,
     postingTimes,
-  } = useScheduleGeneration({ initialBy: '480' });
+  } = useScheduleGeneration({ initialBy: '480', enabled: postsEnabled });
 
   const [samName, setSamName] = useState('');
   const [samMemberName, setSamMemberName] = useState('');
   const [samCert, setSamCert] = useState('');
   const [openTeams, setOpenTeams] = useState<Record<number, boolean>>({});
   const [openSupervisors, setOpenSupervisors] = useState<Record<number, boolean>>({});
-  const [postsEnabled, setPostsEnabled] = useState(false);
   const [lastSelectedPostIndex, setLastSelectedPostIndex] = useState<number | null>(null);
   const [scheduleChips, setScheduleChips] = useState<{ id: string; time: string; editable: boolean }[]>([]);
   const [editingChipId, setEditingChipId] = useState<string | null>(null);
@@ -157,21 +162,6 @@ export default function EventCreation() {
     const { start, end } = scheduleTimesToWindow(eventData.date || new Date().toISOString(), scheduleFrom, scheduleTo);
     setEventData(prev => ({ ...prev, scheduleStart: start, scheduleEnd: end }));
   }, [scheduleFrom, scheduleTo, eventData.date]);
-
-  // Default post selection to "all posts" the first time the venue's posts
-  // become known, instead of starting from none — only runs once per page
-  // load, and only if nothing has already been selected.
-  const postsSeededRef = useRef(false);
-  useEffect(() => {
-    if (postsSeededRef.current) return;
-    const venue = eventData.venue;
-    if (!venue?.name || !venue?.layers?.length) return;
-    postsSeededRef.current = true;
-    if ((eventData.eventPosts || []).length > 0) return;
-    const allVenuePosts = venue.layers.flatMap(layer => layer.posts || []);
-    if (allVenuePosts.length === 0) return;
-    setEventData(prev => ({ ...prev, eventPosts: allVenuePosts }));
-  }, [eventData.venue, eventData.eventPosts]);
 
   // Autosave postingTimes to the draft event document when they change.
   // Debounced to avoid excessive writes while the user is adjusting inputs.

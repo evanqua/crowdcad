@@ -91,11 +91,10 @@ export default function AppNavbar() {
   ];
 
   // Whether the current dispatch event actually has something for these
-  // buttons to open — a venue with no map uploaded, or an event with no
-  // posting schedule configured, gets no button rather than one that opens
-  // an empty modal. Defaults to shown (true) until the event doc loads, to
-  // avoid the buttons popping in after a flash of nothing.
-  const [hasVenueMap, setHasVenueMap] = useState(true);
+  // buttons to open — an event with no posting schedule configured gets no
+  // button rather than one that opens an empty modal. Defaults to shown
+  // (true) until the event doc loads, to avoid the button popping in after
+  // a flash of nothing.
   const [postingScheduleEnabled, setPostingScheduleEnabled] = useState(true);
   const [eventEnded, setEventEnded] = useState(false);
   const [eventOwnerId, setEventOwnerId] = useState<string | null>(null);
@@ -105,7 +104,6 @@ export default function AppNavbar() {
 
     const loadDispatchNavState = async () => {
       if (!isDispatch || !dispatchEventId) {
-        setHasVenueMap(true);
         setPostingScheduleEnabled(true);
         setEventEnded(false);
         setEventOwnerId(null);
@@ -117,16 +115,12 @@ export default function AppNavbar() {
         if (cancelled) return;
 
         const data = docSnap.exists ? docSnap.data : null;
-        const layers = data?.venue?.layers;
-        const hasMap = Boolean((layers && layers.some((layer) => !!layer.mapUrl)) || data?.venue?.mapUrl);
 
-        setHasVenueMap(hasMap);
         setPostingScheduleEnabled((data?.postingTimes?.length ?? 0) > 0);
         setEventEnded(data ? isEventEnded(data) : false);
         setEventOwnerId(data?.userId ?? null);
       } catch {
         if (!cancelled) {
-          setHasVenueMap(true);
           setPostingScheduleEnabled(true);
         }
       }
@@ -151,12 +145,6 @@ export default function AppNavbar() {
   }, []);
 
   const dispatchItems = [
-    ...(hasVenueMap
-      ? [{
-          label: "Venue Map",
-          onClick: () => window.dispatchEvent(new CustomEvent('open-venue-map')),
-        }]
-      : []),
     ...(postingScheduleEnabled
       ? [{
           label: "Posting Schedule",

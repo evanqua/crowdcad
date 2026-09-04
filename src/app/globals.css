@@ -14,6 +14,13 @@
   --surface-bg-2: 35 2% 78%;
   --surface-bg-3: 35 2% 70%;
 
+  /* Venue/event map location pin — CrowdCAD's brand accent blue (#3eb1fd,
+     see tailwind.config.js `accent.DEFAULT`), expressed as HSL since this
+     value is consumed as a raw hsl() in marker fill/stroke props rather
+     than through a Tailwind class. Paired with a white outline in the
+     marker itself so it still reads against light/washed-out map images. */
+  --map-marker: 204 98% 62%;
+
   /* Surface text & border variables used by Tailwind surface.* tokens (light theme) */
   --surface-text: 240 10% 3.9%;
   --surface-text-strong: 240 6% 2.5%;
