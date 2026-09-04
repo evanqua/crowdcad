@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { Event, Call, DetachedTeam } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import DispatchMotionCell from '@/components/dispatch/motioncell';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
 import { getStatusColor } from '@/lib/statusColors';
@@ -38,24 +39,9 @@ type CallTrackingCardProps = {
   handleTogglePriority: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
   formatAgeSex: (age?: string | number, gender?: string) => string;
-  getCallRowClass: (call: Call) => string;
+  teamStatusMap: { [callId: string]: { [team: string]: string } };
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
-
-function callBg(call: Call, event: Event) {
-  // Check if any assigned team has active status
-  if (!Array.isArray(call.assignedTeam)) return 'bg-surface-deep';
-  
-  const statuses = call.assignedTeam
-    .map(t => event?.staff?.find(s => s.team === t)?.status)
-    .filter((status): status is string => status !== undefined);
-
-  if (statuses.some(status => ['En Route', 'On Scene', 'Transporting'].includes(status))) {
-    return 'bg-status-card-red';
-  }
-
-  return 'bg-surface-deep';
-}
 
 const dropdownMotionProps = {
   initial: { opacity: 0, y: -8, scale: 0.98 },
@@ -79,7 +65,7 @@ export default function CallTrackingCard({
   handleTogglePriority,
   handleDeleteCall,
   formatAgeSex,
-  getCallRowClass,
+  teamStatusMap,
   updateEvent,
 }: CallTrackingCardProps) {
   const { t } = useDispatchTerms();
@@ -138,7 +124,6 @@ export default function CallTrackingCard({
   }, [call.log]);
 
   const timer = useMMSS(callTimestamp);
-  const bg = getCallRowClass(call) || callBg(call, event);
 
   // Get available teams for dropdown (including On Break and In Clinic)
   const availableStaff = useMemo(() => {
@@ -168,7 +153,9 @@ export default function CallTrackingCard({
   }, [event.staff]);
 
   return (
-    <Card className={`rounded-lg shadow-sm border-0 ${bg}`}>
+    <Card
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-lg bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
+    >
       {/* HEADER */}
       <CardHeader 
         onClick={() => setExpanded(v => !v)}
@@ -319,9 +306,12 @@ export default function CallTrackingCard({
               ? ['En Route Eq', 'Assisting', 'Delivered Eq']
               : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
             
-            // Get current team status from event
-            const teamStaff = event.staff?.find(s => s.team === team) || event.supervisor?.find(s => s.team === team);
-            const currentStatus = teamStaff?.status || 'Unknown';
+            // Same resolution desktop's CallTrackingTable uses: a per-call
+            // override (teamStatusMap) takes priority over the team's own
+            // current status, so the pill reflects and resets exactly like
+            // the real call does.
+            const currentStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
+            const teamStatusColor = getStatusColor(currentStatus);
 
             return (
               <Chip
@@ -329,7 +319,7 @@ export default function CallTrackingCard({
                 size="lg"
                 variant="flat"
                 color="default"
-                className="text-surface-light h-9"
+                className={`text-surface-light h-9 ${teamStatusColor.chipClass}`}
                 onClose={() => onRemoveTeamFromCall(call.id, team)}
               >
                 <div className="flex items-center gap-2" data-testid={`team-chip-${team}`}>
@@ -605,8 +595,12 @@ export default function CallTrackingCard({
         </div>
 
         {/* Expanded section: Notes and Log */}
-        {expanded && (
-          <div className="pt-3 border-t border-surface-liner space-y-3" onClick={e => e.stopPropagation()}>
+        <DispatchMotionCell isOpen={expanded} animate overflowVisibleWhenOpen>
+          <div
+            className="pt-3 border-t border-surface-liner space-y-3"
+            onClick={e => e.stopPropagation()}
+            aria-hidden={!expanded}
+          >
             {call.priority && (
               <div className="bg-status-red text-surface-light p-2 rounded">
                 ⚠️ PRIORITY CALL: Life threat to patient/provider
@@ -689,7 +683,7 @@ export default function CallTrackingCard({
               />
             </div>
           </div>
-        )}
+        </DispatchMotionCell>
       </CardBody>
     </Card>
   );

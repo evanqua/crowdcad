@@ -21,8 +21,10 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useCertifications } from '@/hooks/useCertifications';
 import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
-import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4, Map as MapIcon } from "lucide-react";
+import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4, Map as MapIcon, Users, BriefcaseMedical, HousePlus } from "lucide-react";
+import { FaWalkieTalkie } from "react-icons/fa6";
 import TeamWidget from '@/components/dispatch/teamwidget';
+import DispatchMotionCell from '@/components/dispatch/motioncell';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CallTrackingTable } from '@/components/dispatch/calltracking';
 import ClinicTrackingTable from '@/components/dispatch/clinictracking';
@@ -1803,6 +1805,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
   const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
+  const [mobileTeamsSubTab, setMobileTeamsSubTab] = useState<'teams' | 'supervisors'>('teams');
+  const [mobileActiveTab, setMobileActiveTab] = useState<string>('teams');
+  const [mobileSelectedClinicId, setMobileSelectedClinicId] = useState<string>('');
   // Set alongside switching to the Map tab from a team card's "view on
   // map" button. requestId must change on every click (not just teamName)
   // since the Map tab may already be open and wouldn't otherwise notice a
@@ -3209,6 +3214,16 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     wasAboveSurgeThresholdRef.current = aboveThreshold;
   }, [event, updateEvent]);
 
+  // Keeps the mobile Clinic tab's selected clinic valid as `event.clinics`
+  // is added to (new venue posts flagged as clinics) or the selection is
+  // stale from a previous event.
+  useEffect(() => {
+    const currentClinics = getEventClinics(event?.clinics);
+    if (!currentClinics.some(c => c.id === mobileSelectedClinicId)) {
+      setMobileSelectedClinicId(currentClinics[0]?.id ?? '');
+    }
+  }, [event?.clinics, mobileSelectedClinicId]);
+
   // Return early if auth is not ready or user is not authenticated
   if (!isLiteMode && !ready) {
     return <LoadingScreen label="Loading…" />;
@@ -3329,6 +3344,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // Venue-designated clinics, falling back to a single default "Clinic" for
   // events created before multi-clinic support existed.
   const clinics: Clinic[] = getEventClinics(event.clinics);
+  const mobileClinicId = clinics.some(c => c.id === mobileSelectedClinicId) ? mobileSelectedClinicId : (clinics[0]?.id ?? '');
 
   // Layers shown on the Map tab: the venue's own multi-layer array when
   // present, falling back to a single synthetic layer built from the
@@ -3598,6 +3614,236 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     </div>
   );
 
+  // Rendered once, above the mobile <Tabs>, inside the same sticky container
+  // as AvailabilitySurgeStrip — sharing one sticky box with the availability
+  // strip means there's no gap between them for scrolling cards to peek
+  // through, unlike two independently-offset sticky elements would have.
+  const renderMobileTabHeader = () => {
+    if (mobileActiveTab === 'teams') {
+      return (
+        <>
+          <Select
+            selectedKeys={[mobileTeamsSubTab]}
+            onSelectionChange={(keys) => {
+              const selected = Array.from(keys)[0] as 'teams' | 'supervisors';
+              if (selected) setMobileTeamsSubTab(selected);
+            }}
+            aria-label="Select teams or supervisors"
+            className="w-auto min-w-[160px]"
+            classNames={{
+              trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
+              value: "text-surface-light",
+              popoverContent: "bg-surface-deep border-surface-liner",
+            }}
+          >
+            <SelectItem key="teams">{t('Teams')}</SelectItem>
+            <SelectItem key="supervisors">{t('Supervisors')}</SelectItem>
+          </Select>
+          <TeamActionButtonGroup selectedTab={mobileTeamsSubTab} />
+        </>
+      );
+    }
+    if (mobileActiveTab === 'equipment') {
+      return (
+        <>
+          <h2 className="text-xl font-bold text-surface-light">{t('Equipment')}</h2>
+          <TeamActionButtonGroup selectedTab="equipment" />
+        </>
+      );
+    }
+    if (mobileActiveTab === 'calls') {
+      return (
+        <>
+          <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
+          <div className="flex items-center gap-2">
+            <Tooltip content={t('Add Call')} placement="top">
+              <div>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                  aria-label={t('Add Call')}
+                  onPress={() => openAddCallModal()}
+                >
+                  {t('Add Call')}
+                </Button>
+              </div>
+            </Tooltip>
+          </div>
+        </>
+      );
+    }
+    if (mobileActiveTab === 'clinic') {
+      return (
+        <>
+          {clinics.length > 1 ? (
+            <Select
+              selectedKeys={mobileClinicId ? [mobileClinicId] : []}
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as string;
+                if (selected) setMobileSelectedClinicId(selected);
+              }}
+              aria-label="Select clinic"
+              className="w-auto min-w-[160px]"
+              classNames={{
+                trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
+                value: "text-surface-light",
+                popoverContent: "bg-surface-deep border-surface-liner",
+              }}
+            >
+              {clinics.map((clinic) => (
+                <SelectItem key={clinic.id}>{clinic.name}</SelectItem>
+              ))}
+            </Select>
+          ) : (
+            <h2 className="text-xl font-bold text-surface-light">{clinics[0]?.name ?? t('Clinic')}</h2>
+          )}
+          <Tooltip content={t('Add Patient')} placement="top">
+            <div>
+              <Button
+                size="sm"
+                variant="flat"
+                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                aria-label={t('Add patient (mobile)')}
+                onPress={() => setShowQuickClinicCallForm(true)}
+              >
+                {t('Add Patient')}
+              </Button>
+            </div>
+          </Tooltip>
+        </>
+      );
+    }
+    return null;
+  };
+
+  const renderMobileCallCard = (call: Call) => (
+    <CallTrackingCard
+      key={call.id}
+      call={call}
+      callDisplayNumber={callDisplayNumberMap.get(call.id) || 0}
+      event={event}
+      onLocationChange={async (callId, newLocation) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          location: newLocation,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Location changed to ${newLocation}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onAgeSexChange={async (callId, ageSexValue) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const { age, gender } = parseAgeSex(ageSexValue);
+        const newAge = age || '';
+        const newGender = gender || '';
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          age: newAge,
+          gender: newGender,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Age/Sex set to ${formatAgeSex(newAge, newGender) || 'N/A'}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onChiefComplaintChange={async (callId, newChiefComplaint) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          chiefComplaint: newChiefComplaint,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Chief Complaint changed to ${newChiefComplaint}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onRemoveTeamFromCall={handleRemoveTeamFromCall}
+      onAddTeamToCall={handleAddTeamToCall}
+      handleTeamStatusChange={handleTeamStatusChange}
+      handleRevertDetachment={handleRevertDetachment}
+      handleMarkDuplicate={handleMarkDuplicate}
+      handleTogglePriority={handleTogglePriorityFromMenu}
+      handleDeleteCall={handleDeleteCall}
+      formatAgeSex={formatAgeSex}
+      teamStatusMap={teamStatusMap}
+      updateEvent={updateEvent}
+    />
+  );
+
+  const renderMobileClinicCard = (call: Call) => (
+    <ClinicTrackingCard
+      key={call.id}
+      call={call}
+      callDisplayNumber={callDisplayNumberMap.get(call.id) || 0}
+      event={event}
+      onLocationChange={async (callId, newLocation) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          location: newLocation,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Location changed to ${newLocation}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onAgeSexChange={async (callId, ageSexValue) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const { age, gender } = parseAgeSex(ageSexValue);
+        const newAge = age || '';
+        const newGender = gender || '';
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          age: newAge,
+          gender: newGender,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Age/Sex set to ${formatAgeSex(newAge, newGender) || 'N/A'}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onChiefComplaintChange={async (callId, newChiefComplaint) => {
+        const callToUpdate = event.calls.find(c => c.id === callId);
+        if (!callToUpdate) return;
+
+        const now = new Date();
+        const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+        const updatedCall = {
+          ...callToUpdate,
+          chiefComplaint: newChiefComplaint,
+          log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Chief Complaint changed to ${newChiefComplaint}.` }]
+        };
+        const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
+        await updateEvent({ calls: updatedCalls });
+      }}
+      onOutcomeChange={handleClinicOutcomeChange}
+      onRevertOutcome={handleRevertClinicOutcome}
+      handleDeleteCall={handleDeleteCall}
+      formatAgeSex={formatAgeSex}
+      updateEvent={updateEvent}
+    />
+  );
+
   return (
     <DispatchVocabularyProvider terms={vocabularyTerms}>
       <ToastContainer
@@ -3626,7 +3872,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         setClinicCall={setClinicCall}
         formatAgeSex={formatAgeSex}
         parseAgeSex={parseAgeSex}
-        clinicId={clinics.find(c => c.id === selectedRightTab)?.id || clinics[0]?.id}
+        clinicId={isMobile ? mobileClinicId : (clinics.find(c => c.id === selectedRightTab)?.id || clinics[0]?.id)}
       />
       <TransportUnitModal
         isOpen={showTransportUnitModal}
@@ -4104,29 +4350,34 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
           {/* Mobile/Tablet Layout - Bottom Tabs */}
           <div className="lg:hidden">
-            {event && <AvailabilitySurgeStrip event={event} />}
-            {/* Background rectangle to cover bottom radius space */}
-            <div className="fixed bottom-0 left-0 right-0 h-5 bg-surface-deep z-40"></div>
+            <div className="sticky top-14 z-40 bg-surface-deepest">
+              {event && <AvailabilitySurgeStrip event={event} />}
+              {mobileActiveTab !== 'map' && (
+                <div className="flex justify-between items-center py-2">
+                  {renderMobileTabHeader()}
+                </div>
+              )}
+            </div>
             <Tabs
-              aria-label="Dispatch sections" 
+              aria-label="Dispatch sections"
               placement="bottom"
-              radius="full"
+              radius="none"
+              selectedKey={mobileActiveTab}
+              onSelectionChange={(key) => setMobileActiveTab(String(key))}
               classNames={{
                 base: "w-full",
-                tabList: "fixed bottom-0 left-0 right-0 w-full bg-surface-deep border-t border-surface-light/10 z-50",
-                cursor: "bg-blue-600",
-                tab: "h-10",
-                tabContent: "text-lg text-surface-light group-data-[selected=true]:text-surface-light"
+                tabList: "fixed bottom-0 left-0 right-0 w-full rounded-none bg-surface-deep border-t border-surface-light/10 z-50 gap-0",
+                cursor: "rounded-none bg-surface-liner",
+                tab: "h-16 rounded-none",
+                tabContent: "text-surface-light group-data-[selected=true]:text-surface-light",
+                panel: "pt-0"
               }}
             >
               {/* TEAMS TAB */}
-              <Tab key="teams" title={t('Teams')}>
+              <Tab key="teams" title={<Users className="h-6 w-6" />} aria-label={t('Teams')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">{t('Teams')}</h2>
-                      <TeamActionButtonGroup selectedTab="teams" />
-                    </div>
+                    {mobileTeamsSubTab === 'teams' && (
                     <div className={cardViewMode === 'condensed' ? 'space-y-1.5' : 'space-y-3'}>
                       <div className="dispatch-shell-list">
                         {[...(event?.staff || [])]
@@ -4164,18 +4415,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 knownMapLocations={knownMapLocations}
                             />
                           ))}
+                        {(!event?.staff || event.staff.length === 0) && (
+                          <div className="text-center text-surface-light/50 py-8">
+                            {t('No teams added yet')}
+                          </div>
+                        )}
                       </div>
                     </div>
+                    )}
                   </div>
 
-                  {event?.supervisor && event.supervisor.length > 0 && (
+                  {mobileTeamsSubTab === 'supervisors' && (
                     <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-xl font-bold text-surface-light">{t('Supervisors')}</h2>
-                      </div>
                       <div className="dispatch-shell-list">
-                        {event.supervisor
-                          ?.sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
+                        {event?.supervisor && event.supervisor.length > 0 ? (
+                        event.supervisor
+                          .sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }))
                           .map(supervisor => {
                             const supervisorAsStaff: Staff = {
                               team: supervisor.team,
@@ -4207,7 +4462,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 knownMapLocations={knownMapLocations}
                               />
                             );
-                          })}
+                          })
+                        ) : (
+                          <div className="text-center text-surface-light/50 py-8">
+                            {t('No supervisors added yet')}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -4215,13 +4475,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               </Tab>
 
               {/* EQUIPMENT TAB */}
-              <Tab key="equipment" title={t('Equipment')}>
+              <Tab key="equipment" title={<BriefcaseMedical className="h-6 w-6" />} aria-label={t('Equipment')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">{t('Equipment')}</h2>
-                      <TeamActionButtonGroup selectedTab="equipment" />
-                    </div>
                     <div className="space-y-3">
                       {(event?.venue?.equipment?.length || event?.eventEquipment?.length) ? (
                         <div className="dispatch-shell-list">
@@ -4260,111 +4516,39 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 </div>
               </Tab>
 
-              <Tab key="calls" title={t('Calls')}>
+              <Tab key="calls" title={<FaWalkieTalkie className="h-5 w-5" />} aria-label={t('Calls')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
-                      <div className="flex items-center gap-2">
-                        <Tooltip content={t('Add Call')} placement="top">
-                          <div>
-                            <Button
-                              isIconOnly
-                              size="md"
-                              variant="light"
-                              className="!bg-surface-liner"
-                              aria-label={t('Add Call')}
-                              onPress={() => openAddCallModal()}
-                            >
-                              <Plus className="h-5 w-5" />
-                            </Button>
+                    {(() => {
+                      const activeMobileCalls = event.calls
+                        .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status))
+                        .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
+                      const resolvedMobileCalls = event.calls
+                        .filter((c: Call) => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(c.status))
+                        .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
+                      return (
+                        <>
+                          <div className="dispatch-shell-list">
+                            {isMobile && activeMobileCalls.map(renderMobileCallCard)}
+                            {(!event.calls || event.calls.length === 0) && (
+                              <div className="text-center text-surface-light/50 py-8">
+                                {t('No calls')}
+                              </div>
+                            )}
                           </div>
-                        </Tooltip>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      {isMobile && [
-                        // Active calls first
-                        ...event.calls
-                          .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status))
-                          .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id)),
-                        // Show resolved calls when showResolvedCalls is true
-                        ...(showResolvedCalls
-                          ? event.calls
-                              .filter((c: Call) => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(c.status))
-                              .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id))
-                          : [])
-                      ].map((call: Call) => (
-                        <CallTrackingCard
-                          key={call.id}
-                          call={call}
-                          callDisplayNumber={callDisplayNumberMap.get(call.id) || 0}
-                          event={event}
-                          onLocationChange={async (callId, newLocation) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              location: newLocation,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Location changed to ${newLocation}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onAgeSexChange={async (callId, ageSexValue) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const { age, gender } = parseAgeSex(ageSexValue);
-                            const newAge = age || '';
-                            const newGender = gender || '';
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              age: newAge,
-                              gender: newGender,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Age/Sex set to ${formatAgeSex(newAge, newGender) || 'N/A'}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onChiefComplaintChange={async (callId, newChiefComplaint) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              chiefComplaint: newChiefComplaint,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Chief Complaint changed to ${newChiefComplaint}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onRemoveTeamFromCall={handleRemoveTeamFromCall}
-                          onAddTeamToCall={handleAddTeamToCall}
-                          handleTeamStatusChange={handleTeamStatusChange}
-                          handleRevertDetachment={handleRevertDetachment}
-                          handleMarkDuplicate={handleMarkDuplicate}
-                          handleTogglePriority={handleTogglePriorityFromMenu}
-                          handleDeleteCall={handleDeleteCall}
-                          getCallRowClass={getCallRowClass}
-                          formatAgeSex={formatAgeSex}
-                          updateEvent={updateEvent}
-                        />
-                      ))}
-                      {(!event.calls || event.calls.length === 0) && (
-                        <div className="text-center text-surface-light/50 py-8">
-                          {t('No calls')}
-                        </div>
-                      )}
-                    </div>
+                          <DispatchMotionCell isOpen={showResolvedCalls} animate>
+                            {/* Manual top border (rather than the shared .dispatch-shell-list
+                                adjacent-sibling CSS) since this list is a separate DOM subtree
+                                from the active list above, so the sibling-based divider rule
+                                can't bridge the seam between the last active and first
+                                resolved card. */}
+                            <div className={`dispatch-shell-list ${activeMobileCalls.length > 0 ? 'border-t border-surface-liner/60' : ''}`}>
+                              {isMobile && resolvedMobileCalls.map(renderMobileCallCard)}
+                            </div>
+                          </DispatchMotionCell>
+                        </>
+                      );
+                    })()}
                     <div className="flex justify-center pt-3">
                       <button
                         onClick={() => setShowResolvedCalls(prev => !prev)}
@@ -4377,90 +4561,37 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 </div>
               </Tab>
 
-              {/* CLINIC TABS - one per venue-designated clinic */}
-              {clinics.map((clinic) => (
-              <Tab key={clinic.id} title={clinic.name}>
+              {/* CLINIC TAB - single tab, switch clinic via the dropdown when multiple are configured */}
+              <Tab key="clinic" title={<HousePlus className="h-6 w-6" />} aria-label={t('Clinic')}>
                 <div className="space-y-6 pb-20">
                   <div>
-                    <div className="space-y-3">
-                      {isMobile && [
-                        // Unresolved clinic (Delivered with no outcome)
-                        ...(event.calls || [])
-                          .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
-                          .sort((a, b) => parseInt(a.id) - parseInt(b.id)),
-                        // Resolved clinic (Delivered with an outcome) when toggled on
-                        ...(showResolvedClinicCalls
-                          ? (event.calls || [])
-                              .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === clinic.id))
-                              .sort((a, b) => parseInt(a.id) - parseInt(b.id))
-                          : [])
-                      ].map((call: Call) => (
-                        <ClinicTrackingCard
-                          key={call.id}
-                          call={call}
-                          callDisplayNumber={callDisplayNumberMap.get(call.id) || 0}
-                          event={event}
-                          onLocationChange={async (callId, newLocation) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              location: newLocation,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Location changed to ${newLocation}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onAgeSexChange={async (callId, ageSexValue) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const { age, gender } = parseAgeSex(ageSexValue);
-                            const newAge = age || '';
-                            const newGender = gender || '';
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              age: newAge,
-                              gender: newGender,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Age/Sex set to ${formatAgeSex(newAge, newGender) || 'N/A'}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onChiefComplaintChange={async (callId, newChiefComplaint) => {
-                            const callToUpdate = event.calls.find(c => c.id === callId);
-                            if (!callToUpdate) return;
-                            
-                            const now = new Date();
-                            const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
-                            const updatedCall = {
-                              ...callToUpdate,
-                              chiefComplaint: newChiefComplaint,
-                              log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Chief Complaint changed to ${newChiefComplaint}.` }]
-                            };
-                            const updatedCalls = event.calls.map(c => c.id === callId ? updatedCall : c);
-                            await updateEvent({ calls: updatedCalls });
-                          }}
-                          onOutcomeChange={handleClinicOutcomeChange}
-                          onRevertOutcome={handleRevertClinicOutcome}
-                          handleDeleteCall={handleDeleteCall}
-                          getCallRowClass={getCallRowClass}
-                          formatAgeSex={formatAgeSex}
-                          updateEvent={updateEvent}
-                        />
-                      ))}
-                      {getClinicCalls(clinic.id).length === 0 && (
-                        <div className="text-center text-surface-light/50 py-8">
-                          {t('No clinic calls')}
-                        </div>
-                      )}
-                    </div>
+                    {(() => {
+                      const activeMobileClinicCalls = (event.calls || [])
+                        .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
+                        .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                      const resolvedMobileClinicCalls = (event.calls || [])
+                        .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
+                        .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                      return (
+                        <>
+                          <div className="dispatch-shell-list">
+                            {isMobile && activeMobileClinicCalls.map(renderMobileClinicCard)}
+                            {getClinicCalls(mobileClinicId).length === 0 && (
+                              <div className="text-center text-surface-light/50 py-8">
+                                {t('No clinic calls')}
+                              </div>
+                            )}
+                          </div>
+                          <DispatchMotionCell isOpen={showResolvedClinicCalls} animate>
+                            {/* See the Calls tab's identical comment: manual border since this
+                                is a separate DOM subtree from the active list above. */}
+                            <div className={`dispatch-shell-list ${activeMobileClinicCalls.length > 0 ? 'border-t border-surface-liner/60' : ''}`}>
+                              {isMobile && resolvedMobileClinicCalls.map(renderMobileClinicCard)}
+                            </div>
+                          </DispatchMotionCell>
+                        </>
+                      );
+                    })()}
                     <div className="flex justify-center pt-3">
                       <button
                         onClick={() => setShowResolvedClinicCalls(prev => !prev)}
@@ -4473,11 +4604,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                   </div>
                 </div>
               </Tab>
-              ))}
 
               {hasVenueMapImage && (
-                <Tab key="map" title={<MapIcon className="h-4 w-4" />} aria-label={t('Map')}>
-                  <div className="h-[70vh] pb-20">
+                <Tab key="map" title={<MapIcon className="h-6 w-6" />} aria-label={t('Map')}>
+                  <div className="h-[70vh] pt-3 pb-20">
                     <VenueMapTab
                       layers={venueLayers}
                       staff={event.staff || []}

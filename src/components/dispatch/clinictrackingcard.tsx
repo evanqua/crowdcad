@@ -9,6 +9,7 @@ import {
 import { MoreVertical, RotateCw } from 'lucide-react';
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
+import DispatchMotionCell from '@/components/dispatch/motioncell';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { useMMSS } from '@/hooks/useMMSS';
 import { isClinicCallResolved } from '@/lib/clinics';
@@ -24,14 +25,8 @@ type ClinicTrackingCardProps = {
   onRevertOutcome: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
   formatAgeSex: (age?: string | number, gender?: string) => string;
-  getCallRowClass: (call: Call) => string;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
-
-function callBg() {
-  // Clinic calls always use default background
-  return 'bg-surface-deep';
-}
 const dropdownMotionProps = {
   initial: { opacity: 0, y: -8, scale: 0.98 },
   animate: { opacity: 1, y: 0, scale: 1 },
@@ -50,7 +45,6 @@ export default function ClinicTrackingCard({
   onRevertOutcome,
   handleDeleteCall,
   formatAgeSex,
-  getCallRowClass,
   updateEvent,
 }: ClinicTrackingCardProps) {
   const { t } = useDispatchTerms();
@@ -107,7 +101,6 @@ export default function ClinicTrackingCard({
   }, [call.log]);
 
   const timer = useMMSS(callTimestamp);
-  const bg = getCallRowClass(call) || callBg();
   const isResolved = isClinicCallResolved(call);
 
   // Get primary team (first assigned team or first detached team)
@@ -122,7 +115,9 @@ export default function ClinicTrackingCard({
   }, [call.assignedTeam, call.detachedTeams]);
 
   return (
-    <Card className={`rounded-2xl shadow-sm border-0 ${bg}`}>
+    <Card
+      className={`dispatch-shell-card ${expanded ? 'dispatch-shell-card--open' : ''} w-full border-0 transition-colors duration-200 ${expanded ? 'rounded-lg bg-surface-deep shadow-sm' : 'rounded-none bg-transparent shadow-none hover:bg-surface-deep'}`}
+    >
       {/* HEADER */}
       <CardHeader 
         onClick={() => setExpanded(v => !v)}
@@ -265,7 +260,7 @@ export default function ClinicTrackingCard({
                   className={`w-full h-full justify-start bg-surface-deep border border-surface-liner text-surface-light px-2 ${isResolved ? 'opacity-100 cursor-default' : 'hover:bg-surface-muted'}`}
                 >
                   <div className="text-left flex-4 pl-0.5">
-                    <div className="text-xs text-[#d4d4d8] pb-0.5">{t('Status')}</div>
+                    <div className="text-xs text-surface-faint pb-0.5">{t('Status')}</div>
                     <div className="text-sm">{t(call.outcome || 'In Clinic')}</div>
                   </div>
                 </Button>
@@ -297,15 +292,19 @@ export default function ClinicTrackingCard({
           {/* Primary Team (read-only) */}
           <div className="flex-1">
             <div className="h-full px-2.5 py-2 bg-surface-deep border border-surface-liner rounded-xl flex flex-col justify-center">
-              <div className="text-xs text-[#d4d4d8] mb-0.5">{t('Primary Team')}</div>
+              <div className="text-xs text-surface-faint mb-0.5">{t('Primary Team')}</div>
               <div className="text-sm">{t(primaryTeam)}</div>
             </div>
           </div>
         </div>
 
         {/* Expanded section: Notes and Log */}
-        {expanded && (
-          <div className="pt-3 border-t border-surface-liner space-y-3" onClick={e => e.stopPropagation()}>
+        <DispatchMotionCell isOpen={expanded} animate overflowVisibleWhenOpen>
+          <div
+            className="pt-3 border-t border-surface-liner space-y-3"
+            onClick={e => e.stopPropagation()}
+            aria-hidden={!expanded}
+          >
             {call.priority && (
               <div className="bg-status-red text-surface-light p-2 rounded">
                 ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
@@ -388,7 +387,7 @@ export default function ClinicTrackingCard({
               />
             </div>
           </div>
-        )}
+        </DispatchMotionCell>
       </CardBody>
     </Card>
   );
