@@ -9,6 +9,15 @@ import { MAP_CHECKER_BG } from '@/lib/mapStyles';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import { VenueMapWithPosts } from '@/components/modals/event/venuemapmodal';
 
+/** A request to jump to and highlight a specific team on the map. requestId
+ *  must change (e.g. Date.now()) each time, including re-clicking the same
+ *  team, since this tab may already be mounted and showing — a plain prop
+ *  read on mount wouldn't re-fire in that case. */
+export interface TeamFocusRequest {
+  teamName: string;
+  requestId: number;
+}
+
 interface VenueMapTabProps {
   layers: Layer[];
   staff: Staff[];
@@ -16,6 +25,11 @@ interface VenueMapTabProps {
   teamTimers: { [team: string]: number };
   calls: Call[];
   clinics: Clinic[];
+  /** Clicking a post pin shows a small "Add Call" button under it prefilled with that location. */
+  onAddCallAtPost?: (postName: string) => void;
+  /** Clicking a team marker shows a small "Add Call" button under it prefilled with that team assigned. */
+  onAddCallForTeam?: (teamName: string) => void;
+  focusTeamRequest?: TeamFocusRequest | null;
 }
 
 function isCoordinatedPost(post: Post): post is { name: string; x: number; y: number } {
@@ -33,10 +47,21 @@ interface SearchItem {
 // occupying the whole panel below the tab strip. Replaces the old
 // click-to-open VenueMapModal so the map, layer navigation, and location
 // search are always one click away instead of a full-screen overlay.
-export default function VenueMapTab({ layers, staff, equipment, teamTimers, calls, clinics }: VenueMapTabProps) {
+export default function VenueMapTab({
+  layers,
+  staff,
+  equipment,
+  teamTimers,
+  calls,
+  clinics,
+  onAddCallAtPost,
+  onAddCallForTeam,
+  focusTeamRequest,
+}: VenueMapTabProps) {
   const [currentLayer, setCurrentLayer] = useState(0);
   const [searchInput, setSearchInput] = useState('');
   const [selectedPostName, setSelectedPostName] = useState<string | null>(null);
+  const [selectedTeamName, setSelectedTeamName] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
   const {
@@ -56,13 +81,37 @@ export default function VenueMapTab({ layers, staff, equipment, teamTimers, call
   const safeCurrentLayer = Math.min(currentLayer, Math.max(0, layers.length - 1));
   const currentLayerData = layers[safeCurrentLayer];
 
-  // The attention ring on a search result fades on its own rather than
+  // The attention arrow on a search result fades on its own rather than
   // sticking around until something else clears it.
   useEffect(() => {
     if (!selectedPostName) return;
     const timeout = setTimeout(() => setSelectedPostName(null), 4000);
     return () => clearTimeout(timeout);
   }, [selectedPostName]);
+
+  useEffect(() => {
+    if (!selectedTeamName) return;
+    const timeout = setTimeout(() => setSelectedTeamName(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [selectedTeamName]);
+
+  // A team card's "view on map" button. requestId (not just the team name)
+  // is the dependency so re-clicking the same team while this tab is
+  // already open still re-triggers the jump/highlight.
+  useEffect(() => {
+    if (!focusTeamRequest) return;
+    const team = staff.find((s) => s.team === focusTeamRequest.teamName);
+    const location = team?.location;
+    if (location) {
+      const layerIdx = layers.findIndex((layer) =>
+        (layer.posts || []).some((post) => isCoordinatedPost(post) && post.name === location)
+      );
+      if (layerIdx >= 0) setCurrentLayer(layerIdx);
+    }
+    setSelectedTeamName(focusTeamRequest.teamName);
+    resetZoom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTeamRequest?.requestId]);
 
   const searchItems = useMemo(() => {
     const items: SearchItem[] = [];
@@ -181,6 +230,9 @@ export default function VenueMapTab({ layers, staff, equipment, teamTimers, call
           imgRef={imgRef}
           imageRadiusClassName="rounded-lg"
           selectedPostName={selectedPostName}
+          selectedTeamName={selectedTeamName}
+          onAddCallAtPost={onAddCallAtPost}
+          onAddCallForTeam={onAddCallForTeam}
         />
         <MapZoomControls onZoomIn={() => zoomIn(0.25)} onZoomOut={() => zoomOut(0.25)} onReset={resetZoom} />
       </div>

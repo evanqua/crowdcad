@@ -6,7 +6,7 @@ import {
   Card, CardHeader, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Select, SelectItem, Autocomplete, AutocompleteItem, Button
 } from '@heroui/react';
-import {ChevronDown, ChevronUp, MapPin, MoreVertical, ArrowRight} from 'lucide-react';
+import {ChevronDown, ChevronUp, MapPin, MoreVertical, ArrowRight, Map as MapIcon} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
@@ -24,6 +24,9 @@ type TeamCardCondensedProps = {
   onDelete?: (teamName: string) => void;
   onRefreshPost?: (teamName: string) => void;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
+  /** Whether the venue has a map uploaded — gates the "view on map" button. */
+  hasVenueMap?: boolean;
+  onViewOnMap?: (teamName: string) => void;
 };
 
 function useMMSS(since?: number) {
@@ -43,7 +46,8 @@ function useMMSS(since?: number) {
 export default function TeamCardCondensed({
   staff, event, sinceMs,
   onStatusChange, onLocationChange,
-  onEdit, onDelete, onRefreshPost, updateEvent
+  onEdit, onDelete, onRefreshPost, updateEvent,
+  hasVenueMap, onViewOnMap,
 }: TeamCardCondensedProps) {
   const { t } = useDispatchTerms();
   const [expanded, setExpanded] = useState(false);
@@ -155,6 +159,21 @@ export default function TeamCardCondensed({
         <div className="text-surface-light/70">
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </div>
+
+        {hasVenueMap && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewOnMap?.(staff.team);
+            }}
+            className="p-0 m-0 border-0 bg-transparent text-surface-light hover:text-status-blue transition-colors cursor-pointer flex items-center justify-center"
+            aria-label="View on map"
+            title="View on map"
+          >
+            <MapIcon className="h-4 w-4" />
+          </button>
+        )}
 
         {/* Three dots menu */}
         <div

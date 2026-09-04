@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState, useRef, useCallback, use } from 'react';
 import PostingScheduleModal from '@/components/modals/event/postingschedulemodal';
-import VenueMapTab from '@/components/dispatch/venuemaptab';
+import VenueMapTab, { type TeamFocusRequest } from '@/components/dispatch/venuemaptab';
 import EventSummaryModal from '@/components/modals/event/eventsummarymodal';
 import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
@@ -189,6 +189,23 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     chiefComplaint: '',
     assignedTeam: '',
   });
+
+  // Opens the Add Call modal fresh each time — resets any fields left over
+  // from a previous open before applying prefill (a map pin/team marker
+  // click prefills location or assignedTeam; a plain "Add Call" button
+  // passes none).
+  const openAddCallModal = (prefill?: Partial<typeof quickCall>) => {
+    setQuickCall({
+      location: '',
+      source: '',
+      age: '',
+      gender: '',
+      chiefComplaint: '',
+      assignedTeam: '',
+      ...prefill,
+    });
+    setShowQuickCallForm(true);
+  };
   const [clinicCall, setClinicCall] = useState({
     age: '',
     gender: '',
@@ -1707,6 +1724,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
   const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
+  // Set alongside switching to the Map tab from a team card's "view on
+  // map" button. requestId must change on every click (not just teamName)
+  // since the Map tab may already be open and wouldn't otherwise notice a
+  // repeat request for the same team.
+  const [mapTeamFocusRequest, setMapTeamFocusRequest] = useState<TeamFocusRequest | null>(null);
+  const viewTeamOnMap = (teamName: string) => {
+    setMapTeamFocusRequest({ teamName, requestId: Date.now() });
+    setSelectedRightTab('map');
+  };
 
   // Matches the lg breakpoint used by the desktop/mobile CSS split below —
   // keeps CallTrackingTable/Card and ClinicTrackingTable/Card from both being
@@ -2134,7 +2160,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         return {
             ...s,
             status: newStatus,
-            location: newStatus === 'Available' ? (s.originalPost || 'Roaming') : s.location,
+            // Location is never this handler's call — teamcard.tsx/
+            // teamcard-condensed.tsx already compute the right destination
+            // (originalPost, a pending assignment, or the last valid
+            // location) and apply it via their own onLocationChange before
+            // calling this. Overwriting it here with a cruder originalPost-
+            // or-'Roaming' fallback used to stomp on that right after.
             log: [...(s.log || []), teamLogEntry]
         };
       });
@@ -3226,6 +3257,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         current.manualSurgeActive ? { manualSurgeActive: false, manualSurgeStartedAt: undefined } : {}
       );
     } else {
+      if (!window.confirm(t('Are you sure you want to enable surge?'))) return;
       // Functional form: if a surge was already started (by the auto-trigger
       // effect or another dispatcher) between this click and the transaction
       // running, keep its original start time instead of overwriting it.
@@ -3324,7 +3356,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             className="rounded-full bg-transparent hover:bg-surface-liner"
             onPress={refreshAllPostsFromSchedule}
             aria-label="Update all posts"
-            isDisabled={selectedTab === 'supervisors' || selectedTab === 'equipment'}
+            isDisabled={selectedTab === 'supervisors' || selectedTab === 'equipment' || !((event.postingTimes?.length ?? 0) > 0)}
           >
             <RotateCw className="h-5 w-5" />
           </Button>
@@ -3622,6 +3654,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 onRefreshTeamPost={refreshTeamFromSchedule}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
+                                hasVenueMap={hasVenueMapImage}
+                                onViewOnMap={viewTeamOnMap}
                               />
                             ))}
                           {(!event?.staff || event.staff.length === 0) && (
@@ -3667,6 +3701,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                     onRefreshTeamPost={refreshTeamFromSchedule}
                                     updateEvent={updateEvent}
                                     cardViewMode={cardViewMode}
+                                    // Supervisors aren't rendered as map markers (VenueMapWithPosts
+                                    // only plots event.staff), so there's nothing for this to jump to.
+                                    hasVenueMap={false}
                                   />
                                 );
                               })
@@ -3787,7 +3824,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                   className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
                                   aria-label={t('Add Call')}
                                   data-testid="add-call-button"
-                                  onPress={() => setShowQuickCallForm(true)}
+                                  onPress={() => openAddCallModal()}
                                 >
                                   {t('Add Call')}
                                 </Button>
@@ -3898,6 +3935,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           teamTimers={teamTimers}
                           calls={event.calls || []}
                           clinics={clinics}
+                          onAddCallAtPost={(location) => openAddCallModal({ location })}
+                          onAddCallForTeam={(assignedTeam) => openAddCallModal({ assignedTeam })}
+                          focusTeamRequest={mapTeamFocusRequest}
                         />
                       </div>
                     )}
@@ -3964,6 +4004,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               onRefreshTeamPost={refreshTeamFromSchedule}
                               updateEvent={updateEvent}
                               cardViewMode={cardViewMode}
+                                hasVenueMap={hasVenueMapImage}
+                                onViewOnMap={viewTeamOnMap}
                             />
                           ))}
                       </div>
@@ -4004,6 +4046,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 onRefreshTeamPost={refreshTeamFromSchedule}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
+                                // Supervisors aren't rendered as map markers (VenueMapWithPosts
+                                // only plots event.staff), so there's nothing for this to jump to.
+                                hasVenueMap={false}
                               />
                             );
                           })}
@@ -4067,7 +4112,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               variant="light"
                               className="!bg-surface-liner"
                               aria-label={t('Add Call')}
-                              onPress={() => setShowQuickCallForm(true)}
+                              onPress={() => openAddCallModal()}
                             >
                               <Plus className="h-5 w-5" />
                             </Button>
@@ -4278,6 +4323,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       teamTimers={teamTimers}
                       calls={event.calls || []}
                       clinics={clinics}
+                      onAddCallAtPost={(location) => openAddCallModal({ location })}
+                      onAddCallForTeam={(assignedTeam) => openAddCallModal({ assignedTeam })}
+                      focusTeamRequest={mapTeamFocusRequest}
                     />
                   </div>
                 </Tab>

@@ -50,12 +50,29 @@ interface PostMarkerProps {
   scale: number;
   /** True when this post was just navigated to (e.g. via the Map tab's location search) — draws a brief attention ring around it. */
   isSelected?: boolean;
+  /** Clicking the pin toggles a small "Add Call" button beneath it; provided only where a Call actually makes sense (the dispatch board). */
+  onAddCall?: (postName: string) => void;
 }
 
-function PostMarker({ post, rect, scale, isSelected }: PostMarkerProps) {
+function PostMarker({ post, rect, scale, isSelected, onAddCall }: PostMarkerProps) {
   const [hovered, setHovered] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
+
+  // Clicking anywhere outside the marker (including panning the map)
+  // dismisses its Add Call popup instead of leaving it stuck open.
+  useEffect(() => {
+    if (!expanded) return;
+    const handleClickAway = (e: MouseEvent) => {
+      if (markerRef.current && !markerRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickAway);
+    return () => document.removeEventListener('mousedown', handleClickAway);
+  }, [expanded]);
+
   if (!isPostObject(post)) return null;
 
   const { x, y, width, height } = rect;
@@ -90,15 +107,19 @@ function PostMarker({ post, rect, scale, isSelected }: PostMarkerProps) {
         // since it's computed pre-scale, same as every other marker here.
         transform: `translate(-50%, -50%) scale(${emphasis})`,
         transformOrigin: 'center center',
-        // A selected post's attention arrow needs to clear every other
-        // marker on the map regardless of DOM order, not just sit above its
-        // own immediate neighbors.
-        zIndex: isSelected ? 999 : 12,
+        // A selected/expanded post needs to clear every other marker on the
+        // map regardless of DOM order, not just sit above its own
+        // immediate neighbors.
+        zIndex: isSelected || expanded ? 999 : 12,
         cursor: "pointer",
         transition: 'transform 0.15s ease-out',
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onAddCall) setExpanded((v) => !v);
+      }}
     >
       {isSelected && (
         // Centering (-translate-x-1/2) and the bounce both animate `transform`,
@@ -124,6 +145,22 @@ function PostMarker({ post, rect, scale, isSelected }: PostMarkerProps) {
         fill="hsl(var(--map-marker))"
         style={{ filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' }}
       />
+
+      {expanded && onAddCall && (
+        <div className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap" style={{ top: '100%', marginTop: 6 }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddCall(post.name);
+              setExpanded(false);
+            }}
+            className="rounded-full bg-surface-deepest/95 px-3 py-1 text-xs font-semibold text-surface-light shadow-lg hover:bg-surface-deep"
+          >
+            Add Call
+          </button>
+        </div>
+      )}
 
       {/* Hover tooltip with fixed positioning using portal */}
       {hovered && typeof window !== 'undefined' && createPortal(
@@ -323,6 +360,10 @@ interface TeamMarkerProps {
   calls: Call[];
   clinics: Clinic[];
   scale: number;
+  /** True when this team was just navigated to (e.g. via a team card's "view on map" button) — draws the same attention arrow a selected post gets. */
+  isSelected?: boolean;
+  /** Clicking the icon toggles a small "Add Call" button beneath it, prefilled with this team already assigned. */
+  onAddCall?: (teamName: string) => void;
 }
 
 function TeamMarker({
@@ -333,17 +374,40 @@ function TeamMarker({
   calls,
   clinics,
   scale,
+  isSelected,
+  onAddCall,
 }: TeamMarkerProps) {
   const [hovered, setHovered] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const markerRef = useRef<HTMLDivElement>(null);
+
+  // Clicking anywhere outside the marker (including panning the map)
+  // dismisses its Add Call popup instead of leaving it stuck open.
+  useEffect(() => {
+    if (!expanded) return;
+    const handleClickAway = (e: MouseEvent) => {
+      if (markerRef.current && !markerRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickAway);
+    return () => document.removeEventListener('mousedown', handleClickAway);
+  }, [expanded]);
 
   const postIsValid = isPostObject(post);
   if (!postIsValid) return null;
 
-  // Stagger team marker 8px right and 8px up from post center
-  const left = rect.x + (post.x / 100) * rect.width + 16;
-  const top = rect.y + (post.y / 100) * rect.height - 16;
+  // Stagger the team marker from its post's center. This offset is in the
+  // map's pre-zoom coordinate space, which the ambient container transform
+  // (scale(scale), see VenueMapWithPosts) then multiplies by `scale` again —
+  // so a flat constant here would make the on-screen gap grow the more you
+  // zoom in. Dividing by scale² instead makes the on-screen gap shrink
+  // (16 / scale) as you zoom in, tightening the team back toward its post
+  // once you're already zoomed in enough to tell them apart easily.
+  const teamOffset = 16 / (scale * scale);
+  const left = rect.x + (post.x / 100) * rect.width + teamOffset;
+  const top = rect.y + (post.y / 100) * rect.height - teamOffset;
 
   const { color } = getTeamMarkerColors(team);
 
@@ -375,12 +439,28 @@ function TeamMarker({
         // constant on-screen size, same treatment as PostMarker/EquipmentMarker.
         transform: `translate(-50%, -50%) scale(${1 / scale})`,
         transformOrigin: 'center center',
-        zIndex: 25,
+        zIndex: isSelected || expanded ? 999 : 25,
         cursor: 'pointer',
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onAddCall) setExpanded((v) => !v);
+      }}
     >
+      {isSelected && (
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ bottom: '100%', marginBottom: 6 }}>
+          <ArrowBigDown
+            className="animate-bounce"
+            size={40}
+            strokeWidth={1.5}
+            fill="#f97316"
+            stroke="white"
+            style={{ filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' }}
+          />
+        </div>
+      )}
       <ShieldPlus
         size={26}
         strokeWidth={1.5}
@@ -388,6 +468,21 @@ function TeamMarker({
         fill={color}
         style={{ filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' }}
       />
+      {expanded && onAddCall && (
+        <div className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap" style={{ top: '100%', marginTop: 6 }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddCall(team.team);
+              setExpanded(false);
+            }}
+            className="rounded-full bg-surface-deepest/95 px-3 py-1 text-xs font-semibold text-surface-light shadow-lg hover:bg-surface-deep"
+          >
+            Add Call
+          </button>
+        </div>
+      )}
       {/* Hover card with fixed positioning using portal */}
       {hovered && typeof window !== 'undefined' && createPortal(
         <div 
@@ -441,6 +536,12 @@ export interface VenueMapWithPostsProps {
   imageRadiusClassName?: string;
   /** Name of a post on the current layer to draw a brief attention ring around — e.g. the dispatch Map tab's location search jumping to a result. */
   selectedPostName?: string | null;
+  /** Name of a team on the current layer to draw the same attention arrow around — e.g. a team card's "view on map" button. */
+  selectedTeamName?: string | null;
+  /** Clicking a post pin shows a small "Add Call" button under it prefilled with that location; omit to disable (event creation/venue management have no Calls). */
+  onAddCallAtPost?: (postName: string) => void;
+  /** Same, but from clicking a team marker — prefills the assigned team instead of the location. */
+  onAddCallForTeam?: (teamName: string) => void;
 }
 
 export function VenueMapWithPosts({
@@ -463,6 +564,9 @@ export function VenueMapWithPosts({
   onWheel,
   imgRef,
   selectedPostName,
+  selectedTeamName,
+  onAddCallAtPost,
+  onAddCallForTeam,
 }: VenueMapWithPostsProps) {
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
@@ -633,6 +737,7 @@ export function VenueMapWithPosts({
                 staff={staff}
                 scale={scale}
                 isSelected={!!selectedPostName && typeof post === 'object' && post !== null && post.name === selectedPostName}
+                onAddCall={onAddCallAtPost}
               />
             ))}
             {equipment.map((equip) => {
@@ -665,6 +770,8 @@ export function VenueMapWithPosts({
                   calls={calls}
                   clinics={clinics}
                   scale={scale}
+                  isSelected={!!selectedTeamName && team.team === selectedTeamName}
+                  onAddCall={onAddCallForTeam}
                 />
               );
             })}

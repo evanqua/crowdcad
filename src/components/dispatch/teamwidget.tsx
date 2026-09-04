@@ -15,6 +15,8 @@ type TeamWidgetProps = {
   onRefreshTeamPost?: (team: string) => void;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
   cardViewMode?: 'normal' | 'condensed';
+  hasVenueMap?: boolean;
+  onViewOnMap?: (teamName: string) => void;
 };
 
 const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
@@ -29,6 +31,8 @@ const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
     onRefreshTeamPost,
     updateEvent,
     cardViewMode = 'normal',
+    hasVenueMap,
+    onViewOnMap,
   } = props;
 
   const CardComponent = cardViewMode === 'condensed' ? TeamCardCondensed : TeamCard;
@@ -44,6 +48,8 @@ const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
       onDelete={onDeleteTeam}
       onRefreshPost={onRefreshTeamPost}
       updateEvent={updateEvent}
+      hasVenueMap={hasVenueMap}
+      onViewOnMap={onViewOnMap}
     />
   );
 });
