@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Autocomplete, AutocompleteItem, Button } from '@heroui/react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import type { Layer, Staff, Equipment, Call, Clinic, Post } from '@/app/types';
+import type { Layer, Staff, Supervisor, Equipment, Call, Clinic, Post } from '@/app/types';
 import { useZoomPan } from '@/hooks/useZoomPan';
 import { MAP_CHECKER_BG } from '@/lib/mapStyles';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
@@ -21,6 +21,7 @@ export interface TeamFocusRequest {
 interface VenueMapTabProps {
   layers: Layer[];
   staff: Staff[];
+  supervisor?: Supervisor[];
   equipment: Equipment[];
   teamTimers: { [team: string]: number };
   calls: Call[];
@@ -50,6 +51,7 @@ interface SearchItem {
 export default function VenueMapTab({
   layers,
   staff,
+  supervisor = [],
   equipment,
   teamTimers,
   calls,
@@ -216,6 +218,7 @@ export default function VenueMapTab({
           layers={layers}
           currentLayer={safeCurrentLayer}
           staff={staff}
+          supervisor={supervisor}
           equipment={equipment}
           teamTimers={teamTimers}
           calls={calls}

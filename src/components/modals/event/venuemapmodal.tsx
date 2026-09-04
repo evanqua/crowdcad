@@ -2,9 +2,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { MapPin, ShieldPlus, Briefcase, HousePlus, ArrowBigDown } from 'lucide-react';
-import { Post, Staff, Equipment, Layer, Call, Clinic } from '@/app/types';
+import { MapPin, ShieldPlus, ShieldUser, Briefcase, HousePlus, ArrowBigDown } from 'lucide-react';
+import { Post, Staff, Supervisor, Equipment, Layer, Call, Clinic } from '@/app/types';
 import { isClinicPost, getTransportingLabel } from '@/lib/clinics';
+import { getStatusColor } from '@/lib/statusColors';
+import { STATUS_COLORS_HEX } from '@/lib/colorTokens';
 
 function StatusTimer({ since }: { since: number }) {
   const [elapsed, setElapsed] = React.useState(0);
@@ -204,19 +206,18 @@ function getEquipmentIcon(equipment: Equipment) {
 // 'wheelchair'/'stretcher' are separate raster assets (not lucide icons), so
 // unlike every other marker on the map they can't take a fill/stroke prop —
 // recoloring them to match would mean editing those SVG files directly.
-// They keep their original white-on-transparent look, just with the same
-// drop-shadow as everything else for contrast against the map image.
-function EquipmentIcon({ type, size = 22 }: { type: string; size?: number }) {
-  const dropShadow = { filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' };
+// They keep their original white-on-transparent look; the status color and
+// white border now live on the circular badge these sit inside of
+// (EquipmentMarker), not on the icon itself.
+function EquipmentIcon({ type, size = 16 }: { type: string; size?: number }) {
   if (type === 'wheelchair') {
-    return <Image src="/map/wheelchair.svg" alt="Wheelchair" width={size} height={size} draggable={false} style={dropShadow} />;
+    return <Image src="/map/wheelchair.svg" alt="Wheelchair" width={size} height={size} draggable={false} />;
   }
   if (type === 'stretcher') {
-    return <Image src="/map/gurney.svg" alt="Gurney" width={size} height={size} draggable={false} style={dropShadow} />;
+    return <Image src="/map/gurney.svg" alt="Gurney" width={size} height={size} draggable={false} />;
   }
-  // 'aed' and the default case share the same filled + white-outlined
-  // treatment as the post pin and every other lucide-based marker.
-  return <Briefcase size={size} strokeWidth={1.5} stroke="white" fill="#e2c93d" style={dropShadow} />;
+  // 'aed' and the default case: plain white glyph, same as the raster icons above.
+  return <Briefcase size={size} strokeWidth={1.75} stroke="white" fill="none" />;
 }
 
 function getContainedImageRect(containerW: number, containerH: number, naturalW: number, naturalH: number) {
@@ -262,11 +263,19 @@ function EquipmentMarker({
   const postIsValid = isPostObject(post);
   if (!postIsValid) return null;
 
-  // Position equipment marker
-  const left = rect.x + (post.x / 100) * rect.width - 15;
-  const top = rect.y + (post.y / 100) * rect.height + 15;
+  // Position equipment marker. Like TeamMarker's own offset, this is in the
+  // map's pre-zoom coordinate space, which the ambient container transform
+  // (scale(scale), see VenueMapWithPosts) then multiplies by `scale` again —
+  // dividing by `scale` here cancels that out, so the on-screen distance
+  // from the post stays constant across zoom levels instead of growing the
+  // more you zoom in (a flat pixel offset would, since it wasn't
+  // compensating for the ambient scale at all).
+  const equipmentOffset = 12 / scale;
+  const left = rect.x + (post.x / 100) * rect.width - equipmentOffset;
+  const top = rect.y + (post.y / 100) * rect.height + equipmentOffset;
 
   const iconType = getEquipmentIcon(equipment);
+  const badgeColor = getEquipmentMarkerColor(equipment);
 
   const handleMouseEnter = () => {
     setHovered(true);
@@ -294,7 +303,21 @@ function EquipmentMarker({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
     >
-      <EquipmentIcon type={iconType} />
+      <div
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: '50%',
+          background: badgeColor,
+          border: '2px solid white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))',
+        }}
+      >
+        <EquipmentIcon type={iconType} />
+      </div>
       {/* Hover tooltip with fixed positioning using portal */}
       {hovered && typeof window !== 'undefined' && createPortal(
         <div 
@@ -321,11 +344,20 @@ function EquipmentMarker({
   );
 }
 
-function getTeamMarkerColors(team: Staff) {
+// Shared by TeamMarker and SupervisorMarker — Staff and Supervisor both
+// carry a plain `status` string, so one status→color mapping covers both.
+function getTeamMarkerColors(team: { status: string }) {
   let color = '#2300a1ff';
   const outline = '2px solid white';
 
-  if (team.status === 'Available') {
+  // Same "carrying/delivering equipment" convention calltracking.tsx's
+  // status chips use (getStatusColor's 'text-status-orange' group: En Route
+  // Eq, Assisting, Delivered Eq) — checked first since e.g. 'Assisting'
+  // isn't in any of the other buckets below and would otherwise fall
+  // through to the default color.
+  if (getStatusColor(team.status).textClass === 'text-status-orange') {
+    color = STATUS_COLORS_HEX.orange;
+  } else if (team.status === 'Available') {
     color = '#4cb600ff';
   } else if (team.status === 'On Break') {
     color = 'grey';
@@ -337,11 +369,16 @@ function getTeamMarkerColors(team: Staff) {
     color = 'red';
   }
 
-  // if (team.sam) {
-  //   outline = '2px solid red';
-  // }
-
   return { color, outline };
+}
+
+/** Same green/grey/orange/red/default convention as team markers, applied to an equipment item's own status. */
+function getEquipmentMarkerColor(equipment: Equipment): string {
+  const status = equipment.status || '';
+  if (status.startsWith('Call ') || status === 'In Use') return 'red';
+  if (status === 'In Clinic') return 'grey';
+  if (status === 'Available') return '#4cb600ff';
+  return '#2300a1ff';
 }
 
 // function getTeamMarkerText(team: Staff) {
@@ -364,6 +401,8 @@ interface TeamMarkerProps {
   isSelected?: boolean;
   /** Clicking the icon toggles a small "Add Call" button beneath it, prefilled with this team already assigned. */
   onAddCall?: (teamName: string) => void;
+  /** How many other teams at this same post were already placed before this one (0 for the first) — staggers each additional team a bit further right so a shared post/call doesn't stack their pins on top of each other. */
+  staggerIndex?: number;
 }
 
 function TeamMarker({
@@ -376,6 +415,7 @@ function TeamMarker({
   scale,
   isSelected,
   onAddCall,
+  staggerIndex = 0,
 }: TeamMarkerProps) {
   const [hovered, setHovered] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -401,12 +441,16 @@ function TeamMarker({
   // Stagger the team marker from its post's center. This offset is in the
   // map's pre-zoom coordinate space, which the ambient container transform
   // (scale(scale), see VenueMapWithPosts) then multiplies by `scale` again —
-  // so a flat constant here would make the on-screen gap grow the more you
-  // zoom in. Dividing by scale² instead makes the on-screen gap shrink
-  // (16 / scale) as you zoom in, tightening the team back toward its post
-  // once you're already zoomed in enough to tell them apart easily.
-  const teamOffset = 16 / (scale * scale);
-  const left = rect.x + (post.x / 100) * rect.width + teamOffset;
+  // dividing by `scale` here cancels that back out, so the on-screen gap
+  // between a team and its post stays a constant size across zoom levels
+  // (same treatment as the icon's own counter-scale below), instead of
+  // growing when zoomed out and shrinking when zoomed in.
+  const teamOffset = 16 / scale;
+  // Extra teams sharing this exact post (e.g. several teams attached to the
+  // same call) step further right one at a time, also counter-scaled so the
+  // on-screen spacing between them stays constant too.
+  const staggerStep = (20 * staggerIndex) / scale;
+  const left = rect.x + (post.x / 100) * rect.width + teamOffset + staggerStep;
   const top = rect.y + (post.y / 100) * rect.height - teamOffset;
 
   const { color } = getTeamMarkerColors(team);
@@ -472,12 +516,15 @@ function TeamMarker({
         <div className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap" style={{ top: '100%', marginTop: 6 }}>
           <button
             type="button"
+            disabled={!!activeCall}
+            title={activeCall ? `${team.team} is already on a call` : undefined}
             onClick={(e) => {
               e.stopPropagation();
+              if (activeCall) return;
               onAddCall(team.team);
               setExpanded(false);
             }}
-            className="rounded-full bg-surface-deepest/95 px-3 py-1 text-xs font-semibold text-surface-light shadow-lg hover:bg-surface-deep"
+            className="rounded-full bg-surface-deepest/95 px-3 py-1 text-xs font-semibold text-surface-light shadow-lg hover:bg-surface-deep disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-surface-deepest/95"
           >
             Add Call
           </button>
@@ -513,10 +560,95 @@ function TeamMarker({
   );
 }
 
+interface SupervisorMarkerProps {
+  supervisor: Supervisor;
+  post: Post;
+  rect: ImageRect;
+  scale: number;
+}
+
+function SupervisorMarker({ supervisor, post, rect, scale }: SupervisorMarkerProps) {
+  const [hovered, setHovered] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const markerRef = useRef<HTMLDivElement>(null);
+
+  const postIsValid = isPostObject(post);
+  if (!postIsValid) return null;
+
+  // Offset down-right from the post — the opposite corner from TeamMarker's
+  // up-right and EquipmentMarker's down-left — so a team, supervisor, and
+  // equipment item sharing the exact same post don't stack on top of each
+  // other. Counter-scaled the same way as the other markers' offsets so the
+  // on-screen gap stays constant across zoom levels.
+  const supervisorOffset = 16 / scale;
+  const left = rect.x + (post.x / 100) * rect.width + supervisorOffset;
+  const top = rect.y + (post.y / 100) * rect.height + supervisorOffset;
+
+  const { color } = getTeamMarkerColors(supervisor);
+
+  const handleMouseEnter = () => {
+    setHovered(true);
+    if (markerRef.current) {
+      const rect = markerRef.current.getBoundingClientRect();
+      const yPos = Math.max(10, rect.top);
+      setTooltipPos({ x: rect.right + 10, y: yPos });
+    }
+  };
+
+  return (
+    <div
+      ref={markerRef}
+      style={{
+        position: 'absolute',
+        left: `${left}px`,
+        top: `${top}px`,
+        // Counter-scale against ambient map zoom so the icon stays a
+        // constant on-screen size, same treatment as every other marker.
+        transform: `translate(-50%, -50%) scale(${1 / scale})`,
+        transformOrigin: 'center center',
+        zIndex: 25,
+        cursor: 'default',
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <ShieldUser
+        size={26}
+        strokeWidth={1.5}
+        stroke="white"
+        fill={color}
+        style={{ filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' }}
+      />
+      {/* Hover card with fixed positioning using portal */}
+      {hovered && typeof window !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: `${tooltipPos.x}px`,
+            top: `${tooltipPos.y}px`,
+            zIndex: 10000,
+            pointerEvents: 'none',
+          }}
+        >
+          <div className="rounded-md bg-surface-deepest/95 px-2 py-1 text-xs text-surface-light shadow-lg whitespace-nowrap">
+            <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: 4 }}>
+              {supervisor.team}
+            </div>
+            <div><strong>Status:</strong> {supervisor.status || 'Unknown'}</div>
+            <div><strong>Post:</strong> {supervisor.location || 'Unassigned'}</div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
 export interface VenueMapWithPostsProps {
   layers: Layer[];
   currentLayer: number;
   staff: Staff[];
+  supervisor?: Supervisor[];
   equipment?: Equipment[];
   teamTimers: { [team: string]: number };
   calls?: Call[];
@@ -548,6 +680,7 @@ export function VenueMapWithPosts({
   layers,
   currentLayer,
   staff,
+  supervisor = [],
   equipment = [],
   teamTimers,
   calls = [],
@@ -756,22 +889,47 @@ export function VenueMapWithPosts({
                 />
               );
             })}
-            {staff.map((team) => {
-              const postObj = posts.find(p => (typeof p === "string" ? p : p.name) === team.location);
+            {(() => {
+              // Teams sharing the exact same post (e.g. several teams
+              // attached to the same call, all still logged at that post)
+              // get staggered further right one at a time instead of
+              // stacking on top of each other — see TeamMarker's staggerStep.
+              const postOccupancy: { [postName: string]: number } = {};
+              return staff.map((team) => {
+                const postObj = posts.find(p => (typeof p === "string" ? p : p.name) === team.location);
+                if (!postObj || typeof postObj === "string") return null;
+
+                const staggerIndex = postOccupancy[team.location] ?? 0;
+                postOccupancy[team.location] = staggerIndex + 1;
+
+                return (
+                  <TeamMarker
+                    key={team.team}
+                    team={team}
+                    post={postObj}
+                    rect={rect}
+                    teamTimers={teamTimers}
+                    calls={calls}
+                    clinics={clinics}
+                    scale={scale}
+                    isSelected={!!selectedTeamName && team.team === selectedTeamName}
+                    onAddCall={onAddCallForTeam}
+                    staggerIndex={staggerIndex}
+                  />
+                );
+              });
+            })()}
+            {supervisor.map((sup) => {
+              const postObj = posts.find(p => (typeof p === "string" ? p : p.name) === sup.location);
               if (!postObj || typeof postObj === "string") return null;
 
               return (
-                <TeamMarker
-                  key={team.team}
-                  team={team}
+                <SupervisorMarker
+                  key={sup.team}
+                  supervisor={sup}
                   post={postObj}
                   rect={rect}
-                  teamTimers={teamTimers}
-                  calls={calls}
-                  clinics={clinics}
                   scale={scale}
-                  isSelected={!!selectedTeamName && team.team === selectedTeamName}
-                  onAddCall={onAddCallForTeam}
                 />
               );
             })}
