@@ -11,6 +11,7 @@ import { ChevronDown, ChevronUp, MapPin, MoreVertical, Map as MapIcon } from 'lu
 import type { Event, EquipmentItem } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
+import { getStatusColor } from '@/lib/statusColors';
 
 type EquipmentCardProps = {
   equipment: EquipmentItem;
@@ -27,23 +28,16 @@ type EquipmentCardProps = {
   canLocateOnMap?: boolean;
 };
 
+// Shares statusColors.ts's team/supervisor status→color convention
+// (Available -> green, In Clinic -> blue, etc.) instead of a separate
+// hand-rolled mapping — equipment's two statuses with no team-status
+// equivalent ("In Use" and "Call N", both meaning "away on a call") map
+// onto the same red family team's own En Route/On Scene/Transporting use.
 function equipmentStatusTone(status: string) {
-  if (status === 'In Clinic') {
-    return {
-      borderClass: 'border-status-card-ring-blue',
-      fillClass: 'bg-status-card-blue'
-    };
-  }
   if (status.startsWith('Call ') || status === 'In Use') {
-    return {
-      borderClass: 'border-status-card-ring-red',
-      fillClass: 'bg-status-card-red'
-    };
+    return getStatusColor('En Route');
   }
-  return {
-    borderClass: 'border-surface-liner',
-    fillClass: 'bg-surface-liner/30'
-  };
+  return getStatusColor(status);
 }
 
 export default function EquipmentCard({
