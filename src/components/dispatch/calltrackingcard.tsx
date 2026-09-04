@@ -20,8 +20,10 @@ import type { Event, Call, DetachedTeam } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import DispatchMotionCell from '@/components/dispatch/motioncell';
 import StatusLabel, { getMenuLabel } from '@/components/dispatch/statuslabel';
+import EquipmentTypeIcon, { getEquipmentStatusWord } from '@/components/dispatch/equipmenttypeicon';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel, isCallResolved, getVenueLocationOptions } from '@/lib/clinics';
+import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { getStatusColor } from '@/lib/statusColors';
 import { useMMSS } from '@/hooks/useMMSS';
 
@@ -346,6 +348,16 @@ export default function CallTrackingCard({
             const teamStatusColor = getStatusColor(currentStatus);
             const transportingLabel = currentStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : null;
 
+            // Equipment this team is actually running — used to swap the
+            // pill's "Eq" suffix for the matching map icon, and to name the
+            // specific item in the dropdown options and the activity log.
+            const teamEquipment = isEquipmentOnlyTeam
+              ? (event.eventEquipment || []).filter(eq => eq.assignedTeam === team)
+              : [];
+            const teamEquipmentNames = teamEquipment.map(eq => eq.name).join(', ');
+            const teamEquipmentIconType = teamEquipment[0] ? getEquipmentIconType(teamEquipment[0].name) : null;
+            const isEqStatus = currentStatus === 'Delivered Eq' || currentStatus === 'En Route Eq';
+
             return (
               <Chip
                 key={team}
@@ -396,11 +408,18 @@ export default function CallTrackingCard({
                           }}
                           className="text-xs text-surface-faint hover:text-surface-light transition-colors"
                         >
-                          <StatusLabel
-                            status={currentStatus}
-                            text={transportingLabel ? transportingLabel.text : t(currentStatus)}
-                            showIcon={transportingLabel ? transportingLabel.showIcon : true}
-                          /> ▼
+                          {isEqStatus && teamEquipmentIconType ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span>{getEquipmentStatusWord(currentStatus)}</span>
+                              <EquipmentTypeIcon type={teamEquipmentIconType} />
+                            </span>
+                          ) : (
+                            <StatusLabel
+                              status={currentStatus}
+                              text={transportingLabel ? transportingLabel.text : t(currentStatus)}
+                              showIcon={transportingLabel ? transportingLabel.showIcon : true}
+                            />
+                          )} ▼
                         </button>
                       </DropdownTrigger>
                       <DropdownMenu
@@ -419,7 +438,11 @@ export default function CallTrackingCard({
                         }}
                       >
                         {statusOptions.map(status => (
-                          <DropdownItem key={status}>{getMenuLabel(status, t)}</DropdownItem>
+                          <DropdownItem key={status}>
+                            {(status === 'Delivered Eq' || status === 'En Route Eq') && teamEquipmentNames
+                              ? `${getEquipmentStatusWord(status)} ${teamEquipmentNames}`
+                              : getMenuLabel(status, t)}
+                          </DropdownItem>
                         ))}
                       </DropdownMenu>
                     </Dropdown>

@@ -16,11 +16,13 @@ import { useCallTrackingState } from '@/hooks/useCallTrackingState';
 import CallTrackingDetails from '@/components/dispatch/calltrackingdetails';
 import DispatchMotionCell from './motioncell';
 import StatusLabel, { getMenuLabel } from './statuslabel';
+import EquipmentTypeIcon, { getEquipmentStatusWord } from './equipmenttypeicon';
 import TrackingTableBase from './trackingtablebase';
 import PendingCallChip from './pendingcallchip';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, getTransportingLabel, getDeliveredLabel, RESOLVED_CALL_STATUSES, getVenueLocationOptions } from '@/lib/clinics';
+import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { withPendingSuffix } from '@/lib/callTiming';
 
 import {
@@ -427,7 +429,17 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                               const currentTeamStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
                               const teamStatusColor = getStatusColor(currentTeamStatus);
                               const transportingLabel = currentTeamStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : null;
-                           
+
+                              // Equipment this team is actually running — used to swap the
+                              // pill's "Eq" suffix for the matching map icon, and to name the
+                              // specific item in the dropdown options and the activity log.
+                              const teamEquipment = isEquipmentOnlyTeam
+                                ? (event.eventEquipment || []).filter(eq => eq.assignedTeam === team)
+                                : [];
+                              const teamEquipmentNames = teamEquipment.map(eq => eq.name).join(', ');
+                              const teamEquipmentIconType = teamEquipment[0] ? getEquipmentIconType(teamEquipment[0].name) : null;
+                              const isEqStatus = currentTeamStatus === 'Delivered Eq' || currentTeamStatus === 'En Route Eq';
+
                               return (
                                 <Chip
                                   key={team}
@@ -500,11 +512,18 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                             variant="light"
                                             className="min-w-0 h-6 px-2 text-xs shrink-0"
                                           >
-                                            <StatusLabel
-                                              status={currentTeamStatus}
-                                              text={transportingLabel ? transportingLabel.text : t(currentTeamStatus)}
-                                              showIcon={transportingLabel ? transportingLabel.showIcon : true}
-                                            />
+                                            {isEqStatus && teamEquipmentIconType ? (
+                                              <span className="inline-flex items-center gap-1">
+                                                <span>{getEquipmentStatusWord(currentTeamStatus)}</span>
+                                                <EquipmentTypeIcon type={teamEquipmentIconType} />
+                                              </span>
+                                            ) : (
+                                              <StatusLabel
+                                                status={currentTeamStatus}
+                                                text={transportingLabel ? transportingLabel.text : t(currentTeamStatus)}
+                                                showIcon={transportingLabel ? transportingLabel.showIcon : true}
+                                              />
+                                            )}
                                           </Button>
                                         </DropdownTrigger>
                                         <DropdownMenu
@@ -524,7 +543,11 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                           }}
                                         >
                                           {statusOptions.map((status: string) => (
-                                            <DropdownItem key={status}>{getMenuLabel(status, t)}</DropdownItem>
+                                            <DropdownItem key={status}>
+                                              {(status === 'Delivered Eq' || status === 'En Route Eq') && teamEquipmentNames
+                                                ? `${getEquipmentStatusWord(status)} ${teamEquipmentNames}`
+                                                : getMenuLabel(status, t)}
+                                            </DropdownItem>
                                           ))}
                                         </DropdownMenu>
                                       </Dropdown>

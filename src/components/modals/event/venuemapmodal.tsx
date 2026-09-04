@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { MapPin, ShieldPlus, ShieldUser, Briefcase, HousePlus, ArrowBigDown } from 'lucide-react';
 import { Post, Staff, Supervisor, Equipment, Layer, Call, Clinic } from '@/app/types';
 import { isClinicPost, getTransportingLabel } from '@/lib/clinics';
+import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { getStatusColor } from '@/lib/statusColors';
 import { STATUS_COLORS_HEX } from '@/lib/colorTokens';
 
@@ -186,21 +187,7 @@ function PostMarker({ post, rect, scale, isSelected, onAddCall }: PostMarkerProp
 }
 
 function getEquipmentIcon(equipment: Equipment) {
-  const name = equipment.name.toLowerCase();
-  
-  // Specific equipment type icons
-  if (name.includes('wheelchair')) {
-    // Using a custom wheelchair SVG path since we don't have hugeicons in lucide
-    return 'wheelchair';
-  }
-  if (name.includes('gurney') || name.includes('stretcher')) {
-    return 'stretcher';
-  }
-  if (name.includes('aed')) {
-    return 'aed';
-  }
-  
-  return 'briefcase'; // Default medical briefcase
+  return getEquipmentIconType(equipment.name);
 }
 
 // 'wheelchair'/'stretcher' are separate raster assets (not lucide icons), so

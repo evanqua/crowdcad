@@ -1332,6 +1332,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       logMessage = `${hhmm} - ${team} transporting to ${destinationClinicName || 'clinic'}`;
     } else if (newStatus === 'Rolled from Scene') {
       logMessage = `${hhmm} - ${team} Transferred to ambulance${transportUnitValue ? `, unit #: ${transportUnitValue}` : ''}`;
+    } else if (newStatus === 'Delivered Eq' || newStatus === 'En Route Eq') {
+      // Names the actual equipment item(s) instead of the generic "Eq"
+      // suffix shown in the pill/dropdown (see equipmenttypeicon.tsx).
+      const equipmentNames = (event?.eventEquipment || [])
+        .filter(eq => eq.assignedTeam === team)
+        .map(eq => eq.name)
+        .join(', ');
+      const verb = newStatus === 'Delivered Eq' ? 'Delivered' : 'En Route';
+      logMessage = `${hhmm} - ${team} ${verb}${equipmentNames ? ` ${equipmentNames}` : ''}`;
     } else {
       logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
     }
