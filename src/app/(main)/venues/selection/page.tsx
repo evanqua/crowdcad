@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState, useMemo } from 'react';
 import { dbService, type Unsubscribe } from '@/lib/services';
 import type { Venue, Event } from '@/app/types';
+import { isEventEnded } from '@/lib/eventStatus';
 import { useAuth } from '@/hooks/useauth';
 import { useAdmin } from '@/hooks/useAdmin';
 import LoadingScreen from '@/components/ui/loading-screen';
@@ -66,6 +67,15 @@ export default function VenueSelection() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Re-evaluates each event's Active/Ended status periodically so the
+  // 1-hour-no-activity backup end (a pure function of wall-clock time, see
+  // src/lib/eventStatus.ts) shows up here without needing a write.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 60000);
+    return () => clearInterval(id);
   }, []);
 
   // const isEventIncomplete = (data: Partial<Event>) => {
@@ -547,11 +557,14 @@ export default function VenueSelection() {
                 </Card>
               ) : (
                 <div className="minimal-scrollbar space-y-3 max-h-[32rem] overflow-y-auto pr-2">
-                  {selectedVenueEvents.map((event) => (
+                  {selectedVenueEvents.map((event) => {
+                    const ended = isEventEnded(event, nowTick);
+                    const destination = ended ? `/events/${event.id}/summary` : `/events/${event.id}/dispatch`;
+                    return (
                     <Card
                       key={event.id}
                       isPressable
-                      onPress={() => router.push(`/events/${event.id}/dispatch`)}
+                      onPress={() => router.push(destination)}
                       classNames={{
                         base: "rounded-sm bg-surface-deep/50 backdrop-blur-sm w-full"
                       }}
@@ -560,7 +573,7 @@ export default function VenueSelection() {
                         <div className="flex justify-between items-start w-full">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-lg mb-2 truncate">{event.name || 'Untitled Event'}</h3>
-                            
+
                             <div className="space-y-1 text-sm text-surface-light">
                               <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4" />
@@ -582,6 +595,11 @@ export default function VenueSelection() {
                             {event.isOrgEvent && (
                               <Chip size="sm" variant="flat" className="mt-2 bg-accent/20 text-accent">Org</Chip>
                             )}
+                            {ended ? (
+                              <Chip size="sm" variant="flat" className="mt-2 bg-status-red/20 text-status-red">Ended</Chip>
+                            ) : (
+                              <Chip size="sm" variant="flat" className="mt-2 bg-status-green/20 text-status-green">Active</Chip>
+                            )}
                           </div>
 
                           <div
@@ -602,9 +620,9 @@ export default function VenueSelection() {
                                 <DropdownItem
                                   key="resume"
                                   startContent={<Play className="w-4 h-4" />}
-                                  onPress={() => router.push(`/events/${event.id}/dispatch`)}
+                                  onPress={() => router.push(destination)}
                                 >
-                                  Resume
+                                  {ended ? 'View Summary' : 'Resume'}
                                 </DropdownItem>
                                 <DropdownItem
                                   key="share"
@@ -644,7 +662,7 @@ export default function VenueSelection() {
                         </div>
                       </CardBody>
                     </Card>
-                  ))}
+                  );})}
                 </div>
               )}
             </>
@@ -863,11 +881,12 @@ export default function VenueSelection() {
                         <div className="minimal-scrollbar overflow-auto h-full min-w-[500px]">
                           <table className="w-full table-fixed border-separate border-spacing-0">
                             <colgroup>
-                              <col className="w-[36%]" />
-                              <col className="w-[20%]" />
-                              <col className="w-[14%]" />
-                              <col className="w-[14%]" />
+                              <col className="w-[30%]" />
                               <col className="w-[16%]" />
+                              <col className="w-[12%]" />
+                              <col className="w-[12%]" />
+                              <col className="w-[16%]" />
+                              <col className="w-[14%]" />
                             </colgroup>
                             <thead className="sticky top-0 bg-surface-deep">
                               <tr className="border-b border-surface-liner">
@@ -875,15 +894,19 @@ export default function VenueSelection() {
                                 <th className="text-left px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Date</th>
                                 <th className="text-left px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Teams</th>
                                 <th className="text-left px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Calls</th>
+                                <th className="text-left px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Status</th>
                                 <th className="text-right px-4 py-4 text-sm font-semibold uppercase tracking-wide text-surface-light/60">Actions</th>
                               </tr>
                             </thead>
                             <tbody className="[&>tr>td]:border-b [&>tr>td]:border-surface-liner">
-                              {selectedVenueEvents.map((event) => (
+                              {selectedVenueEvents.map((event) => {
+                                const ended = isEventEnded(event, nowTick);
+                                const destination = ended ? `/events/${event.id}/summary` : `/events/${event.id}/dispatch`;
+                                return (
                                 <tr
                                   key={event.id}
                                   className="hover:bg-surface-deep cursor-pointer transition-colors"
-                                  onClick={() => router.push(`/events/${event.id}/dispatch`)}
+                                  onClick={() => router.push(destination)}
                                 >
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2 min-w-0">
@@ -911,6 +934,24 @@ export default function VenueSelection() {
                                       {event.calls?.length || 0}
                                     </div>
                                   </td>
+                                  <td className="px-4 py-3">
+                                    {ended ? (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          router.push(`/events/${event.id}/summary`);
+                                        }}
+                                        className="text-sm font-medium text-accent hover:text-accent/80 underline underline-offset-2"
+                                      >
+                                        Event Summary
+                                      </button>
+                                    ) : (
+                                      <Chip size="sm" variant="flat" className="bg-status-green/20 text-status-green">
+                                        Active
+                                      </Chip>
+                                    )}
+                                  </td>
                                   <td className="px-4 py-3 text-right">
                                     <div
                                       onClick={(e) => e.stopPropagation()}
@@ -930,9 +971,9 @@ export default function VenueSelection() {
                                           <DropdownItem
                                             key="resume"
                                             startContent={<Play className="w-4 h-4" />}
-                                            onPress={() => router.push(`/events/${event.id}/dispatch`)}
+                                            onPress={() => router.push(destination)}
                                           >
-                                            Resume Event
+                                            {ended ? 'View Summary' : 'Resume Event'}
                                           </DropdownItem>
                                           <DropdownItem
                                             key="share"
@@ -971,7 +1012,7 @@ export default function VenueSelection() {
                                     </div>
                                   </td>
                                 </tr>
-                              ))}
+                              );})}
                             </tbody>
                           </table>
                         </div>

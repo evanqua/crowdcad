@@ -7,6 +7,7 @@ import QuickCallModal from "@/components/modals/event/quickcallmodal";
 import ClinicWalkupModal from "@/components/dispatch/clinicwalkupmodal";
 import AddTeamModal, { TeamDraft } from "@/components/modals/event/addteammodal";
 import AddSupervisorModal from "@/components/modals/event/addsupervisormodal";
+import EndEventModal from "@/components/modals/event/endeventmodal";
 import TransportUnitModal from "@/components/modals/event/transportunitmodal";
 import React from 'react';
 import { dbService, ServiceError } from '@/lib/services';
@@ -15,6 +16,7 @@ import { toast, Slide, ToastContainer } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
 import { useAuth } from '@/hooks/useauth';
+import { useAdmin } from '@/hooks/useAdmin';
 import { useCertifications } from '@/hooks/useCertifications';
 import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
@@ -41,6 +43,8 @@ import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResol
 import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
+import { isEventEnded } from '@/lib/eventStatus';
+import { formatLogTimestampForCsv } from '@/lib/csvFormat';
 
 interface DispatchRoutePageProps {
   params: Promise<{ eventId: string }>;
@@ -80,6 +84,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   const { user: authUser, ready: authReady } = useAuth();
   const user = isLiteMode ? null : authUser;
   const ready = isLiteMode ? true : authReady;
+  const { isAdmin: isOrgAdmin } = useAdmin();
   const { activePreset: dispatchVocabularyPreset } = useDispatchVocabulary();
   const vocabularyTerms = dispatchVocabularyPreset.terms;
   const t = useCallback((key: string) => vocabularyTerms[key] ?? key, [vocabularyTerms]);
@@ -234,7 +239,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   };
 
   const updateEvent = useCallback(async (
-    updateInput: Partial<Event> | ((current: Event) => Partial<Event>)
+    updateInput: Partial<Event> | ((current: Event) => Partial<Event>),
+    options?: { bypassEndedCheck?: boolean }
   ) => {
     if (!eventId) return;
 
@@ -246,6 +252,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         }
 
         const currentEvent = normalizeLiteDraftToEvent(currentDraft);
+
+        if (!options?.bypassEndedCheck && isEventEnded(currentEvent)) {
+          console.warn('Blocked update: event has ended.');
+          return;
+        }
+
         const updates =
           typeof updateInput === 'function' ? updateInput(currentEvent) : updateInput;
 
@@ -273,6 +285,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
         const currentEvent = snap.data;
 
+        if (!options?.bypassEndedCheck && isEventEnded(currentEvent)) {
+          throw new Error('EVENT_ENDED');
+        }
+
         let updates: Partial<Event>;
         if (typeof updateInput === 'function') {
           updates = updateInput(currentEvent);
@@ -283,6 +299,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         tx.update('events', eventId, removeUndefinedDeep(updates));
       });
     } catch (error) {
+      if (error instanceof Error && error.message === 'EVENT_ENDED') {
+        console.warn('Blocked update: event has ended.');
+        return;
+      }
       console.error("Update failed:", error);
       toast.error("Failed to save changes. Please try again.");
     }
@@ -1822,7 +1842,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // Lazily backfill/refresh event.clinics from the venue's clinic-flagged posts
   // (additive — never removes an entry, so existing calls' clinicId never orphans).
   useEffect(() => {
-    if (!event) return;
+    if (!event || isEventEnded(event)) return;
     const synced = syncClinicsFromVenue(event.venue, event.clinics);
     if (!isEqual(synced, event.clinics || [])) {
       void updateEvent({ clinics: synced });
@@ -2836,7 +2856,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   }
 
   const formatSummaryTimestamp = useCallback((timestamp: number): string => {
-    return Number.isFinite(timestamp) ? timestamp.toFixed(2) : '';
+    return formatLogTimestampForCsv(timestamp);
   }, []);
 
   const generateSummaryCSVData = useCallback((): string => {
@@ -2900,6 +2920,41 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     }
   }, [isLiteMode, eventId, router]);
 
+  // Ticks every 30s so the "ended by the 1-hour-no-activity backup" state
+  // (a pure function of wall-clock time against the event's own End Time,
+  // see src/lib/eventStatus.ts) is re-evaluated even when nothing about the
+  // event itself has changed to trigger a re-render on its own.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const eventEnded = useMemo(() => (event ? isEventEnded(event, nowTick) : false), [event, nowTick]);
+
+  // Only the event's creator or a site admin can end it.
+  const canEndEvent = isLiteMode || isOrgAdmin || (!!user && !!event && event.userId === user.uid);
+
+  const goToSummary = useCallback(() => {
+    if (!eventId) return;
+    router.push(`/events/${eventId}/summary`);
+  }, [eventId, router]);
+
+  const [showEndEventModal, setShowEndEventModal] = useState(false);
+
+  const handleEndEvent = useCallback(async () => {
+    if (!event || !eventId || !canEndEvent) return;
+
+    await updateEvent(() => ({ ended: true, endedAt: Date.now() }), { bypassEndedCheck: true });
+    setShowEndEventModal(false);
+
+    if (!isLiteMode) {
+      window.dispatchEvent(new CustomEvent('dispatch-event-ended'));
+    }
+
+    goToSummary();
+  }, [event, eventId, canEndEvent, updateEvent, isLiteMode, goToSummary]);
+
   const [showVenueMap, setShowVenueMap] = useState(false);
   const [showPostingSchedule, setShowPostingSchedule] = useState(false);
   const [showEventSummary, setShowEventSummary] = useState(false);
@@ -2908,6 +2963,16 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     const openVenue = () => setShowVenueMap(true);
     const openPosting = () => setShowPostingSchedule(true);
     const openEventSummary = () => setShowEventSummary(true);
+    const openEndEvent = () => {
+      if (!canEndEvent) return;
+      // Already ended (manually, or by the 1-hour-no-activity backup) — just
+      // take them straight to the summary instead of asking again.
+      if (eventEnded) {
+        goToSummary();
+        return;
+      }
+      setShowEndEventModal(true);
+    };
     const openLiteClear = () => {
       void handleClearLiteEvent();
     };
@@ -2922,6 +2987,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (!isLiteMode) {
       window.addEventListener('open-venue-map', openVenue);
       window.addEventListener('open-event-summary', openEventSummary);
+      window.addEventListener('open-end-event', openEndEvent);
     }
 
     return () => {
@@ -2932,9 +2998,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       if (!isLiteMode) {
         window.removeEventListener('open-venue-map', openVenue);
         window.removeEventListener('open-event-summary', openEventSummary);
+        window.removeEventListener('open-end-event', openEndEvent);
       }
     };
-  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv]);
+  }, [isLiteMode, handleClearLiteEvent, handleExportSummaryCsv, eventEnded, goToSummary, canEndEvent]);
 
   // Tab cycling for left sidebar tabs
   useEffect(() => {
@@ -2976,7 +3043,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // re-triggers it.
   const wasAboveSurgeThresholdRef = useRef(false);
   useEffect(() => {
-    if (!event) return;
+    if (!event || isEventEnded(event)) return;
     const summary = getTeamAvailabilitySummary(event);
     const threshold = getSurgeLimitPercent(event);
     const aboveThreshold = isSurging(summary.percentOnCalls, threshold);
@@ -3436,9 +3503,19 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         event={event}
       />
       {/* Main Layout */}
-      <div className="w-full bg-surface-deepest h-[calc(100vh-72px)]">
+      <div className="relative w-full bg-surface-deepest h-[calc(100vh-72px)]">
+        {eventEnded && (
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-neutral-700/70 text-center px-6">
+            <p className="text-xl font-semibold text-surface-light">{t('This event has ended')}</p>
+            <p className="text-sm text-surface-light/80 max-w-sm">
+              {t('Data collection is locked. Go to the Event Summary for a read-only record.')}
+            </p>
+            <Button onPress={goToSummary} className="mt-1 bg-accent hover:bg-accent/90 text-surface-light">
+              {t('Go to Event Summary')}
+            </Button>
+          </div>
+        )}
         <div className="max-w-[1750px] mx-auto px-2 sm:px-4 h-full">
-
 
           {isAdmin && (
             <button 
@@ -4197,6 +4274,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             onClose={() => setShowEventSummary(false)}
             onExportCsv={handleExportSummaryCsv}
             eventId={event.id}
+          />
+
+          <EndEventModal
+            isOpen={showEndEventModal}
+            onClose={() => setShowEndEventModal(false)}
+            onConfirm={handleEndEvent}
           />
         </>
       )}

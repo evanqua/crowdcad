@@ -7,6 +7,7 @@ import { Event, Call, TeamLogEntry, CallLogEntry, InteractionSession } from '@/a
 import dynamic from 'next/dynamic';
 import { Button } from '@heroui/react';
 import { getScheduleWindow, teamStatusBreakdown, teamAvailabilitySeries } from '@/lib/analyticsUtils';
+import { formatLogTimestampForCsv } from '@/lib/csvFormat';
 import { GRID_WRAPPER, GRID_CELL } from './summaryGrid';
 
 const SummaryCharts = dynamic(() => import('./SummaryCharts'), { ssr: false, loading: () => <div className="p-6 bg-surface-deep border border-surface-liner">Loading charts...</div> });
@@ -79,7 +80,7 @@ export default function SummaryPage() {
     event.calls.filter(c => c.outcome === 'Rolled from Clinic' || c.status === 'Rolled from Scene').length;
 
   const formatTimestamp = (timestamp: number) => {
-    return timestamp.toFixed(2);
+    return formatLogTimestampForCsv(timestamp);
   };
 
   // Utility to generate full log text for CSV

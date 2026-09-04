@@ -1,4 +1,5 @@
 import { Event, Staff } from '@/app/types';
+import { getEffectiveEndTime } from './eventStatus';
 
 const TWO_HOURS = 2 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -13,10 +14,14 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 /**
  * The reporting window used for the summary page's charts and stats. New
  * events always carry an explicit scheduleStart/scheduleEnd (event setup's
- * From/To, now mandatory) — when present, the window is restricted to
- * exactly that designated start/end, no padding. Events created before
- * that field existed fall back to a padded window derived from the
- * earliest/latest call log timestamp, so old data doesn't just disappear.
+ * From/To, now mandatory) — when present, the window starts there, and ends
+ * at whichever comes later of the designated end and one hour past the
+ * event's last dispatch log entry (`getEffectiveEndTime`, see
+ * src/lib/eventStatus.ts) — so an event that ran (or was simply forgotten)
+ * past its scheduled end still gets its actual activity represented, no
+ * matter how old the event is. Events created before scheduleStart/End
+ * existed fall back to a padded window derived from the earliest/latest
+ * call log timestamp, so old data doesn't just disappear.
  */
 export function getScheduleWindow(event: Event): { start: number; end: number } {
   const getNum = (v: unknown): number | undefined => {
@@ -29,18 +34,15 @@ export function getScheduleWindow(event: Event): { start: number; end: number } 
   };
 
   const startFields = ['postingStart', 'scheduleStart', 'startTime', 'start'];
-  const endFields = ['postingEnd', 'scheduleEnd', 'endTime', 'end'];
 
   const starts = startFields
     .map((k) => getNum(event[k as keyof Event]))
     .filter(Boolean) as number[];
 
-  const ends = endFields
-    .map((k) => getNum(event[k as keyof Event]))
-    .filter(Boolean) as number[];
+  const effectiveEnd = getEffectiveEndTime(event);
 
-  if (starts.length && ends.length) {
-    return { start: Math.min(...starts), end: Math.max(...ends) };
+  if (starts.length && effectiveEnd !== null) {
+    return { start: Math.min(...starts), end: Math.max(effectiveEnd, ...starts) };
   }
 
   let minTs = Number.POSITIVE_INFINITY;
@@ -58,7 +60,7 @@ export function getScheduleWindow(event: Event): { start: number; end: number } 
   const derivedEnd = Number.isFinite(maxTs) ? maxTs : derivedStart + 4 * 60 * 60 * 1000;
 
   const start = (starts.length ? Math.min(...starts) : derivedStart) - TWO_HOURS;
-  const end = (ends.length ? Math.max(...ends) : derivedEnd) + TWO_HOURS;
+  const end = (effectiveEnd ?? derivedEnd) + TWO_HOURS;
   return { start, end };
 }
 
