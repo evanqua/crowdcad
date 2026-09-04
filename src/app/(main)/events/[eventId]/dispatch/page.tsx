@@ -348,14 +348,21 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       if (isActive && updatedStaff) {
         updatedStaff = updatedStaff.map(s => {
           if (s.team !== team) return s;
-          
+
           const newHomeBase = post || 'Roaming';
           const shouldMoveLocation = s.status === 'Available';
 
+          if (!shouldMoveLocation || newHomeBase === s.location) {
+            return { ...s, originalPost: newHomeBase };
+          }
+
+          const now = new Date();
+          const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
           return {
             ...s,
             originalPost: newHomeBase,
-            location: shouldMoveLocation ? newHomeBase : s.location
+            location: newHomeBase,
+            log: [...(s.log || []), { timestamp: now.getTime(), message: `${hhmm} - Post changed to ${newHomeBase}` }],
           };
         });
       }
@@ -383,15 +390,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           const assignedPost = Object.keys(activeAssignments).find(
             key => activeAssignments[key] === s.team
           );
-          
+
           const newHomeBase = assignedPost || 'Roaming';
           const shouldMoveLocation = s.status === 'Available';
           if (s.originalPost === newHomeBase) return s;
 
+          if (!shouldMoveLocation || newHomeBase === s.location) {
+            return { ...s, originalPost: newHomeBase };
+          }
+
+          const now = new Date();
+          const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
           return {
             ...s,
             originalPost: newHomeBase,
-            location: shouldMoveLocation ? newHomeBase : s.location
+            location: newHomeBase,
+            log: [...(s.log || []), { timestamp: now.getTime(), message: `${hhmm} - Post changed to ${newHomeBase}` }],
           };
         });
       }
@@ -409,11 +423,19 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     await updateEvent((currentEvent) => {
       const emptyAssignments: PostAssignment = {};
       
-      const updatedStaff = (currentEvent.staff || []).map(s => ({
-        ...s,
-        originalPost: 'Roaming',
-        location: s.status === 'Available' ? 'Roaming' : s.location
-      }));
+      const now = new Date();
+      const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+      const updatedStaff = (currentEvent.staff || []).map(s => {
+        if (s.status !== 'Available' || s.location === 'Roaming') {
+          return { ...s, originalPost: 'Roaming' };
+        }
+        return {
+          ...s,
+          originalPost: 'Roaming',
+          location: 'Roaming',
+          log: [...(s.log || []), { timestamp: now.getTime(), message: `${hhmm} - Post changed to Roaming` }],
+        };
+      });
 
       return {
         postAssignments: emptyAssignments,
@@ -1148,10 +1170,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (!event) return;
 
     // Find the venue equipment definition
-    const venueEq = (event.venue?.equipment || []).find(v => 
+    const venueEq = (event.venue?.equipment || []).find(v =>
       (typeof v === 'string' ? v : v.name) === equipmentName
     );
-    
+
     if (!venueEq) return;
 
     const name = typeof venueEq === 'string' ? venueEq : venueEq.name;
@@ -2322,9 +2344,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         if (!teamName) return;
         updatedStaff = updatedStaff.map(staff => {
           if (staff.team === teamName) {
-            const isBusy = ['En Route', 'On Scene', 'Transporting'].includes(staff.status);
+            const isBusy = ['En Route', 'On Scene', 'Transporting', 'In Clinic'].includes(staff.status);
             if (isBusy) {
-              // Store the pending assignment for this team
+              // Store the pending assignment for this team — applied once they
+              // leave their current status (e.g. return from clinic), instead
+              // of silently relocating a team still at the clinic.
               pendingAssignments[teamName] = { post, time };
               return staff; // Do not update location or log yet
             } else {
@@ -2369,9 +2393,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       const entry = team.log[i];
       const msg = entry.message || '';
 
-      // Case 1: Status change matches current status
+      // Case 1: Status change matches current status. handleStatusChange logs
+      // "<team> set to <status>"; the supervisor path and older entries log
+      // "status changed to <status>" — match either wording.
       if (
-        msg.includes('status changed to') &&
+        (msg.includes(`${team.team} set to`) || msg.includes('status changed to')) &&
         msg.toLowerCase().includes(currentStatus.toLowerCase())
       ) {
         return entry.timestamp || null;
@@ -2713,7 +2739,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       return;
     }
 
-    const busy = new Set(['En Route', 'On Scene', 'Transporting']);
+    const busy = new Set(['En Route', 'On Scene', 'Transporting', 'In Clinic']);
     const now = new Date();
     const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
 
@@ -2770,7 +2796,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (!team) return;
 
     // if you want to prevent moving busy teams, keep this:
-    if (['En Route', 'On Scene', 'Transporting'].includes(team.status)) {
+    if (['En Route', 'On Scene', 'Transporting', 'In Clinic'].includes(team.status)) {
       toast.info(`${teamName} is busy; not moved.`);
       return;
     }
@@ -3547,8 +3573,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         setMemberCert={setMemberCert}
         roles={LICENSES.map(name => ({ name, fullName: name }))}
       />
-      <DebugModal 
-        isOpen={showDebugModal} 
+      <DebugModal
+        isOpen={showDebugModal}
         onClose={() => setShowDebugModal(false)}
         onPopulate={handlePopulateTestData}
         onReset={handleResetAllStatuses}
