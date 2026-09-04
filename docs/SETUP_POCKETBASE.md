@@ -83,7 +83,7 @@ MSYS_NO_PATHCONV=1 docker exec pocketbase /pb/pocketbase superuser upsert admin@
 node scripts/setup-pocketbase.js
 ```
 
-This creates the `venues`, `events`, `dispatchLogs`, `_storage`, and `settings` collections, plus an `isAdmin` field on the built-in `users` auth collection. It's idempotent — safe to run again any time. **Do not skip this step**: without it, the `users` auth collection has no matching app schema yet, and signing up will fail with a "Failed to create record" error.
+This creates the `venues`, `events`, `dispatchLogs`, `_storage`, and `settings` collections, plus an `isAdmin` field on the built-in `users` auth collection, and applies the access rules that keep editing or deleting someone else's venue, or ending someone else's event, restricted to that record's owner or an admin (mirrors this repo's `firestore.rules` — see the rule constants at the top of the script for exactly what each collection allows). It's idempotent — safe to run again any time, and re-applies those rules on every run even to collections that already existed, so a manual rule change made in the admin UI afterward will be reverted the next time this runs; change the script itself instead if you need different rules. **Do not skip this step**: without it, the `users` auth collection has no matching app schema yet, and signing up will fail with a "Failed to create record" error.
 
 **6. Run the app**
 

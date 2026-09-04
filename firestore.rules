@@ -91,8 +91,25 @@ service cloud.firestore {
     // Users: allow users to read/write their own profile; admins may also
     // read/write any user's doc (needed to grant/revoke isAdmin from the
     // Profile > Admin > Manage Admins panel).
+    //
+    // `isAdmin` is carved out of a self-write: without this, any signed-in
+    // user could set `isAdmin: true` on their own doc directly via Firestore
+    // (the Profile > Admin panel's own "self or admin" button gating is a
+    // client-side convenience only) and grant themselves full admin rights —
+    // including editing or deleting any other user's venues/events, which
+    // `isRequestingUserAdmin()` unlocks everywhere else in this file. Only an
+    // existing admin may set `isAdmin` on anyone (self included).
     match /users/{userId} {
-      allow read, write: if request.auth != null &&
+      allow read: if request.auth != null &&
+        (request.auth.uid == userId || isRequestingUserAdmin());
+      allow create: if request.auth != null && request.auth.uid == userId &&
+        request.resource.data.get('isAdmin', false) == false;
+      allow update: if request.auth != null &&
+        (
+          isRequestingUserAdmin() ||
+          (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']))
+        );
+      allow delete: if request.auth != null &&
         (request.auth.uid == userId || isRequestingUserAdmin());
     }
 
