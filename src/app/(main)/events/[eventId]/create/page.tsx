@@ -98,6 +98,12 @@ export default function EventCreation() {
   };
   const handleMouseUp = () => setIsPanning(false);
 
+  const [postsEnabled, setPostsEnabled] = useState(false);
+
+  // enabled must track postsEnabled — without it, postingTimes is always
+  // generated regardless of whether "Enable Posts" is checked, which made
+  // the navbar's "Posting Schedule" item show up for every event (it goes
+  // off event.postingTimes.length > 0).
   const {
     scheduleFrom,
     setScheduleFrom,
@@ -106,14 +112,13 @@ export default function EventCreation() {
     scheduleBy,
     setScheduleBy,
     postingTimes,
-  } = useScheduleGeneration({ initialBy: '480' });
+  } = useScheduleGeneration({ initialBy: '480', enabled: postsEnabled });
 
   const [samName, setSamName] = useState('');
   const [samMemberName, setSamMemberName] = useState('');
   const [samCert, setSamCert] = useState('');
   const [openTeams, setOpenTeams] = useState<Record<number, boolean>>({});
   const [openSupervisors, setOpenSupervisors] = useState<Record<number, boolean>>({});
-  const [postsEnabled, setPostsEnabled] = useState(false);
   const [lastSelectedPostIndex, setLastSelectedPostIndex] = useState<number | null>(null);
   const [scheduleChips, setScheduleChips] = useState<{ id: string; time: string; editable: boolean }[]>([]);
   const [editingChipId, setEditingChipId] = useState<string | null>(null);
