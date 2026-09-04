@@ -18,8 +18,10 @@ export interface VenueMapMarkerProps {
   isHover?: boolean;
   isPending?: boolean;
   isDragging?: boolean;
-  /** Pin diameter in px. Icon scales proportionally (2/3 of this). Defaults to 24, matching the original inline h-6 w-6 marker. */
+  /** Pin size in px at scale 1. Defaults to 24, matching the original inline h-6 w-6 marker. */
   size?: number;
+  /** Ambient zoom level of the map this marker sits on. The pin counter-scales against it so it stays a constant on-screen size instead of growing/shrinking as the map zooms. Defaults to 1 (no ambient zoom). */
+  scale?: number;
   showTooltip?: boolean;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
@@ -36,35 +38,41 @@ export default function VenueMapMarker({
   isPending,
   isDragging,
   size = 24,
+  scale = 1,
   showTooltip = true,
   onMouseEnter,
   onMouseLeave,
   onMouseDown,
   onClick,
 }: VenueMapMarkerProps) {
-  const iconSize = Math.round(size * (2 / 3));
+  const Icon = isClinic ? HousePlus : MapPin;
+  const emphasis = isPending ? 1.3 : isHover || isDragging ? 1.15 : 1;
 
   return (
     <>
-      <div
-        style={{ left: `calc(${x}% - ${size / 2}px)`, top: `calc(${y}% - ${size / 2}px)`, width: size, height: size }}
-        className={`absolute z-10 flex cursor-grab items-center justify-center rounded-full border-2 transition-all ${
-          isPending
-            ? 'border-status-blue bg-status-blue/20 scale-125'
-            : isHover || isDragging
-            ? 'border-accent bg-accent/30 scale-110'
-            : 'border-accent bg-accent/20 hover:scale-110'
-        } ${isDragging ? 'cursor-grabbing scale-110' : ''}`}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        onMouseDown={onMouseDown}
-        onClick={onClick}
-      >
-        {isClinic ? (
-          <HousePlus className="text-accent" strokeWidth={2.5} style={{ width: iconSize, height: iconSize }} />
-        ) : (
-          <MapPin className="text-accent" strokeWidth={2.5} style={{ width: iconSize, height: iconSize }} />
-        )}
+      <div style={{ left: `${x}%`, top: `${y}%` }} className="absolute z-10">
+        <div
+          style={{ transform: `translate(-50%, -50%) scale(${emphasis / scale})` }}
+          className={`relative transition-transform ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
+          onMouseDown={onMouseDown}
+          onClick={onClick}
+        >
+          {isPending && (
+            <span
+              className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full"
+              style={{ backgroundColor: 'hsl(var(--map-marker) / 0.6)' }}
+            />
+          )}
+          <Icon
+            size={size}
+            strokeWidth={1.5}
+            stroke="white"
+            fill="hsl(var(--map-marker))"
+            style={{ filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' }}
+          />
+        </div>
       </div>
       {showTooltip && isHover && !isPending && name && (
         <div

@@ -568,6 +568,7 @@ export default function VenueManagementPageClient() {
             isHover={isHover}
             isPending={isPending}
             isDragging={draggingIdx === idx}
+            scale={scale}
             onMouseEnter={() => setHoverId(idx)}
             onMouseLeave={() => setHoverId((cur) => (cur === idx ? null : cur))}
             onMouseDown={onMarkerMouseDown(idx)}
