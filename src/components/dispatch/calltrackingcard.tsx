@@ -420,7 +420,11 @@ export default function CallTrackingCard({
                 isDisabled
                 className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
               >
-                {detachedTeam.reason === 'Delivered' ? getDeliveredLabel(t, clinics, call.clinicId) : t(detachedTeam.reason)}
+                {detachedTeam.reason === 'Delivered' ? (
+                  getDeliveredLabel(t, clinics, call.clinicId)
+                ) : (
+                  <StatusLabel status={detachedTeam.reason} text={t(detachedTeam.reason)} />
+                )}
               </Button>
             </Chip>
           ))}

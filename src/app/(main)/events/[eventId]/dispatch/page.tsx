@@ -3307,6 +3307,50 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     wasAboveSurgeThresholdRef.current = aboveThreshold;
   }, [event, updateEvent]);
 
+  // Same auto-activation, for the combined calls+clinic pending-transport
+  // count crossing its own configurable threshold.
+  const wasPendingTransportAboveThresholdRef = useRef(false);
+  useEffect(() => {
+    if (!event || isEventEnded(event)) return;
+    const pendingTransportCount = (event.calls || []).filter(c => c.outcome === 'Pending Transport' || c.status === 'Pending Transport').length;
+    const aboveThreshold = pendingTransportCount >= getPendingTransportSurgeThreshold(event);
+
+    if (aboveThreshold && !wasPendingTransportAboveThresholdRef.current && !event.manualSurgeActive) {
+      updateEvent((current) =>
+        current.manualSurgeActive ? {} : withSurgeStarted(current, Date.now())
+      );
+    }
+    wasPendingTransportAboveThresholdRef.current = aboveThreshold;
+  }, [event, updateEvent]);
+
+  // Same auto-activation again, for the unassigned-call-time threshold —
+  // polls wall-clock time (rather than reacting to `event` changes) since
+  // nothing about a Pending call's own data changes while it waits, same
+  // reasoning as the toast alarm earlier in this file. Independent of the
+  // Pending chip's own fixed 1-minute blink animation (PendingCallChip),
+  // which always fires regardless of this configurable threshold.
+  const wasUnassignedCallAboveThresholdRef = useRef(false);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const currentEvent = eventRef.current;
+      if (!currentEvent || isEventEnded(currentEvent)) return;
+      const alarmMs = getUnassignedCallSurgeSeconds(currentEvent) * 1000;
+      const aboveThreshold = (currentEvent.calls || []).some(c => {
+        if (c.status !== 'Pending') return false;
+        const createdAt = c.log?.[0]?.timestamp;
+        return !!createdAt && Date.now() - createdAt >= alarmMs;
+      });
+
+      if (aboveThreshold && !wasUnassignedCallAboveThresholdRef.current && !currentEvent.manualSurgeActive) {
+        updateEvent((current) =>
+          current.manualSurgeActive ? {} : withSurgeStarted(current, Date.now())
+        );
+      }
+      wasUnassignedCallAboveThresholdRef.current = aboveThreshold;
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [updateEvent]);
+
   // Keeps the mobile Clinic tab's selected clinic valid as `event.clinics`
   // is added to (new venue posts flagged as clinics) or the selection is
   // stale from a previous event.
