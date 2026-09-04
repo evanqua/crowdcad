@@ -163,21 +163,6 @@ export default function EventCreation() {
     setEventData(prev => ({ ...prev, scheduleStart: start, scheduleEnd: end }));
   }, [scheduleFrom, scheduleTo, eventData.date]);
 
-  // Default post selection to "all posts" the first time the venue's posts
-  // become known, instead of starting from none — only runs once per page
-  // load, and only if nothing has already been selected.
-  const postsSeededRef = useRef(false);
-  useEffect(() => {
-    if (postsSeededRef.current) return;
-    const venue = eventData.venue;
-    if (!venue?.name || !venue?.layers?.length) return;
-    postsSeededRef.current = true;
-    if ((eventData.eventPosts || []).length > 0) return;
-    const allVenuePosts = venue.layers.flatMap(layer => layer.posts || []);
-    if (allVenuePosts.length === 0) return;
-    setEventData(prev => ({ ...prev, eventPosts: allVenuePosts }));
-  }, [eventData.venue, eventData.eventPosts]);
-
   // Autosave postingTimes to the draft event document when they change.
   // Debounced to avoid excessive writes while the user is adjusting inputs.
   useEffect(() => {

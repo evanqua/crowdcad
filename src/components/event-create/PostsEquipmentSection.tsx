@@ -62,20 +62,22 @@ export function PostsSelectionSection({
 
       <div className="space-y-3">
         <div className={`space-y-3 ${!postsEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
-          <Select
-            label="Select Posts"
-            labelPlacement="outside"
-            variant="flat"
-            color="default"
-            placeholder="Choose posts for this event"
-            selectionMode="multiple"
-            selectedKeys={new Set((eventData.eventPosts || []).map((post) => getPostName(post)))}
-            isDisabled={!postsEnabled}
-            classNames={selectClassNames}
-            size="lg"
-            disabledKeys={[]}
-          >
-            {flattenedPosts.map(({ post, layerName }, idx) => {
+          <div className="flex items-end gap-2">
+            <div className="flex-1 min-w-0">
+              <Select
+                label="Select Posts"
+                labelPlacement="outside"
+                variant="flat"
+                color="default"
+                placeholder="Choose posts for this event"
+                selectionMode="multiple"
+                selectedKeys={new Set((eventData.eventPosts || []).map((post) => getPostName(post)))}
+                isDisabled={!postsEnabled}
+                classNames={selectClassNames}
+                size="lg"
+                disabledKeys={[]}
+              >
+                {flattenedPosts.map(({ post, layerName }, idx) => {
               const postName = getPostName(post);
               return (
                 <SelectItem
@@ -125,7 +127,18 @@ export function PostsSelectionSection({
                 </SelectItem>
               );
             })}
-          </Select>
+              </Select>
+            </div>
+            <Button
+              size="lg"
+              variant="flat"
+              isDisabled={!postsEnabled || allPosts.length === 0}
+              onPress={() => setEventData((prev) => ({ ...prev, eventPosts: allPosts }))}
+              className="flex-shrink-0"
+            >
+              Enable All
+            </Button>
+          </div>
 
           {(eventData.eventPosts || []).length > 0 && (
             <div className="flex flex-wrap gap-2">

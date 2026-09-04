@@ -123,7 +123,6 @@ function LiteCreateContent() {
   const [editingChipValue, setEditingChipValue] = useState('');
 
   const initializedScheduleRef = useRef<string | null>(null);
-  const postsSeededRef = useRef(false);
 
   const inputClassNames = {
     label: 'text-surface-light font-medium',
@@ -222,18 +221,6 @@ function LiteCreateContent() {
     updateDraft((current) => ({ ...current, scheduleStart: start, scheduleEnd: end }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleFrom, scheduleTo, eventDraft?.date]);
-
-  // Default post selection to "all posts" the first time a location is
-  // added, instead of starting from none — only runs once, and only if
-  // nothing has already been selected.
-  useEffect(() => {
-    if (postsSeededRef.current) return;
-    if (!eventDraft) return;
-    if (eventDraft.venue.posts.length === 0) return;
-    postsSeededRef.current = true;
-    if (eventDraft.eventPosts.length > 0) return;
-    updateDraft((current) => ({ ...current, eventPosts: current.venue.posts }));
-  }, [eventDraft]);
 
   const eventDraftId = eventDraft?.id;
   useEffect(() => {
