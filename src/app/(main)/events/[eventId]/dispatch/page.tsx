@@ -168,14 +168,20 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         const minutes = Math.floor(alarmMs / 60000);
         const seconds = Math.round((alarmMs % 60000) / 1000);
         const durationLabel = `${minutes}:${String(seconds).padStart(2, '0')}`;
-        toast.warning(`${t('Call')} #${call.order}: ${t('Call pending')} ${durationLabel} — ${t('surge alert activated')}`, {
-          position: 'top-right',
-          autoClose: 10000,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          transition: Slide,
-        });
+        toast.warning(
+          <div>
+            <div>{`${t('Call')} #${call.order}: ${t('Call pending')} ${durationLabel}`}</div>
+            <div>{t('surge alert activated')}</div>
+          </div>,
+          {
+            position: 'top-right',
+            autoClose: 10000,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            transition: Slide,
+          }
+        );
       }
     }, 5000);
     return () => clearInterval(interval);

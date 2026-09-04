@@ -128,6 +128,18 @@ export default function CallTrackingCard({
 
   const timer = useMMSS(callTimestamp);
 
+  // Detached-team pill label — 'Delivered' gets the same clinic-name
+  // decoration (and icon-suppression once a real name is shown) as the
+  // active Transporting pill above; every other reason is a plain
+  // status label.
+  const renderDetachedReason = (reason: string) => {
+    if (reason === 'Delivered') {
+      const { text, showIcon } = getDeliveredLabel(t, clinics, call.clinicId);
+      return <StatusLabel status="Delivered" text={text} showIcon={showIcon} />;
+    }
+    return <StatusLabel status={reason} text={t(reason)} />;
+  };
+
   // Get available teams for dropdown (including On Break and In Clinic)
   const availableStaff = useMemo(() => {
     return (event.staff || []).filter(s => 
@@ -315,6 +327,7 @@ export default function CallTrackingCard({
             // the real call does.
             const currentStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
             const teamStatusColor = getStatusColor(currentStatus);
+            const transportingLabel = currentStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : null;
 
             return (
               <Chip
@@ -368,7 +381,8 @@ export default function CallTrackingCard({
                         >
                           <StatusLabel
                             status={currentStatus}
-                            text={currentStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentStatus)}
+                            text={transportingLabel ? transportingLabel.text : t(currentStatus)}
+                            showIcon={transportingLabel ? transportingLabel.showIcon : true}
                           /> ▼
                         </button>
                       </DropdownTrigger>
@@ -420,11 +434,7 @@ export default function CallTrackingCard({
                 isDisabled
                 className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
               >
-                {detachedTeam.reason === 'Delivered' ? (
-                  getDeliveredLabel(t, clinics, call.clinicId)
-                ) : (
-                  <StatusLabel status={detachedTeam.reason} text={t(detachedTeam.reason)} />
-                )}
+                {renderDetachedReason(detachedTeam.reason)}
               </Button>
             </Chip>
           ))}

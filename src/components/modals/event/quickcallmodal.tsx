@@ -244,33 +244,37 @@ export default function QuickCallModal({
                 value={quickCall.location}
                 onValueChange={(v) => setQuickCall((p) => ({ ...p, location: v }))}
               />
-              <Input
-                autoFocus={firstEmptyField === "source"}
-                label={t("Source")}
-                labelPlacement="inside"
-                variant="flat"
-                size="lg"
-                radius="lg"
-                classNames={inputClassNames}
-                value={quickCall.source}
-                onValueChange={(v) => setQuickCall((p) => ({ ...p, source: v }))}
-                aria-label="Source"
-              />
-              <Input
-                autoFocus={firstEmptyField === "ageSex"}
-                label={t("Age/Sex")}
-                labelPlacement="inside"
-                variant="flat"
-                size="lg"
-                radius="lg"
-                classNames={inputClassNames}
-                value={formatAgeSex(quickCall.age, quickCall.gender)}
-                onValueChange={(v) => {
-                  const { age, gender } = parseAgeSex(v);
-                  setQuickCall((prev) => ({ ...prev, age, gender }));
-                }}
-                aria-label="Age/Sex"
-              />
+              <div className="flex gap-2">
+                <Input
+                  autoFocus={firstEmptyField === "source"}
+                  label={t("Source")}
+                  labelPlacement="inside"
+                  variant="flat"
+                  size="lg"
+                  radius="lg"
+                  classNames={inputClassNames}
+                  value={quickCall.source}
+                  onValueChange={(v) => setQuickCall((p) => ({ ...p, source: v }))}
+                  aria-label="Source"
+                  className="flex-1"
+                />
+                <Input
+                  autoFocus={firstEmptyField === "ageSex"}
+                  label={t("Age/Sex")}
+                  labelPlacement="inside"
+                  variant="flat"
+                  size="lg"
+                  radius="lg"
+                  classNames={inputClassNames}
+                  value={formatAgeSex(quickCall.age, quickCall.gender)}
+                  onValueChange={(v) => {
+                    const { age, gender } = parseAgeSex(v);
+                    setQuickCall((prev) => ({ ...prev, age, gender }));
+                  }}
+                  aria-label="Age/Sex"
+                  className="w-1/3"
+                />
+              </div>
 
               <Input
                 autoFocus={firstEmptyField === "chiefComplaint"}

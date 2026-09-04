@@ -477,7 +477,7 @@ function TeamMarker({
     c.assignedTeam?.includes(team.team) && !['Resolved', 'Delivered', 'Refusal', 'NMM'].includes(c.status)
   );
   const statusLabel = team.status === 'Transporting'
-    ? getTransportingLabel((key) => key, clinics, activeCall?.clinicId)
+    ? getTransportingLabel((key) => key, clinics, activeCall?.clinicId).text
     : (team.status || 'Unknown');
 
   // Same hover/selected enlarge as every other marker (see PostMarker).

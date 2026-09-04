@@ -95,7 +95,7 @@ export default function SurgeCriteriaSection({ eventData, setEventData, inputCla
       </div>
 
       <div className="max-w-xs pt-1">
-        <div className={`inline-flex items-center gap-1 text-sm mb-1.5 ${inputClassNames.label}`}>
+        <div className={`inline-flex items-center gap-1 text-medium mb-1.5 ${inputClassNames.label}`}>
           Unassigned Call Time
           <Tooltip content="How long a call can sit with no team assigned before a surge alert fires. Default 2:00 (minutes:seconds)." placement="top">
             <CircleHelp className="w-3.5 h-3.5 text-surface-faint" />

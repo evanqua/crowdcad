@@ -94,44 +94,48 @@ export function getClinicName(clinics: Clinic[], clinicId: string | undefined): 
   return clinics.find(c => c.id === clinicId)?.name;
 }
 
-function withClinicDestination(
-  t: (key: string) => string,
-  label: string,
-  clinics: Clinic[],
-  clinicId: string | undefined
-): string {
-  const clinicName = getClinicName(clinics, clinicId);
-  return clinicName ? `${label} ${t('to')} ${clinicName}` : label;
-}
+/** A status pill's display text, and whether its status icon should still render alongside it. */
+export type DestinationLabel = { text: string; showIcon: boolean };
 
 /**
- * Status pill label for a team that's Transporting. The 'Transporting' term
- * itself already reads as "Transporting to" (see dispatchVocabulary label
- * override), so — unlike `getDeliveredLabel` — this appends the clinic name
- * directly rather than routing through `withClinicDestination`'s injected
- * `t('to')`, which would otherwise double up ("Transporting to to X").
- * Only decorates with a destination when more than one clinic exists and the
- * clinicId resolves — single-clinic events keep the plain label. The
- * resolved clinic name is user-authored text and is never passed through `t()`.
+ * Shared by getTransportingLabel/getDeliveredLabel: both terms already read
+ * as "X to" (see dispatchVocabulary label overrides), so the clinic name is
+ * appended directly rather than through a separately-translated "to" (which
+ * would double up — "Transporting to to Main Clinic"). Only decorates with a
+ * destination when more than one clinic exists and the clinicId resolves —
+ * single-clinic events keep the plain label. The resolved clinic name is
+ * user-authored text and is never passed through `t()`.
+ *
+ * Once a real clinic name is shown, the status icon is suppressed
+ * (`showIcon: false`) — the icon exists to stand in for an unnamed,
+ * single-clinic destination, and reads as redundant clutter once the actual
+ * destination is spelled out in text.
  */
+function getDestinationLabel(
+  t: (key: string) => string,
+  termKey: string,
+  clinics: Clinic[],
+  clinicId: string | undefined
+): DestinationLabel {
+  const label = t(termKey);
+  const clinicName = getClinicName(clinics, clinicId);
+  return clinicName ? { text: `${label} ${clinicName}`, showIcon: false } : { text: label, showIcon: true };
+}
+
+/** Status pill label for a team that's Transporting. See getDestinationLabel. */
 export function getTransportingLabel(
   t: (key: string) => string,
   clinics: Clinic[],
   clinicId: string | undefined
-): string {
-  const label = t('Transporting');
-  const clinicName = getClinicName(clinics, clinicId);
-  return clinicName ? `${label} ${clinicName}` : label;
+): DestinationLabel {
+  return getDestinationLabel(t, 'Transporting', clinics, clinicId);
 }
 
-/**
- * Status pill label for a team/call resolved as Delivered. Same destination
- * decoration rules as getTransportingLabel.
- */
+/** Status pill label for a team/call resolved as Delivered. Same destination decoration rules as getTransportingLabel. */
 export function getDeliveredLabel(
   t: (key: string) => string,
   clinics: Clinic[],
   clinicId: string | undefined
-): string {
-  return withClinicDestination(t, t('Delivered'), clinics, clinicId);
+): DestinationLabel {
+  return getDestinationLabel(t, 'Delivered', clinics, clinicId);
 }

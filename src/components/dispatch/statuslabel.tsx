@@ -11,6 +11,7 @@ import { HousePlus, Ambulance } from 'lucide-react';
  */
 const STATUS_ICONS: Record<string, typeof HousePlus> = {
   Transporting: HousePlus,
+  Delivered: HousePlus,
   'Rolled from Scene': Ambulance,
   'Pending Transport': Ambulance,
   Transported: Ambulance,
@@ -21,12 +22,19 @@ type StatusLabelProps = {
   status: string;
   /** Translated (or destination-decorated) text to display. */
   text: string;
+  /**
+   * Force the icon off even when STATUS_ICONS has one for this status — used
+   * when a real clinic name is already spelled out in `text` (e.g.
+   * getTransportingLabel/getDeliveredLabel with multiple clinics), where the
+   * generic icon would read as redundant clutter. Defaults to true.
+   */
+  showIcon?: boolean;
   className?: string;
 };
 
 /** Renders a status/outcome's label with its status-specific icon, when one exists. */
-export default function StatusLabel({ status, text, className }: StatusLabelProps) {
-  const Icon = STATUS_ICONS[status];
+export default function StatusLabel({ status, text, showIcon = true, className }: StatusLabelProps) {
+  const Icon = showIcon ? STATUS_ICONS[status] : undefined;
   return (
     <span className={`inline-flex items-center gap-1 ${className || ''}`}>
       <span>{text}</span>

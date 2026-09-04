@@ -9,6 +9,7 @@ import { Button } from '@heroui/react';
 import { getScheduleWindow, teamStatusBreakdown, teamAvailabilitySeries, getSurgeIntervals } from '@/lib/analyticsUtils';
 import { formatLogTimestampForCsv } from '@/lib/csvFormat';
 import { GRID_WRAPPER, GRID_CELL } from './summaryGrid';
+import LoadingScreen from '@/components/ui/loading-screen';
 
 const SummaryCharts = dynamic(() => import('./SummaryCharts'), { ssr: false, loading: () => <div className="p-6 bg-surface-deep border border-surface-liner">Loading charts...</div> });
 
@@ -71,11 +72,7 @@ export default function SummaryPage() {
   })), [interactionSessions]);
 
   if (!event) {
-    return (
-      <div className="p-6 text-surface-light bg-surface-deepest rounded-2xl m-6">
-        Loading summary...
-      </div>
-    );
+    return <LoadingScreen label="Loading summary…" />;
   }
 
   // Delivered to Clinic (robust: use status OR clinic flag)

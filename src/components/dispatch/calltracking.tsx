@@ -120,6 +120,18 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   // unless they came from an actual selection (onAction).
   const { t } = useDispatchTerms();
   const clinics = getEventClinics(event.clinics);
+
+  // Detached-team pill label — 'Delivered' gets the same clinic-name
+  // decoration (and icon-suppression once a real name is shown) as the
+  // active Transporting pill; every other reason is a plain status label.
+  const renderDetachedReason = (reason: string, call: Call) => {
+    if (reason === 'Delivered') {
+      const { text, showIcon } = getDeliveredLabel(t, clinics, call.clinicId);
+      return <StatusLabel status="Delivered" text={text} showIcon={showIcon} />;
+    }
+    return <StatusLabel status={reason} text={t(reason)} />;
+  };
+
   const TEAM_STATUS_MENU_CLOSE_GUARD_MS = 150;
   const teamStatusMenuOpenedAtRef = React.useRef<number>(0);
   const teamStatusMenuSelectedRef = React.useRef<boolean>(false);
@@ -403,6 +415,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Pending Transport', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
                               const currentTeamStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
                               const teamStatusColor = getStatusColor(currentTeamStatus);
+                              const transportingLabel = currentTeamStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : null;
                            
                               return (
                                 <Chip
@@ -478,7 +491,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                           >
                                             <StatusLabel
                                               status={currentTeamStatus}
-                                              text={currentTeamStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentTeamStatus)}
+                                              text={transportingLabel ? transportingLabel.text : t(currentTeamStatus)}
+                                              showIcon={transportingLabel ? transportingLabel.showIcon : true}
                                             />
                                           </Button>
                                         </DropdownTrigger>
@@ -531,11 +545,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   isDisabled
                                   className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
                                 >
-                                  {detachedTeam.reason === 'Delivered' ? (
-                                    getDeliveredLabel(t, clinics, call.clinicId)
-                                  ) : (
-                                    <StatusLabel status={detachedTeam.reason} text={t(detachedTeam.reason)} />
-                                  )}
+                                  {renderDetachedReason(detachedTeam.reason, call)}
                                 </Button>
                               </Chip>
                             ))}
