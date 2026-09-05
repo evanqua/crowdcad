@@ -10,7 +10,7 @@ import { MoreVertical, RotateCw } from 'lucide-react';
 import type { Event, Call } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import DispatchMotionCell from '@/components/dispatch/motioncell';
-import StatusLabel from '@/components/dispatch/statuslabel';
+import StatusLabel, { getMenuLabel } from '@/components/dispatch/statuslabel';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { useMMSS } from '@/hooks/useMMSS';
 import { isClinicCallResolved } from '@/lib/clinics';
@@ -273,8 +273,8 @@ export default function ClinicTrackingCard({
                 onAction={(key) => onOutcomeChange(call.id, key as string)}
               >
                 <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
-                <DropdownItem key="Pending Transport"><StatusLabel status="Pending Transport" text={t('Pending Transport')} /></DropdownItem>
-                <DropdownItem key="Transported"><StatusLabel status="Transported" text={t('Transported')} /></DropdownItem>
+                <DropdownItem key="Pending Transport">{getMenuLabel('Pending Transport', t)}</DropdownItem>
+                <DropdownItem key="Transported">{getMenuLabel('Transported', t)}</DropdownItem>
                 <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
                 <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
               </DropdownMenu>

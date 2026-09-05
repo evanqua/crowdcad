@@ -78,6 +78,7 @@ const CROWDCAD_FRENCH_TERMS: Record<string, string> = {
   'Primary Team': 'Équipe principale',
   Location: 'Position',
   'Add Call': 'Ajouter un appel',
+  'New Call': 'Nouvel appel',
   'Add Team': 'Ajouter une équipe',
   'Add Supervisor': 'Ajouter un superviseur',
   'Add Equipment': 'Ajouter un équipement',

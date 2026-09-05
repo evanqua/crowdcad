@@ -27,6 +27,11 @@ export function getVenuePosts(venue: PostsSource | Venue | undefined | null): Po
   return (venue.layers || []).flatMap(layer => layer.posts || []);
 }
 
+/** Every post name placed on the venue's map, deduplicated — offered as autocomplete suggestions for free-text location fields (a call's Location, quick-call creation), never an exclusive/enum choice. */
+export function getVenueLocationOptions(venue: PostsSource | Venue | undefined | null): string[] {
+  return Array.from(new Set(getVenuePosts(venue).map(p => (typeof p === 'string' ? p : p.name))));
+}
+
 /**
  * Additively merges clinic-flagged venue posts into an event's existing
  * clinics list, matched by the post's stable `clinicId`. Never removes an
@@ -94,44 +99,20 @@ export function getClinicName(clinics: Clinic[], clinicId: string | undefined): 
   return clinics.find(c => c.id === clinicId)?.name;
 }
 
-function withClinicDestination(
-  t: (key: string) => string,
-  label: string,
-  clinics: Clinic[],
-  clinicId: string | undefined
-): string {
-  const clinicName = getClinicName(clinics, clinicId);
-  return clinicName ? `${label} ${t('to')} ${clinicName}` : label;
+/**
+ * Call.status values that mean the call itself is fully closed out — every
+ * team/supervisor/equipment still on it has been auto-returned to post (see
+ * the resolving cascade in dispatch/page.tsx's handleTeamStatusChange). A
+ * call resolved via "Transferred to ambulance" (Rolled from Scene) ends up
+ * with status 'Resolved' here, same as any other non-Delivered/Refusal/NMM/
+ * Unable-to-Locate resolution — see the note on totalTransports in
+ * summary/page.tsx for how that specific case is still distinguished when
+ * needed via `detachedTeams`.
+ */
+export const RESOLVED_CALL_STATUSES = ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'];
+
+/** True once a call's status is one of RESOLVED_CALL_STATUSES. */
+export function isCallResolved(call: Call): boolean {
+  return RESOLVED_CALL_STATUSES.includes(call.status);
 }
 
-/**
- * Status pill label for a team that's Transporting. The 'Transporting' term
- * itself already reads as "Transporting to" (see dispatchVocabulary label
- * override), so — unlike `getDeliveredLabel` — this appends the clinic name
- * directly rather than routing through `withClinicDestination`'s injected
- * `t('to')`, which would otherwise double up ("Transporting to to X").
- * Only decorates with a destination when more than one clinic exists and the
- * clinicId resolves — single-clinic events keep the plain label. The
- * resolved clinic name is user-authored text and is never passed through `t()`.
- */
-export function getTransportingLabel(
-  t: (key: string) => string,
-  clinics: Clinic[],
-  clinicId: string | undefined
-): string {
-  const label = t('Transporting');
-  const clinicName = getClinicName(clinics, clinicId);
-  return clinicName ? `${label} ${clinicName}` : label;
-}
-
-/**
- * Status pill label for a team/call resolved as Delivered. Same destination
- * decoration rules as getTransportingLabel.
- */
-export function getDeliveredLabel(
-  t: (key: string) => string,
-  clinics: Clinic[],
-  clinicId: string | undefined
-): string {
-  return withClinicDestination(t, t('Delivered'), clinics, clinicId);
-}

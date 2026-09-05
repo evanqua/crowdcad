@@ -42,6 +42,7 @@ function terms(category: DispatchTermCategory, keys: string[]): DispatchTerm[] {
  */
 const LABEL_OVERRIDES: Record<string, string> = {
   Transporting: 'Transporting to',
+  Delivered: 'Delivered to',
   'Rolled from Scene': 'Transferred to',
   Transported: 'Transferred to',
   'Pending Transport': 'Pending',
@@ -110,6 +111,7 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'Primary Team',
     'Location',
     'Add Call',
+    'New Call',
     'Add Team',
     'Add Supervisor',
     'Add Equipment',

@@ -6,13 +6,16 @@ import {
   Card, CardHeader, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Select, SelectItem, Autocomplete, AutocompleteItem, Button
 } from '@heroui/react';
-import {ChevronDown, ChevronUp, MapPin, MoreVertical, ArrowRight, Map as MapIcon} from 'lucide-react';
+import {ChevronDown, ChevronUp, MapPin, MoreVertical, Map as MapIcon} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 import DispatchMotionCell from './motioncell';
+import StatusLabel from './statuslabel';
+import EquipmentTypeIcon, { getEquipmentStatusWord } from './equipmenttypeicon';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getClinicName } from '@/lib/clinics';
+import { getEventClinics } from '@/lib/clinics';
+import { getEquipmentIconType } from '@/lib/equipmentIcon';
 
 type TeamCardCondensedProps = {
   staff: Staff;
@@ -24,6 +27,8 @@ type TeamCardCondensedProps = {
   onDelete?: (teamName: string) => void;
   onRefreshPost?: (teamName: string) => void;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
+  /** Opens the Add Call modal pre-filled with this team/supervisor as the assigned team. */
+  onNewCall?: (teamName: string) => void;
   /** Whether the venue has a map uploaded — gates the "view on map" button. */
   hasVenueMap?: boolean;
   onViewOnMap?: (teamName: string) => void;
@@ -48,7 +53,7 @@ function useMMSS(since?: number) {
 export default function TeamCardCondensed({
   staff, event, sinceMs,
   onStatusChange, onLocationChange,
-  onEdit, onDelete, onRefreshPost, updateEvent,
+  onEdit, onDelete, onRefreshPost, onNewCall, updateEvent,
   hasVenueMap, onViewOnMap, canLocateOnMap,
 }: TeamCardCondensedProps) {
   const { t } = useDispatchTerms();
@@ -102,8 +107,16 @@ export default function TeamCardCondensed({
   const statusOptions = isOnEq
     ? ['En Route Eq', 'Assisting', 'Delivered Eq']
     : isOnAnyActiveCall
-      ? ['En Route', 'On Scene', 'Transporting']
+      ? ['En Route', 'On Scene', 'Transporting', 'Pending Transport']
       : ['Available', 'On Break', 'In Clinic'];
+
+  // Equipment this team/supervisor is actually running — same icon
+  // convention as the call tracker's team chip (see equipmenttypeicon.tsx).
+  const teamEquipment = isOnEq
+    ? (event.eventEquipment || []).filter(eq => eq.assignedTeam === staff.team)
+    : [];
+  const teamEquipmentNames = teamEquipment.map(eq => eq.name).join(', ');
+  const teamEquipmentIconType = teamEquipment[0] ? getEquipmentIconType(teamEquipment[0].name) : null;
 
   const postOptions: string[] = React.useMemo(() => {
     const base: string[] = ['Clinic'];
@@ -144,13 +157,16 @@ export default function TeamCardCondensed({
             {staff.team}
           </span>
           <span className={`text-sm font-bold truncate flex items-center gap-1 min-w-0 ${statusTone.textClass}`}>
-            {staff.status === 'Transporting' && getClinicName(clinics, activeCall?.clinicId) ? (
+            {(staff.status === 'Delivered Eq' || staff.status === 'En Route Eq') && teamEquipmentIconType ? (
               <>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-                <span className="truncate">{getClinicName(clinics, activeCall?.clinicId)}</span>
+                <span className="truncate">{getEquipmentStatusWord(staff.status)}</span>
+                <EquipmentTypeIcon type={teamEquipmentIconType} />
               </>
             ) : (
-              t(staff.status)
+              // Icon-aware for any other status (Transporting, Pending
+              // Transport, etc. — see STATUS_ICONS); the destination clinic
+              // name lives in the log now, not the pill.
+              <StatusLabel status={staff.status} text={t(staff.status)} />
             )}
           </span>
           <span className="text-sm text-surface-faint truncate">
@@ -199,10 +215,12 @@ export default function TeamCardCondensed({
               itemClasses={{ base: 'px-3 py-2 text-sm text-surface-light rounded-xl' }}
               onAction={(key) => {
                 if (key === 'refresh') onRefreshPost?.(staff.team);
+                if (key === 'newCall') onNewCall?.(staff.team);
                 if (key === 'edit') onEdit?.(staff);
                 if (key === 'delete') onDelete?.(staff.team);
               }}
             >
+              <DropdownItem key="newCall">{t('New Call')}</DropdownItem>
               <DropdownItem key="refresh">{t('Refresh Post')}</DropdownItem>
               <DropdownItem key="edit">{t('Edit')}</DropdownItem>
               <DropdownItem key="delete" className="text-status-red">{t('Delete')}</DropdownItem>
@@ -277,19 +295,18 @@ export default function TeamCardCondensed({
                 renderValue={(items) => {
                   const key = items[0]?.key as string | undefined;
                   if (!key) return null;
-                  if (key === 'Transporting') {
-                    const clinicName = getClinicName(clinics, activeCall?.clinicId);
-                    if (clinicName) {
-                      return (
-                        <span className="inline-flex items-center gap-1 min-w-0">
-                          <ArrowRight className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-                          <span className="truncate">{clinicName}</span>
-                        </span>
-                      );
-                    }
-                    return t('Transporting');
+                  if ((key === 'Delivered Eq' || key === 'En Route Eq') && teamEquipmentIconType) {
+                    return (
+                      <span className="inline-flex items-center gap-1 min-w-0">
+                        <span className="truncate">{getEquipmentStatusWord(key)}</span>
+                        <EquipmentTypeIcon type={teamEquipmentIconType} />
+                      </span>
+                    );
                   }
-                  return t(key);
+                  // Icon-aware for any other status (Transporting, Pending
+                  // Transport, etc. — see STATUS_ICONS); the destination
+                  // clinic name lives in the log now, not the pill.
+                  return <StatusLabel status={key} text={t(key)} />;
                 }}
                 classNames={{
                   base: 'min-w-0',
@@ -297,7 +314,11 @@ export default function TeamCardCondensed({
                 }}
               >
                 {statusOptions.map((s) => (
-                  <SelectItem key={s}>{t(s)}</SelectItem>
+                  <SelectItem key={s}>
+                    {(s === 'Delivered Eq' || s === 'En Route Eq') && teamEquipmentNames
+                      ? `${s === 'En Route Eq' ? 'En Route -' : 'Delivered'} ${teamEquipmentNames}`
+                      : t(s)}
+                  </SelectItem>
                 ))}
               </Select>
               )}

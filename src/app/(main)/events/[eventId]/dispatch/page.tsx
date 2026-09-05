@@ -42,7 +42,7 @@ import { getTeamAvailabilitySummary, getSurgeLimitPercent, isSurging, getPending
 import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
-import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResolved } from '@/lib/clinics';
+import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResolved, RESOLVED_CALL_STATUSES } from '@/lib/clinics';
 import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
@@ -168,14 +168,20 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         const minutes = Math.floor(alarmMs / 60000);
         const seconds = Math.round((alarmMs % 60000) / 1000);
         const durationLabel = `${minutes}:${String(seconds).padStart(2, '0')}`;
-        toast.warning(`${t('Call')} #${call.order}: ${t('Call pending')} ${durationLabel} — ${t('surge alert activated')}`, {
-          position: 'top-right',
-          autoClose: 10000,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          transition: Slide,
-        });
+        toast.warning(
+          <div>
+            <div>{`${t('Call')} #${call.order}: ${t('Call pending')} ${durationLabel}`}</div>
+            <div>{t('surge alert activated')}</div>
+          </div>,
+          {
+            position: 'top-right',
+            autoClose: 10000,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            transition: Slide,
+          }
+        );
       }
     }, 5000);
     return () => clearInterval(interval);
@@ -974,6 +980,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   };
 
   const handleSupervisorStatusChange = useCallback((supervisor: Staff, newStatus: string) => {
+    // "at <location>" gives the log entry real context (which call this
+    // status change belongs to) without needing a separate call reference.
+    const activeCall = event?.calls?.find(c =>
+      c.assignedTeam?.includes(supervisor.team) && !['Resolved', 'Available'].includes(c.status)
+    );
+    const now = new Date();
+    const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+    const logMessage = `${hhmm} - status changed to ${newStatus}${activeCall ? ` at ${activeCall.location}` : ''}`;
+
     const updatedSupervisors = event?.supervisor.map(s =>
       s.team === supervisor.team
         ? {
@@ -981,10 +996,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             status: newStatus,
             log: [
               ...(s.log || []),
-              {
-                timestamp: Date.now(),
-                message: `${new Date().getHours().toString().padStart(2, '0')}${new Date().getMinutes().toString().padStart(2, '0')} - status changed to ${newStatus}`
-              }
+              { timestamp: now.getTime(), message: logMessage }
             ]
           }
         : s
@@ -1326,8 +1338,19 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       logMessage = `${hhmm} - ${team} transporting to ${destinationClinicName || 'clinic'}`;
     } else if (newStatus === 'Rolled from Scene') {
       logMessage = `${hhmm} - ${team} Transferred to ambulance${transportUnitValue ? `, unit #: ${transportUnitValue}` : ''}`;
+    } else if (newStatus === 'Delivered Eq' || newStatus === 'En Route Eq') {
+      // Names the actual equipment item(s) instead of the generic "Eq"
+      // suffix shown in the pill/dropdown (see equipmenttypeicon.tsx).
+      const equipmentNames = (event?.eventEquipment || [])
+        .filter(eq => eq.assignedTeam === team)
+        .map(eq => eq.name)
+        .join(', ');
+      const verb = newStatus === 'Delivered Eq' ? 'Delivered' : 'En Route';
+      logMessage = `${hhmm} - ${team} ${verb}${equipmentNames ? ` ${equipmentNames}` : ''}`;
     } else {
-      logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
+      // "at <location>" gives the log entry real context (which call this
+      // status change belongs to) without needing a separate call reference.
+      logMessage = `${hhmm} - ${team} set to ${newStatus} at ${latestCall.location}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
     }
 
     // DECLARE newCallStatus here with proper initialization
@@ -1732,7 +1755,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       let clinicId = c.clinicId;
       let outcome = c.outcome;
 
-      if (kind === 'team') {
+      // Only the team whose OWN status change actually resolved the call
+      // (reason is the resolving status itself, not 'Auto-detached') reopens
+      // it on revert — reverting one of the other teams/equipment the
+      // resolving cascade auto-released just restores that one team; the
+      // call stays resolved via whichever distinction is still recorded.
+      if (kind === 'team' && detachedEntry.reason !== 'Auto-detached') {
         if (restoredStatus === 'Transporting') newCallStatus = 'Transporting';
         else if (restoredStatus === 'On Scene') newCallStatus = 'On Scene';
         else newCallStatus = 'En Route';
@@ -1939,6 +1967,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         setTimeout(() => {
           (document.querySelector('input[name="callLocation"]') as HTMLInputElement | null)?.focus();
         }, 10);
+      }
+      if (e.ctrlKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        setSelectedRightTab('map');
       }
       if (e.key === 'Escape') {
         setShowQuickCallForm(false);
@@ -2339,7 +2371,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       const destinationClinicName = newStatus === 'Transporting'
         ? getClinicName(getEventClinics(currentEvent.clinics), resolvedClinicId)
         : undefined;
-      const logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
+      // Matches the calls-tracker's own phrasing for these two cases;
+      // "at <location>" gives every other status real context (which call
+      // it belongs to) without needing a separate call reference.
+      const logMessage = newStatus === 'Transporting'
+        ? `${hhmm} - ${team} transporting to ${destinationClinicName || 'clinic'}`
+        : `${hhmm} - ${team} set to ${newStatus}${activeCall ? ` at ${activeCall.location}` : ''}`;
 
       const updatedStaff = (currentEvent.staff || []).map(s => {
         if (s.team !== team) return s;
@@ -2375,6 +2412,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             // Calculate new composite status for the call
             let newCallStatus = c.status;
             if (teamStatuses.includes('Transporting')) newCallStatus = 'Transporting';
+            else if (teamStatuses.includes('Pending Transport')) newCallStatus = 'Pending Transport';
             else if (teamStatuses.includes('On Scene')) newCallStatus = 'On Scene';
             else if (teamStatuses.includes('En Route')) newCallStatus = 'En Route';
 
@@ -3307,6 +3345,50 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     wasAboveSurgeThresholdRef.current = aboveThreshold;
   }, [event, updateEvent]);
 
+  // Same auto-activation, for the combined calls+clinic pending-transport
+  // count crossing its own configurable threshold.
+  const wasPendingTransportAboveThresholdRef = useRef(false);
+  useEffect(() => {
+    if (!event || isEventEnded(event)) return;
+    const pendingTransportCount = (event.calls || []).filter(c => c.outcome === 'Pending Transport' || c.status === 'Pending Transport').length;
+    const aboveThreshold = pendingTransportCount >= getPendingTransportSurgeThreshold(event);
+
+    if (aboveThreshold && !wasPendingTransportAboveThresholdRef.current && !event.manualSurgeActive) {
+      updateEvent((current) =>
+        current.manualSurgeActive ? {} : withSurgeStarted(current, Date.now())
+      );
+    }
+    wasPendingTransportAboveThresholdRef.current = aboveThreshold;
+  }, [event, updateEvent]);
+
+  // Same auto-activation again, for the unassigned-call-time threshold —
+  // polls wall-clock time (rather than reacting to `event` changes) since
+  // nothing about a Pending call's own data changes while it waits, same
+  // reasoning as the toast alarm earlier in this file. Independent of the
+  // Pending chip's own fixed 1-minute blink animation (PendingCallChip),
+  // which always fires regardless of this configurable threshold.
+  const wasUnassignedCallAboveThresholdRef = useRef(false);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const currentEvent = eventRef.current;
+      if (!currentEvent || isEventEnded(currentEvent)) return;
+      const alarmMs = getUnassignedCallSurgeSeconds(currentEvent) * 1000;
+      const aboveThreshold = (currentEvent.calls || []).some(c => {
+        if (c.status !== 'Pending') return false;
+        const createdAt = c.log?.[0]?.timestamp;
+        return !!createdAt && Date.now() - createdAt >= alarmMs;
+      });
+
+      if (aboveThreshold && !wasUnassignedCallAboveThresholdRef.current && !currentEvent.manualSurgeActive) {
+        updateEvent((current) =>
+          current.manualSurgeActive ? {} : withSurgeStarted(current, Date.now())
+        );
+      }
+      wasUnassignedCallAboveThresholdRef.current = aboveThreshold;
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [updateEvent]);
+
   // Keeps the mobile Clinic tab's selected clinic valid as `event.clinics`
   // is added to (new venue posts flagged as clinics) or the selection is
   // stale from a previous event.
@@ -3403,14 +3485,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   if (!event) return <LoadingScreen label="Loading event…" />;
 
-  const resolvedCallStatuses = [
-    'Delivered',
-    'Refusal',
-    'NMM',
-    'Rolled',
-    'Resolved',
-    'Unable to Locate',
-  ];
+  const resolvedCallStatuses = RESOLVED_CALL_STATUSES;
 
   const activeCallsList = (event.calls || []).filter(
     call => !resolvedCallStatuses.includes(call.status)
@@ -4149,6 +4224,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 onEditTeam={handleEditTeam}
                                 onDeleteTeam={handleDeleteTeam}
                                 onRefreshTeamPost={refreshTeamFromSchedule}
+                                onNewCall={(teamName) => openAddCallModal({ assignedTeam: teamName })}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
                                 hasVenueMap={hasVenueMapImage}
@@ -4197,6 +4273,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                     }}
                                     onDeleteTeam={handleDeleteSupervisor}
                                     onRefreshTeamPost={refreshTeamFromSchedule}
+                                    onNewCall={(teamName) => openAddCallModal({ assignedTeam: teamName })}
                                     updateEvent={updateEvent}
                                     cardViewMode={cardViewMode}
                                     hasVenueMap={hasVenueMapImage}
@@ -4287,16 +4364,17 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         ))}
 
                         {hasVenueMapImage && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRightTab('map')}
-                            className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'map' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
-                            aria-pressed={selectedRightTab === 'map'}
-                            aria-label={t('Map')}
-                            title={t('Map')}
-                          >
-                            <MapIcon className="h-4 w-4" />
-                          </button>
+                          <Tooltip content={`${t('Map')} (Ctrl+M)`} placement="top">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRightTab('map')}
+                              className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'map' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                              aria-pressed={selectedRightTab === 'map'}
+                              aria-label={t('Map')}
+                            >
+                              <MapIcon className="h-4 w-4" />
+                            </button>
+                          </Tooltip>
                         )}
                       </div>
 
@@ -4320,7 +4398,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 { key: 'transporting', label: t('Transporting'), count: transportingCallsCount, colorClass: 'text-status-red' },
                               ]}
                             />
-                            <Tooltip content={t('Add Call')} placement="top">
+                            <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
                               <div>
                                 <Button
                                   size="sm"
@@ -4515,6 +4593,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               onEditTeam={handleEditTeam}
                               onDeleteTeam={handleDeleteTeam}
                               onRefreshTeamPost={refreshTeamFromSchedule}
+                              onNewCall={(teamName) => openAddCallModal({ assignedTeam: teamName })}
                               updateEvent={updateEvent}
                               cardViewMode={cardViewMode}
                                 hasVenueMap={hasVenueMapImage}
@@ -4562,6 +4641,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 }}
                                 onDeleteTeam={handleDeleteSupervisor}
                                 onRefreshTeamPost={refreshTeamFromSchedule}
+                                onNewCall={(teamName) => openAddCallModal({ assignedTeam: teamName })}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
                                 hasVenueMap={hasVenueMapImage}

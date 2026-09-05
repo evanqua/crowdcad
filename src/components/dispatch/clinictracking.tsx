@@ -12,7 +12,7 @@ import {
 import { MoreVertical, RotateCw } from 'lucide-react';
 import type { Event, Call, CallLogEntry, Clinic } from '@/app/types';
 import DispatchMotionCell from './motioncell';
-import StatusLabel from './statuslabel';
+import StatusLabel, { getMenuLabel } from './statuslabel';
 import TrackingTableBase from './trackingtablebase';
 import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
@@ -400,8 +400,8 @@ export default function ClinicTrackingTable({
                             }}
                           >
                             <DropdownItem key="In Clinic">{t('In Clinic')}</DropdownItem>
-                            <DropdownItem key="Pending Transport"><StatusLabel status="Pending Transport" text={t('Pending Transport')} /></DropdownItem>
-                            <DropdownItem key="Transported"><StatusLabel status="Transported" text={t('Transported')} /></DropdownItem>
+                            <DropdownItem key="Pending Transport">{getMenuLabel('Pending Transport', t)}</DropdownItem>
+                            <DropdownItem key="Transported">{getMenuLabel('Transported', t)}</DropdownItem>
                             <DropdownItem key="AMA">{t('AMA')}</DropdownItem>
                             <DropdownItem key="Discharged">{t('Discharged')}</DropdownItem>
                           </DropdownMenu>

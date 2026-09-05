@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Card, CardHeader, CardBody, Input, Chip, Button,
-  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem
+  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Autocomplete, AutocompleteItem
 } from '@heroui/react';
 import { Plus, MoreVertical, RotateCw } from 'lucide-react';
 import {
@@ -19,9 +19,11 @@ import {
 import type { Event, Call, DetachedTeam } from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import DispatchMotionCell from '@/components/dispatch/motioncell';
-import StatusLabel from '@/components/dispatch/statuslabel';
+import StatusLabel, { getMenuLabel } from '@/components/dispatch/statuslabel';
+import EquipmentTypeIcon, { getEquipmentStatusWord } from '@/components/dispatch/equipmenttypeicon';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getTransportingLabel, getDeliveredLabel } from '@/lib/clinics';
+import { getEventClinics, isCallResolved, getVenueLocationOptions } from '@/lib/clinics';
+import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { getStatusColor } from '@/lib/statusColors';
 import { useMMSS } from '@/hooks/useMMSS';
 
@@ -73,7 +75,11 @@ export default function CallTrackingCard({
 }: CallTrackingCardProps) {
   const { t } = useDispatchTerms();
   const clinics = getEventClinics(event.clinics);
+  const isResolved = isCallResolved(call);
   const [clinicPickTeam, setClinicPickTeam] = useState<string | null>(null);
+  // Which status opened the clinic picker — 'Transporting' or 'Delivered',
+  // both of which need a destination clinic recorded when more than one exists.
+  const [clinicPickStatus, setClinicPickStatus] = useState<string>('Transporting');
   const [expanded, setExpanded] = useState(false);
   const [locationInput, setLocationInput] = useState(call.location || '');
   const [ageSexInput, setAgeSexInput] = useState(formatAgeSex(call.age, call.gender) || '');
@@ -127,6 +133,27 @@ export default function CallTrackingCard({
   }, [call.log]);
 
   const timer = useMMSS(callTimestamp);
+
+  // Detached-team pill label — 'Delivered Eq' shows the equipment's own
+  // icon, using the equipmentNames captured at detach time (the equipment
+  // record itself is no longer linked to this team by the time it's
+  // rendered here — delivering unassigns it, see handleTeamStatusChange's
+  // isEqDetaching branch); every other reason (including 'Delivered', via
+  // STATUS_ICONS) is a plain icon-aware status label.
+  const renderDetachedReason = (detachedTeam: DetachedTeam) => {
+    const { reason, equipmentNames } = detachedTeam;
+    if (reason === 'Delivered Eq' && equipmentNames?.[0]) {
+      return (
+        <span className="inline-flex items-center gap-1">
+          <span>{getEquipmentStatusWord('Delivered Eq')}</span>
+          <EquipmentTypeIcon type={getEquipmentIconType(equipmentNames[0])} />
+        </span>
+      );
+    }
+    return <StatusLabel status={reason} text={t(reason)} />;
+  };
+
+  const locationOptions = useMemo(() => getVenueLocationOptions(event.venue), [event.venue]);
 
   // Get available teams for dropdown (including On Break and In Clinic)
   const availableStaff = useMemo(() => {
@@ -228,11 +255,14 @@ export default function CallTrackingCard({
       <CardBody className="px-4 pb-3 space-y-3">
         {/* Row 1: Location */}
         <div className="flex gap-2">
-          <Input
+          <Autocomplete
             label="Location"
             labelPlacement="inside"
-            value={locationInput}
-            onChange={(e) => setLocationInput(e.target.value)}
+            inputValue={locationInput}
+            onInputChange={(v) => setLocationInput(v)}
+            onSelectionChange={(key) => {
+              if (key) onLocationChange(call.id, key as string);
+            }}
             onBlur={() => {
               if (locationInput !== call.location) {
                 onLocationChange(call.id, locationInput);
@@ -243,13 +273,20 @@ export default function CallTrackingCard({
                 (e.target as HTMLInputElement).blur();
               }
             }}
+            allowsCustomValue
             variant="flat"
-            classNames={{
-              input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none",
-              inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep"
+            inputProps={{
+              classNames: {
+                input: "text-surface-light bg-surface-deep outline-none focus:outline-none data-[focus=true]:outline-none",
+                inputWrapper: "bg-surface-deep shadow-none border border-surface-liner hover:bg-surface-liner group-data-[focus=true]:bg-surface-deep"
+              }
             }}
             className="flex-1"
-          />
+          >
+            {locationOptions.map((loc) => (
+              <AutocompleteItem key={loc}>{loc}</AutocompleteItem>
+            ))}
+          </Autocomplete>
         </div>
 
         {/* Row 2: Age/Sex (1/4) + Chief Complaint (3/4) */}
@@ -316,6 +353,22 @@ export default function CallTrackingCard({
             const currentStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
             const teamStatusColor = getStatusColor(currentStatus);
 
+            // Equipment this team is actually running — used to swap the
+            // pill's "Eq" suffix for the matching map icon, and to name the
+            // specific item in the dropdown options and the activity log.
+            const teamEquipment = isEquipmentOnlyTeam
+              ? (event.eventEquipment || []).filter(eq => eq.assignedTeam === team)
+              : [];
+            const teamEquipmentNames = teamEquipment.map(eq => eq.name).join(', ');
+            const teamEquipmentIconType = teamEquipment[0] ? getEquipmentIconType(teamEquipment[0].name) : null;
+            const isEqStatus = currentStatus === 'Delivered Eq' || currentStatus === 'En Route Eq';
+            // Reuses the chip's own translucent status fill on the status
+            // button — stacked on top of the chip's already-tinted
+            // background, the same semi-transparent token reads visibly
+            // darker/more saturated, marking this piece out as a button
+            // without introducing a whole new color.
+            const statusButtonClass = `inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-surface-light ${teamStatusColor.fillClass} hover:brightness-110 transition-all`;
+
             return (
               <Chip
                 key={team}
@@ -340,7 +393,7 @@ export default function CallTrackingCard({
                       <DropdownTrigger>
                         <button
                           onClick={(e) => e.stopPropagation()}
-                          className="text-xs text-surface-faint hover:text-surface-light transition-colors"
+                          className={statusButtonClass}
                         >
                           {t('Select clinic')} ▼
                         </button>
@@ -349,7 +402,7 @@ export default function CallTrackingCard({
                         aria-label="Select destination clinic"
                         onAction={(key) => {
                           setClinicPickTeam(null);
-                          handleTeamStatusChange(call.id, team, 'Transporting', key as string);
+                          handleTeamStatusChange(call.id, team, clinicPickStatus, key as string);
                         }}
                       >
                         {clinics.map((clinic) => (
@@ -364,31 +417,38 @@ export default function CallTrackingCard({
                           onClick={(e) => {
                             e.stopPropagation();
                           }}
-                          className="text-xs text-surface-faint hover:text-surface-light transition-colors"
+                          className={statusButtonClass}
                         >
-                          <StatusLabel
-                            status={currentStatus}
-                            text={currentStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : t(currentStatus)}
-                          /> ▼
+                          {isEqStatus && teamEquipmentIconType ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span>{getEquipmentStatusWord(currentStatus)}</span>
+                              <EquipmentTypeIcon type={teamEquipmentIconType} />
+                            </span>
+                          ) : (
+                            <StatusLabel status={currentStatus} text={t(currentStatus)} />
+                          )} ▼
                         </button>
                       </DropdownTrigger>
                       <DropdownMenu
                         aria-label="Team Status"
                         onAction={(key) => {
-                          if (key === 'Transporting' && clinics.length > 1) {
+                          if ((key === 'Transporting' || key === 'Delivered') && clinics.length > 1) {
                             setClinicPickTeam(team);
+                            setClinicPickStatus(key as string);
                             return;
                           }
                           if (key === 'Rolled from Scene') {
                             onTransportToAmbulance(call.id, team);
                             return;
                           }
-                          handleTeamStatusChange(call.id, team, key as string, key === 'Transporting' ? clinics[0]?.id : undefined);
+                          handleTeamStatusChange(call.id, team, key as string, (key === 'Transporting' || key === 'Delivered') ? clinics[0]?.id : undefined);
                         }}
                       >
                         {statusOptions.map(status => (
                           <DropdownItem key={status}>
-                            <StatusLabel status={status} text={t(status)} />
+                            {(status === 'Delivered Eq' || status === 'En Route Eq') && teamEquipmentNames
+                              ? `${status === 'En Route Eq' ? 'En Route -' : 'Delivered'} ${teamEquipmentNames}`
+                              : getMenuLabel(status, t)}
                           </DropdownItem>
                         ))}
                       </DropdownMenu>
@@ -420,12 +480,14 @@ export default function CallTrackingCard({
                 isDisabled
                 className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
               >
-                {detachedTeam.reason === 'Delivered' ? getDeliveredLabel(t, clinics, call.clinicId) : t(detachedTeam.reason)}
+                {renderDetachedReason(detachedTeam)}
               </Button>
             </Chip>
           ))}
 
-          {/* Add Team Button */}
+          {/* Add Team Button — disabled once the call is resolved (delivered,
+              refusal, nmm, unable to locate, transferred to ambulance); only
+              reopening it via handleRevertDetachment re-enables this. */}
           <Dropdownmenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -433,6 +495,7 @@ export default function CallTrackingCard({
                 size="sm"
                 variant="flat"
                 aria-label="Add"
+                isDisabled={isResolved}
                 className="w-8 h-8 rounded-full hover:bg-surface-liner"
               >
                 <Plus className="h-4 w-4" />

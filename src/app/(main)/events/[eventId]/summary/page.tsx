@@ -9,6 +9,7 @@ import { Button } from '@heroui/react';
 import { getScheduleWindow, teamStatusBreakdown, teamAvailabilitySeries, getSurgeIntervals } from '@/lib/analyticsUtils';
 import { formatLogTimestampForCsv } from '@/lib/csvFormat';
 import { GRID_WRAPPER, GRID_CELL } from './summaryGrid';
+import LoadingScreen from '@/components/ui/loading-screen';
 
 const SummaryCharts = dynamic(() => import('./SummaryCharts'), { ssr: false, loading: () => <div className="p-6 bg-surface-deep border border-surface-liner">Loading charts...</div> });
 
@@ -71,11 +72,7 @@ export default function SummaryPage() {
   })), [interactionSessions]);
 
   if (!event) {
-    return (
-      <div className="p-6 text-surface-light bg-surface-deepest rounded-2xl m-6">
-        Loading summary...
-      </div>
-    );
+    return <LoadingScreen label="Loading summary…" />;
   }
 
   // Delivered to Clinic (robust: use status OR clinic flag)
@@ -84,10 +81,21 @@ export default function SummaryPage() {
 
   // "Transports" counts both a clinic patient transferred to an ambulance
   // (outcome === 'Transported') and a call resolved directly to an ambulance
-  // from the scene (status === 'Rolled from Scene'). 'Rolled from Clinic' is
-  // kept for legacy data — the outcome dropdown no longer offers it.
+  // from the scene ("Transferred to" in the call tracker, stored internally
+  // as status/reason 'Rolled from Scene'). A call resolved this way ends up
+  // with call.status === 'Resolved' (the generic terminal status every
+  // non-Delivered/Refusal/NMM/Unable-to-Locate resolution collapses to), so
+  // the acting team's detachedTeams reason — which does preserve the
+  // original 'Rolled from Scene' value — is what actually identifies it.
+  // 'Rolled from Clinic' is kept for legacy data — the outcome dropdown no
+  // longer offers it.
   const totalTransports =
-    event.calls.filter(c => c.outcome === 'Transported' || c.outcome === 'Rolled from Clinic' || c.status === 'Rolled from Scene').length;
+    event.calls.filter(c =>
+      c.outcome === 'Transported' ||
+      c.outcome === 'Rolled from Clinic' ||
+      c.status === 'Rolled from Scene' ||
+      c.detachedTeams?.some(dt => dt.reason === 'Rolled from Scene')
+    ).length;
 
   const formatTimestamp = (timestamp: number) => {
     return formatLogTimestampForCsv(timestamp);

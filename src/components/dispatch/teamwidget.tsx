@@ -13,6 +13,7 @@ type TeamWidgetProps = {
   onEditTeam?: (staff: Staff) => void;
   onDeleteTeam?: (team: string) => void;
   onRefreshTeamPost?: (team: string) => void;
+  onNewCall?: (team: string) => void;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
   cardViewMode?: 'normal' | 'condensed';
   hasVenueMap?: boolean;
@@ -31,6 +32,7 @@ const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
     onEditTeam,
     onDeleteTeam,
     onRefreshTeamPost,
+    onNewCall,
     updateEvent,
     cardViewMode = 'normal',
     hasVenueMap,
@@ -51,6 +53,7 @@ const TeamWidget = React.memo(function TeamWidget(props: TeamWidgetProps) {
       onEdit={onEditTeam}
       onDelete={onDeleteTeam}
       onRefreshPost={onRefreshTeamPost}
+      onNewCall={onNewCall}
       updateEvent={updateEvent}
       hasVenueMap={hasVenueMap}
       onViewOnMap={onViewOnMap}
