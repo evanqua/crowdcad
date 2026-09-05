@@ -284,7 +284,6 @@ export default function QuickCallModal({
             <ModalBody className="">
               <Autocomplete
                 autoFocus={firstEmptyField === "location"}
-                aria-label="Location"
                 label={t("Location")}
                 labelPlacement="inside"
                 variant="flat"

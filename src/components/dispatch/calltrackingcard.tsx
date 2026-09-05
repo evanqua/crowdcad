@@ -22,7 +22,7 @@ import DispatchMotionCell from '@/components/dispatch/motioncell';
 import StatusLabel, { getMenuLabel } from '@/components/dispatch/statuslabel';
 import EquipmentTypeIcon, { getEquipmentStatusWord } from '@/components/dispatch/equipmenttypeicon';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getTransportingLabel, getDeliveredLabel, isCallResolved, getVenueLocationOptions } from '@/lib/clinics';
+import { getEventClinics, isCallResolved, getVenueLocationOptions } from '@/lib/clinics';
 import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { getStatusColor } from '@/lib/statusColors';
 import { useMMSS } from '@/hooks/useMMSS';
@@ -134,19 +134,14 @@ export default function CallTrackingCard({
 
   const timer = useMMSS(callTimestamp);
 
-  // Detached-team pill label — 'Delivered' gets the same clinic-name
-  // decoration (and icon-suppression once a real name is shown) as the
-  // active Transporting pill above; 'Delivered Eq' shows the equipment's
-  // own icon, using the equipmentNames captured at detach time (the
-  // equipment record itself is no longer linked to this team by the time
-  // it's rendered here — delivering unassigns it, see handleTeamStatusChange's
-  // isEqDetaching branch); every other reason is a plain status label.
+  // Detached-team pill label — 'Delivered Eq' shows the equipment's own
+  // icon, using the equipmentNames captured at detach time (the equipment
+  // record itself is no longer linked to this team by the time it's
+  // rendered here — delivering unassigns it, see handleTeamStatusChange's
+  // isEqDetaching branch); every other reason (including 'Delivered', via
+  // STATUS_ICONS) is a plain icon-aware status label.
   const renderDetachedReason = (detachedTeam: DetachedTeam) => {
     const { reason, equipmentNames } = detachedTeam;
-    if (reason === 'Delivered') {
-      const { text, showIcon } = getDeliveredLabel(t, clinics, call.clinicId);
-      return <StatusLabel status="Delivered" text={text} showIcon={showIcon} />;
-    }
     if (reason === 'Delivered Eq' && equipmentNames?.[0]) {
       return (
         <span className="inline-flex items-center gap-1">
@@ -261,7 +256,6 @@ export default function CallTrackingCard({
         {/* Row 1: Location */}
         <div className="flex gap-2">
           <Autocomplete
-            aria-label="Location"
             label="Location"
             labelPlacement="inside"
             inputValue={locationInput}
@@ -358,7 +352,6 @@ export default function CallTrackingCard({
             // the real call does.
             const currentStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
             const teamStatusColor = getStatusColor(currentStatus);
-            const transportingLabel = currentStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : null;
 
             // Equipment this team is actually running — used to swap the
             // pill's "Eq" suffix for the matching map icon, and to name the
@@ -432,11 +425,7 @@ export default function CallTrackingCard({
                               <EquipmentTypeIcon type={teamEquipmentIconType} />
                             </span>
                           ) : (
-                            <StatusLabel
-                              status={currentStatus}
-                              text={transportingLabel ? transportingLabel.text : t(currentStatus)}
-                              showIcon={transportingLabel ? transportingLabel.showIcon : true}
-                            />
+                            <StatusLabel status={currentStatus} text={t(currentStatus)} />
                           )} ▼
                         </button>
                       </DropdownTrigger>

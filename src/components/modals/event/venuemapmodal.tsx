@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { MapPin, ShieldPlus, ShieldUser, Briefcase, HousePlus, ArrowBigDown } from 'lucide-react';
 import { Post, Staff, Supervisor, Equipment, Layer, Call, Clinic } from '@/app/types';
-import { isClinicPost, getTransportingLabel } from '@/lib/clinics';
+import { isClinicPost } from '@/lib/clinics';
 import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { getStatusColor } from '@/lib/statusColors';
 import { STATUS_COLORS_HEX } from '@/lib/colorTokens';
@@ -416,7 +416,6 @@ function TeamMarker({
   rect,
   teamTimers,
   calls,
-  clinics,
   scale,
   isSelected,
   onAddCall,
@@ -463,9 +462,7 @@ function TeamMarker({
   const activeCall = calls.find(c =>
     c.assignedTeam?.includes(team.team) && !['Resolved', 'Delivered', 'Refusal', 'NMM'].includes(c.status)
   );
-  const statusLabel = team.status === 'Transporting'
-    ? getTransportingLabel((key) => key, clinics, activeCall?.clinicId).text
-    : (team.status || 'Unknown');
+  const statusLabel = team.status || 'Unknown';
 
   // Same hover/selected enlarge as every other marker (see PostMarker).
   const emphasis = (hovered || isSelected ? 1.15 : 1) / scale;

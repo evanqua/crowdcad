@@ -21,7 +21,7 @@ import TrackingTableBase from './trackingtablebase';
 import PendingCallChip from './pendingcallchip';
 import { getStatusColor, TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getTransportingLabel, getDeliveredLabel, RESOLVED_CALL_STATUSES, getVenueLocationOptions } from '@/lib/clinics';
+import { getEventClinics, RESOLVED_CALL_STATUSES, getVenueLocationOptions } from '@/lib/clinics';
 import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { withPendingSuffix } from '@/lib/callTiming';
 
@@ -128,19 +128,14 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   const clinics = getEventClinics(event.clinics);
   const locationOptions = React.useMemo(() => getVenueLocationOptions(event.venue), [event.venue]);
 
-  // Detached-team pill label — 'Delivered' gets the same clinic-name
-  // decoration (and icon-suppression once a real name is shown) as the
-  // active Transporting pill; 'Delivered Eq' shows the equipment's own icon,
-  // using the equipmentNames captured at detach time (the equipment record
-  // itself is no longer linked to this team by the time it's rendered here —
-  // delivering unassigns it, see handleTeamStatusChange's isEqDetaching
-  // branch); every other reason is a plain status label.
-  const renderDetachedReason = (detachedTeam: DetachedTeam, call: Call) => {
+  // Detached-team pill label — 'Delivered Eq' shows the equipment's own
+  // icon, using the equipmentNames captured at detach time (the equipment
+  // record itself is no longer linked to this team by the time it's
+  // rendered here — delivering unassigns it, see handleTeamStatusChange's
+  // isEqDetaching branch); every other reason (including 'Delivered', via
+  // STATUS_ICONS) is a plain icon-aware status label.
+  const renderDetachedReason = (detachedTeam: DetachedTeam) => {
     const { reason, equipmentNames } = detachedTeam;
-    if (reason === 'Delivered') {
-      const { text, showIcon } = getDeliveredLabel(t, clinics, call.clinicId);
-      return <StatusLabel status="Delivered" text={text} showIcon={showIcon} />;
-    }
     if (reason === 'Delivered Eq' && equipmentNames?.[0]) {
       return (
         <span className="inline-flex items-center gap-1">
@@ -445,7 +440,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 : ['En Route', 'On Scene', 'Unable to Locate', 'Transporting', 'Pending Transport', 'Rolled from Scene', 'Delivered', 'Refusal', 'NMM', 'Detached'];
                               const currentTeamStatus = teamStatusMap[call.id]?.[team] || event?.staff.find(s => s.team === team)?.status || 'En Route';
                               const teamStatusColor = getStatusColor(currentTeamStatus);
-                              const transportingLabel = currentTeamStatus === 'Transporting' ? getTransportingLabel(t, clinics, call.clinicId) : null;
 
                               // Equipment this team is actually running — used to swap the
                               // pill's "Eq" suffix for the matching map icon, and to name the
@@ -541,11 +535,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                                 <EquipmentTypeIcon type={teamEquipmentIconType} />
                                               </span>
                                             ) : (
-                                              <StatusLabel
-                                                status={currentTeamStatus}
-                                                text={transportingLabel ? transportingLabel.text : t(currentTeamStatus)}
-                                                showIcon={transportingLabel ? transportingLabel.showIcon : true}
-                                              />
+                                              <StatusLabel status={currentTeamStatus} text={t(currentTeamStatus)} />
                                             )}
                                           </Button>
                                         </DropdownTrigger>
@@ -601,7 +591,7 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                   isDisabled
                                   className="min-w-0 h-6 px-2 text-xs shrink-0 opacity-100 cursor-default"
                                 >
-                                  {renderDetachedReason(detachedTeam, call)}
+                                  {renderDetachedReason(detachedTeam)}
                                 </Button>
                               </Chip>
                             ))}

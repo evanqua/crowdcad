@@ -6,14 +6,15 @@ import {
   Card, CardHeader, CardBody, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
   Select, SelectItem, Autocomplete, AutocompleteItem, Button
 } from '@heroui/react';
-import {ChevronDown, ChevronUp, MapPin, MoreVertical, ArrowRight, Map as MapIcon} from 'lucide-react';
+import {ChevronDown, ChevronUp, MapPin, MoreVertical, Map as MapIcon} from 'lucide-react';
 import type {Event, Staff} from '@/app/types';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { deriveTeamVisualStatus, getStatusColor } from '@/lib/statusColors';
 import DispatchMotionCell from './motioncell';
+import StatusLabel from './statuslabel';
 import EquipmentTypeIcon, { getEquipmentStatusWord } from './equipmenttypeicon';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
-import { getEventClinics, getClinicName } from '@/lib/clinics';
+import { getEventClinics } from '@/lib/clinics';
 import { getEquipmentIconType } from '@/lib/equipmentIcon';
 
 type TeamCardProps = {
@@ -118,7 +119,7 @@ export default function TeamCard({
   const statusOptions = isOnEq
     ? ['En Route Eq', 'Assisting', 'Delivered Eq']
     : isOnAnyActiveCall
-      ? ['En Route', 'On Scene', 'Transporting']
+      ? ['En Route', 'On Scene', 'Transporting', 'Pending Transport']
       : ['Available', 'On Break', 'In Clinic'];
 
   // Equipment this team/supervisor is actually running — same icon
@@ -279,18 +280,6 @@ export default function TeamCard({
               renderValue={(items) => {
                 const key = items[0]?.key as string | undefined;
                 if (!key) return null;
-                if (key === 'Transporting') {
-                  const clinicName = getClinicName(clinics, activeCall?.clinicId);
-                  if (clinicName) {
-                    return (
-                      <span className="inline-flex items-center gap-1 min-w-0">
-                        <ArrowRight className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-                        <span className="truncate">{clinicName}</span>
-                      </span>
-                    );
-                  }
-                  return t('Transporting');
-                }
                 if ((key === 'Delivered Eq' || key === 'En Route Eq') && teamEquipmentIconType) {
                   return (
                     <span className="inline-flex items-center gap-1 min-w-0">
@@ -299,7 +288,10 @@ export default function TeamCard({
                     </span>
                   );
                 }
-                return t(key);
+                // Icon-aware for any other status (Transporting, Pending
+                // Transport, etc. — see STATUS_ICONS); the destination clinic
+                // name lives in the log now, not the pill.
+                return <StatusLabel status={key} text={t(key)} />;
               }}
               classNames={{
                 base: 'min-w-0',

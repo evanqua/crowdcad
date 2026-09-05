@@ -980,6 +980,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   };
 
   const handleSupervisorStatusChange = useCallback((supervisor: Staff, newStatus: string) => {
+    // "at <location>" gives the log entry real context (which call this
+    // status change belongs to) without needing a separate call reference.
+    const activeCall = event?.calls?.find(c =>
+      c.assignedTeam?.includes(supervisor.team) && !['Resolved', 'Available'].includes(c.status)
+    );
+    const now = new Date();
+    const hhmm = now.getHours().toString().padStart(2, '0') + now.getMinutes().toString().padStart(2, '0');
+    const logMessage = `${hhmm} - status changed to ${newStatus}${activeCall ? ` at ${activeCall.location}` : ''}`;
+
     const updatedSupervisors = event?.supervisor.map(s =>
       s.team === supervisor.team
         ? {
@@ -987,10 +996,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             status: newStatus,
             log: [
               ...(s.log || []),
-              {
-                timestamp: Date.now(),
-                message: `${new Date().getHours().toString().padStart(2, '0')}${new Date().getMinutes().toString().padStart(2, '0')} - status changed to ${newStatus}`
-              }
+              { timestamp: now.getTime(), message: logMessage }
             ]
           }
         : s
@@ -1342,7 +1348,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       const verb = newStatus === 'Delivered Eq' ? 'Delivered' : 'En Route';
       logMessage = `${hhmm} - ${team} ${verb}${equipmentNames ? ` ${equipmentNames}` : ''}`;
     } else {
-      logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
+      // "at <location>" gives the log entry real context (which call this
+      // status change belongs to) without needing a separate call reference.
+      logMessage = `${hhmm} - ${team} set to ${newStatus} at ${latestCall.location}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
     }
 
     // DECLARE newCallStatus here with proper initialization
@@ -2363,7 +2371,12 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       const destinationClinicName = newStatus === 'Transporting'
         ? getClinicName(getEventClinics(currentEvent.clinics), resolvedClinicId)
         : undefined;
-      const logMessage = `${hhmm} - ${team} set to ${newStatus}${destinationClinicName ? ` (${destinationClinicName})` : ''}`;
+      // Matches the calls-tracker's own phrasing for these two cases;
+      // "at <location>" gives every other status real context (which call
+      // it belongs to) without needing a separate call reference.
+      const logMessage = newStatus === 'Transporting'
+        ? `${hhmm} - ${team} transporting to ${destinationClinicName || 'clinic'}`
+        : `${hhmm} - ${team} set to ${newStatus}${activeCall ? ` at ${activeCall.location}` : ''}`;
 
       const updatedStaff = (currentEvent.staff || []).map(s => {
         if (s.team !== team) return s;
@@ -2399,6 +2412,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             // Calculate new composite status for the call
             let newCallStatus = c.status;
             if (teamStatuses.includes('Transporting')) newCallStatus = 'Transporting';
+            else if (teamStatuses.includes('Pending Transport')) newCallStatus = 'Pending Transport';
             else if (teamStatuses.includes('On Scene')) newCallStatus = 'On Scene';
             else if (teamStatuses.includes('En Route')) newCallStatus = 'En Route';
 
