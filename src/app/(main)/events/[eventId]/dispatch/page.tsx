@@ -1960,6 +1960,10 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           (document.querySelector('input[name="callLocation"]') as HTMLInputElement | null)?.focus();
         }, 10);
       }
+      if (e.ctrlKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        setSelectedRightTab('map');
+      }
       if (e.key === 'Escape') {
         setShowQuickCallForm(false);
       }
@@ -4206,6 +4210,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 onEditTeam={handleEditTeam}
                                 onDeleteTeam={handleDeleteTeam}
                                 onRefreshTeamPost={refreshTeamFromSchedule}
+                                onNewCall={(teamName) => openAddCallModal({ assignedTeam: teamName })}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
                                 hasVenueMap={hasVenueMapImage}
@@ -4254,6 +4259,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                     }}
                                     onDeleteTeam={handleDeleteSupervisor}
                                     onRefreshTeamPost={refreshTeamFromSchedule}
+                                    onNewCall={(teamName) => openAddCallModal({ assignedTeam: teamName })}
                                     updateEvent={updateEvent}
                                     cardViewMode={cardViewMode}
                                     hasVenueMap={hasVenueMapImage}
@@ -4344,16 +4350,17 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         ))}
 
                         {hasVenueMapImage && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedRightTab('map')}
-                            className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'map' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
-                            aria-pressed={selectedRightTab === 'map'}
-                            aria-label={t('Map')}
-                            title={t('Map')}
-                          >
-                            <MapIcon className="h-4 w-4" />
-                          </button>
+                          <Tooltip content={`${t('Map')} (Ctrl+M)`} placement="top">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRightTab('map')}
+                              className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'map' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                              aria-pressed={selectedRightTab === 'map'}
+                              aria-label={t('Map')}
+                            >
+                              <MapIcon className="h-4 w-4" />
+                            </button>
+                          </Tooltip>
                         )}
                       </div>
 
@@ -4377,7 +4384,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 { key: 'transporting', label: t('Transporting'), count: transportingCallsCount, colorClass: 'text-status-red' },
                               ]}
                             />
-                            <Tooltip content={t('Add Call')} placement="top">
+                            <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
                               <div>
                                 <Button
                                   size="sm"
@@ -4572,6 +4579,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               onEditTeam={handleEditTeam}
                               onDeleteTeam={handleDeleteTeam}
                               onRefreshTeamPost={refreshTeamFromSchedule}
+                              onNewCall={(teamName) => openAddCallModal({ assignedTeam: teamName })}
                               updateEvent={updateEvent}
                               cardViewMode={cardViewMode}
                                 hasVenueMap={hasVenueMapImage}
@@ -4619,6 +4627,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 }}
                                 onDeleteTeam={handleDeleteSupervisor}
                                 onRefreshTeamPost={refreshTeamFromSchedule}
+                                onNewCall={(teamName) => openAddCallModal({ assignedTeam: teamName })}
                                 updateEvent={updateEvent}
                                 cardViewMode={cardViewMode}
                                 hasVenueMap={hasVenueMapImage}

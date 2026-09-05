@@ -26,6 +26,8 @@ type TeamCardProps = {
   onDelete?: (teamName: string) => void;
   onRefreshPost?: (teamName: string) => void;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
+  /** Opens the Add Call modal pre-filled with this team/supervisor as the assigned team. */
+  onNewCall?: (teamName: string) => void;
   /** Whether the venue has a map uploaded — gates the "view on map" button. */
   hasVenueMap?: boolean;
   onViewOnMap?: (teamName: string) => void;
@@ -60,7 +62,7 @@ function formatMemberLine(member: string, t: (key: string) => string) {
 export default function TeamCard({
   staff, event, sinceMs,
   onStatusChange, onLocationChange,
-  onEdit, onDelete, onRefreshPost, updateEvent,
+  onEdit, onDelete, onRefreshPost, onNewCall, updateEvent,
   hasVenueMap, onViewOnMap, canLocateOnMap,
 }: TeamCardProps) {
   const { t } = useDispatchTerms();
@@ -200,10 +202,12 @@ export default function TeamCard({
               itemClasses={{ base: 'px-3 py-2 text-sm text-surface-light rounded-xl' }}
               onAction={(key) => {
                 if (key === 'refresh') onRefreshPost?.(staff.team);
+                if (key === 'newCall') onNewCall?.(staff.team);
                 if (key === 'edit') onEdit?.(staff);
                 if (key === 'delete') onDelete?.(staff.team);
               }}
             >
+              <DropdownItem key="newCall">{t('New Call')}</DropdownItem>
               <DropdownItem key="refresh">{t('Refresh Post')}</DropdownItem>
               <DropdownItem key="edit">{t('Edit')}</DropdownItem>
               <DropdownItem key="delete" className="text-status-red">{t('Delete')}</DropdownItem>

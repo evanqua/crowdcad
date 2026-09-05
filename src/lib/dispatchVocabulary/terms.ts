@@ -111,6 +111,7 @@ export const DISPATCH_TERMS: DispatchTerm[] = [
     'Primary Team',
     'Location',
     'Add Call',
+    'New Call',
     'Add Team',
     'Add Supervisor',
     'Add Equipment',

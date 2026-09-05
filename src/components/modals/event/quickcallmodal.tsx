@@ -15,7 +15,7 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react";
-import type { Event, Staff, Call, TeamLogEntry } from "@/app/types";
+import type { Event, Staff, Supervisor, Call, TeamLogEntry } from "@/app/types";
 import { useDispatchTerms } from "@/lib/dispatchVocabulary/context";
 import { getVenueLocationOptions } from "@/lib/clinics";
 
@@ -86,6 +86,28 @@ export default function QuickCallModal({
     return { availableTeams: available, inactiveTeams: inactive };
   }, [event?.staff, event?.calls]);
 
+  // Supervisors can also be dispatched to initiate a call — same
+  // available/inactive split as teams, offered alongside them in the same
+  // Assign Team list.
+  const { availableSupervisors, inactiveSupervisors } = React.useMemo(() => {
+    const allSupervisors = event?.supervisor ?? [];
+
+    const isAssignedToActiveCall = (supervisor: Supervisor) =>
+      event?.calls?.some((c: Call) =>
+        c.assignedTeam?.includes(supervisor.team) &&
+        !['Resolved', 'Delivered', 'Refusal', 'NMM', 'Rolled'].includes(c.status)
+      );
+
+    const available = allSupervisors
+      .filter((s) => !isAssignedToActiveCall(s) && s.status === 'Available')
+      .sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }));
+
+    const inactive = allSupervisors
+      .filter((s) => !isAssignedToActiveCall(s) && ['In Clinic', 'On Break'].includes(s.status || ''))
+      .sort((a, b) => a.team.localeCompare(b.team, undefined, { numeric: true }));
+
+    return { availableSupervisors: available, inactiveSupervisors: inactive };
+  }, [event?.supervisor, event?.calls]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -130,32 +152,52 @@ export default function QuickCallModal({
         ],
       };
 
-      // Update staff if a team was assigned
+      // Update staff or supervisor if one was assigned — the assignee is
+      // either a staff team or a supervisor callsign (never both), so only
+      // one of these actually changes anything.
       let updatedStaff: Staff[] | undefined = event?.staff;
-      
-      if (quickCall.assignedTeam && event?.staff) {
+      let updatedSupervisor: Supervisor[] | undefined = event?.supervisor;
+
+      if (quickCall.assignedTeam) {
         const teamLogEntry: TeamLogEntry = {
           timestamp: now.getTime(),
           message: `${hhmm} - responding to call #${nextOrder}`,
         };
 
-        updatedStaff = event.staff.map((staff: Staff) =>
-          staff.team === quickCall.assignedTeam
-            ? {
-                ...staff,
-                status: "En Route",
-                location: quickCall.location,
-                originalPost: staff.location || "Unknown",
-                // Now teamLogEntry matches the type expected inside the log array
-                log: [...(staff.log || []), teamLogEntry],
-              }
-            : staff
-        );
+        const assignedIsSupervisor = event?.supervisor?.some((s) => s.team === quickCall.assignedTeam);
+
+        if (assignedIsSupervisor && event?.supervisor) {
+          updatedSupervisor = event.supervisor.map((supervisor: Supervisor) =>
+            supervisor.team === quickCall.assignedTeam
+              ? {
+                  ...supervisor,
+                  status: "En Route",
+                  location: quickCall.location,
+                  originalPost: supervisor.location || "Unknown",
+                  log: [...(supervisor.log || []), teamLogEntry],
+                }
+              : supervisor
+          );
+        } else if (event?.staff) {
+          updatedStaff = event.staff.map((staff: Staff) =>
+            staff.team === quickCall.assignedTeam
+              ? {
+                  ...staff,
+                  status: "En Route",
+                  location: quickCall.location,
+                  originalPost: staff.location || "Unknown",
+                  // Now teamLogEntry matches the type expected inside the log array
+                  log: [...(staff.log || []), teamLogEntry],
+                }
+              : staff
+          );
+        }
       }
 
       await updateEvent({
         calls: [...(event?.calls || []), cleanCall],
         ...(updatedStaff && { staff: updatedStaff }),
+        ...(updatedSupervisor && { supervisor: updatedSupervisor }),
       });
 
       // Reset & close
@@ -184,11 +226,13 @@ export default function QuickCallModal({
       "text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none",
   } as const;
 
-  // Select
+  // Select — matches inputClassNames' trigger/label treatment so "Assign
+  // Team" reads consistently with the Input/Autocomplete fields above it.
   const selectClassNames = {
     label: "text-surface-light mb-1",
     trigger: [
       "rounded-2xl px-4",
+      "hover:bg-surface-deep",
       "text-surface-light",
     ].join(" "),
     value: "text-surface-light",
@@ -254,7 +298,10 @@ export default function QuickCallModal({
                 }}
                 allowsCustomValue
               >
-                {locationOptions.map((loc) => (
+                {/* 'Unknown' listed first — an unfamiliar location shouldn't
+                    force typing; tabbing past a pile of venue-post suggestions
+                    can land here instead. */}
+                {Array.from(new Set(['Unknown', ...locationOptions])).map((loc) => (
                   <AutocompleteItem key={loc}>{loc}</AutocompleteItem>
                 ))}
               </Autocomplete>
@@ -306,6 +353,8 @@ export default function QuickCallModal({
               autoFocus={firstEmptyField === "assignedTeam"}
               label={t("Assign Team")}
               placeholder={t("Select a team")}
+              size="lg"
+              radius="lg"
               selectedKeys={quickCall.assignedTeam ? new Set([quickCall.assignedTeam]) : new Set()}
               onSelectionChange={(keys) => {
                 if (keys === "all") return;
@@ -325,6 +374,14 @@ export default function QuickCallModal({
                     {team.team} - {t(team.location || 'Unknown')}
                   </SelectItem>
                 )),
+                ...availableSupervisors.map((supervisor) => (
+                  <SelectItem
+                    key={supervisor.team}
+                    textValue={`${supervisor.team} - ${t(supervisor.location || 'Unknown')}`}
+                  >
+                    {supervisor.team} - {t(supervisor.location || 'Unknown')}
+                  </SelectItem>
+                )),
                 ...inactiveTeams.map((team) => (
                   <SelectItem
                     key={team.team}
@@ -334,6 +391,17 @@ export default function QuickCallModal({
                     }}
                   >
                     {team.team} - {t(team.location || 'Unknown')}
+                  </SelectItem>
+                )),
+                ...inactiveSupervisors.map((supervisor) => (
+                  <SelectItem
+                    key={supervisor.team}
+                    textValue={`${supervisor.team} - ${t(supervisor.location || 'Unknown')}`}
+                    classNames={{
+                      base: "bg-status-blue/20"
+                    }}
+                  >
+                    {supervisor.team} - {t(supervisor.location || 'Unknown')}
                   </SelectItem>
                 ))
               ]}
