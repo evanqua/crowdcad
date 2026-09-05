@@ -49,9 +49,12 @@ Given('I have ended an event and am on the summary page', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Add New Team' })).not.toBeVisible();
 
   // 5. Log a call assigned to the team
+  // Named locator avoids a strict-mode clash with the Location field's own
+  // Autocomplete popover, which also carries role="dialog" and opens
+  // immediately (it autofocuses on a fresh call) alongside the modal itself.
   await page.getByTestId('add-call-button').click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  const callDialog = page.getByRole('dialog');
+  await expect(page.getByRole('dialog', { name: 'Add Call' })).toBeVisible();
+  const callDialog = page.getByRole('dialog', { name: 'Add Call' });
   await callDialog.getByLabel('Location').fill('Main Stage');
   await callDialog.getByLabel('Chief Complaint').fill('Test Complaint');
   await callDialog.locator('[aria-label="Assign Team"]').click();

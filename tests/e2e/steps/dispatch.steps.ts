@@ -41,14 +41,17 @@ Then('I should see the teams section', async ({ page }) => {
   await expect(page.getByText('No teams available')).toBeVisible();
 });
 
+// Named locator avoids a strict-mode clash with the Location field's own
+// Autocomplete popover, which also carries role="dialog" and opens
+// immediately (it autofocuses on a fresh call) alongside the modal itself.
 When('I open the quick call modal', async ({ page }) => {
   await page.getByTestId('add-call-button').click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Add Call' })).toBeVisible();
 });
 
 When('I log a call with location {string} and complaint {string}', async ({ page, scenarioState }, location: string, complaint: string) => {
   scenarioState.loggedCallLocation = location;
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: 'Add Call' });
   await dialog.getByLabel('Location').fill(location);
   await dialog.getByLabel('Chief Complaint').fill(complaint);
   await dialog.getByRole('button', { name: 'Submit' }).click();
@@ -105,7 +108,7 @@ Then('the team {string} should have status {string}', async ({ page }, teamName:
 
 When('I log a call assigned to team {string} at location {string} with complaint {string}', async ({ page, scenarioState }, teamName: string, location: string, complaint: string) => {
   scenarioState.loggedCallLocation = location;
-  const dialog = page.getByRole('dialog');
+  const dialog = page.getByRole('dialog', { name: 'Add Call' });
   await dialog.getByLabel('Location').fill(location);
   await dialog.getByLabel('Chief Complaint').fill(complaint);
   await dialog.locator('[aria-label="Assign Team"]').click();
@@ -117,16 +120,16 @@ When('I log a call assigned to team {string} at location {string} with complaint
 // Quick call modal cancel
 
 When('I fill the quick call location with {string}', async ({ page }, text: string) => {
-  await page.getByRole('dialog').getByLabel('Location').fill(text);
+  await page.getByRole('dialog', { name: 'Add Call' }).getByLabel('Location').fill(text);
 });
 
 When('I cancel the quick call modal', async ({ page }) => {
-  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 });
+  await page.getByRole('dialog', { name: 'Add Call' }).getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('dialog', { name: 'Add Call' })).not.toBeVisible({ timeout: 5_000 });
 });
 
 Then('the quick call location field should be empty', async ({ page }) => {
-  await expect(page.getByRole('dialog').getByLabel('Location')).toHaveValue('');
+  await expect(page.getByRole('dialog', { name: 'Add Call' }).getByLabel('Location')).toHaveValue('');
 });
 
 // Event summary modal
