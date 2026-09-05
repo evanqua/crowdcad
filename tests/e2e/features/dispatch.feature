@@ -106,7 +106,7 @@ Feature: Dispatch board
     And I open the quick call modal
     And I log a call assigned to team "Golf" at location "East Gate" with complaint "Nausea"
     Then the team "Golf" should have status "En Route"
-    When I change team "Golf" status on the call to "NMM"
+    When I change team "Golf" status on the call to "No Medical Merit"
     Then the team "Golf" should have status "Available"
 
   Scenario: Total Calls counter reflects the number of logged calls

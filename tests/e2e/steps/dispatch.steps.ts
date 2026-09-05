@@ -120,7 +120,13 @@ When('I log a call assigned to team {string} at location {string} with complaint
 // Quick call modal cancel
 
 When('I fill the quick call location with {string}', async ({ page }, text: string) => {
-  await page.getByRole('dialog', { name: 'Add Call' }).getByLabel('Location').fill(text);
+  const dialog = page.getByRole('dialog', { name: 'Add Call' });
+  await dialog.getByLabel('Location').fill(text);
+  // Blurs the field so the Autocomplete's own suggestion popover (open from
+  // the fill above) closes before the next interaction — otherwise it can
+  // still be sitting over later controls in the modal (e.g. the Cancel
+  // button) since nothing else in this flow moves focus away first.
+  await dialog.getByText('Add Call', { exact: true }).click();
 });
 
 When('I cancel the quick call modal', async ({ page }) => {
