@@ -45,6 +45,15 @@ interface VenueMapTabProps {
   focusTeamRequest?: TeamFocusRequest | null;
   focusSupervisorRequest?: SupervisorFocusRequest | null;
   focusEquipmentRequest?: EquipmentFocusRequest | null;
+  /** Called once a focus request above has been consumed (layer jumped, zoom
+   *  reset, highlight started) so the parent can clear it. Without this, the
+   *  request stays set after being handled, and since this tab unmounts
+   *  whenever the user leaves the Map tab, simply navigating back to it
+   *  remounts the component, re-runs the focus effect against the same
+   *  stale request, and replays the highlight animation unprompted. */
+  onTeamFocusHandled?: () => void;
+  onSupervisorFocusHandled?: () => void;
+  onEquipmentFocusHandled?: () => void;
 }
 
 function isCoordinatedPost(post: Post): post is { name: string; x: number; y: number } {
@@ -75,6 +84,9 @@ export default function VenueMapTab({
   focusTeamRequest,
   focusSupervisorRequest,
   focusEquipmentRequest,
+  onTeamFocusHandled,
+  onSupervisorFocusHandled,
+  onEquipmentFocusHandled,
 }: VenueMapTabProps) {
   const [currentLayer, setCurrentLayer] = useState(0);
   const [searchInput, setSearchInput] = useState('');
@@ -92,6 +104,9 @@ export default function VenueMapTab({
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
     zoomIn,
     zoomOut,
     resetZoom,
@@ -142,6 +157,7 @@ export default function VenueMapTab({
     }
     setSelectedTeamName(focusTeamRequest.teamName);
     resetZoom();
+    onTeamFocusHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTeamRequest?.requestId]);
 
@@ -158,6 +174,7 @@ export default function VenueMapTab({
     }
     setSelectedSupervisorName(focusSupervisorRequest.supervisorName);
     resetZoom();
+    onSupervisorFocusHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusSupervisorRequest?.requestId]);
 
@@ -174,6 +191,7 @@ export default function VenueMapTab({
     }
     setSelectedEquipmentName(focusEquipmentRequest.equipmentName);
     resetZoom();
+    onEquipmentFocusHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusEquipmentRequest?.requestId]);
 
@@ -292,6 +310,9 @@ export default function VenueMapTab({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onWheel={handleWheel}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           imgRef={imgRef}
           imageRadiusClassName="rounded-lg"
           selectedPostName={selectedPostName}

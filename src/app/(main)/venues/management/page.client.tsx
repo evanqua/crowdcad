@@ -119,6 +119,9 @@ export default function VenueManagementPageClient() {
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
     zoomIn,
     zoomOut,
     resetZoom,
@@ -935,6 +938,9 @@ export default function VenueManagementPageClient() {
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           style={{
             cursor: isAddMarkerMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
             height: '100%',

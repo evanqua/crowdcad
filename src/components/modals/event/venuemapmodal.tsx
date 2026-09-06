@@ -685,6 +685,12 @@ export interface VenueMapWithPostsProps {
   onMouseMove: (e: React.MouseEvent<HTMLDivElement>) => void;
   onMouseUp: () => void;
   onWheel: (e: React.WheelEvent<HTMLDivElement>) => void;
+  /** Touch counterpart of the mouse handlers above — one finger pans, two
+   *  fingers pinch to zoom. Optional since not every caller (e.g. event
+   *  creation's own hand-rolled pan/zoom state) wires these up. */
+  onTouchStart?: (e: React.TouchEvent<HTMLDivElement>) => void;
+  onTouchMove?: (e: React.TouchEvent<HTMLDivElement>) => void;
+  onTouchEnd?: (e: React.TouchEvent<HTMLDivElement>) => void;
   imgRef: React.RefObject<HTMLImageElement | null>;
   /** Overrides the image container's default rounded-2xl corners — for a
    *  caller (e.g. event creation) whose map merges flush with UI beneath it. */
@@ -722,6 +728,9 @@ export function VenueMapWithPosts({
   onMouseMove,
   onMouseUp,
   onWheel,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
   imgRef,
   selectedPostName,
   selectedTeamName,
@@ -871,11 +880,15 @@ export function VenueMapWithPosts({
           transition: isPanning ? 'none' : 'transform 0.1s ease-out',
           width: '100%',
           height: '100%',
+          touchAction: onTouchStart ? 'none' : undefined,
         }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         <Image
           ref={imgRef}

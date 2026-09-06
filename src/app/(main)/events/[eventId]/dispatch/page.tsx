@@ -4524,6 +4524,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           focusTeamRequest={mapTeamFocusRequest}
                           focusSupervisorRequest={mapSupervisorFocusRequest}
                           focusEquipmentRequest={mapEquipmentFocusRequest}
+                          onTeamFocusHandled={() => setMapTeamFocusRequest(null)}
+                          onSupervisorFocusHandled={() => setMapSupervisorFocusRequest(null)}
+                          onEquipmentFocusHandled={() => setMapEquipmentFocusRequest(null)}
                         />
                       </div>
                     )}
@@ -4808,6 +4811,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       focusTeamRequest={mapTeamFocusRequest}
                       focusSupervisorRequest={mapSupervisorFocusRequest}
                       focusEquipmentRequest={mapEquipmentFocusRequest}
+                      onTeamFocusHandled={() => setMapTeamFocusRequest(null)}
+                      onSupervisorFocusHandled={() => setMapSupervisorFocusRequest(null)}
+                      onEquipmentFocusHandled={() => setMapEquipmentFocusRequest(null)}
                     />
                   </div>
                 </Tab>
