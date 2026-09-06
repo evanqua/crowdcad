@@ -150,7 +150,13 @@ function PostMarker({ post, rect, scale, isSelected, onAddCall }: PostMarkerProp
       />
 
       {expanded && onAddCall && (
-        <div className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap" style={{ top: '100%', marginTop: 6 }}>
+        // marginBottom clears the bouncing attention arrow above (see
+        // isSelected below) when both happen to be showing at once — it sits
+        // in this same bottom:100% spot, just further out.
+        <div
+          className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
+          style={{ bottom: '100%', marginBottom: isSelected ? 48 : 6 }}
+        >
           <button
             type="button"
             onClick={(e) => {
@@ -519,7 +525,13 @@ function TeamMarker({
         style={{ filter: 'drop-shadow(0 1px 3px rgb(0 0 0 / 0.6))' }}
       />
       {expanded && onAddCall && (
-        <div className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap" style={{ top: '100%', marginTop: 6 }}>
+        // marginBottom clears the bouncing attention arrow above (see
+        // isSelected below) when both happen to be showing at once — it sits
+        // in this same bottom:100% spot, just further out.
+        <div
+          className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap"
+          style={{ bottom: '100%', marginBottom: isSelected ? 48 : 6 }}
+        >
           <button
             type="button"
             disabled={!!activeCall}
