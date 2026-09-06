@@ -45,6 +45,15 @@ interface VenueMapTabProps {
   focusTeamRequest?: TeamFocusRequest | null;
   focusSupervisorRequest?: SupervisorFocusRequest | null;
   focusEquipmentRequest?: EquipmentFocusRequest | null;
+  /** Called once a focus request above has been consumed (layer jumped, zoom
+   *  reset, highlight started) so the parent can clear it. Without this, the
+   *  request stays set after being handled, and since this tab unmounts
+   *  whenever the user leaves the Map tab, simply navigating back to it
+   *  remounts the component, re-runs the focus effect against the same
+   *  stale request, and replays the highlight animation unprompted. */
+  onTeamFocusHandled?: () => void;
+  onSupervisorFocusHandled?: () => void;
+  onEquipmentFocusHandled?: () => void;
 }
 
 function isCoordinatedPost(post: Post): post is { name: string; x: number; y: number } {
@@ -75,6 +84,9 @@ export default function VenueMapTab({
   focusTeamRequest,
   focusSupervisorRequest,
   focusEquipmentRequest,
+  onTeamFocusHandled,
+  onSupervisorFocusHandled,
+  onEquipmentFocusHandled,
 }: VenueMapTabProps) {
   const [currentLayer, setCurrentLayer] = useState(0);
   const [searchInput, setSearchInput] = useState('');
@@ -92,6 +104,9 @@ export default function VenueMapTab({
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
     zoomIn,
     zoomOut,
     resetZoom,
@@ -142,6 +157,7 @@ export default function VenueMapTab({
     }
     setSelectedTeamName(focusTeamRequest.teamName);
     resetZoom();
+    onTeamFocusHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTeamRequest?.requestId]);
 
@@ -158,6 +174,7 @@ export default function VenueMapTab({
     }
     setSelectedSupervisorName(focusSupervisorRequest.supervisorName);
     resetZoom();
+    onSupervisorFocusHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusSupervisorRequest?.requestId]);
 
@@ -174,6 +191,7 @@ export default function VenueMapTab({
     }
     setSelectedEquipmentName(focusEquipmentRequest.equipmentName);
     resetZoom();
+    onEquipmentFocusHandled?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusEquipmentRequest?.requestId]);
 
@@ -259,12 +277,18 @@ export default function VenueMapTab({
             onSelectionChange={handleSelectLocation}
             classNames={{
               base: 'min-w-0 data-[focus-visible=true]:outline-none data-[focus=true]:outline-none',
+              // See teamcard.tsx's Location Autocomplete for why: HeroUI's
+              // clear (x) button reserves real flex width next to the input
+              // even while invisible pre-hover, cutting text off well short
+              // of the dropdown chevron. Overlaying it instead frees that
+              // space for text.
+              clearButton: 'absolute end-6 top-1/2 -translate-y-1/2',
             }}
             inputProps={{
               classNames: {
                 inputWrapper:
                   'bg-surface-deep text-surface-light border border-surface-liner rounded-full group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
-                input: 'bg-surface-deep text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
+                input: 'bg-surface-deep text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none pe-0 !pe-0 data-[has-end-content=true]:pe-0 group-data-[has-end-content=true]:pe-0',
               },
             }}
           >
@@ -292,6 +316,9 @@ export default function VenueMapTab({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onWheel={handleWheel}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           imgRef={imgRef}
           imageRadiusClassName="rounded-lg"
           selectedPostName={selectedPostName}

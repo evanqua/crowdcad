@@ -16,7 +16,7 @@ import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
 import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
 import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
 import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/event-create/PostsEquipmentSection';
-import { WizardShell, StepProgress, type WizardStep } from '@/components/wizard';
+import { WizardShell, StepProgress, ReviewColumns, type WizardStep, type ReviewColumn } from '@/components/wizard';
 import AddTeamModal, { TeamDraft, TeamMemberDraft } from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
 import BulkImportModal from '@/components/modals/event/bulkimportmodal';
@@ -788,65 +788,64 @@ function LiteCreateContent() {
     </div>
   );
 
-  const reviewStep = (
-    <div className="px-6 pt-4 h-full max-w-md space-y-4">
-      <h3 className="text-surface-light font-semibold text-xl mb-1">Review</h3>
-      <div>
-        <span className="text-sm text-surface-faint">Event name</span>
-        <p className="text-surface-light font-medium text-lg">{eventDraft.name.trim() || '(untitled)'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Locations</span>
-        <p className="text-surface-light text-lg">{allPosts.length} location{allPosts.length === 1 ? '' : 's'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Date</span>
-        <p className="text-surface-light text-lg">{eventDraft.date ? new Date(eventDraft.date).toLocaleDateString() : '—'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Start / End time</span>
-        <p className="text-surface-light text-lg">
-          {formatTimeValue(scheduleFrom)} – {formatTimeValue(scheduleTo)}
-        </p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Surge limit</span>
-        <p className="text-surface-light text-lg">{eventDraft.surgeLimitPercent ?? 70}%</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Pending transport surge</span>
-        <p className="text-surface-light text-lg">{eventDraft.pendingTransportSurgeThreshold ?? 3} patients</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Unassigned call surge</span>
-        <p className="text-surface-light text-lg">
-          {Math.floor((eventDraft.unassignedCallSurgeSeconds ?? 120) / 60)}:{String((eventDraft.unassignedCallSurgeSeconds ?? 120) % 60).padStart(2, '0')}
-        </p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Teams</span>
-        <p className="text-surface-light text-lg">{eventDraft.staff.length} team{eventDraft.staff.length === 1 ? '' : 's'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Supervisors</span>
-        <p className="text-surface-light text-lg">
-          {eventDraft.supervisor.length} supervisor{eventDraft.supervisor.length === 1 ? '' : 's'}
-        </p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Equipment</span>
-        <p className="text-surface-light text-lg">
-          {eventDraft.eventEquipment.length} item{eventDraft.eventEquipment.length === 1 ? '' : 's'}
-        </p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Post schedule</span>
-        <p className="text-surface-light text-lg">
-          {postsEnabled
+  const reviewColumns: ReviewColumn[] = [
+    {
+      id: 'basics',
+      label: 'Event Configuration',
+      fields: [
+        { label: 'Event name', value: eventDraft.name.trim() || '(untitled)' },
+        { label: 'Date', value: eventDraft.date ? new Date(eventDraft.date).toLocaleDateString() : '—' },
+        { label: 'Start / End time', value: `${formatTimeValue(scheduleFrom)} – ${formatTimeValue(scheduleTo)}` },
+        { label: 'Surge limit', value: `${eventDraft.surgeLimitPercent ?? 70}%` },
+        { label: 'Pending transport surge', value: `${eventDraft.pendingTransportSurgeThreshold ?? 3} patients` },
+        {
+          label: 'Unassigned call surge',
+          value: `${Math.floor((eventDraft.unassignedCallSurgeSeconds ?? 120) / 60)}:${String((eventDraft.unassignedCallSurgeSeconds ?? 120) % 60).padStart(2, '0')}`,
+        },
+      ],
+    },
+    {
+      id: 'locations',
+      label: 'Locations',
+      fields: [{ label: 'Locations', value: `${allPosts.length} location${allPosts.length === 1 ? '' : 's'}` }],
+    },
+    {
+      id: 'teams',
+      label: 'Staff Assignments',
+      fields: [
+        { label: 'Teams', value: `${eventDraft.staff.length} team${eventDraft.staff.length === 1 ? '' : 's'}` },
+        { label: 'Supervisors', value: `${eventDraft.supervisor.length} supervisor${eventDraft.supervisor.length === 1 ? '' : 's'}` },
+      ],
+    },
+    ...(hasVenueEquipment
+      ? [
+          {
+            id: 'equipment',
+            label: 'Equipment',
+            fields: [
+              { label: 'Equipment', value: `${eventDraft.eventEquipment.length} item${eventDraft.eventEquipment.length === 1 ? '' : 's'}` },
+            ],
+          },
+        ]
+      : []),
+    {
+      id: 'postschedule',
+      label: 'Post schedule',
+      fields: [
+        {
+          label: 'Post schedule',
+          value: postsEnabled
             ? `${eventDraft.eventPosts.length} post${eventDraft.eventPosts.length === 1 ? '' : 's'} · ${scheduleChips.length} repost time${scheduleChips.length === 1 ? '' : 's'}`
-            : 'Not enabled'}
-        </p>
-      </div>
+            : 'Not enabled',
+        },
+      ],
+    },
+  ];
+
+  const reviewStep = (
+    <div className="px-6 pt-4 h-full overflow-y-auto space-y-4">
+      <h3 className="text-surface-light font-semibold text-xl mb-1">Review</h3>
+      <ReviewColumns columns={reviewColumns} />
     </div>
   );
 

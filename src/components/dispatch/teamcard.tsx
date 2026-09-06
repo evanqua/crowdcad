@@ -351,6 +351,14 @@ export default function TeamCard({
               className="min-w-0"
               classNames={{
                 base: 'min-w-0 data-[focus-visible=true]:outline-none data-[focus=true]:outline-none',
+                // HeroUI lays the clear (x) button out as a real flex sibling
+                // of the input (not an overlay), so its width — reserved even
+                // while invisible pre-hover — was eating into the input's own
+                // width well before the text reached the dropdown chevron.
+                // Taking it out of flow and overlaying it instead frees that
+                // space for text, which can now run underneath it exactly
+                // like the "clear" button does everywhere else in this app.
+                clearButton: 'absolute end-6 top-1/2 -translate-y-1/2',
               }}
               inputProps={{
                 classNames: {

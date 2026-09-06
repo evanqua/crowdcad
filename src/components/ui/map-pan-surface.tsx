@@ -10,6 +10,12 @@ interface MapPanSurfaceProps {
   onMouseUp: (e: React.MouseEvent<HTMLDivElement>) => void;
   onMouseLeave?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  /** Touch counterpart of the mouse handlers above — one finger pans, two
+   *  fingers pinch to zoom. Optional since not every caller wires up
+   *  useZoomPan's touch handlers. */
+  onTouchStart?: (e: React.TouchEvent<HTMLDivElement>) => void;
+  onTouchMove?: (e: React.TouchEvent<HTMLDivElement>) => void;
+  onTouchEnd?: (e: React.TouchEvent<HTMLDivElement>) => void;
   className?: string;
   style?: React.CSSProperties;
   children: React.ReactNode;
@@ -23,6 +29,9 @@ export default function MapPanSurface({
   onMouseUp,
   onMouseLeave,
   onClick,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
   className = 'relative overflow-auto scrollbar-hide',
   style,
   children,
@@ -37,7 +46,10 @@ export default function MapPanSurface({
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseLeave ?? onMouseUp}
       onClick={onClick}
-      style={style}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      style={{ touchAction: onTouchStart ? 'none' : undefined, ...style }}
     >
       {children}
     </div>

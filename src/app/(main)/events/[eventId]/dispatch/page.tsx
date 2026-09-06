@@ -1968,7 +1968,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
           (document.querySelector('input[name="callLocation"]') as HTMLInputElement | null)?.focus();
         }, 10);
       }
-      if (e.ctrlKey && e.key.toLowerCase() === 'm') {
+      if (e.altKey && e.key.toLowerCase() === 'm') {
         e.preventDefault();
         setSelectedRightTab('map');
       }
@@ -3823,21 +3823,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       return (
         <>
           <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
-          <div className="flex items-center gap-2">
-            <Tooltip content={t('Add Call')} placement="top">
-              <div>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                  aria-label={t('Add Call')}
-                  onPress={() => openAddCallModal()}
-                >
-                  {t('Add Call')}
-                </Button>
-              </div>
-            </Tooltip>
-          </div>
+          <Tooltip content={t('Add Call')} placement="top">
+            {/* Same pill treatment as TeamActionButtonGroup (p-1 + a
+                transparent inner button) so this single-button header
+                matches that triple-button one in total height. */}
+            <div className="p-1 rounded-full bg-surface-deep border border-surface-liner">
+              <Button
+                size="sm"
+                variant="flat"
+                className="rounded-full bg-transparent hover:bg-surface-liner text-base"
+                aria-label={t('Add Call')}
+                onPress={() => openAddCallModal()}
+              >
+                {t('Add Call')}
+              </Button>
+            </div>
+          </Tooltip>
         </>
       );
     }
@@ -3867,11 +3868,14 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             <h2 className="text-xl font-bold text-surface-light">{clinics[0]?.name ?? t('Clinic')}</h2>
           )}
           <Tooltip content={t('Add Patient')} placement="top">
-            <div>
+            {/* Same pill treatment as TeamActionButtonGroup (p-1 + a
+                transparent inner button) so this single-button header
+                matches that triple-button one in total height. */}
+            <div className="p-1 rounded-full bg-surface-deep border border-surface-liner">
               <Button
                 size="sm"
                 variant="flat"
-                className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                className="rounded-full bg-transparent hover:bg-surface-liner text-base"
                 aria-label={t('Add patient (mobile)')}
                 onPress={() => setShowQuickClinicCallForm(true)}
               >
@@ -4364,7 +4368,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         ))}
 
                         {hasVenueMapImage && (
-                          <Tooltip content={`${t('Map')} (Ctrl+M)`} placement="top">
+                          <Tooltip content={`${t('Map')} (Alt+M)`} placement="top">
                             <button
                               type="button"
                               onClick={() => setSelectedRightTab('map')}
@@ -4524,6 +4528,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           focusTeamRequest={mapTeamFocusRequest}
                           focusSupervisorRequest={mapSupervisorFocusRequest}
                           focusEquipmentRequest={mapEquipmentFocusRequest}
+                          onTeamFocusHandled={() => setMapTeamFocusRequest(null)}
+                          onSupervisorFocusHandled={() => setMapSupervisorFocusRequest(null)}
+                          onEquipmentFocusHandled={() => setMapEquipmentFocusRequest(null)}
                         />
                       </div>
                     )}
@@ -4808,6 +4815,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       focusTeamRequest={mapTeamFocusRequest}
                       focusSupervisorRequest={mapSupervisorFocusRequest}
                       focusEquipmentRequest={mapEquipmentFocusRequest}
+                      onTeamFocusHandled={() => setMapTeamFocusRequest(null)}
+                      onSupervisorFocusHandled={() => setMapSupervisorFocusRequest(null)}
+                      onEquipmentFocusHandled={() => setMapEquipmentFocusRequest(null)}
                     />
                   </div>
                 </Tab>
