@@ -30,7 +30,12 @@ export interface ReviewColumn {
 export default function ReviewColumns({ columns }: { columns: ReviewColumn[] }) {
   return (
     <div className="overflow-x-auto">
-      <div className="flex divide-x divide-surface-liner/70 min-w-max">
+      {/* w-max + mx-auto rather than justify-center: centering this way just
+          collapses to flush-left once the columns are wider than the
+          container (auto margins resolve to 0), instead of flexbox's
+          justify-center-with-overflow quirk of clipping evenly off both
+          ends and forcing a scroll left before anything is visible. */}
+      <div className="flex divide-x divide-surface-liner/70 w-max mx-auto">
         {columns.map((column) => (
           <div key={column.id} className="w-[170px] shrink-0 space-y-3 px-5 first:pl-0 last:pr-0">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-surface-faint">{column.label}</h4>
