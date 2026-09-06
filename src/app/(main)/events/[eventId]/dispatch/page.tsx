@@ -3831,7 +3831,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Button
                 size="sm"
                 variant="flat"
-                className="rounded-full bg-transparent hover:bg-surface-liner"
+                className="rounded-full bg-transparent hover:bg-surface-liner text-base"
                 aria-label={t('Add Call')}
                 onPress={() => openAddCallModal()}
               >
@@ -3875,7 +3875,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
               <Button
                 size="sm"
                 variant="flat"
-                className="rounded-full bg-transparent hover:bg-surface-liner"
+                className="rounded-full bg-transparent hover:bg-surface-liner text-base"
                 aria-label={t('Add patient (mobile)')}
                 onPress={() => setShowQuickClinicCallForm(true)}
               >
