@@ -15,15 +15,32 @@ type Props = {
  * Renders an equipment type's icon for inline text contexts (status pills,
  * dropdown options) — same three visuals as the venue map's EquipmentMarker
  * (wheelchair.svg, gurney.svg, or a medical briefcase for 'aed'/default),
- * but without the map's forced white-on-badge styling: these inherit the
- * surrounding text color like every other status icon.
+ * but without the map's forced white-on-badge styling.
+ *
+ * wheelchair.svg/gurney.svg are baked white — fine on the map's colored
+ * badge, illegible on these pills' surface in light mode. Unlike a lucide
+ * icon, an <Image> pointing at an SVG file can't be recolored with a
+ * `fill`/`stroke`/`currentColor` prop (the color is inside the file), so
+ * this renders both a white and a black copy and lets Tailwind's `dark:`
+ * variant pick one via plain CSS — no theme-detection JS or hydration
+ * flash. The map's own EquipmentMarker is untouched and always white.
  */
 export default function EquipmentTypeIcon({ type, className = 'w-4 h-4 shrink-0' }: Props) {
   if (type === 'wheelchair') {
-    return <Image src="/map/wheelchair.svg" alt="Wheelchair" width={16} height={16} className={className} />;
+    return (
+      <>
+        <Image src="/map/wheelchair.svg" alt="Wheelchair" width={16} height={16} className={`${className} hidden dark:block`} />
+        <Image src="/map/wheelchair-black.svg" alt="Wheelchair" width={16} height={16} className={`${className} block dark:hidden`} />
+      </>
+    );
   }
   if (type === 'stretcher') {
-    return <Image src="/map/gurney.svg" alt="Gurney" width={16} height={16} className={className} />;
+    return (
+      <>
+        <Image src="/map/gurney.svg" alt="Gurney" width={16} height={16} className={`${className} hidden dark:block`} />
+        <Image src="/map/gurney-black.svg" alt="Gurney" width={16} height={16} className={`${className} block dark:hidden`} />
+      </>
+    );
   }
   return <Briefcase className={className} aria-hidden="true" />;
 }
