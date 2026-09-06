@@ -277,12 +277,18 @@ export default function VenueMapTab({
             onSelectionChange={handleSelectLocation}
             classNames={{
               base: 'min-w-0 data-[focus-visible=true]:outline-none data-[focus=true]:outline-none',
+              // See teamcard.tsx's Location Autocomplete for why: HeroUI's
+              // clear (x) button reserves real flex width next to the input
+              // even while invisible pre-hover, cutting text off well short
+              // of the dropdown chevron. Overlaying it instead frees that
+              // space for text.
+              clearButton: 'absolute end-6 top-1/2 -translate-y-1/2',
             }}
             inputProps={{
               classNames: {
                 inputWrapper:
                   'bg-surface-deep text-surface-light border border-surface-liner rounded-full group-data-[focus-visible=true]:ring-0 group-data-[focus-visible=true]:ring-offset-0 data-[focus-visible=true]:ring-0 data-[focus-visible=true]:ring-offset-0 focus-within:ring-0 focus:ring-0',
-                input: 'bg-surface-deep text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none',
+                input: 'bg-surface-deep text-surface-light outline-none focus:outline-none data-[focus=true]:outline-none pe-0 !pe-0 data-[has-end-content=true]:pe-0 group-data-[has-end-content=true]:pe-0',
               },
             }}
           >
