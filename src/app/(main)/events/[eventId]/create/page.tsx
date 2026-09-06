@@ -17,7 +17,7 @@ import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
 import SupervisorStaffingSection from '@/components/event-create/SupervisorStaffingSection';
 import PostingScheduleSection from '@/components/event-create/PostingScheduleSection';
 import { EquipmentSelectionSection, PostsSelectionSection } from '@/components/event-create/PostsEquipmentSection';
-import { WizardShell, StepProgress, type WizardStep } from '@/components/wizard';
+import { WizardShell, StepProgress, ReviewColumns, type WizardStep, type ReviewColumn } from '@/components/wizard';
 import { stripUndefined } from '@/lib/utils';
 import AddTeamModal, { TeamDraft } from '@/components/modals/event/addteammodal';
 import AddSupervisorModal from '@/components/modals/event/addsupervisormodal';
@@ -598,63 +598,60 @@ export default function EventCreation() {
     </div>
   );
 
-  const reviewStep = (
-    <div className="px-6 pt-4 h-full max-w-md space-y-4">
-      <h3 className="text-surface-light font-semibold text-xl mb-1">Review</h3>
-      <div>
-        <span className="text-sm text-surface-faint">Event name</span>
-        <p className="text-surface-light font-medium text-lg">{eventData.name?.trim() || '(untitled)'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Venue</span>
-        <p className="text-surface-light text-lg">{eventData.venue?.name || '(none)'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Date</span>
-        <p className="text-surface-light text-lg">
-          {eventData.date ? new Date(eventData.date).toLocaleDateString() : '—'}
-        </p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Start / End time</span>
-        <p className="text-surface-light text-lg">
-          {formatTimeValue(scheduleFrom)} – {formatTimeValue(scheduleTo)}
-        </p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Surge limit</span>
-        <p className="text-surface-light text-lg">{eventData.surgeLimitPercent ?? 70}%</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Pending transport surge</span>
-        <p className="text-surface-light text-lg">{eventData.pendingTransportSurgeThreshold ?? 3} patients</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Unassigned call surge</span>
-        <p className="text-surface-light text-lg">
-          {Math.floor((eventData.unassignedCallSurgeSeconds ?? 120) / 60)}:{String((eventData.unassignedCallSurgeSeconds ?? 120) % 60).padStart(2, '0')}
-        </p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Teams</span>
-        <p className="text-surface-light text-lg">{(eventData.staff || []).length} team{(eventData.staff || []).length === 1 ? '' : 's'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Supervisors</span>
-        <p className="text-surface-light text-lg">{(eventData.supervisor || []).length} supervisor{(eventData.supervisor || []).length === 1 ? '' : 's'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Equipment</span>
-        <p className="text-surface-light text-lg">{eventData.eventEquipment.length} item{eventData.eventEquipment.length === 1 ? '' : 's'}</p>
-      </div>
-      <div>
-        <span className="text-sm text-surface-faint">Post schedule</span>
-        <p className="text-surface-light text-lg">
-          {postsEnabled
+  const reviewColumns: ReviewColumn[] = [
+    {
+      id: 'basics',
+      label: 'Event Configuration',
+      fields: [
+        { label: 'Event name', value: eventData.name?.trim() || '(untitled)' },
+        { label: 'Venue', value: eventData.venue?.name || '(none)' },
+        { label: 'Date', value: eventData.date ? new Date(eventData.date).toLocaleDateString() : '—' },
+        { label: 'Start / End time', value: `${formatTimeValue(scheduleFrom)} – ${formatTimeValue(scheduleTo)}` },
+        { label: 'Surge limit', value: `${eventData.surgeLimitPercent ?? 70}%` },
+        { label: 'Pending transport surge', value: `${eventData.pendingTransportSurgeThreshold ?? 3} patients` },
+        {
+          label: 'Unassigned call surge',
+          value: `${Math.floor((eventData.unassignedCallSurgeSeconds ?? 120) / 60)}:${String((eventData.unassignedCallSurgeSeconds ?? 120) % 60).padStart(2, '0')}`,
+        },
+      ],
+    },
+    {
+      id: 'teams',
+      label: 'Staff Assignments',
+      fields: [
+        { label: 'Teams', value: `${(eventData.staff || []).length} team${(eventData.staff || []).length === 1 ? '' : 's'}` },
+        { label: 'Supervisors', value: `${(eventData.supervisor || []).length} supervisor${(eventData.supervisor || []).length === 1 ? '' : 's'}` },
+      ],
+    },
+    ...(hasVenueEquipment
+      ? [
+          {
+            id: 'equipment',
+            label: 'Equipment',
+            fields: [
+              { label: 'Equipment', value: `${eventData.eventEquipment.length} item${eventData.eventEquipment.length === 1 ? '' : 's'}` },
+            ],
+          },
+        ]
+      : []),
+    {
+      id: 'postschedule',
+      label: 'Post schedule',
+      fields: [
+        {
+          label: 'Post schedule',
+          value: postsEnabled
             ? `${(eventData.eventPosts || []).length} post${(eventData.eventPosts || []).length === 1 ? '' : 's'} · ${scheduleChips.length} repost time${scheduleChips.length === 1 ? '' : 's'}`
-            : 'Not enabled'}
-        </p>
-      </div>
+            : 'Not enabled',
+        },
+      ],
+    },
+  ];
+
+  const reviewStep = (
+    <div className="px-6 pt-4 h-full overflow-y-auto space-y-4">
+      <h3 className="text-surface-light font-semibold text-xl mb-1">Review</h3>
+      <ReviewColumns columns={reviewColumns} />
     </div>
   );
 
