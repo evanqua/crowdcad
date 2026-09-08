@@ -21,6 +21,8 @@ CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system f
 - **Changelog / Releases:** [CHANGELOG.md](CHANGELOG.md)
 - **Security & reporting:** [SECURITY.md](SECURITY.md)
 - **License:** [LICENSE.md](LICENSE.md)
+- **Privacy:** [PRIVACY.md](PRIVACY.md)
+- **Deployment disclaimer:** [DISCLAIMER.md](DISCLAIMER.md)
 
 #### Quickstart
 
@@ -200,6 +202,12 @@ npx playwright show-report
 
 - Report security issues per [SECURITY.md](SECURITY.md).
 - Community expectations are in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+#### Privacy and Deployment
+
+See [PRIVACY.md](./PRIVACY.md) for information on how CrowdCAD handles
+data, and [DISCLAIMER.md](./DISCLAIMER.md) for the terms under which
+CrowdCAD is made available to deploying organizations.
 
 #### Contributing
 

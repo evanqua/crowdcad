@@ -1,4 +1,4 @@
-> This document reflects CrowdCAD at commit `f146992` (branch `feature/profile-refactor`, 2026-08-12). PocketBase schema and API surface change independently of the app — verify against a live `/api/collections/{name}` response if this looks stale.
+> This document reflects CrowdCAD at commit `f321fce7` (branch `main`, 2026-09-07). PocketBase schema and API surface change independently of the app — verify against a live `/api/collections/{name}` response if this looks stale.
 
 # CrowdCAD Interface Control Document (ICD) — PocketBase Backend
 
@@ -42,7 +42,16 @@ The built-in `users` collection is a PocketBase **auth collection**:
 - `POST /api/collections/users/request-password-reset`, `/confirm-password-reset` for password recovery.
 - `POST /api/collections/users/auth-refresh` to renew a token using the current one.
 
-All non-`users` collections in this deployment (`venues`, `events`, `dispatchLogs`, `_storage`, `settings`) use the API rule `@request.auth.id != ""` for list/view/create/update/delete — i.e. **any authenticated user may read and write any record in these collections**; there is no per-owner or per-role restriction enforced by PocketBase itself (`userId`/`sharedWith` fields are used for *application-level* filtering only, not access control). `settings` create/update/delete additionally requires `@request.auth.isAdmin = true`.
+Access rules differ per collection and per operation (set by `scripts/setup-pocketbase.js`, which mirrors `firestore.rules` so both backends enforce the same guarantees):
+
+- **`venues`**: list/view use the open rule `@request.auth.id != ""` (any authenticated user). Create requires `@request.body.userId = @request.auth.id` (a record can only be created with yourself as owner). Update/delete require `userId = @request.auth.id || @request.auth.isAdmin = true` — only the owner or an admin may edit or delete a venue.
+- **`events`**: list/view are open to any authenticated user. Create is self-owned, same as `venues`. Update allows the owner or an admin unrestricted writes; a user in `sharedWith` or on an org-designated event (`isOrgEvent = true`) may also update a record, but only if the request leaves `userId`, `sharedWith`, `isOrgEvent`, `ended`, and `endedAt` untouched — these "protected fields" (who owns/can see/can end the event) can only be changed by the owner or an admin. Delete requires owner or admin.
+- **`dispatchLogs`**: list/view/update/delete all require `userId = @request.auth.id || @request.auth.isAdmin = true` — **unlike `venues`/`events`, even reading another user's dispatch logs is blocked**, not just writing them. Create is self-owned.
+- **`_storage`**: no custom rules are applied — PocketBase's default `@request.auth.id != ""` applies to all five operations, so any authenticated user may list/view/create/update/delete any stored file record.
+- **`settings`**: list/view use the open rule; create/update/delete additionally require `@request.auth.isAdmin = true`.
+- **`users`**: see §3.1's note on the built-in auth collection's own rules, which are tighter than the open rule used above.
+
+`userId`/`sharedWith` are still not relation fields and carry no database-level referential integrity (§5), but as of this schema they **are** enforced as access-control predicates by PocketBase itself on `venues`, `events`, and `dispatchLogs` — this is a change from an earlier version of this document, which described access control as purely application-layer for all non-`users` collections. That was true prior to the `fix/venue-owner-only-edit`, `fix/org-event-dispatch-access`, and `fix/org-event-dispatch-write-access` fixes; it is no longer true for `venues`/`events`/`dispatchLogs`, and never was true for `_storage`.
 
 ### 2.4 Realtime (SSE) subscriptions
 
@@ -71,6 +80,7 @@ Only fields actually read/written by the app are listed; PocketBase auth collect
 | `name` | text | Display name. | Yes | `"Jordan Lee"` |
 | `phone` | text | Contact phone number. | Yes | `"+1-555-0100"` |
 | `isAdmin` | bool | Grants access to CrowdCAD's Profile → Admin section (manage other admins, org settings). Added via `scripts/setAdminPocketbase.js`; not present by default until the setup script runs. | Yes (defaults false) | `true` |
+| `dispatchVocabularyPresetId` | text | The dispatcher's chosen dispatch-language preset (see `src/hooks/useDispatchVocabulary.ts`). | Yes | `"ems-standard"` |
 
 ### 3.2 `venues`
 
@@ -110,6 +120,9 @@ The central planning/dispatch record for a single event: a snapshot of the venue
 | `pendingAssignments` | json — `{ [team]: { post, time } }` | Assignments queued but not yet committed to `postAssignments`, keyed by team name. | Yes | `{"Team 1":{"post":"Gate A","time":"08:00"}}` |
 | `postAssignments` | json — `{ [time]: { [post]: team } }` | Committed post assignment grid: for each posting time, which team covers which post. See §3.7. | Yes | `{"08:00":{"Gate A":"Team 1"}}` |
 | `interactionSessions` | json — `InteractionSession[]` | Client-side usage-tracking sessions (mouse/keystroke activity timestamps) for the dispatch UI. See §3.7. | Yes | `[{"sessionId":"s1","eventId":"e1f2...","startTime":1755000000000,"mouseClicks":[],"keyStrokes":[]}]` |
+| `isOrgEvent` | bool | If true, visible to every user on this instance (set by an admin or the event owner), not just the owner/sharedWith list. Also one of the "protected fields" a shared/org-event member cannot change via a direct write — see §2.3. | Yes (defaults false) | `false` |
+| `ended` | bool | Whether the event has been ended (manually, or automatically after its designated End Time plus one hour with no further dispatch activity). Once true, the dispatch board rejects further writes. A protected field — see §2.3. | Yes (defaults false) | `true` |
+| `endedAt` | number | Epoch ms when the event was ended; unset while active. A protected field — see §2.3. | Yes | `1757280000000` |
 
 ### 3.4 `dispatchLogs`
 
@@ -119,6 +132,7 @@ Append-style log of dispatch-page activity for an event.
 |---|---|---|---|---|
 | `id` | text (15-char) | Primary key. | No | `"d1e2f3g4h5i6j7k"` |
 | `eventId` | text | `id` of the related `events` record (plain text, not a relation). | Yes | `"e1f2g3h4i5j6k7l"` |
+| `userId` | text | `id` of the `users` record that created the log entry (plain text, not a relation). Used by the app's own query for a user's dispatch logs (Profile → Security), and by the `dispatchLogs` access rule (§2.3). | Yes | `"a1b2c3d4e5f6g7h"` |
 | `data` | json | Log payload; shape is caller-defined and not further constrained by the schema. | Yes | `{"type":"call-created","callId":"c1"}` |
 
 ### 3.5 `_storage`
@@ -189,7 +203,8 @@ PocketBase stores these as opaque `json` fields with no server-side schema; the 
 | `notes?` | string | Free text. |
 | `detachedTeams?` | `{team:string, reason:string}[]` | Teams detached from the call and why. |
 | `equipmentTeams?`, `equipment?` | string[] | Related equipment/teams. |
-| `outcome?` | `"Discharged" \| "AMA" \| "Rolled from Clinic" \| "Transported"` | Clinic disposition. |
+| `outcome?` | `"Discharged" \| "AMA" \| "Rolled from Clinic" \| "Transported" \| "Pending Transport"` | Clinic disposition. |
+| `transportUnit?` | string | Ambulance/transport unit number, captured when `outcome` is set to `"Transported"`. |
 
 **`postAssignments`**: `{ [time: string]: { [post: string]: string /* team */ } }` — the committed schedule grid.
 
@@ -199,7 +214,9 @@ PocketBase stores these as opaque `json` fields with no server-side schema; the 
 
 ## 4. Fields present in the app's TypeScript types but not in this PocketBase schema
 
-`src/app/types.ts`'s `Event` interface also declares `createdAt`, `ended`, `postingStart`/`postingEnd`, `scheduleStart`/`scheduleEnd`, `startTime`/`endTime`, and `start`/`end`. None of these appear in the `events` collection's actual field list (`scripts/setup-pocketbase.js`, `tests/e2e/pb_migrations/…created_events.js`). CrowdCAD supports both a Firebase and a PocketBase backend behind a common interface, and these fields appear to be write-only leftovers for the Firebase path: since PocketBase silently drops unknown fields on create/update (§2.2), sending them to a PocketBase-backed deployment has no effect — they will not be persisted or returned. Do not rely on them being present in PocketBase `events` records.
+`src/app/types.ts`'s `Event` interface also declares `createdAt`, `postingStart`/`postingEnd`, `scheduleStart`/`scheduleEnd`, `startTime`/`endTime`, and `start`/`end`. None of these appear in the `events` collection's actual field list (`scripts/setup-pocketbase.js`, `tests/e2e/pb_migrations/…created_events.js`). CrowdCAD supports both a Firebase and a PocketBase backend behind a common interface, and these fields appear to be write-only leftovers for the Firebase path: since PocketBase silently drops unknown fields on create/update (§2.2), sending them to a PocketBase-backed deployment has no effect — they will not be persisted or returned. Do not rely on them being present in PocketBase `events` records.
+
+`isOrgEvent`, `ended`, and `endedAt` **are** schema-backed `events` fields (§3.3) — unlike the list above, they are not Firebase-only leftovers; PocketBase persists them.
 
 `clinics` **is** a schema-backed `json` field on `events` (added alongside multi-clinic support) — it does persist on PocketBase.
 
@@ -209,5 +226,5 @@ PocketBase stores these as opaque `json` fields with no server-side schema; the 
 - **No `created`/`updated` audit fields**: unlike PocketBase's usual default, none of the five custom collections define `created`/`updated` autodate fields, so there is no built-in record of when a `venues`/`events`/`dispatchLogs`/`_storage`/`settings` row was created or last modified.
 - **ID conventions**: every collection's primary key (`id`) is a 15-character lowercase alphanumeric string (`^[a-z0-9]{15}$`), auto-generated by PocketBase. Cross-references between collections (`events.userId`, `venues.userId`, `dispatchLogs.eventId`, `Call.duplicateOf`, `Call.clinicId`) are stored as plain text copies of the referenced id — none of them are PocketBase `relation` fields, so referential integrity (e.g. cascading delete, existence checks) is not enforced by the database.
 - **No soft deletes**: `deleteDocument` issues a real PocketBase `DELETE`; there is no `deleted`/`isDeleted` flag or tombstone record in any collection. Deletion is permanent.
-- **Access control is mostly at the application layer, not PocketBase's**: as noted in §2.3, any authenticated user can read/write any `venues`/`events`/`dispatchLogs`/`_storage` record via the raw API — `userId`/`sharedWith` only drive what the CrowdCAD UI *chooses* to show, not what PocketBase *permits*. An integration talking to the API directly must not assume those fields are an access-control boundary.
+- **Access control is enforced by PocketBase itself for most collections**: as detailed in §2.3, `venues`/`events`/`dispatchLogs` restrict create/update/delete (and, for `dispatchLogs`, list/view too) to the owning user or an admin, with `events` additionally allowing a `sharedWith`/`isOrgEvent` member to write non-protected fields. `_storage` is the one collection where any authenticated user can read/write any record via the raw API with no ownership check. An integration talking to the API directly should not assume `_storage` records are access-controlled, but should expect `venues`/`events`/`dispatchLogs` writes outside these rules to be rejected (`403`), not silently permitted.
 - **JSON fields are schemaless in PocketBase**: all `json`-typed fields (venue/staff/calls/equipment/etc.) are validated only by the TypeScript types in `src/app/types.ts` on the frontend, not by PocketBase. A non-CrowdCAD client can write any JSON shape into them without the server rejecting it.
