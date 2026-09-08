@@ -64,5 +64,5 @@ deploying with default or unsecured configurations.
 ## 5. Contact
 
 Questions concerning this document may be directed to
-[CONTACT EMAIL] or submitted as an issue at
+support@crowdcad.org or submitted as an issue at
 https://github.com/evanqua/crowdcad.
