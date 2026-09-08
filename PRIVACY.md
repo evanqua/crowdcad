@@ -47,17 +47,7 @@ no third party is involved in storage.
 
 As of this writing, the CrowdCAD application makes no outbound calls
 to third party services other than the backend selected by the
-deploying organization. This was confirmed by reviewing the
-application's dependencies and source for analytics, telemetry, error
-reporting, or other third party network calls.
-
-Weather Integration (planned). When enabled, CrowdCAD is expected to
-send venue coordinates and a timestamp to [WEATHER PROVIDER] in order
-to retrieve weather conditions for a venue. This call is expected to
-include only coordinates and time. No patient, personnel, or other
-identifying information is expected to be transmitted. This section
-must be updated with the name of the provider and the fields actually
-transmitted before the feature is released.
+deploying organization. 
 
 ## 4. Modifications and Forks
 
