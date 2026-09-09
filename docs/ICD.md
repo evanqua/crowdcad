@@ -209,7 +209,7 @@ PocketBase stores these as opaque `json` fields with no server-side schema; the 
 | `assignedTeam` | string[] | Team(s) responding. |
 | `chiefComplaint` | string | Reason for the call. |
 | `source?`, `age?`, `gender?` | string | Optional patient/context details. |
-| `priority?`, `duplicate?`, `clinic?` | bool | Flags. |
+| `priority?`, `duplicate?`, `clinic?`, `pin?` | bool | Flags. `pin?` pins the call to the top of its list (below `priority?` calls); cleared automatically once the call resolves and never logged. |
 | `duplicateOf?`, `clinicId?` | string | Reference ids (plain strings, not relations). |
 | `log?` | `{timestamp:number, message:string}[]` | Call activity log. |
 | `notes?` | string | Free text. |

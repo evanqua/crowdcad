@@ -18,6 +18,8 @@ import { TEAM_CARD_ROW_HOVER_CLASS } from '@/lib/statusColors';
 import TrackingTextEntry from '@/components/dispatch/trackingtextentry';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { isClinicCallResolved } from '@/lib/clinics';
+import { sortActiveCalls } from '@/lib/callSort';
+import CallIndicatorIcons from './callindicatoricons';
 
 type EditableCallField = keyof Call | 'ageSex';
 
@@ -40,6 +42,7 @@ interface ClinicTrackingTableProps {
   handleAgeSexBlur: (callId: string) => Promise<void>;
   onOutcomeChange: (callId: string, outcome: string) => void;
   onRevertOutcome: (callId: string) => void;
+  handleTogglePin: (callId: string) => void;
   getCallRowClass: (call: Call) => string;
   formatAgeSex: (age?: string | number, gender?: string) => string;
 }
@@ -61,7 +64,7 @@ const TableColGroup = () => (
     <col className="w-48" />
     <col className="w-40" />
     <col />
-    <col className="w-12" />
+    <col className="w-20" />
   </colgroup>
 );
 
@@ -84,6 +87,7 @@ export default function ClinicTrackingTable({
   handleAgeSexBlur,
   onOutcomeChange,
   onRevertOutcome,
+  handleTogglePin,
   getCallRowClass,
   formatAgeSex,
 }: ClinicTrackingTableProps) {
@@ -108,9 +112,11 @@ export default function ClinicTrackingTable({
   const resolvedClinicCalls = (event?.calls || [])
     .filter(c => isClinicCallResolved(c) && belongsToThisClinic(c))
     .sort((a, b) => parseInt(a.id) - parseInt(b.id));
-  const unresolvedClinicCalls = (event?.calls || [])
-    .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && belongsToThisClinic(c))
-    .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+  const unresolvedClinicCalls = sortActiveCalls(
+    (event?.calls || [])
+      .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && belongsToThisClinic(c)),
+    'oldest'
+  );
 
   const isClinicCallVisible = React.useCallback(
     (call: Call) => (!isClinicCallResolved(call) || showResolvedClinicCalls) && belongsToThisClinic(call),
@@ -430,7 +436,8 @@ export default function ClinicTrackingTable({
                   </td>
                   {/* Options Ellipsis */}
                   <td className="p-0">
-                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
+                    <DispatchMotionCell isOpen={isClinicCallVisible(call)} animate={isResolvedClinicCall} delayMs={motionDelayMs} className="px-3 py-2.5 flex items-center justify-end gap-1.5">
+                      <CallIndicatorIcons call={call} />
                       <Dropdown
                         motionProps={dropdownMotionProps}
                         placement="bottom-end"
@@ -456,7 +463,7 @@ export default function ClinicTrackingTable({
                           </button>
                         </DropdownTrigger>
                         <DropdownMenu aria-label="Call actions">
-                          <DropdownItem 
+                          <DropdownItem
                             key="showLog"
                             onPress={() => {
                               setOpenMenuToken(null);
@@ -465,7 +472,17 @@ export default function ClinicTrackingTable({
                           >
                             {openClinicCallId === call.id ? t('Hide Log') : t('Show Log')}
                           </DropdownItem>
-                          <DropdownItem 
+                          <DropdownItem
+                            key="pin"
+                            isDisabled={isResolvedClinicCall}
+                            onPress={() => {
+                              setOpenMenuToken(null);
+                              handleTogglePin(call.id);
+                            }}
+                          >
+                            {call.pin ? t('Unpin Call') : t('Pin Call')}
+                          </DropdownItem>
+                          <DropdownItem
                             key="delete"
                             className="text-danger"
                             color="danger"
@@ -503,12 +520,6 @@ export default function ClinicTrackingTable({
                         }`}
                       >
                         <DispatchMotionCell isOpen={openClinicCallId === call.id} animate={true} className="cursor-pointer" overflowVisibleWhenOpen>
-                          {call.priority && (
-                            <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
-                              ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
-                            </div>
-                          )}
-
                           {/* Notes - Using HeroUI Textarea - NO LOG ENTRY */}
                           <div
                             className="mt-0 mb-1.5 text-sm text-surface-light"
