@@ -678,7 +678,7 @@ export default function EventCreation() {
     { id: 'review', label: 'Review', component: reviewStep, isComplete: hasRequiredBasics },
   ];
 
-  const showMapPanel = currentStepId === 'equipment' || currentStepId === 'postschedule' || currentStepId === 'review';
+  const showMapPanel = currentStepId === 'equipment' || currentStepId === 'postschedule';
   const showMapColumn = showMapPanel && hasMap;
 
   const stepIdx = STEP_ORDER.indexOf(currentStepId as (typeof STEP_ORDER)[number]);

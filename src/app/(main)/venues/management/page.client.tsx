@@ -1008,7 +1008,7 @@ export default function VenueManagementPageClient() {
     : venueData.layers;
   // The Map step always renders full-width (header + its own interactive
   // map), never the half-split every other map-showing step uses.
-  const showMapPanel = currentStepId !== 'basics' && currentStepId !== 'map';
+  const showMapPanel = currentStepId !== 'basics' && currentStepId !== 'map' && currentStepId !== 'review';
   const showMapColumn = showMapPanel && hasMapForStep;
   // The interactive editor (place/drag markers) only applies to Locations
   // (placing a location directly on the map); Equipment and Review just

@@ -21,7 +21,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useCertifications } from '@/hooks/useCertifications';
 import { useLiteMode } from '@/lib/LiteContext';
 import { deleteLiteEvent, getLiteEvent, saveLiteEvent } from '@/lib/liteEventStore';
-import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4, Map as MapIcon, Users, BriefcaseMedical, HousePlus } from "lucide-react";
+import { Plus, RotateCw, ArrowDownWideNarrow, Rows2, Rows4, Map as MapIcon, Users, BriefcaseMedical, HousePlus, ListFilter } from "lucide-react";
 import { FaWalkieTalkie } from "react-icons/fa6";
 import TeamWidget from '@/components/dispatch/teamwidget';
 import DispatchMotionCell from '@/components/dispatch/motioncell';
@@ -1935,6 +1935,14 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
   const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
+  // Which dispatch zone(s) the Calls tab is scoped to — the 'all' sentinel
+  // means unfiltered ("All Calls"); it's mutually exclusive with any zone
+  // id, enforced in the dropdown's onSelectionChange below, never both at
+  // once. Replaces one-tab-per-zone with a single Calls tab + dropdown.
+  const [callZoneFilter, setCallZoneFilter] = useState<Set<string>>(new Set(['all']));
+  // Controlled so picking "All Calls" can close the dropdown itself while
+  // picking a zone leaves it open for further multi-select picks.
+  const [isCallZoneFilterOpen, setIsCallZoneFilterOpen] = useState(false);
   const [mobileTeamsSubTab, setMobileTeamsSubTab] = useState<'teams' | 'supervisors'>('teams');
   const [mobileActiveTab, setMobileActiveTab] = useState<string>('teams');
   const [mobileSelectedClinicId, setMobileSelectedClinicId] = useState<string>('');
@@ -3521,11 +3529,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const resolvedCallStatuses = RESOLVED_CALL_STATUSES;
 
-  const activeCallsList = (event.calls || []).filter(
-    call => !resolvedCallStatuses.includes(call.status)
-  );
-  const activeCallsCount = activeCallsList.length;
-
   // A call's "primary" team status, mirroring the same Transporting > On Scene
   // priority used for the table row tint (getRowStatusClass) so a call with
   // teams in more than one status isn't double-counted across insight tiles.
@@ -3538,10 +3541,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (statuses.includes('On Scene')) return 'On Scene';
     return 'Other';
   };
-
-  const pendingCallsCount = activeCallsList.filter(call => getCallPrimaryStatus(call) === 'Pending').length;
-  const onSceneCallsCount = activeCallsList.filter(call => getCallPrimaryStatus(call) === 'On Scene').length;
-  const transportingCallsCount = activeCallsList.filter(call => getCallPrimaryStatus(call) === 'Transporting').length;
 
   // Venue-designated clinics, falling back to a single default "Clinic" for
   // events created before multi-clinic support existed.
@@ -3596,26 +3595,77 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // fallback since "All Calls" already covers every call.
   const dispatchZones: DispatchZone[] = getEventDispatchZones(event.dispatchZones);
 
-  // A call belongs to a zone's tab purely by geometry — whether its
-  // location's post falls inside that zone's polygon on the venue map —
-  // never by a manually assigned field, so redrawing a zone's shape
-  // re-routes existing calls automatically instead of orphaning them.
-  const getZoneCalls = (zoneId: string) =>
-    (event.calls || []).filter(call => getCallZoneIds(call, venueLayers).includes(zoneId));
+  // A call belongs to a zone purely by geometry — whether its location's
+  // post falls inside that zone's polygon on the venue map — never by a
+  // manually assigned field, so redrawing a zone's shape re-routes existing
+  // calls automatically instead of orphaning them.
+  //
+  // The Calls tab is scoped by `zoneIds`, the callZoneFilter selection
+  // (still a Set even for a single zone, since the dropdown is multi-select)
+  // — the 'all' sentinel means unfiltered, otherwise a call counts if it
+  // falls in ANY of the selected zones.
+  const getCallsForZoneSelection = (zoneIds: Set<string>) => {
+    if (zoneIds.has('all')) return event.calls || [];
+    return (event.calls || []).filter(call =>
+      getCallZoneIds(call, venueLayers).some(id => zoneIds.has(id))
+    );
+  };
 
-  const getZoneActiveCalls = (zoneId: string) =>
-    getZoneCalls(zoneId).filter(call => !resolvedCallStatuses.includes(call.status));
+  const getActiveCallsForZoneSelection = (zoneIds: Set<string>) =>
+    getCallsForZoneSelection(zoneIds).filter(call => !resolvedCallStatuses.includes(call.status));
 
-  const getZoneInsightCounts = (zoneId: string) => {
-    const zoneCalls = getZoneCalls(zoneId);
-    const zoneActiveCalls = getZoneActiveCalls(zoneId);
+  const getInsightCountsForZoneSelection = (zoneIds: Set<string>) => {
+    const calls = getCallsForZoneSelection(zoneIds);
+    const active = getActiveCallsForZoneSelection(zoneIds);
     return {
-      total: zoneCalls.length,
-      active: zoneActiveCalls.length,
-      pending: zoneActiveCalls.filter(call => getCallPrimaryStatus(call) === 'Pending').length,
-      onScene: zoneActiveCalls.filter(call => getCallPrimaryStatus(call) === 'On Scene').length,
-      transporting: zoneActiveCalls.filter(call => getCallPrimaryStatus(call) === 'Transporting').length,
+      total: calls.length,
+      active: active.length,
+      pending: active.filter(call => getCallPrimaryStatus(call) === 'Pending').length,
+      onScene: active.filter(call => getCallPrimaryStatus(call) === 'On Scene').length,
+      transporting: active.filter(call => getCallPrimaryStatus(call) === 'Transporting').length,
     };
+  };
+
+  // The label shown on the single Calls tab and in the zone-filter
+  // dropdown's trigger — "All Calls" when unfiltered, the zone's own name
+  // for exactly one selected zone, or a joined list for several.
+  const callZoneFilterLabel = callZoneFilter.has('all')
+    ? t('All Calls')
+    : dispatchZones
+        .filter(zone => callZoneFilter.has(zone.id))
+        .map(zone => zone.name)
+        .join(', ') || t('All Calls');
+
+  // Shared by the desktop dropdown and the mobile Select — "All Calls" is
+  // exclusive with every zone: picking it clears any zone selection,
+  // picking a zone drops "All Calls" and multi-selects normally, and
+  // clearing the last selected zone falls back to "All Calls" so the
+  // filter can never end up selecting nothing. Returns true when "All
+  // Calls" was the option just picked, so the desktop dropdown (which
+  // otherwise stays open for repeated zone picks) knows to close itself.
+  const applyCallZoneSelectionChange = (keys: 'all' | Iterable<React.Key>): boolean => {
+    // The listbox's own "select all" (e.g. Ctrl+A) isn't exposed anywhere
+    // in this menu's UI, but the type allows for it — treat it as if every
+    // zone (not the "All Calls" sentinel) were picked individually.
+    const newSelection = keys === 'all'
+      ? new Set(dispatchZones.map(zone => zone.id))
+      : new Set(Array.from(keys, String));
+    const addedKeys = Array.from(newSelection).filter((key) => !callZoneFilter.has(key));
+
+    if (addedKeys.includes('all')) {
+      setCallZoneFilter(new Set(['all']));
+      return true;
+    }
+    if (addedKeys.length > 0) {
+      const base = callZoneFilter.has('all') ? new Set<string>() : new Set(callZoneFilter);
+      addedKeys.forEach((key) => base.add(key));
+      setCallZoneFilter(base);
+      return false;
+    }
+    // Nothing added, only a zone removed — fall back to "All Calls" if
+    // that emptied the selection.
+    setCallZoneFilter(newSelection.size > 0 ? newSelection : new Set(['all']));
+    return false;
   };
 
   const handleToggleSurge = async () => {
@@ -3707,6 +3757,63 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
             >
               {t('Pending')}
             </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      </div>
+    </Tooltip>
+  );
+
+  // Replaces one tab per dispatch zone with a single dropdown, styled like
+  // CallSortButton, that both switches which zone's calls the table shows
+  // and multi-selects across zones. "All Calls" is exclusive with every
+  // zone — picking it clears any zone selection (and the zones read as
+  // disabled while it's active); picking a zone drops "All Calls" and
+  // multi-selects normally; clearing the last selected zone falls back to
+  // "All Calls" so the filter can never end up selecting nothing.
+  const CallZoneFilterButton = () => (
+    <Tooltip content={t('Filter by zone')} placement="top">
+      <div>
+        <Dropdown
+          classNames={{ content: 'min-w-[180px]' }}
+          isOpen={isCallZoneFilterOpen}
+          onOpenChange={setIsCallZoneFilterOpen}
+        >
+          <DropdownTrigger>
+            <Button
+              size="sm"
+              variant="flat"
+              className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner px-3 gap-1.5 max-w-[220px]"
+              aria-label={t('Filter by zone')}
+            >
+              <ListFilter className="h-4 w-4 shrink-0" />
+              <span className="truncate">{callZoneFilterLabel}</span>
+            </Button>
+          </DropdownTrigger>
+          <DropdownMenu
+            aria-label={t('Filter by zone')}
+            selectionMode="multiple"
+            closeOnSelect={false}
+            selectedKeys={callZoneFilter}
+            onSelectionChange={(keys) => {
+              // Stays open for repeated zone picks (closeOnSelect={false});
+              // only closes itself once "All Calls" is picked, same as if
+              // the user had clicked away.
+              if (applyCallZoneSelectionChange(keys)) setIsCallZoneFilterOpen(false);
+            }}
+          >
+            <DropdownItem key="all" className={callZoneFilter.has('all') ? 'font-semibold' : ''}>
+              {t('All Calls')}
+            </DropdownItem>
+            <>
+              {dispatchZones.map((zone) => (
+                <DropdownItem
+                  key={zone.id}
+                  className={callZoneFilter.has('all') ? 'opacity-50' : ''}
+                >
+                  {zone.name}
+                </DropdownItem>
+              ))}
+            </>
           </DropdownMenu>
         </Dropdown>
       </div>
@@ -3917,7 +4024,33 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (mobileActiveTab === 'calls') {
       return (
         <>
-          <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
+          {dispatchZones.length > 1 ? (
+            <Select
+              selectedKeys={callZoneFilter}
+              selectionMode="multiple"
+              onSelectionChange={(keys) => applyCallZoneSelectionChange(keys)}
+              aria-label={t('Filter by zone')}
+              className="w-auto min-w-[160px]"
+              classNames={{
+                trigger: "bg-surface-deep border border-surface-liner rounded-lg hover:bg-surface-liner h-10 min-h-10",
+                value: "text-surface-light",
+                popoverContent: "bg-surface-deep border-surface-liner",
+              }}
+            >
+              <SelectItem key="all" className={callZoneFilter.has('all') ? 'font-semibold' : ''}>
+                {t('All Calls')}
+              </SelectItem>
+              <>
+                {dispatchZones.map((zone) => (
+                  <SelectItem key={zone.id} className={callZoneFilter.has('all') ? 'opacity-50' : ''}>
+                    {zone.name}
+                  </SelectItem>
+                ))}
+              </>
+            </Select>
+          ) : (
+            <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
+          )}
           <div className="flex items-center gap-1.5">
             <CallSortButton large />
             <Tooltip content={t('Add Call')} placement="top">
@@ -4452,23 +4585,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
                           aria-pressed={selectedRightTab === 'calls'}
                         >
-                          {dispatchZones.length > 0 ? t('All Calls') : t('Calls')} ({activeCallsCount})
+                          {dispatchZones.length > 0 ? callZoneFilterLabel : t('Calls')} ({getActiveCallsForZoneSelection(callZoneFilter).length})
                         </button>
-
-                        {dispatchZones.map((zone) => {
-                          const zoneTabKey = `zone:${zone.id}`;
-                          return (
-                            <button
-                              key={zoneTabKey}
-                              type="button"
-                              onClick={() => setSelectedRightTab(zoneTabKey)}
-                              className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === zoneTabKey ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
-                              aria-pressed={selectedRightTab === zoneTabKey}
-                            >
-                              {zone.name} {t('Calls')} ({getZoneActiveCalls(zone.id).length})
-                            </button>
-                          );
-                        })}
 
                         {clinics.map((clinic) => (
                           <button
@@ -4504,20 +4622,24 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                       />
                     </div>
 
-                    {selectedRightTab === 'calls' && !isMobile && (
+                    {selectedRightTab === 'calls' && !isMobile && (() => {
+                      const zoneCounts = getInsightCountsForZoneSelection(callZoneFilter);
+                      const isAllCalls = callZoneFilter.has('all');
+                      return (
                       <div className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 flex flex-col flex-1 min-h-0">
                         <div className="shrink-0 flex flex-col gap-2 pb-1">
                           <div className="flex items-center justify-between py-1">
                             <TrackingInsightsRow
                               items={[
-                                { key: 'total', label: t('Total Calls Logged'), count: event.calls?.length || 0 },
-                                { key: 'active', label: t('Active'), count: activeCallsCount },
-                                { key: 'pending', label: t('Pending'), count: pendingCallsCount, colorClass: 'text-surface-light' },
-                                { key: 'onScene', label: t('On Scene'), count: onSceneCallsCount, colorClass: 'text-status-red' },
-                                { key: 'transporting', label: t('Transporting'), count: transportingCallsCount, colorClass: 'text-status-red' },
+                                { key: 'total', label: t('Total Calls Logged'), count: zoneCounts.total },
+                                { key: 'active', label: t('Active'), count: zoneCounts.active },
+                                { key: 'pending', label: t('Pending'), count: zoneCounts.pending, colorClass: 'text-surface-light' },
+                                { key: 'onScene', label: t('On Scene'), count: zoneCounts.onScene, colorClass: 'text-status-red' },
+                                { key: 'transporting', label: t('Transporting'), count: zoneCounts.transporting, colorClass: 'text-status-red' },
                               ]}
                             />
                             <div className="flex items-center gap-1.5">
+                              {dispatchZones.length > 1 && <CallZoneFilterButton />}
                               <CallSortButton />
                               <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
                                 <div>
@@ -4540,6 +4662,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         <div className="flex-1 min-h-0">
                           <CallTrackingTable
                             event={event}
+                            filterCalls={isAllCalls ? undefined : (call) => getCallZoneIds(call, venueLayers).some(id => callZoneFilter.has(id))}
                             callDisplayNumberMap={callDisplayNumberMap}
                             showResolvedCalls={showResolvedCalls}
                             setShowResolvedCalls={setShowResolvedCalls}
@@ -4571,84 +4694,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           />
                         </div>
                       </div>
-                    )}
-
-                    {dispatchZones.map((zone) => {
-                      const zoneTabKey = `zone:${zone.id}`;
-                      return selectedRightTab === zoneTabKey && !isMobile && (
-                        <div key={zoneTabKey} className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 flex flex-col flex-1 min-h-0">
-                          <div className="shrink-0 flex flex-col gap-2 pb-1">
-                            <div className="flex items-center justify-between py-1">
-                              {(() => {
-                                const zoneCounts = getZoneInsightCounts(zone.id);
-                                return (
-                                  <TrackingInsightsRow
-                                    items={[
-                                      { key: 'total', label: t('Total Calls Logged'), count: zoneCounts.total },
-                                      { key: 'active', label: t('Active'), count: zoneCounts.active },
-                                      { key: 'pending', label: t('Pending'), count: zoneCounts.pending, colorClass: 'text-surface-light' },
-                                      { key: 'onScene', label: t('On Scene'), count: zoneCounts.onScene, colorClass: 'text-status-red' },
-                                      { key: 'transporting', label: t('Transporting'), count: zoneCounts.transporting, colorClass: 'text-status-red' },
-                                    ]}
-                                  />
-                                );
-                              })()}
-                              <div className="flex items-center gap-1.5">
-                                <CallSortButton />
-                                <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
-                                  <div>
-                                    <Button
-                                      size="sm"
-                                      variant="flat"
-                                      className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                                      aria-label={t('Add Call')}
-                                      onPress={() => openAddCallModal()}
-                                    >
-                                      {t('Add Call')}
-                                    </Button>
-                                  </div>
-                                </Tooltip>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex-1 min-h-0">
-                            <CallTrackingTable
-                              event={event}
-                              filterCalls={(call) => getCallZoneIds(call, venueLayers).includes(zone.id)}
-                              callDisplayNumberMap={callDisplayNumberMap}
-                              showResolvedCalls={showResolvedCalls}
-                              setShowResolvedCalls={setShowResolvedCalls}
-                              openCallId={openCallId}
-                              setOpenCallId={setOpenCallId}
-                              editingCell={editingCell}
-                              setEditingCell={setEditingCell}
-                              editValue={editValue}
-                              setEditValue={setEditValue}
-                              teamStatusMap={teamStatusMap}
-                              updateEvent={updateEvent}
-                              handleCellClick={handleCellClick}
-                              handleCellBlur={handleCellBlur}
-                              handleAgeSexBlur={handleAgeSexBlur}
-                              handleRowClick={handleRowClick}
-                              handleMarkDuplicate={handleMarkDuplicate}
-                              handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
-                              handleTogglePin={handleTogglePin}
-                              sortMode={callSortMode}
-                              handleDeleteCall={handleDeleteCall}
-                              handleTeamStatusChange={handleTeamStatusChange}
-                              onTransportToAmbulance={openCallTransportUnitModal}
-                              handleRemoveTeamFromCall={handleRemoveTeamFromCall}
-                              handleAddTeamToCall={handleAddTeamToCall}
-                              handleRevertDetachment={handleRevertDetachment}
-                              getCallRowClass={getCallRowClass}
-                              formatAgeSex={formatAgeSex}
-                              TableColGroup={TableColGroup}
-                            />
-                          </div>
-                        </div>
                       );
-                    })}
+                    })()}
 
                     {clinics.map((clinic) => selectedRightTab === clinic.id && !isMobile && (
                       <div key={clinic.id} className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 flex flex-col flex-1 min-h-0">
@@ -4912,13 +4959,18 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 <div className="space-y-6 pb-20">
                   <div>
                     {(() => {
+                      const mobileZoneFilter = callZoneFilter.has('all')
+                        ? undefined
+                        : (call: Call) => getCallZoneIds(call, venueLayers).some(id => callZoneFilter.has(id));
                       const activeMobileCalls = sortActiveCalls(
                         event.calls
-                          .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status)),
+                          .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status))
+                          .filter((call: Call) => !mobileZoneFilter || mobileZoneFilter(call)),
                         callSortMode
                       );
                       const resolvedMobileCalls = event.calls
                         .filter((c: Call) => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(c.status))
+                        .filter((call: Call) => !mobileZoneFilter || mobileZoneFilter(call))
                         .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
                       return (
                         <>
