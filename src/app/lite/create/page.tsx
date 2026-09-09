@@ -10,6 +10,7 @@ import LoadingScreen from '@/components/ui/loading-screen';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { scheduleTimesToWindow, formatTimeValue, parseTimeValue } from '@/lib/scheduleUtils';
 import { syncClinicsFromVenue } from '@/lib/clinics';
+import { syncDispatchZonesFromVenue } from '@/lib/zones';
 import { stripUndefined } from '@/lib/utils';
 import MetadataSection from '@/components/event-create/MetadataSection';
 import TeamStaffingSection from '@/components/event-create/TeamStaffingSection';
@@ -506,6 +507,7 @@ function LiteCreateContent() {
       status: 'active',
       updatedAt: new Date().toISOString(),
       clinics: syncClinicsFromVenue(eventDraft.venue, eventDraft.clinics),
+      dispatchZones: syncDispatchZonesFromVenue(eventDraft.venue, eventDraft.dispatchZones),
     };
 
     await saveLiteEvent(stripUndefined(finalized));

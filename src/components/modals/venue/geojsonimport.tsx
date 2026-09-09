@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { AlertTriangle, MapPin, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, MapPin, Shapes, Trash2, Upload } from "lucide-react";
 import {
   Modal,
   ModalContent,
@@ -13,13 +13,20 @@ import {
   Button,
   Input,
 } from "@heroui/react";
-import type { GeoBounds, Post } from "@/app/types";
-import { geoJsonToPosts, isGeoJsonFeatureCollection } from "@/lib/markerUtils";
+import type { GeoBounds, Post, Zone } from "@/app/types";
+import {
+  deriveGeoBounds,
+  geoJsonToPosts,
+  geoJsonToZones,
+  isGeoJsonFeatureCollection,
+  mergeFeatureCollections,
+  type GeoJsonFeatureCollection,
+} from "@/lib/markerUtils";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (name: string, imageFile: File, posts: Post[], geoBounds: GeoBounds) => void;
+  onSubmit: (name: string, imageFile: File, posts: Post[], zones: Zone[], geoBounds: GeoBounds) => void;
 };
 
 type CoordinatedPost = { name: string; x: number; y: number };
@@ -32,14 +39,22 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
   const [name, setName] = React.useState("");
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(null);
-  const [geoJsonFile, setGeoJsonFile] = React.useState<File | null>(null);
-  const [parsedPosts, setParsedPosts] = React.useState<Post[] | null>(null);
-  const [parsedBounds, setParsedBounds] = React.useState<GeoBounds | null>(null);
-  const [skippedCount, setSkippedCount] = React.useState(0);
+
+  // Points and polygon zones are two independent, optional GeoJSON files —
+  // ArcGIS (and most GIS tools) export one geometry type per layer, so a
+  // "venue map" export is typically a point layer and a polygon layer as
+  // separate files. Either can be omitted; a single combined FeatureCollection
+  // (mixed Point + Polygon features) also works by uploading it as either file.
+  const [pointsFile, setPointsFile] = React.useState<File | null>(null);
+  const [pointsCollection, setPointsCollection] = React.useState<GeoJsonFeatureCollection | null>(null);
+  const [zonesFile, setZonesFile] = React.useState<File | null>(null);
+  const [zonesCollection, setZonesCollection] = React.useState<GeoJsonFeatureCollection | null>(null);
+
   const [parseError, setParseError] = React.useState<string | null>(null);
 
   const imageInputRef = React.useRef<HTMLInputElement>(null);
-  const geoJsonInputRef = React.useRef<HTMLInputElement>(null);
+  const pointsInputRef = React.useRef<HTMLInputElement>(null);
+  const zonesInputRef = React.useRef<HTMLInputElement>(null);
 
   const inputClassNames = {
     label: "text-surface-light mb-1",
@@ -58,32 +73,60 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
 
-  const handleGeoJsonFile = async (file: File | null) => {
-    setGeoJsonFile(file);
-    setParsedPosts(null);
-    setParsedBounds(null);
-    setSkippedCount(0);
-    setParseError(null);
+  // A single shared bounds is derived across both files (rather than each
+  // computing its own) so points and zones from separate exports land in
+  // the same geographic frame instead of drifting apart on the image.
+  const geoBounds = React.useMemo(() => {
+    if (!pointsCollection && !zonesCollection) return null;
+    return deriveGeoBounds(mergeFeatureCollections([pointsCollection, zonesCollection]));
+  }, [pointsCollection, zonesCollection]);
 
-    if (!file) return;
-
+  const { posts: parsedPosts, skipped: skippedPosts } = React.useMemo(() => {
+    if (!pointsCollection || !geoBounds) return { posts: [] as Post[], skipped: 0 };
     try {
-      const text = await file.text();
-      const json = JSON.parse(text);
-      if (!isGeoJsonFeatureCollection(json)) {
-        setParseError("File is not a valid GeoJSON FeatureCollection");
-        return;
-      }
-      const { posts, geoBounds, skipped } = geoJsonToPosts(json);
-      if (posts.length === 0) {
-        setParseError(
-          "No usable point features found — each needs a name and Point geometry"
-        );
-        return;
-      }
-      setParsedPosts(posts);
-      setParsedBounds(geoBounds);
-      setSkippedCount(skipped);
+      return geoJsonToPosts(pointsCollection, geoBounds);
+    } catch {
+      return { posts: [] as Post[], skipped: 0 };
+    }
+  }, [pointsCollection, geoBounds]);
+
+  const { zones: parsedZones, skipped: skippedZones } = React.useMemo(() => {
+    if (!zonesCollection || !geoBounds) return { zones: [] as Zone[], skipped: 0 };
+    try {
+      return geoJsonToZones(zonesCollection, geoBounds);
+    } catch {
+      return { zones: [] as Zone[], skipped: 0 };
+    }
+  }, [zonesCollection, geoBounds]);
+
+  const parseGeoJsonFile = async (file: File): Promise<GeoJsonFeatureCollection> => {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    if (!isGeoJsonFeatureCollection(json)) {
+      throw new Error("File is not a valid GeoJSON FeatureCollection");
+    }
+    return json;
+  };
+
+  const handlePointsFile = async (file: File | null) => {
+    setPointsFile(file);
+    setPointsCollection(null);
+    setParseError(null);
+    if (!file) return;
+    try {
+      setPointsCollection(await parseGeoJsonFile(file));
+    } catch (error) {
+      setParseError(error instanceof Error ? error.message : "Failed to parse GeoJSON file");
+    }
+  };
+
+  const handleZonesFile = async (file: File | null) => {
+    setZonesFile(file);
+    setZonesCollection(null);
+    setParseError(null);
+    if (!file) return;
+    try {
+      setZonesCollection(await parseGeoJsonFile(file));
     } catch (error) {
       setParseError(error instanceof Error ? error.message : "Failed to parse GeoJSON file");
     }
@@ -92,10 +135,10 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
   const reset = () => {
     setName("");
     setImageFile(null);
-    setGeoJsonFile(null);
-    setParsedPosts(null);
-    setParsedBounds(null);
-    setSkippedCount(0);
+    setPointsFile(null);
+    setPointsCollection(null);
+    setZonesFile(null);
+    setZonesCollection(null);
     setParseError(null);
   };
 
@@ -104,14 +147,15 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
     reset();
   };
 
+  const canSubmit = !!name.trim() && !!imageFile && !!geoBounds && (parsedPosts.length > 0 || parsedZones.length > 0);
+
   const handleSubmit = () => {
-    if (!name.trim() || !imageFile || !parsedPosts || !parsedBounds) return;
-    onSubmit(name.trim(), imageFile, parsedPosts, parsedBounds);
+    if (!name.trim() || !imageFile || !geoBounds) return;
+    if (parsedPosts.length === 0 && parsedZones.length === 0) return;
+    onSubmit(name.trim(), imageFile, parsedPosts, parsedZones, geoBounds);
     onClose();
     reset();
   };
-
-  const canSubmit = !!name.trim() && !!imageFile && !!parsedPosts && !!parsedBounds;
 
   return (
     <Modal
@@ -158,15 +202,23 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
                 onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
               />
               <input
-                ref={geoJsonInputRef}
+                ref={pointsInputRef}
                 type="file"
                 accept=".geojson,.json,application/geo+json,application/json"
                 className="hidden"
-                data-testid="geojson-import-file-input"
-                onChange={(e) => handleGeoJsonFile(e.target.files?.[0] ?? null)}
+                data-testid="geojson-import-points-input"
+                onChange={(e) => handlePointsFile(e.target.files?.[0] ?? null)}
+              />
+              <input
+                ref={zonesInputRef}
+                type="file"
+                accept=".geojson,.json,application/geo+json,application/json"
+                className="hidden"
+                data-testid="geojson-import-zones-input"
+                onChange={(e) => handleZonesFile(e.target.files?.[0] ?? null)}
               />
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-surface-light">
                     Background Image
@@ -199,17 +251,17 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-surface-light">
-                    GeoJSON Points
+                    Points (.geojson)
                   </label>
-                  {geoJsonFile ? (
+                  {pointsFile ? (
                     <div className="flex items-center gap-2 rounded-xl border border-default bg-surface-deep p-2">
                       <MapPin className="ml-2 h-5 w-5 flex-shrink-0 text-accent" />
-                      <span className="truncate text-sm text-surface-light">{geoJsonFile.name}</span>
+                      <span className="truncate text-sm text-surface-light">{pointsFile.name}</span>
                       <Button
                         size="sm"
                         variant="light"
                         color="danger"
-                        onPress={() => handleGeoJsonFile(null)}
+                        onPress={() => handlePointsFile(null)}
                         className="ml-auto h-10 w-10 min-w-10"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -218,15 +270,51 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
                   ) : (
                     <button
                       type="button"
-                      onClick={() => geoJsonInputRef.current?.click()}
+                      onClick={() => pointsInputRef.current?.click()}
                       className="flex h-24 w-full flex-col items-center justify-center gap-2 rounded-xl border border-default text-surface-light/70 transition hover:border-status-blue/50 hover:text-status-blue"
                     >
                       <MapPin className="h-8 w-8" />
-                      <p className="text-xs font-medium">.geojson file</p>
+                      <p className="text-xs font-medium">Point features</p>
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-surface-light">
+                    Areas (.geojson)
+                  </label>
+                  {zonesFile ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-default bg-surface-deep p-2">
+                      <Shapes className="ml-2 h-5 w-5 flex-shrink-0 text-accent" />
+                      <span className="truncate text-sm text-surface-light">{zonesFile.name}</span>
+                      <Button
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        onPress={() => handleZonesFile(null)}
+                        className="ml-auto h-10 w-10 min-w-10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => zonesInputRef.current?.click()}
+                      className="flex h-24 w-full flex-col items-center justify-center gap-2 rounded-xl border border-default text-surface-light/70 transition hover:border-status-blue/50 hover:text-status-blue"
+                    >
+                      <Shapes className="h-8 w-8" />
+                      <p className="text-xs font-medium">Polygon features</p>
                     </button>
                   )}
                 </div>
               </div>
+
+              <p className="text-xs text-surface-light/50">
+                A single combined GeoJSON file (mixed point + polygon features) also works, uploaded as
+                either Points or Areas. See <code>docs/examples/venue-map-import.geojson</code> for the
+                expected attribute fields per geometry type.
+              </p>
 
               {parseError && (
                 <div className="flex items-start gap-2 rounded-xl border border-status-red/40 bg-status-red/10 px-3 py-2 text-xs text-status-red">
@@ -235,13 +323,21 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
                 </div>
               )}
 
-              {parsedPosts && parsedBounds && (
+              {(pointsCollection || zonesCollection) && !geoBounds && (
+                <div className="flex items-start gap-2 rounded-xl border border-status-red/40 bg-status-red/10 px-3 py-2 text-xs text-status-red">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>Could not determine geographic bounds. The file(s) have no bbox and no usable features.</span>
+                </div>
+              )}
+
+              {geoBounds && (parsedPosts.length > 0 || parsedZones.length > 0) && (
                 <div className="space-y-2">
                   <p className="text-xs text-surface-light/70">
                     {parsedPosts.length} point{parsedPosts.length === 1 ? "" : "s"} placed
-                    {skippedCount > 0
-                      ? ` · ${skippedCount} skipped (missing name or not a point)`
-                      : ""}
+                    {skippedPosts > 0 ? ` · ${skippedPosts} point feature${skippedPosts === 1 ? "" : "s"} skipped` : ""}
+                    {" · "}
+                    {parsedZones.length} area{parsedZones.length === 1 ? "" : "s"} placed
+                    {skippedZones > 0 ? ` · ${skippedZones} polygon feature${skippedZones === 1 ? "" : "s"} skipped` : ""}
                   </p>
                   {imagePreviewUrl && (
                     <div className="max-h-72 overflow-y-auto rounded-xl border border-default bg-surface-deep">
@@ -255,6 +351,19 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
                           className="block"
                           style={{ display: "block", width: "100%", height: "auto" }}
                         />
+                        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                          {parsedZones.map((zone) => (
+                            <polygon
+                              key={zone.id}
+                              points={zone.points.map((p) => `${p.x},${p.y}`).join(" ")}
+                              fill={zone.color}
+                              fillOpacity={0.28}
+                              stroke={zone.color}
+                              strokeWidth={2}
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          ))}
+                        </svg>
                         <div className="pointer-events-none absolute inset-0">
                           {parsedPosts.filter(isCoordinatedPost).map((post, idx) => (
                             <div
@@ -271,8 +380,8 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
                     </div>
                   )}
                   <p className="text-xs text-surface-light/50">
-                    Check that markers line up with their real locations before importing — if they
-                    look off, the GeoJSON&apos;s bbox likely doesn&apos;t match this image&apos;s extent.
+                    Check that markers and areas line up with their real locations before importing. If
+                    they look off, the GeoJSON&apos;s bbox likely doesn&apos;t match this image&apos;s extent.
                   </p>
                 </div>
               )}

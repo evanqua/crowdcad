@@ -1,0 +1,37 @@
+{
+  "type": "FeatureCollection",
+  "bbox": [-122.4200, 37.7700, -122.4100, 37.7800],
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4150, 37.7750]
+      },
+      "properties": {
+        "name": "Main Aid Station",
+        "isClinic": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-122.4180, 37.7720],
+            [-122.4130, 37.7720],
+            [-122.4130, 37.7760],
+            [-122.4180, 37.7760],
+            [-122.4180, 37.7720]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "Zone 2",
+        "isDispatchZone": true,
+        "color": "#22c55e"
+      }
+    }
+  ]
+}

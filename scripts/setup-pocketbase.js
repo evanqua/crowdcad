@@ -298,6 +298,7 @@ async function main() {
       { name: 'postAssignments', type: 'json' },
       { name: 'interactionSessions', type: 'json' },
       { name: 'clinics', type: 'json' },
+      { name: 'dispatchZones', type: 'json' },
       { name: 'isOrgEvent', type: 'bool' },
       { name: 'ended', type: 'bool' },
       { name: 'endedAt', type: 'number' },
@@ -319,6 +320,8 @@ async function main() {
   // `clinics` on `events` — set for deployments where this collection
   // already existed before the field was added above.
   await ensureField(headers, 'events', { name: 'clinics', type: 'json' });
+  // Same, for `dispatchZones` (map zones support).
+  await ensureField(headers, 'events', { name: 'dispatchZones', type: 'json' });
 
   // `isOrgEvent`/`ended`/`endedAt` on `events` — set for deployments where
   // this collection already existed before these fields were added above.

@@ -12,7 +12,7 @@ import EndEventModal from "@/components/modals/event/endeventmodal";
 import TransportUnitModal from "@/components/modals/event/transportunitmodal";
 import React from 'react';
 import { dbService, ServiceError } from '@/lib/services';
-import { PostAssignment, Event, Staff, Supervisor, Call, EquipmentStatus, CallLogEntry, TeamLogEntry, EquipmentItem, EventEquipment, ClinicOutcome, Clinic, Layer } from '@/app/types';
+import { PostAssignment, Event, Staff, Supervisor, Call, EquipmentStatus, CallLogEntry, TeamLogEntry, EquipmentItem, EventEquipment, ClinicOutcome, Clinic, Layer, DispatchZone } from '@/app/types';
 import { toast, Slide, ToastContainer } from 'react-toastify';
 import { useRouter } from 'next/navigation';
 import isEqual from 'lodash.isequal';
@@ -43,6 +43,7 @@ import LoadingScreen from '@/components/ui/loading-screen';
 import { normalizeLiteDraftToEvent, removeUndefinedDeep, toLiteDraftFromEvent } from '@/lib/liteEventAdapters';
 import { getRowStatusClass } from '@/lib/statusColors';
 import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResolved, RESOLVED_CALL_STATUSES } from '@/lib/clinics';
+import { syncDispatchZonesFromVenue, getEventDispatchZones, getCallZoneIds, getEventVenueLayers } from '@/lib/zones';
 import { withPendingSuffix } from '@/lib/callTiming';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
@@ -2096,6 +2097,15 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     }
   }, [event, updateEvent]);
 
+  // Same lazy backfill/refresh, for dispatch-zone-flagged venue zones.
+  useEffect(() => {
+    if (!event || isEventEnded(event)) return;
+    const synced = syncDispatchZonesFromVenue(event.venue, event.dispatchZones);
+    if (!isEqual(synced, event.dispatchZones || [])) {
+      void updateEvent({ dispatchZones: synced });
+    }
+  }, [event, updateEvent]);
+
   const handleRemoveTeamFromCall = async (callId: string, teamToRemove: string) => {
     if (!event) return;
     
@@ -3517,22 +3527,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   // Layers shown on the Map tab: the venue's own multi-layer array when
   // present, falling back to a single synthetic layer built from the
   // venue's legacy single mapUrl/eventPosts for venues saved before layers
-  // existed. Same derivation the old VenueMapModal render used.
-  const venueLayers: Layer[] = event.venue
-    ? event.venue.layers && event.venue.layers.length
-      ? event.venue.layers
-      : [
-          {
-            id:
-              typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                ? (crypto as unknown as { randomUUID?: () => string }).randomUUID?.() ?? `layer-${Date.now()}`
-                : `layer-${Date.now()}`,
-            name: event.venue.name || 'Main Floor',
-            posts: event.eventPosts || [],
-            mapUrl: event.venue.mapUrl,
-          },
-        ]
-    : [];
+  // existed. Shared with the post-event summary page's zone breakdown via
+  // getEventVenueLayers, so both resolve a call's zone(s) identically.
+  const venueLayers: Layer[] = getEventVenueLayers(event);
 
   // The Map tab only makes sense once an image actually exists to show —
   // a venue with no map uploaded to any layer gets no tab, same rule the
@@ -3567,6 +3564,33 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       totalInClinic: calls.filter(c => !c.outcome).length,
       totalTransported: calls.filter(c => c.outcome === 'Transported').length,
       totalPendingTransport: calls.filter(c => c.outcome === 'Pending Transport').length,
+    };
+  };
+
+  // Dispatch zones, derived from the venue's dispatch-zone-flagged areas —
+  // empty for events with none, unlike clinics there's no single-default
+  // fallback since "All Calls" already covers every call.
+  const dispatchZones: DispatchZone[] = getEventDispatchZones(event.dispatchZones);
+
+  // A call belongs to a zone's tab purely by geometry — whether its
+  // location's post falls inside that zone's polygon on the venue map —
+  // never by a manually assigned field, so redrawing a zone's shape
+  // re-routes existing calls automatically instead of orphaning them.
+  const getZoneCalls = (zoneId: string) =>
+    (event.calls || []).filter(call => getCallZoneIds(call, venueLayers).includes(zoneId));
+
+  const getZoneActiveCalls = (zoneId: string) =>
+    getZoneCalls(zoneId).filter(call => !resolvedCallStatuses.includes(call.status));
+
+  const getZoneInsightCounts = (zoneId: string) => {
+    const zoneCalls = getZoneCalls(zoneId);
+    const zoneActiveCalls = getZoneActiveCalls(zoneId);
+    return {
+      total: zoneCalls.length,
+      active: zoneActiveCalls.length,
+      pending: zoneActiveCalls.filter(call => getCallPrimaryStatus(call) === 'Pending').length,
+      onScene: zoneActiveCalls.filter(call => getCallPrimaryStatus(call) === 'On Scene').length,
+      transporting: zoneActiveCalls.filter(call => getCallPrimaryStatus(call) === 'Transporting').length,
     };
   };
 
@@ -4352,8 +4376,23 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                           className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === 'calls' ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
                           aria-pressed={selectedRightTab === 'calls'}
                         >
-                          {t('Calls')} ({activeCallsCount})
+                          {dispatchZones.length > 0 ? t('All Calls') : t('Calls')} ({activeCallsCount})
                         </button>
+
+                        {dispatchZones.map((zone) => {
+                          const zoneTabKey = `zone:${zone.id}`;
+                          return (
+                            <button
+                              key={zoneTabKey}
+                              type="button"
+                              onClick={() => setSelectedRightTab(zoneTabKey)}
+                              className={`tab-chrome relative h-10 px-4 text-[15px] sm:text-base font-semibold rounded-t-[20px] rounded-b-none transition-colors ${selectedRightTab === zoneTabKey ? "tab-active bg-surface-deep text-surface-light after:content-[''] after:absolute after:left-0 after:right-0 after:top-full after:h-3 after:bg-surface-deep" : 'bg-transparent border-0 text-surface-faint hover:text-surface-light'}`}
+                              aria-pressed={selectedRightTab === zoneTabKey}
+                            >
+                              {zone.name} {t('Calls')} ({getZoneActiveCalls(zone.id).length})
+                            </button>
+                          );
+                        })}
 
                         {clinics.map((clinic) => (
                           <button
@@ -4452,6 +4491,78 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                         </div>
                       </div>
                     )}
+
+                    {dispatchZones.map((zone) => {
+                      const zoneTabKey = `zone:${zone.id}`;
+                      return selectedRightTab === zoneTabKey && !isMobile && (
+                        <div key={zoneTabKey} className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 flex flex-col flex-1 min-h-0">
+                          <div className="shrink-0 flex flex-col gap-2 pb-1">
+                            <div className="flex items-center justify-between py-1">
+                              {(() => {
+                                const zoneCounts = getZoneInsightCounts(zone.id);
+                                return (
+                                  <TrackingInsightsRow
+                                    items={[
+                                      { key: 'total', label: t('Total Calls Logged'), count: zoneCounts.total },
+                                      { key: 'active', label: t('Active'), count: zoneCounts.active },
+                                      { key: 'pending', label: t('Pending'), count: zoneCounts.pending, colorClass: 'text-surface-light' },
+                                      { key: 'onScene', label: t('On Scene'), count: zoneCounts.onScene, colorClass: 'text-status-red' },
+                                      { key: 'transporting', label: t('Transporting'), count: zoneCounts.transporting, colorClass: 'text-status-red' },
+                                    ]}
+                                  />
+                                );
+                              })()}
+                              <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
+                                <div>
+                                  <Button
+                                    size="sm"
+                                    variant="flat"
+                                    className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                    aria-label={t('Add Call')}
+                                    onPress={() => openAddCallModal()}
+                                  >
+                                    {t('Add Call')}
+                                  </Button>
+                                </div>
+                              </Tooltip>
+                            </div>
+                          </div>
+
+                          <div className="flex-1 min-h-0">
+                            <CallTrackingTable
+                              event={event}
+                              filterCalls={(call) => getCallZoneIds(call, venueLayers).includes(zone.id)}
+                              callDisplayNumberMap={callDisplayNumberMap}
+                              showResolvedCalls={showResolvedCalls}
+                              setShowResolvedCalls={setShowResolvedCalls}
+                              openCallId={openCallId}
+                              setOpenCallId={setOpenCallId}
+                              editingCell={editingCell}
+                              setEditingCell={setEditingCell}
+                              editValue={editValue}
+                              setEditValue={setEditValue}
+                              teamStatusMap={teamStatusMap}
+                              updateEvent={updateEvent}
+                              handleCellClick={handleCellClick}
+                              handleCellBlur={handleCellBlur}
+                              handleAgeSexBlur={handleAgeSexBlur}
+                              handleRowClick={handleRowClick}
+                              handleMarkDuplicate={handleMarkDuplicate}
+                              handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
+                              handleDeleteCall={handleDeleteCall}
+                              handleTeamStatusChange={handleTeamStatusChange}
+                              onTransportToAmbulance={openCallTransportUnitModal}
+                              handleRemoveTeamFromCall={handleRemoveTeamFromCall}
+                              handleAddTeamToCall={handleAddTeamToCall}
+                              handleRevertDetachment={handleRevertDetachment}
+                              getCallRowClass={getCallRowClass}
+                              formatAgeSex={formatAgeSex}
+                              TableColGroup={TableColGroup}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
 
                     {clinics.map((clinic) => selectedRightTab === clinic.id && !isMobile && (
                       <div key={clinic.id} className="relative z-10 -mt-px mx-1.5 rounded-lg bg-surface-deep px-2.5 py-2 flex flex-col flex-1 min-h-0">

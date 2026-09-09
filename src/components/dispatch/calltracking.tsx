@@ -40,6 +40,8 @@ type EditableCallField = keyof Call | 'ageSex';
 
 interface CallTrackingTableProps {
   event: Event;
+  /** Restricts which calls this table displays (e.g. a dispatch zone's tab, scoped to calls whose location falls in that zone) — mutations still always operate on the full `event.calls`, only the resolved/active lists rendered below are filtered. Omit to show every call, as "All Calls"/"Calls" does. */
+  filterCalls?: (call: Call) => boolean;
   callDisplayNumberMap: Map<string, number>;
   showResolvedCalls: boolean;
   setShowResolvedCalls: (value: boolean | ((prev: boolean) => boolean)) => void;
@@ -84,6 +86,7 @@ const DETAILS_CLOSE_ANIMATION_MS = 320;
 
 export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   event,
+  filterCalls,
   callDisplayNumberMap,
   showResolvedCalls,
   setShowResolvedCalls,
@@ -165,10 +168,12 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
 
   const resolvedCalls = event.calls
     .filter((call: Call) => resolvedCallStatuses.includes(call.status))
+    .filter((call: Call) => !filterCalls || filterCalls(call))
     .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
 
   const activeCalls = event.calls
     .filter((call: Call) => !resolvedCallStatuses.includes(call.status))
+    .filter((call: Call) => !filterCalls || filterCalls(call))
     .sort((a: Call, b: Call) => parseInt(b.id) - parseInt(a.id));
 
   React.useEffect(() => {

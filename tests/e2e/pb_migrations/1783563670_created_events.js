@@ -193,6 +193,16 @@ migrate((app) => {
         "required": false,
         "system": false,
         "type": "json"
+      },
+      {
+        "hidden": false,
+        "id": "json3078451269",
+        "maxSize": 0,
+        "name": "dispatchZones",
+        "presentable": false,
+        "required": false,
+        "system": false,
+        "type": "json"
       }
     ],
     "id": "pbc_1687431684",

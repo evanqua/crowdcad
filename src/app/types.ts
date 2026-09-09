@@ -15,6 +15,20 @@ export interface Clinic {
   name: string;
 }
 
+/** A polygon area drawn on a venue map layer, e.g. "Zone 2" or "North Field". */
+export interface Zone {
+  id: string; // stable, generated once when the zone is drawn — never reissued on rename/recolor/edit
+  name: string;
+  color: string; // hex, e.g. "#3b82f6"
+  points: { x: number; y: number }[]; // percent-of-image polygon vertices, in order
+  isDispatchZone?: boolean; // when true, gets its own "{name} Calls" tab in the dispatch view
+}
+
+export interface DispatchZone {
+  id: string; // matches a dispatch-zone-flagged Zone.id
+  name: string;
+}
+
 export interface GeoBounds {
   north: number;
   south: number;
@@ -27,6 +41,7 @@ export interface Layer {
   name: string;
   mapUrl?: string;
   posts: Post[];
+  zones?: Zone[];
   geoBounds?: GeoBounds; // present when this layer's mapUrl was georeferenced via a GIS import
 }
 
@@ -66,6 +81,7 @@ export interface Event {
   endedAt?: number;
   postAssignments?: PostAssignment;
   clinics?: Clinic[];
+  dispatchZones?: DispatchZone[];
 
   postingStart?: string | number;
   postingEnd?: string | number;

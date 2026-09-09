@@ -66,6 +66,16 @@ Exporting Logs
 
 - Dispatchers can export event logs and reports for post-event review. Check the admin panel for export options.
 
+Importing a GIS Venue Map
+
+- From a venue's Map step, "Or import a GIS map with pre-placed points and areas" opens the GIS import dialog — an alternative to manually placing markers/areas, for venues whose layout already exists in a GIS tool (e.g. ArcGIS).
+- You provide: a flattened background image (the map picture itself), and one or two GeoJSON files — one for point locations, one for polygon areas. Either file can be omitted if you only have one kind of feature; a single combined GeoJSON file (with both Point and Polygon features) also works, uploaded as either one.
+- ArcGIS (and most GIS tools) typically export one geometry type per layer, so a point layer and a polygon layer usually come out as two separate files — that maps directly onto the dialog's two file inputs.
+- **Point features** need a `name` property (text); an optional `isClinic` boolean marks that location as a clinic, same as checking "Mark as Clinic" when placing a marker by hand.
+- **Polygon features** (or MultiPolygon — only the first polygon's outer ring is used) need a `name` property; optional `isDispatchZone` (boolean) marks it as a dispatch zone, same as checking "Mark as Dispatch Zone" when drawing an area by hand, and optional `color` (a hex string like `"#22c55e"`) sets its map color — omitted, it's auto-assigned.
+- Georeferencing (lining features up correctly on the image) uses the FeatureCollection's `bbox`, or falls back to the min/max extent of the features themselves if no `bbox` is present. If both a points file and a polygons file are uploaded, the same shared bounds is used for both, so they land in a consistent position relative to each other.
+- See `docs/examples/venue-map-import.geojson` for a minimal worked example (one clinic point, one dispatch-zone polygon). The import preview shows points and areas overlaid on the background image before you confirm — check that they line up with their real locations; if they look off, the bbox likely doesn't match the image's extent.
+
 Privacy & Data Handling
 
 - Only collect the minimal information necessary to provide care.
