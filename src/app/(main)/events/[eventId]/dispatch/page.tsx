@@ -3667,21 +3667,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
   };
 
   // Sort control for the Calls list — same circular icon-button treatment as
-  // TeamActionButtonGroup's sort dropdown below, sized identically on
-  // desktop and mobile since both render the same HeroUI size="sm" button.
-  const CallSortButton = () => (
+  // TeamActionButtonGroup's sort dropdown below. On mobile it's sized up
+  // (larger radius + icon) to match how the adjacent Add Call pill also
+  // grows there (its text-base override vs. desktop's smaller default).
+  const CallSortButton = ({ large }: { large?: boolean }) => (
     <Tooltip content={t('Sort calls')} placement="top">
       <div>
         <Dropdown classNames={{ content: 'min-w-[140px] w-[140px] max-w-[140px]' }}>
           <DropdownTrigger>
             <Button
               isIconOnly
-              size="sm"
+              size={large ? 'md' : 'sm'}
               variant="flat"
-              className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+              className={`rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner ${large ? 'h-10 w-10 min-w-10' : ''}`}
               aria-label={t('Sort calls')}
             >
-              <ArrowDownWideNarrow className="h-5 w-5" />
+              <ArrowDownWideNarrow className={large ? 'h-6 w-6' : 'h-5 w-5'} />
             </Button>
           </DropdownTrigger>
           <DropdownMenu aria-label={t('Sort calls')}>
@@ -3918,6 +3919,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         <>
           <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
           <div className="flex items-center gap-1.5">
+            <CallSortButton large />
             <Tooltip content={t('Add Call')} placement="top">
               {/* Same pill treatment as TeamActionButtonGroup (p-1 + a
                   transparent inner button) so this single-button header
@@ -3934,7 +3936,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 </Button>
               </div>
             </Tooltip>
-            <CallSortButton />
           </div>
         </>
       );
@@ -4517,6 +4518,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               ]}
                             />
                             <div className="flex items-center gap-1.5">
+                              <CallSortButton />
                               <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
                                 <div>
                                   <Button
@@ -4531,7 +4533,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                   </Button>
                                 </div>
                               </Tooltip>
-                              <CallSortButton />
                             </div>
                           </div>
                         </div>
@@ -4593,6 +4594,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 );
                               })()}
                               <div className="flex items-center gap-1.5">
+                                <CallSortButton />
                                 <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
                                   <div>
                                     <Button
@@ -4606,7 +4608,6 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                     </Button>
                                   </div>
                                 </Tooltip>
-                                <CallSortButton />
                               </div>
                             </div>
                           </div>
