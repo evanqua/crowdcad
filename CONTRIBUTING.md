@@ -79,6 +79,8 @@ When opening a PR, include:
 
 Small PRs are easier to review. If work is exploratory, prefer opening a draft PR and request feedback.
 
+**If this PR changes the shape of a `venues` or `events` field** (adds/removes/renames a field, or changes what a JSON sub-shape like `Post`, `Layer`, `Call`, `Clinic`, etc. carries), update `docs/ICD.md` to match, including the field's row in the collection's table and its sub-shape entry in §3.7. The ICD is the one place both the app's own contributors and any external integration (e.g. a TAK bridge) go to find the actual data model — a stale ICD after a schema change is a silent trap for the next person who reads it.
+
 ## Testing & quality
 
 - Run linters, type-checking, and the E2E suite before opening a PR:

@@ -7,6 +7,7 @@ import { Event, Call, TeamLogEntry, CallLogEntry, InteractionSession } from '@/a
 import dynamic from 'next/dynamic';
 import { Button } from '@heroui/react';
 import { getScheduleWindow, teamStatusBreakdown, teamAvailabilitySeries, getSurgeIntervals } from '@/lib/analyticsUtils';
+import { getZoneCallSummaries } from '@/lib/zones';
 import { formatLogTimestampForCsv } from '@/lib/csvFormat';
 import { GRID_WRAPPER, GRID_CELL } from './summaryGrid';
 import LoadingScreen from '@/components/ui/loading-screen';
@@ -62,6 +63,8 @@ export default function SummaryPage() {
   }, [event, scheduleWindow.start, scheduleWindow.end, surgeIntervals]);
 
   const interactionSessions = useMemo<InteractionSession[]>(() => event?.interactionSessions || [], [event?.interactionSessions]);
+
+  const zoneCallSummaries = useMemo(() => getZoneCallSummaries(event), [event]);
 
   const interactionTimeline = useMemo(() => interactionSessions.map(session => ({
     sessionId: session.sessionId,
@@ -131,6 +134,11 @@ export default function SummaryPage() {
         const minutes = Math.round((period.endedAt - period.startedAt) / 60000);
         csvRows.push(`Surge,-,${formatTimestamp(period.endedAt)},"Surge deactivated (active for ${minutes} min)"`);
       }
+    });
+
+    // Zone Summary
+    zoneCallSummaries.forEach((zone) => {
+      csvRows.push(`Zone,${zone.zoneName},-,"${zone.totalCalls} calls, ${zone.deliveredToClinic} delivered to clinic, ${zone.transports} transports"`);
     });
 
     return csvRows.join('\n');
@@ -312,6 +320,36 @@ export default function SummaryPage() {
             <div className="text-6xl md:text-7xl font-extrabold leading-none mt-1">{totalTransports}</div>
           </div>
         </div>
+
+        {zoneCallSummaries.length > 0 && (
+          <div className={GRID_CELL}>
+            <div className="px-4 py-3">
+              <span className="font-semibold">Zone Breakdown</span>
+              <div className="text-sm text-surface-faint">{zoneCallSummaries.length} dispatch zone{zoneCallSummaries.length === 1 ? '' : 's'}</div>
+            </div>
+            <div className="px-4 pb-4 space-y-2">
+              {zoneCallSummaries.map((zone) => (
+                <div key={zone.zoneId} className="bg-surface-deepest p-3 flex items-center justify-between">
+                  <span className="font-semibold">{zone.zoneName}</span>
+                  <div className="flex gap-6 text-sm">
+                    <div>
+                      <span className="text-surface-faint">Calls: </span>
+                      <span className="font-semibold">{zone.totalCalls}</span>
+                    </div>
+                    <div>
+                      <span className="text-surface-faint">Delivered to Clinic: </span>
+                      <span className="font-semibold">{zone.deliveredToClinic}</span>
+                    </div>
+                    <div>
+                      <span className="text-surface-faint">Transports: </span>
+                      <span className="font-semibold">{zone.transports}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <SummaryCharts
           teamStatusBreakdown={teamBreakdown}

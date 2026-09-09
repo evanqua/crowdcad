@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **Map zones** — the venue builder's Map/Locations step gained an "Add Area" button (next to "Add Markers") for drawing a colored polygon area on the map: click to place vertices (each shown as a colored dot in the area's own color, with the first point ringed once there are enough to close), connect back to that first point (or double-click) to complete the loop, then name it and optionally check "Mark as Dispatch Zone". Areas render beneath post pins everywhere the map does (venue builder, dispatch Map tab, event creation). A dispatch zone gets its own "{name} Calls" tab in the dispatch view, positioned next to "All Calls" and before any clinic tabs (the existing "Calls" tab is renamed to "All Calls" once at least one dispatch zone exists) — a call is routed into a zone's tab automatically based on whether its location falls inside that zone's polygon, so redrawing a zone re-routes existing calls instead of orphaning them. The same zone/location association now feeds a "Zone Breakdown" on the post-event Summary page (and its exported CSV), showing calls/delivered-to-clinic/transports per dispatch zone. The GIS import dialog (Import GIS Map) now accepts an optional second GeoJSON file for polygon areas alongside its existing point-features file, matching how ArcGIS and most GIS tools export one geometry type per layer, with a worked example at `docs/examples/venue-map-import.geojson`.
+
 ---
 
 ## [1.6.0] - 2026-09-07

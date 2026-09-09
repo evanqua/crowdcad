@@ -8,6 +8,7 @@ import { isClinicPost } from '@/lib/clinics';
 import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { getStatusColor } from '@/lib/statusColors';
 import { STATUS_COLORS_HEX } from '@/lib/colorTokens';
+import VenueMapZones from '@/components/venue-management/VenueMapZones';
 
 function StatusTimer({ since }: { since: number }) {
   const [elapsed, setElapsed] = React.useState(0);
@@ -914,6 +915,22 @@ export function VenueMapWithPosts({
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
         />
+        {/* Zone polygons render in their own rect-matched overlay, before
+            (and beneath, via plain DOM order — no explicit z-index needed
+            since post/team/supervisor/equipment markers below all carry
+            their own) every marker layer. */}
+        <div
+          style={{
+            position: 'absolute',
+            left: rect.x,
+            top: rect.y,
+            width: rect.width,
+            height: rect.height,
+            pointerEvents: 'none',
+          }}
+        >
+          <VenueMapZones zones={layers[currentLayer]?.zones || []} opacity={0.2} />
+        </div>
         {shouldRenderMarkers && (
           <>
             {posts.map((post, i) => (

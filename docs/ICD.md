@@ -1,4 +1,4 @@
-> This document reflects CrowdCAD at commit `f321fce7` (branch `main`, 2026-09-07). PocketBase schema and API surface change independently of the app — verify against a live `/api/collections/{name}` response if this looks stale.
+> This document reflects CrowdCAD at commit `ccc0801` (branch `feature/map-zones`, 2026-09-08). PocketBase schema and API surface change independently of the app — verify against a live `/api/collections/{name}` response if this looks stale.
 
 # CrowdCAD Interface Control Document (ICD) — PocketBase Backend
 
@@ -92,7 +92,7 @@ Reusable venue templates: layout, posts, and equipment, independent of any speci
 | `name` | text | Venue name. | No (required) | `"Downtown Stadium"` |
 | `userId` | text | `id` of the `users` record that owns/created the venue. Not a PocketBase relation field — plain text copy of the id. | Yes | `"a1b2c3d4e5f6g7h"` |
 | `equipment` | json — `Equipment[]` | Venue's default equipment inventory. See §3.7. | Yes | `[{"id":"eq1","name":"AED #1","status":"Available"}]` |
-| `layers` | json — `Layer[]` | Named map layers, each with its own posts. See §3.7. | Yes | `[{"id":"l1","name":"Main Map","posts":[...]}]` |
+| `layers` | json — `Layer[]` | Named map layers, each with its own posts and zones. See §3.7. | Yes | `[{"id":"l1","name":"Main Map","posts":[...],"zones":[...]}]` |
 | `posts` | json — `Post[]` | Flat list of posts when the venue has no layers. See §3.7. | Yes | `[{"name":"Gate A","x":12.5,"y":40.0}]` |
 | `mapUrl` | text | URL/path to the venue's base map image. | Yes | `"/files/maps/stadium.png"` |
 | `sharedWith` | json — `string[]` | Email addresses of other users granted access to this venue. | Yes | `["helper@example.org"]` |
@@ -114,6 +114,7 @@ The central planning/dispatch record for a single event: a snapshot of the venue
 | `staff` | json — `Staff[]` | Field teams ("units") working the event. See §3.7. | Yes | `[{"team":"Team 1","status":"Available",...}]` |
 | `supervisor` | json — `Supervisor[]` | Supervisory units. See §3.7. | Yes | `[{"team":"Supervisor 1","status":"Available",...}]` |
 | `calls` | json — `Call[]` | Incidents/calls logged during the event. See §3.7. | Yes | `[{"id":"c1","order":1,"status":"Active",...}]` |
+| `dispatchZones` | json — `DispatchZone[]` | Dispatch zones, one per dispatch-zone-flagged `venue.layers[].zones` entry — each gets its own "{name} Calls" tab in the dispatch view. See §3.7. | Yes | `[{"id":"z1","name":"Zone 2"}]` |
 | `status` | text | Event lifecycle state. Observed values: `"draft"`, `"active"`. | Yes | `"active"` |
 | `eventPosts` | json — `Post[]` | Posts as configured for this specific event (may diverge from the venue template). See §3.7. | Yes | `[{"name":"Gate A","x":12.5,"y":40.0}]` |
 | `eventEquipment` | json — `EventEquipment[]` | Equipment inventory for this event. See §3.7. | Yes | `[{"id":"eq1","name":"AED #1","status":"Available","locationId":"Gate A"}]` |
@@ -167,9 +168,20 @@ PocketBase stores these as opaque `json` fields with no server-side schema; the 
 | `isClinic` | bool (optional) | Marks this post as a clinic. |
 | `clinicId` | string (optional) | Stable id, generated once when `isClinic` first becomes true. Survives the post being renamed later; used to match this post against `events.clinics` entries. |
 
-**`Layer`**: `id`, `name`, `mapUrl?`, `posts: Post[]`.
+**`Layer`**: `id`, `name`, `mapUrl?`, `posts: Post[]`, `zones?: Zone[]`, `geoBounds?` (present when the layer's `mapUrl` was georeferenced via a GIS import).
 
 **`Clinic`**: `id` (matches a clinic-flagged `Post.clinicId`), `name` (kept in sync with that post's current name). `events.clinics: Clinic[]` is populated additively from the event's `venue.posts` — see `src/lib/clinics.ts`'s `syncClinicsFromVenue`.
+
+**`Zone`** — a polygon area drawn on a venue map layer (e.g. "Zone 2"):
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Stable id, generated once when the zone is drawn — never reissued on rename/recolor/edit. |
+| `name` | string | Zone name. |
+| `color` | string | Hex color used to render the polygon, e.g. `"#3b82f6"`. |
+| `points` | `{x,y}[]` | Polygon vertices, in order, each a percentage of map width/height (same coordinate system as `Post.x`/`Post.y`). |
+| `isDispatchZone` | bool (optional) | Marks this zone as a dispatch zone — gets its own "{name} Calls" tab in the dispatch view. |
+
+**`DispatchZone`**: `id` (matches a dispatch-zone-flagged `Zone.id`), `name` (kept in sync with that zone's current name). `events.dispatchZones: DispatchZone[]` is populated additively from the event's `venue.layers[].zones` — see `src/lib/zones.ts`'s `syncDispatchZonesFromVenue`. A call is routed into a dispatch zone's tab purely by geometry — whether `call.location` names a post whose coordinates fall inside that zone's polygon (`src/lib/zones.ts`'s `findZonesForPost`/`getCallZoneIds`) — there is no `zoneId` field on `Call` itself.
 
 **`Equipment`** (venue-level): `id`, `name`, `status` (free-text status string), `assignedTeam?`, `location?`.
 
@@ -218,7 +230,7 @@ PocketBase stores these as opaque `json` fields with no server-side schema; the 
 
 `isOrgEvent`, `ended`, and `endedAt` **are** schema-backed `events` fields (§3.3) — unlike the list above, they are not Firebase-only leftovers; PocketBase persists them.
 
-`clinics` **is** a schema-backed `json` field on `events` (added alongside multi-clinic support) — it does persist on PocketBase.
+`clinics` **is** a schema-backed `json` field on `events` (added alongside multi-clinic support) — it does persist on PocketBase. Same for `dispatchZones` (added alongside map zones support).
 
 ## 5. Notes
 

@@ -8,6 +8,7 @@ import { Button, Card, ScrollShadow } from '@heroui/react';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { syncClinicsFromVenue } from '@/lib/clinics';
+import { syncDispatchZonesFromVenue } from '@/lib/zones';
 import MapZoomControls from '@/components/ui/map-zoom-controls';
 import { useScheduleGeneration } from '@/hooks/useScheduleGeneration';
 import { scheduleTimesToWindow, formatTimeValue } from '@/lib/scheduleUtils';
@@ -378,6 +379,8 @@ export default function EventCreation() {
 
       // Populate clinics from venue-designated clinic posts right before save.
       const computedClinics = syncClinicsFromVenue(eventData.venue, eventData.clinics);
+      // Same, for venue-designated dispatch zones.
+      const computedDispatchZones = syncDispatchZonesFromVenue(eventData.venue, eventData.dispatchZones);
 
       let eventDocId = eventId;
       if (eventDocId) {
@@ -388,6 +391,7 @@ export default function EventCreation() {
               ...eventData,
               postingTimes: computedTimes.length > 0 ? computedTimes : eventData.postingTimes,
               clinics: computedClinics,
+              dispatchZones: computedDispatchZones,
               userId: user.uid,
               date: dateValue.toISOString(),
               updatedAt: new Date().toISOString(),
@@ -400,6 +404,7 @@ export default function EventCreation() {
               ...eventData,
               postingTimes: computedTimes.length > 0 ? computedTimes : eventData.postingTimes,
               clinics: computedClinics,
+              dispatchZones: computedDispatchZones,
               userId: user.uid,
               date: dateValue.toISOString(),
               createdAt: new Date().toISOString(),
@@ -413,6 +418,7 @@ export default function EventCreation() {
           eventDocId = await dbService.addDocument('events', stripUndefined({
             ...eventData,
             clinics: computedClinics,
+            dispatchZones: computedDispatchZones,
             userId: user.uid,
             date: dateValue.toISOString(),
             createdAt: new Date().toISOString(),
@@ -425,6 +431,7 @@ export default function EventCreation() {
         eventDocId = await dbService.addDocument('events', stripUndefined({
           ...eventData,
           clinics: computedClinics,
+          dispatchZones: computedDispatchZones,
           userId: user.uid,
           date: dateValue.toISOString(),
           createdAt: new Date().toISOString(),
