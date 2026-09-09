@@ -47,7 +47,7 @@ export default function VenueMapZones({
             fill={zone.color}
             fillOpacity={isHover ? opacity + 0.15 : opacity}
             stroke={zone.color}
-            strokeWidth={isHover ? 0.6 : 0.4}
+            strokeWidth={isHover ? 2.5 : 2}
             vectorEffect="non-scaling-stroke"
             style={{ pointerEvents: onZoneClick || onZoneMouseEnter ? 'auto' : 'none', cursor: onZoneClick ? 'pointer' : undefined }}
             onMouseEnter={() => onZoneMouseEnter?.(zone)}

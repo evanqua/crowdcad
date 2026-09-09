@@ -1196,61 +1196,78 @@ export default function VenueManagementPageClient() {
               onZoneMouseLeave={() => setHoverZoneId(null)}
             />
             {pendingZone && pendingZone.points.length > 0 && (
-              <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ pointerEvents: 'none' }}>
-                {pendingZone.points.length >= 2 && (
-                  <polyline
-                    points={pendingZone.points.map((p) => `${p.x},${p.y}`).join(' ') + (!pendingZone.isDrawing ? ` ${pendingZone.points[0].x},${pendingZone.points[0].y}` : '')}
-                    fill={pendingZone.isDrawing ? 'none' : (zoneColorInput || '#3b82f6')}
-                    fillOpacity={0.25}
-                    stroke={zoneColorInput || '#3b82f6'}
-                    strokeWidth={0.5}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                )}
-                {/* Dashed guide from the last placed point back to the first: this is the connection still missing before the area registers. */}
-                {pendingZone.isDrawing && pendingZone.points.length >= 2 && (
-                  <line
-                    x1={pendingZone.points[pendingZone.points.length - 1].x}
-                    y1={pendingZone.points[pendingZone.points.length - 1].y}
-                    x2={pendingZone.points[0].x}
-                    y2={pendingZone.points[0].y}
-                    stroke={zoneColorInput || '#3b82f6'}
-                    strokeOpacity={0.5}
-                    strokeDasharray="1.2"
-                    strokeWidth={0.4}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                )}
-                {pendingZone.points.map((p, i) => {
-                  const isFirst = i === 0;
-                  const canClose = isFirst && pendingZone.isDrawing && pendingZone.points.length >= 3;
-                  return (
-                    <g key={i}>
-                      {canClose && (
-                        <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r={1.4}
-                          fill="none"
-                          stroke={zoneColorInput || '#3b82f6'}
-                          strokeOpacity={0.6}
-                          strokeWidth={0.3}
-                          vectorEffect="non-scaling-stroke"
+              <>
+                {/* Lines/fill only: an SVG stretched to the image's own (usually
+                    non-square) aspect ratio is the right way to draw these, since
+                    it's the same percent-of-image space the points were captured
+                    in. A <circle> in that same stretched space would come out
+                    elliptical, not round, which is why the point dots below are
+                    plain HTML circles instead. */}
+                <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ pointerEvents: 'none' }}>
+                  {pendingZone.points.length >= 2 && (
+                    <polyline
+                      points={pendingZone.points.map((p) => `${p.x},${p.y}`).join(' ') + (!pendingZone.isDrawing ? ` ${pendingZone.points[0].x},${pendingZone.points[0].y}` : '')}
+                      fill={pendingZone.isDrawing ? 'none' : (zoneColorInput || '#3b82f6')}
+                      fillOpacity={0.25}
+                      stroke={zoneColorInput || '#3b82f6'}
+                      strokeWidth={2}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {/* Dashed guide from the last placed point back to the first: this is the connection still missing before the area registers. */}
+                  {pendingZone.isDrawing && pendingZone.points.length >= 2 && (
+                    <line
+                      x1={pendingZone.points[pendingZone.points.length - 1].x}
+                      y1={pendingZone.points[pendingZone.points.length - 1].y}
+                      x2={pendingZone.points[0].x}
+                      y2={pendingZone.points[0].y}
+                      stroke={zoneColorInput || '#3b82f6'}
+                      strokeOpacity={0.6}
+                      strokeDasharray="3"
+                      strokeWidth={1.5}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                </svg>
+                {/* Point dots: plain HTML circles positioned by percent (like
+                    VenueMapMarker's pins), sized in real pixels so they stay
+                    round no matter how the underlying image is stretched. */}
+                <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
+                  {pendingZone.points.map((p, i) => {
+                    const isFirst = i === 0;
+                    const canClose = isFirst && pendingZone.isDrawing && pendingZone.points.length >= 3;
+                    return (
+                      <div key={i} style={{ position: 'absolute', left: `${p.x}%`, top: `${p.y}%`, transform: 'translate(-50%, -50%)' }}>
+                        {canClose && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: '50%',
+                              top: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              width: 28,
+                              height: 28,
+                              borderRadius: '9999px',
+                              border: `2px solid ${zoneColorInput || '#3b82f6'}`,
+                              opacity: 0.7,
+                            }}
+                          />
+                        )}
+                        <div
+                          style={{
+                            width: isFirst ? 16 : 12,
+                            height: isFirst ? 16 : 12,
+                            borderRadius: '9999px',
+                            backgroundColor: zoneColorInput || '#3b82f6',
+                            border: '2px solid white',
+                            boxShadow: '0 1px 3px rgb(0 0 0 / 0.6)',
+                          }}
                         />
-                      )}
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={isFirst ? 0.8 : 0.6}
-                        fill={zoneColorInput || '#3b82f6'}
-                        stroke="white"
-                        strokeWidth={0.2}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    </g>
-                  );
-                })}
-              </svg>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
             <div className="absolute inset-0 pointer-events-none">
               <div className="relative w-full h-full pointer-events-auto">

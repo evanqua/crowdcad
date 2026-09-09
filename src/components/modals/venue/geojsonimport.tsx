@@ -359,7 +359,7 @@ export default function GeoJsonImportModal({ isOpen, onClose, onSubmit }: Props)
                               fill={zone.color}
                               fillOpacity={0.28}
                               stroke={zone.color}
-                              strokeWidth={0.4}
+                              strokeWidth={2}
                               vectorEffect="non-scaling-stroke"
                             />
                           ))}
