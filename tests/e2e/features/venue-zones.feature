@@ -15,12 +15,12 @@ Feature: Venue map zones (dispatch areas)
     And I draw a triangular area on the venue map
     And I name the area "Storage"
     And I go to the "Locations" venue step
-    Then I should see the text "Storage"
+    Then I should see the area "Storage" in the areas list
 
   Scenario: Marking an area as a dispatch zone
     When I enable Add Area mode
     And I draw a triangular area on the venue map
     And I name the area "Zone 2" and mark it a dispatch zone
     And I go to the "Locations" venue step
-    Then I should see the text "Zone 2"
-    And I should see the text "Dispatch Zone"
+    Then I should see the area "Zone 2" in the areas list
+    And the area "Zone 2" should be marked as a dispatch zone
