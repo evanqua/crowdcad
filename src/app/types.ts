@@ -177,6 +177,8 @@ export interface Call {
   age?: string;
   gender?: string;
   priority?: boolean;
+  /** Pins this call to the top of its list (below Priority calls). Never logged, and cleared automatically once the call resolves. */
+  pin?: boolean;
   duplicate?: boolean;
   duplicateOf?: string;
   log?: CallLogEntry[];

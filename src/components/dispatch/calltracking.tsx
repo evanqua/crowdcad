@@ -24,6 +24,8 @@ import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { getEventClinics, RESOLVED_CALL_STATUSES, getVenueLocationOptions } from '@/lib/clinics';
 import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { withPendingSuffix } from '@/lib/callTiming';
+import { sortActiveCalls, type CallSortMode } from '@/lib/callSort';
+import CallIndicatorIcons from './callindicatoricons';
 
 import {
   Dropdownmenu,
@@ -59,6 +61,8 @@ interface CallTrackingTableProps {
   handleRowClick: (e: React.MouseEvent, callId: string) => void;
   handleMarkDuplicate: (callId: string) => void;
   handleTogglePriorityFromMenu: (callId: string) => void;
+  handleTogglePin: (callId: string) => void;
+  sortMode: CallSortMode;
   handleDeleteCall: (callId: string) => void;
   handleTeamStatusChange: (callId: string, team: string, newStatus: string, clinicId?: string) => void;
   onTransportToAmbulance: (callId: string, team: string) => void;
@@ -104,6 +108,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
   handleRowClick,
   handleMarkDuplicate,
   handleTogglePriorityFromMenu,
+  handleTogglePin,
+  sortMode,
   handleDeleteCall,
   handleTeamStatusChange,
   onTransportToAmbulance,
@@ -171,10 +177,12 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
     .filter((call: Call) => !filterCalls || filterCalls(call))
     .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
 
-  const activeCalls = event.calls
-    .filter((call: Call) => !resolvedCallStatuses.includes(call.status))
-    .filter((call: Call) => !filterCalls || filterCalls(call))
-    .sort((a: Call, b: Call) => parseInt(b.id) - parseInt(a.id));
+  const activeCalls = sortActiveCalls(
+    event.calls
+      .filter((call: Call) => !resolvedCallStatuses.includes(call.status))
+      .filter((call: Call) => !filterCalls || filterCalls(call)),
+    sortMode
+  );
 
   React.useEffect(() => {
     if (!openMenuToken) return;
@@ -1425,7 +1433,8 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                         </td>
                         {/* Options Ellipsis */}
                         <td className="p-0">
-                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 text-right">
+                          <DispatchMotionCell isOpen={isMotionVisible} animate={isResolvedCall} delayMs={motionDelayMs} className="px-3 py-2.5 flex items-center justify-end gap-1.5">
+                            <CallIndicatorIcons call={call} />
                             <Dropdown
                               motionProps={dropdownMotionProps}
                               placement="bottom-end"
@@ -1472,12 +1481,23 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                                 </DropdownItem>
                                 <DropdownItem
                                   key="priority"
+                                  isDisabled={!!call.clinic}
                                   onPress={() => {
                                     setOpenMenuToken(null);
                                     handleTogglePriorityFromMenu(call.id);
                                   }}
                                 >
                                   {call.priority ? t('Remove Priority') : t('Mark as Priority')}
+                                </DropdownItem>
+                                <DropdownItem
+                                  key="pin"
+                                  isDisabled={isResolvedCall}
+                                  onPress={() => {
+                                    setOpenMenuToken(null);
+                                    handleTogglePin(call.id);
+                                  }}
+                                >
+                                  {call.pin ? t('Unpin Call') : t('Pin Call')}
                                 </DropdownItem>
                                 <DropdownItem
                                   key="delete"
@@ -1564,7 +1584,6 @@ export const CallTrackingTable: React.FC<CallTrackingTableProps> = ({
                         setLogTexts((prev) => ({ ...prev, [call.id]: (prev[call.id] || '') + `\n${hhmm} - ` }));
                       }}
                       onClose={() => setOpenCallId(null)}
-                      priority={call.priority}
                     />
                   )}
                 </React.Fragment>

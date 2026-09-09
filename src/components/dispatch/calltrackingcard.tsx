@@ -26,6 +26,7 @@ import { getEventClinics, isCallResolved, getVenueLocationOptions } from '@/lib/
 import { getEquipmentIconType } from '@/lib/equipmentIcon';
 import { getStatusColor } from '@/lib/statusColors';
 import { useMMSS } from '@/hooks/useMMSS';
+import CallIndicatorIcons from './callindicatoricons';
 
 type CallTrackingCardProps = {
   call: Call;
@@ -41,6 +42,7 @@ type CallTrackingCardProps = {
   handleRevertDetachment: (callId: string, team: string) => void;
   handleMarkDuplicate: (callId: string) => void;
   handleTogglePriority: (callId: string) => void;
+  handleTogglePin: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
   formatAgeSex: (age?: string | number, gender?: string) => string;
   teamStatusMap: { [callId: string]: { [team: string]: string } };
@@ -68,6 +70,7 @@ export default function CallTrackingCard({
   handleRevertDetachment,
   handleMarkDuplicate,
   handleTogglePriority,
+  handleTogglePin,
   handleDeleteCall,
   formatAgeSex,
   teamStatusMap,
@@ -202,6 +205,8 @@ export default function CallTrackingCard({
             {timer}
           </div>
 
+          <CallIndicatorIcons call={call} />
+
           {/* 3-dot menu */}
           <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={6}>
@@ -215,7 +220,7 @@ export default function CallTrackingCard({
                 </button>
               </DropdownTrigger>
               <DropdownMenu aria-label="Call actions">
-                <DropdownItem 
+                <DropdownItem
                   key="showLog"
                   onPress={() => setExpanded(v => !v)}
                 >
@@ -229,9 +234,17 @@ export default function CallTrackingCard({
                 </DropdownItem>
                 <DropdownItem
                   key="priority"
+                  isDisabled={!!call.clinic}
                   onPress={() => handleTogglePriority(call.id)}
                 >
                   {call.priority ? t('Remove Priority') : t('Mark as Priority')}
+                </DropdownItem>
+                <DropdownItem
+                  key="pin"
+                  isDisabled={isResolved}
+                  onPress={() => handleTogglePin(call.id)}
+                >
+                  {call.pin ? t('Unpin Call') : t('Pin Call')}
                 </DropdownItem>
                 <DropdownItem
                   key="delete"
@@ -676,12 +689,6 @@ export default function CallTrackingCard({
             onClick={e => e.stopPropagation()}
             aria-hidden={!expanded}
           >
-            {call.priority && (
-              <div className="bg-status-red text-surface-light p-2 rounded">
-                ⚠️ PRIORITY CALL: Life threat to patient/provider
-              </div>
-            )}
-
             {/* Notes - NO LOG ENTRY */}
             <div className="text-sm text-surface-light">
               <div className="font-semibold mb-1">Notes</div>

@@ -14,6 +14,7 @@ import StatusLabel, { getMenuLabel } from '@/components/dispatch/statuslabel';
 import { useDispatchTerms } from '@/lib/dispatchVocabulary/context';
 import { useMMSS } from '@/hooks/useMMSS';
 import { isClinicCallResolved } from '@/lib/clinics';
+import CallIndicatorIcons from './callindicatoricons';
 
 type ClinicTrackingCardProps = {
   call: Call;
@@ -25,6 +26,7 @@ type ClinicTrackingCardProps = {
   onOutcomeChange: (callId: string, outcome: string) => void;
   onRevertOutcome: (callId: string) => void;
   handleDeleteCall: (callId: string) => void;
+  handleTogglePin: (callId: string) => void;
   formatAgeSex: (age?: string | number, gender?: string) => string;
   updateEvent: (updates: Partial<Event>) => Promise<void>;
 };
@@ -45,6 +47,7 @@ export default function ClinicTrackingCard({
   onOutcomeChange,
   onRevertOutcome,
   handleDeleteCall,
+  handleTogglePin,
   formatAgeSex,
   updateEvent,
 }: ClinicTrackingCardProps) {
@@ -135,6 +138,8 @@ export default function ClinicTrackingCard({
             {timer}
           </div>
 
+          <CallIndicatorIcons call={call} />
+
           {/* 3-dot menu */}
           <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <Dropdown motionProps={dropdownMotionProps} placement="bottom-end" offset={6}>
@@ -148,11 +153,18 @@ export default function ClinicTrackingCard({
                 </button>
               </DropdownTrigger>
               <DropdownMenu aria-label="Call actions">
-                <DropdownItem 
+                <DropdownItem
                   key="showLog"
                   onPress={() => setExpanded(v => !v)}
                 >
                   {expanded ? t('Hide Log') : t('Show Log')}
+                </DropdownItem>
+                <DropdownItem
+                  key="pin"
+                  isDisabled={isResolved}
+                  onPress={() => handleTogglePin(call.id)}
+                >
+                  {call.pin ? t('Unpin Call') : t('Pin Call')}
                 </DropdownItem>
                 <DropdownItem
                   key="delete"
@@ -308,12 +320,6 @@ export default function ClinicTrackingCard({
             onClick={e => e.stopPropagation()}
             aria-hidden={!expanded}
           >
-            {call.priority && (
-              <div className="bg-status-red text-surface-light p-2 rounded">
-                ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
-              </div>
-            )}
-
             {/* Notes - NO LOG ENTRY */}
             <div className="text-sm text-surface-light">
               <div className="font-semibold mb-1">{t('Notes')}</div>

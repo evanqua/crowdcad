@@ -18,7 +18,6 @@ type Props = {
   onLogBlur: () => Promise<void>;
   onLogInsertTimestamp: () => void;
   onClose: () => void;
-  priority?: boolean;
   rowClassName?: string;
 };
 
@@ -35,7 +34,6 @@ export default function CallTrackingDetails({
   onLogBlur,
   onLogInsertTimestamp,
   onClose,
-  priority,
   rowClassName,
 }: Props) {
   const { t } = useDispatchTerms();
@@ -52,12 +50,6 @@ export default function CallTrackingDetails({
           }`}
         >
           <DispatchMotionCell isOpen={isOpen} animate={true} className="cursor-pointer" overflowVisibleWhenOpen>
-            {priority && (
-              <div className="bg-status-red text-surface-light p-2 mb-2 rounded">
-                ⚠️ {t('PRIORITY CALL: Life threat to patient/provider')}
-              </div>
-            )}
-
             <div
               className="mt-0 mb-1.5 text-sm text-surface-light"
               onClick={(e) => e.stopPropagation()}

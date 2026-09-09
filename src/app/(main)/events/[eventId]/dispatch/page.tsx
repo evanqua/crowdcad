@@ -45,6 +45,7 @@ import { getRowStatusClass } from '@/lib/statusColors';
 import { syncClinicsFromVenue, getEventClinics, getClinicName, isClinicCallResolved, RESOLVED_CALL_STATUSES } from '@/lib/clinics';
 import { syncDispatchZonesFromVenue, getEventDispatchZones, getCallZoneIds, getEventVenueLayers } from '@/lib/zones';
 import { withPendingSuffix } from '@/lib/callTiming';
+import { sortActiveCalls, type CallSortMode } from '@/lib/callSort';
 import { useDispatchVocabulary } from '@/hooks/useDispatchVocabulary';
 import { DispatchVocabularyProvider } from '@/lib/dispatchVocabulary/context';
 import { isEventEnded } from '@/lib/eventStatus';
@@ -1513,6 +1514,9 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         assignedTeam: updatedAssignedTeam,
         equipmentTeams: updatedEquipmentTeams,
         detachedTeams: updatedDetachedTeams,
+        // Pin only matters while a call is active — once it resolves, drop it
+        // so it doesn't carry over if the call is ever re-opened as a fresh pin.
+        pin: RESOLVED_CALL_STATUSES.includes(displayStatus) ? false : c.pin,
         ...(newStatus === 'Rolled from Scene' && transportUnitValue ? { transportUnit: transportUnitValue } : {}),
       };
     });
@@ -1855,6 +1859,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         transportUnit: outcome === 'In Clinic' ? undefined : callToUpdate.transportUnit,
         log: [...(callToUpdate.log || []), { timestamp: now.getTime(), message: `${hhmm} - Clinic Status: ${outcome}` }]
       };
+      // Pin only matters while a clinic call is still active/unresolved.
+      updatedCall.pin = isClinicCallResolved(updatedCall) ? false : updatedCall.pin;
       return { calls: current.calls.map(c => c.id === callId ? updatedCall : c) };
     });
   }, [updateEvent]);
@@ -1874,6 +1880,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
         ...callToUpdate,
         outcome: 'Transported' as ClinicOutcome,
         transportUnit: unit || undefined,
+        pin: false, // 'Transported' is always a terminal clinic outcome
         log: [
           ...(callToUpdate.log || []),
           { timestamp: now.getTime(), message: unit ? `${hhmm} - Transferred to ambulance, unit #: ${unit}` : `${hhmm} - Transferred to ambulance` }
@@ -1924,6 +1931,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
 
   const [teamSortMode, setTeamSortMode] = useState<'availability' | 'asc' | 'desc'>('asc');
   const [cardViewMode, setCardViewMode] = useState<'normal' | 'condensed'>('normal');
+  const [callSortMode, setCallSortMode] = useState<CallSortMode>('newest');
 
   const [selectedLeftTab, setSelectedLeftTab] = useState<string>('teams');
   const [selectedRightTab, setSelectedRightTab] = useState<string>('calls');
@@ -2330,6 +2338,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     if (!call) return;
 
     await handleTogglePriority(callId, !call.priority);
+    setContextMenu(null);
+  };
+
+  // Pins/unpins a call — unlike priority, this never adds a log entry, and
+  // gets forced back off automatically once the call resolves (see the
+  // resolve branches in handleTeamStatusChange and the clinic-outcome
+  // handlers below).
+  const handleTogglePin = async (callId: string) => {
+    const call = event?.calls.find(c => c.id === callId);
+    if (!call) return;
+
+    const updatedCalls = event?.calls.map(c =>
+      c.id === callId ? { ...c, pin: !c.pin } : c
+    );
+
+    await updateEvent({ calls: updatedCalls });
     setContextMenu(null);
   };
 
@@ -3616,7 +3640,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     CC:     '11rem',  // Chief Complaint
     AS:     '4rem',   // A/S
     LOC:    '11rem',  // Location
-    ACTION: '3rem',   // Row actions
+    ACTION: '4.5rem', // Row actions (kebab menu + priority/pin indicator icons)
   };
 
   function TableColGroup() {
@@ -3641,6 +3665,52 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
     await updateEvent({ calls: updatedCalls });
     setContextMenu(null);
   };
+
+  // Sort control for the Calls list — same circular icon-button treatment as
+  // TeamActionButtonGroup's sort dropdown below, sized identically on
+  // desktop and mobile since both render the same HeroUI size="sm" button.
+  const CallSortButton = () => (
+    <Tooltip content={t('Sort calls')} placement="top">
+      <div>
+        <Dropdown classNames={{ content: 'min-w-[140px] w-[140px] max-w-[140px]' }}>
+          <DropdownTrigger>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="flat"
+              className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+              aria-label={t('Sort calls')}
+            >
+              <ArrowDownWideNarrow className="h-5 w-5" />
+            </Button>
+          </DropdownTrigger>
+          <DropdownMenu aria-label={t('Sort calls')}>
+            <DropdownItem
+              key="newest"
+              onClick={() => setCallSortMode('newest')}
+              className={callSortMode === 'newest' ? 'bg-surface-liner' : ''}
+            >
+              {t('Newest')}
+            </DropdownItem>
+            <DropdownItem
+              key="oldest"
+              onClick={() => setCallSortMode('oldest')}
+              className={callSortMode === 'oldest' ? 'bg-surface-liner' : ''}
+            >
+              {t('Oldest')}
+            </DropdownItem>
+            <DropdownItem
+              key="pending"
+              onClick={() => setCallSortMode('pending')}
+              className={callSortMode === 'pending' ? 'bg-surface-liner' : ''}
+            >
+              {t('Pending')}
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      </div>
+    </Tooltip>
+  );
 
   const TeamActionButtonGroup = ({
     selectedTab,
@@ -3847,22 +3917,25 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       return (
         <>
           <h2 className="text-xl font-bold text-surface-light">{t('Calls')}</h2>
-          <Tooltip content={t('Add Call')} placement="top">
-            {/* Same pill treatment as TeamActionButtonGroup (p-1 + a
-                transparent inner button) so this single-button header
-                matches that triple-button one in total height. */}
-            <div className="p-1 rounded-full bg-surface-deep border border-surface-liner">
-              <Button
-                size="sm"
-                variant="flat"
-                className="rounded-full bg-transparent hover:bg-surface-liner text-base"
-                aria-label={t('Add Call')}
-                onPress={() => openAddCallModal()}
-              >
-                {t('Add Call')}
-              </Button>
-            </div>
-          </Tooltip>
+          <div className="flex items-center gap-1.5">
+            <Tooltip content={t('Add Call')} placement="top">
+              {/* Same pill treatment as TeamActionButtonGroup (p-1 + a
+                  transparent inner button) so this single-button header
+                  matches that triple-button one in total height. */}
+              <div className="p-1 rounded-full bg-surface-deep border border-surface-liner">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  className="rounded-full bg-transparent hover:bg-surface-liner text-base"
+                  aria-label={t('Add Call')}
+                  onPress={() => openAddCallModal()}
+                >
+                  {t('Add Call')}
+                </Button>
+              </div>
+            </Tooltip>
+            <CallSortButton />
+          </div>
         </>
       );
     }
@@ -3973,6 +4046,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       handleRevertDetachment={handleRevertDetachment}
       handleMarkDuplicate={handleMarkDuplicate}
       handleTogglePriority={handleTogglePriorityFromMenu}
+      handleTogglePin={handleTogglePin}
       handleDeleteCall={handleDeleteCall}
       formatAgeSex={formatAgeSex}
       teamStatusMap={teamStatusMap}
@@ -4036,6 +4110,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
       onOutcomeChange={handleClinicOutcomeChange}
       onRevertOutcome={handleRevertClinicOutcome}
       handleDeleteCall={handleDeleteCall}
+      handleTogglePin={handleTogglePin}
       formatAgeSex={formatAgeSex}
       updateEvent={updateEvent}
     />
@@ -4441,20 +4516,23 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                 { key: 'transporting', label: t('Transporting'), count: transportingCallsCount, colorClass: 'text-status-red' },
                               ]}
                             />
-                            <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
-                              <div>
-                                <Button
-                                  size="sm"
-                                  variant="flat"
-                                  className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                                  aria-label={t('Add Call')}
-                                  data-testid="add-call-button"
-                                  onPress={() => openAddCallModal()}
-                                >
-                                  {t('Add Call')}
-                                </Button>
-                              </div>
-                            </Tooltip>
+                            <div className="flex items-center gap-1.5">
+                              <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
+                                <div>
+                                  <Button
+                                    size="sm"
+                                    variant="flat"
+                                    className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                    aria-label={t('Add Call')}
+                                    data-testid="add-call-button"
+                                    onPress={() => openAddCallModal()}
+                                  >
+                                    {t('Add Call')}
+                                  </Button>
+                                </div>
+                              </Tooltip>
+                              <CallSortButton />
+                            </div>
                           </div>
                         </div>
 
@@ -4478,6 +4556,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             handleRowClick={handleRowClick}
                             handleMarkDuplicate={handleMarkDuplicate}
                             handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
+                            handleTogglePin={handleTogglePin}
+                            sortMode={callSortMode}
                             handleDeleteCall={handleDeleteCall}
                             handleTeamStatusChange={handleTeamStatusChange}
                             onTransportToAmbulance={openCallTransportUnitModal}
@@ -4512,19 +4592,22 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                                   />
                                 );
                               })()}
-                              <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
-                                <div>
-                                  <Button
-                                    size="sm"
-                                    variant="flat"
-                                    className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
-                                    aria-label={t('Add Call')}
-                                    onPress={() => openAddCallModal()}
-                                  >
-                                    {t('Add Call')}
-                                  </Button>
-                                </div>
-                              </Tooltip>
+                              <div className="flex items-center gap-1.5">
+                                <Tooltip content={`${t('Add Call')} (Ctrl+Enter)`} placement="top">
+                                  <div>
+                                    <Button
+                                      size="sm"
+                                      variant="flat"
+                                      className="rounded-full bg-surface-deep border border-surface-liner hover:bg-surface-liner"
+                                      aria-label={t('Add Call')}
+                                      onPress={() => openAddCallModal()}
+                                    >
+                                      {t('Add Call')}
+                                    </Button>
+                                  </div>
+                                </Tooltip>
+                                <CallSortButton />
+                              </div>
                             </div>
                           </div>
 
@@ -4549,6 +4632,8 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                               handleRowClick={handleRowClick}
                               handleMarkDuplicate={handleMarkDuplicate}
                               handleTogglePriorityFromMenu={handleTogglePriorityFromMenu}
+                              handleTogglePin={handleTogglePin}
+                              sortMode={callSortMode}
                               handleDeleteCall={handleDeleteCall}
                               handleTeamStatusChange={handleTeamStatusChange}
                               onTransportToAmbulance={openCallTransportUnitModal}
@@ -4617,6 +4702,7 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                             handleAgeSexBlur={handleAgeSexBlur}
                             onOutcomeChange={handleClinicOutcomeChange}
                             onRevertOutcome={handleRevertClinicOutcome}
+                            handleTogglePin={handleTogglePin}
                             getCallRowClass={getCallRowClass}
                             formatAgeSex={formatAgeSex}
                           />
@@ -4825,9 +4911,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 <div className="space-y-6 pb-20">
                   <div>
                     {(() => {
-                      const activeMobileCalls = event.calls
-                        .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status))
-                        .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
+                      const activeMobileCalls = sortActiveCalls(
+                        event.calls
+                          .filter((call: Call) => !['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(call.status)),
+                        callSortMode
+                      );
                       const resolvedMobileCalls = event.calls
                         .filter((c: Call) => ['Delivered', 'Refusal', 'NMM', 'Rolled', 'Resolved', 'Unable to Locate'].includes(c.status))
                         .sort((a: Call, b: Call) => parseInt(a.id) - parseInt(b.id));
@@ -4871,9 +4959,11 @@ export default function DispatchPage({ params }: DispatchRoutePageProps) {
                 <div className="space-y-6 pb-20">
                   <div>
                     {(() => {
-                      const activeMobileClinicCalls = (event.calls || [])
-                        .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
-                        .sort((a, b) => parseInt(a.id) - parseInt(b.id));
+                      const activeMobileClinicCalls = sortActiveCalls(
+                        (event.calls || [])
+                          .filter(c => c.status === 'Delivered' && !isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId)),
+                        'oldest'
+                      );
                       const resolvedMobileClinicCalls = (event.calls || [])
                         .filter(c => isClinicCallResolved(c) && (clinics.length <= 1 || (c.clinicId ?? clinics[0]?.id) === mobileClinicId))
                         .sort((a, b) => parseInt(a.id) - parseInt(b.id));
