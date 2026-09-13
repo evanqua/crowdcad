@@ -11,6 +11,7 @@ import { getZoneCallSummaries } from '@/lib/zones';
 import { formatLogTimestampForCsv } from '@/lib/csvFormat';
 import { GRID_WRAPPER, GRID_CELL } from './summaryGrid';
 import LoadingScreen from '@/components/ui/loading-screen';
+import ExportLogModal from '@/components/modals/event/exportlogmodal';
 
 const SummaryCharts = dynamic(() => import('./SummaryCharts'), { ssr: false, loading: () => <div className="p-6 bg-surface-deep border border-surface-liner">Loading charts...</div> });
 
@@ -25,6 +26,7 @@ export default function SummaryPage() {
   const [openSurge, setOpenSurge] = useState(false);
   const [event, setEvent]         = useState<Event | null>(null);
   const [openDataCollection, setOpenDataCollection] = useState(false);
+  const [showExportLogModal, setShowExportLogModal] = useState(false);
 
 
   useEffect(() => {
@@ -289,6 +291,14 @@ export default function SummaryPage() {
               >
                 Export Logs
               </Button>
+              <Button
+                onPress={() => setShowExportLogModal(true)}
+                variant="flat"
+                radius="lg"
+                className="px-4 py-2 hover:bg-surface-liner text-surface-light font-semibold"
+              >
+                Export Anonymized Report
+              </Button>
               {totalSessions > 0 && (
                 <Button
                   onPress={handleDataCollectionCSVDownload}
@@ -516,6 +526,7 @@ export default function SummaryPage() {
         </div>
       </div>
       </div>
+      <ExportLogModal isOpen={showExportLogModal} onClose={() => setShowExportLogModal(false)} event={event} />
     </main>
   );
 }
