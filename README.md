@@ -1,14 +1,15 @@
 <br/>
-<br/>
-<img src="public/crowdcad_icon.png" alt="CrowdCAD" width="90" align="left" />
+<img src="public/crowdcad_icon.png" alt="CrowdCAD" width="100" align="left" />
 
-# CrowdCAD
+<svg width="230" height="44" viewBox="0 0 230 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CrowdCAD">
+  <text x="0" y="33" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="currentColor">CrowdCAD</text>
+</svg>
 
 [![CI](https://github.com/evanqua/crowdcad/workflows/CI/badge.svg)](https://github.com/evanqua/crowdcad/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE.md)
 [![Version](https://img.shields.io/badge/version-1.6.0-green.svg)](CHANGELOG.md)
-[![DOI](https://zenodo.org/badge/1169795235.svg)](https://doi.org/10.5281/zenodo.18864888)
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/7detyFE7GM)
+[![DOI](https://zenodo.org/badge/1169795235.svg)](https://doi.org/10.5281/zenodo.18864888)
 
 <br clear="left"/>
 
