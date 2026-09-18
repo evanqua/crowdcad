@@ -1,9 +1,24 @@
+<table border="0" cellspacing="0" cellpadding="0">
+<tr>
+<td width="140" valign="middle">
+<br/>
+<img src="public/crowdcad_icon.png" alt="CrowdCAD" width="120" />
+</td>
+<td valign="middle">
+
 # CrowdCAD
+
+---
 
 [![CI](https://github.com/evanqua/crowdcad/workflows/CI/badge.svg)](https://github.com/evanqua/crowdcad/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE.md)
 [![Version](https://img.shields.io/badge/version-1.6.0-green.svg)](CHANGELOG.md)
 [![DOI](https://zenodo.org/badge/1169795235.svg)](https://doi.org/10.5281/zenodo.18864888)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/7detyFE7GM)
+
+</td>
+</tr>
+</table>
 
 
 CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system for volunteer EMS and event medical teams. Full developer and operational documentation lives in the `docs/` folder and in policy files. The demo with further information can be found at [crowdcad.org](https://crowdcad.org)
@@ -220,6 +235,11 @@ CrowdCAD's mission is to make volunteer event medical services safer and more ef
 - Please fork the repository on GitHub when adopting or modifying CrowdCAD. Forks preserve attribution and make upstream collaboration visible.
 - Star and watch the repo if you use it; forks, stars and PRs are public signals that help discoverability.
 - If you use CrowdCAD for your organization, consider linking back to this repository in your README or site to help others find the project.
+
+#### Stay connected
+
+- **Get release notifications:** [Sign up here](https://forms.gle/XbGvaRhpd8kH9wqFA) to hear about new releases and features. This list is used for release announcements only.
+- **Discord:** [Join the CrowdCAD Discord](https://discord.gg/7detyFE7GM) for feature discussion, help debugging, and coordinating ideas for operational formatting.
 
 #### Support / Contact
 
