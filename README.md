@@ -1,9 +1,17 @@
-# CrowdCAD
+<br/>
+<img src="public/crowdcad_icon.png" alt="CrowdCAD" width="100" align="left" />
+
+<svg width="230" height="44" viewBox="0 0 230 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CrowdCAD">
+  <text x="0" y="33" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="currentColor">CrowdCAD</text>
+</svg>
 
 [![CI](https://github.com/evanqua/crowdcad/workflows/CI/badge.svg)](https://github.com/evanqua/crowdcad/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE.md)
 [![Version](https://img.shields.io/badge/version-1.6.0-green.svg)](CHANGELOG.md)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/7detyFE7GM)
 [![DOI](https://zenodo.org/badge/1169795235.svg)](https://doi.org/10.5281/zenodo.18864888)
+
+<br clear="left"/>
 
 
 CrowdCAD is an open-source, browser-based Computer-Aided Dispatch (CAD) system for volunteer EMS and event medical teams. Full developer and operational documentation lives in the `docs/` folder and in policy files. The demo with further information can be found at [crowdcad.org](https://crowdcad.org)
@@ -220,6 +228,11 @@ CrowdCAD's mission is to make volunteer event medical services safer and more ef
 - Please fork the repository on GitHub when adopting or modifying CrowdCAD. Forks preserve attribution and make upstream collaboration visible.
 - Star and watch the repo if you use it; forks, stars and PRs are public signals that help discoverability.
 - If you use CrowdCAD for your organization, consider linking back to this repository in your README or site to help others find the project.
+
+#### Stay connected
+
+- **Get release notifications:** [Sign up here](https://forms.gle/XbGvaRhpd8kH9wqFA) to hear about new releases and features. This list is used for release announcements only.
+- **Discord:** [Join the CrowdCAD Discord](https://discord.gg/7detyFE7GM) for feature discussion, help debugging, and coordinating ideas for operational formatting.
 
 #### Support / Contact
 
