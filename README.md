@@ -1,9 +1,15 @@
 <br/>
-<img src="public/crowdcad_icon.png" alt="CrowdCAD" width="100" align="left" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/crowdcad_icon.png">
+  <img src="public/crowdcad_icon_dark.png" alt="CrowdCAD" width="120" align="left">
+</picture>
 
-<svg width="230" height="44" viewBox="0 0 230 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CrowdCAD">
-  <text x="0" y="33" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="currentColor">CrowdCAD</text>
-</svg>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/logo_text.png">
+  <img src="public/logo_text_dark.png" alt="CrowdCAD" width="260" style="position: relative; top: 14px;">
+</picture>
+
+<br/>
 
 [![CI](https://github.com/evanqua/crowdcad/workflows/CI/badge.svg)](https://github.com/evanqua/crowdcad/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE.md)
