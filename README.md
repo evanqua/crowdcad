@@ -1,7 +1,7 @@
 <br/>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="public/crowdcad_icon.png">
-  <img src="public/crowdcad_icon_dark.png" alt="CrowdCAD" width="120" align="left">
+  <img src="public/crowdcad_icon_dark.png" alt="CrowdCAD" width="85" align="left">
 </picture>
 
 <picture>
