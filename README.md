@@ -6,7 +6,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="public/logo_text.png">
-  <img src="public/logo_text_dark.png" alt="CrowdCAD" width="260" style="position: relative; top: 14px;">
+  <img src="public/logo_text_dark.png" alt="CrowdCAD" width="260" style="position: relative;">
 </picture>
 
 <br/>
